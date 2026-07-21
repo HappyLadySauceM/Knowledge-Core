@@ -101,6 +101,9 @@ var KNOWLEDGE_COREEnvBindings = map[string]string{
 	"jwt.access-ttl":             "KNOWLEDGE_CORE_JWT_ACCESS_TTL",
 	"jwt.refresh-ttl":            "KNOWLEDGE_CORE_JWT_REFRESH_TTL",
 	"websocket.allowed-origins":  "KNOWLEDGE_CORE_WEBSOCKET_ALLOWED_ORIGINS_JSON",
+	"uploads.dir":                "KNOWLEDGE_CORE_UPLOAD_DIR",
+	"uploads.max-bytes":          "KNOWLEDGE_CORE_UPLOAD_MAX_BYTES",
+	"uploads.public-path":        "KNOWLEDGE_CORE_UPLOAD_PUBLIC_PATH",
 }
 
 // loadViperConfig loads configuration with priority: --config > cwd > ~/basename/.

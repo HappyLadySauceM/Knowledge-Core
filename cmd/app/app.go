@@ -15,6 +15,7 @@ import (
 
 	"github.com/HappyLadySauce/Knowledge-Core/cmd/app/options"
 	"github.com/HappyLadySauce/Knowledge-Core/cmd/app/router"
+	assetsroute "github.com/HappyLadySauce/Knowledge-Core/cmd/app/routes/assets"
 	authroute "github.com/HappyLadySauce/Knowledge-Core/cmd/app/routes/auth"
 	documentroute "github.com/HappyLadySauce/Knowledge-Core/cmd/app/routes/document"
 	taxonomyroute "github.com/HappyLadySauce/Knowledge-Core/cmd/app/routes/taxonomy"
@@ -67,6 +68,7 @@ func run(ctx context.Context, opts *options.Options) error {
 		Redis:           opts.Redis,
 		JWT:             opts.JWT,
 		WebSocket:       opts.WebSocket,
+		Uploads:         opts.Uploads,
 	}
 	config.Init(cfg)
 
@@ -140,6 +142,9 @@ func serve(ctx context.Context, opts *options.Options) error {
 // 在服务上下文就绪后初始化 HTTP 路由处理器。
 func routesInit(ctx context.Context, sc *svc.ServiceContext) error {
 	authroute.Init(ctx, sc)
+	if err := assetsroute.Init(ctx, sc); err != nil {
+		return err
+	}
 	userroute.Init(ctx, sc)
 	taxonomyroute.Init(ctx, sc)
 	if err := documentroute.Init(ctx, sc); err != nil {

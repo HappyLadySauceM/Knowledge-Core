@@ -9,5 +9,6 @@ func (o *Options) Validate() error {
 	err = errors.Join(err, o.Redis.Validate())
 	err = errors.Join(err, o.JWT.Validate())
 	err = errors.Join(err, o.WebSocket.Validate())
+	err = errors.Join(err, o.Uploads.Validate())
 	return err
 }

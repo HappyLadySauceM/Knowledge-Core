@@ -14,6 +14,7 @@ type Config struct {
 	Redis           *options.RedisOptions           `mapstructure:"redis"`
 	JWT             *options.JWTOptions             `mapstructure:"jwt"`
 	WebSocket       *options.WebSocketOptions       `mapstructure:"websocket"`
+	Uploads         *options.UploadOptions          `mapstructure:"uploads"`
 }
 
 var (

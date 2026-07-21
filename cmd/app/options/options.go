@@ -16,6 +16,7 @@ type Options struct {
 	Redis           *options.RedisOptions           `mapstructure:"redis"`
 	JWT             *options.JWTOptions             `mapstructure:"jwt"`
 	WebSocket       *options.WebSocketOptions       `mapstructure:"websocket"`
+	Uploads         *options.UploadOptions          `mapstructure:"uploads"`
 }
 
 func NewOptions(basename string) *Options {
@@ -26,6 +27,7 @@ func NewOptions(basename string) *Options {
 		Redis:           options.NewRedisOptions(),
 		JWT:             options.NewJWTOptions(),
 		WebSocket:       options.NewWebSocketOptions(),
+		Uploads:         options.NewUploadOptions(),
 	}
 }
 
@@ -53,6 +55,9 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) *flag.NamedFlagSets {
 
 	websocketFS := nfs.FlagSet("WebSocket")
 	o.WebSocket.AddFlags(websocketFS)
+
+	uploadsFS := nfs.FlagSet("Uploads")
+	o.Uploads.AddFlags(uploadsFS)
 
 	// Merge all named flag sets into the root command FlagSet.
 	// 将所有命名标志集合并到根命令的 FlagSet。

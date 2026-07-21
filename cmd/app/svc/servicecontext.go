@@ -10,8 +10,10 @@ import (
 	"github.com/redis/go-redis/v9"
 	"k8s.io/klog/v2"
 
+	internalassets "github.com/HappyLadySauce/Knowledge-Core/internal/assets"
 	"github.com/HappyLadySauce/Knowledge-Core/internal/auth"
 	"github.com/HappyLadySauce/Knowledge-Core/internal/config"
+	"github.com/HappyLadySauce/Knowledge-Core/pkg/localstorage"
 )
 
 // ServiceContext wires shared infrastructure for HTTP handlers and background work.
@@ -21,6 +23,7 @@ type ServiceContext struct {
 	DB     *sql.DB
 	Redis  *redis.Client
 	Auth   *auth.Service
+	Assets *internalassets.Service
 }
 
 // NewServiceContext opens PostgreSQL and verifies the required schema.
@@ -41,6 +44,9 @@ func NewServiceContext(ctx context.Context, cfg *config.Config) (*ServiceContext
 	if cfg.WebSocket == nil {
 		return nil, fmt.Errorf("websocket config is nil")
 	}
+	if cfg.Uploads == nil {
+		return nil, fmt.Errorf("uploads config is nil")
+	}
 
 	db, err := openPostgres(ctx, cfg)
 	if err != nil {
@@ -55,11 +61,20 @@ func NewServiceContext(ctx context.Context, cfg *config.Config) (*ServiceContext
 		_ = db.Close()
 		return nil, err
 	}
+	store, err := localstorage.New(cfg.Uploads.Dir)
+	if err != nil {
+		if redisClient != nil {
+			_ = redisClient.Close()
+		}
+		_ = db.Close()
+		return nil, fmt.Errorf("initialize local uploads: %w", err)
+	}
 	return &ServiceContext{
 		Config: cfg,
 		DB:     db,
 		Redis:  redisClient,
 		Auth:   auth.NewService(db, cfg.JWT, redisClient),
+		Assets: internalassets.NewService(db, store, cfg.Uploads),
 	}, nil
 }
 
@@ -109,6 +124,7 @@ func verifySchema(ctx context.Context, db *sql.DB) error {
 	requiredTables := []string{
 		"users", "refresh_tokens", "login_attempts", "documents", "document_blocks",
 		"document_ops", "document_revisions", "categories", "tags", "document_tags",
+		"assets",
 	}
 	for _, table := range requiredTables {
 		var exists bool
