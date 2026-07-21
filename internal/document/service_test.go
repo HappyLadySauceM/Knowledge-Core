@@ -55,6 +55,13 @@ func TestDocumentServiceWritesMarkdownAndIndexesPublishedDocuments(t *testing.T)
 	if publicDetail.Content != "Goroutine and channel examples" || len(publicDetail.Blocks) != 1 {
 		t.Fatalf("unexpected public revision: %+v content=%q", publicDetail.Blocks, publicDetail.Content)
 	}
+	publicBySlug, err := service.GetPublicBySlug(ctx, created.Slug)
+	if err != nil {
+		t.Fatalf("get public document by slug failed: %v", err)
+	}
+	if publicBySlug.ID != created.ID || publicBySlug.Content != created.Content {
+		t.Fatalf("public document by slug = %+v, want id=%d content=%q", publicBySlug, created.ID, created.Content)
+	}
 
 	list, err := service.ListPublic(ctx, ListQuery{Q: "goroutine"})
 	if err != nil {
@@ -62,6 +69,21 @@ func TestDocumentServiceWritesMarkdownAndIndexesPublishedDocuments(t *testing.T)
 	}
 	if list.Total != 1 || len(list.Items) != 1 {
 		t.Fatalf("public list = %+v, want one item", list)
+	}
+	second, err := service.CreateAdmin(ctx, admin, CreateCommand{Title: "Newer Publication", Content: "new body", Status: StatusPublished})
+	if err != nil {
+		t.Fatalf("create second document failed: %v", err)
+	}
+	ordered, err := service.ListPublic(ctx, ListQuery{})
+	if err != nil {
+		t.Fatalf("list ordered public documents failed: %v", err)
+	}
+	if len(ordered.Items) != 2 || ordered.Items[0].ID != second.ID || ordered.Items[1].ID != created.ID {
+		t.Fatalf("public order = %+v, want newer publication first", ordered.Items)
+	}
+	staleVersion := created.CurrentVersion - 1
+	if _, err := service.UpdateAdmin(ctx, admin, created.ID, UpdateCommand{ExpectedVersion: &staleVersion}); !errors.Is(err, apperrors.Conflict) {
+		t.Fatalf("stale update error = %v, want conflict", err)
 	}
 
 	draftStatus := StatusDraft
@@ -78,6 +100,9 @@ func TestDocumentServiceWritesMarkdownAndIndexesPublishedDocuments(t *testing.T)
 
 	if err := service.DeleteAdmin(ctx, admin, created.ID); err != nil {
 		t.Fatalf("delete document failed: %v", err)
+	}
+	if err := service.DeleteAdmin(ctx, admin, second.ID); err != nil {
+		t.Fatalf("delete second document failed: %v", err)
 	}
 	if _, err := service.GetAdmin(ctx, admin, created.ID); !errors.Is(err, apperrors.NotFound) {
 		t.Fatalf("get deleted document error = %v, want not found", err)

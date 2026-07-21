@@ -35,6 +35,7 @@ func Init(ctx context.Context, sc *svc.ServiceContext) error {
 func RegisterRoutes(group *gin.RouterGroup, service internaldocument.DocumentService, sc *svc.ServiceContext) {
 	controller := &Controller{service: service, hub: newCollabHub(), allowedOrigins: sc.Config.WebSocket.AllowedOrigins}
 	group.GET("/documents", controller.ListPublic)
+	group.GET("/documents/slug/:slug", controller.GetPublicBySlug)
 	group.GET("/documents/:id", controller.GetPublic)
 
 	adminGroup := group.Group("/admin", middleware.AuthMiddleware(sc), middleware.RequireAdmin())
@@ -100,6 +101,32 @@ func (h *Controller) GetPublic(c *gin.Context) {
 		return
 	}
 	detail, err := h.service.GetPublic(c.Request.Context(), id)
+	if err != nil {
+		writeServiceError(c, err)
+		return
+	}
+	common.OK(c, toDocumentDetailResponse(detail))
+}
+
+// GetPublicBySlug returns one published document by slug.
+// GetPublicBySlug 根据 slug 返回单篇已发布文档。
+// @Summary Get published document by slug
+// @Description Get a published document by its stable slug.
+// @Tags Documents
+// @Produce json
+// @Param slug path string true "Document slug"
+// @Success 200 {object} common.SwaggerResponse{data=v1.DocumentResponse}
+// @Failure 400 {object} common.SwaggerErrorResponse
+// @Failure 404 {object} common.SwaggerErrorResponse
+// @Failure 500 {object} common.SwaggerErrorResponse
+// @Router /api/v1/documents/slug/{slug} [get]
+func (h *Controller) GetPublicBySlug(c *gin.Context) {
+	slug := c.Param("slug")
+	if slug == "" {
+		common.Error(c, apperrors.InvalidRequest)
+		return
+	}
+	detail, err := h.service.GetPublicBySlug(c.Request.Context(), slug)
 	if err != nil {
 		writeServiceError(c, err)
 		return
@@ -271,17 +298,18 @@ func (h *Controller) UpdateAdmin(c *gin.Context) {
 		blocks = &nextBlocks
 	}
 	detail, err := h.service.UpdateAdmin(c.Request.Context(), actor, id, internaldocument.UpdateCommand{
-		Slug:       req.Slug,
-		Title:      req.Title,
-		Summary:    req.Summary,
-		Content:    req.Content,
-		CategoryID: req.CategoryID,
-		TagIDs:     req.TagIDs,
-		Source:     req.Source,
-		Status:     req.Status,
-		Confidence: req.Confidence,
-		CoverURL:   req.CoverURL,
-		Blocks:     blocks,
+		ExpectedVersion: req.ExpectedVersion,
+		Slug:            req.Slug,
+		Title:           req.Title,
+		Summary:         req.Summary,
+		Content:         req.Content,
+		CategoryID:      req.CategoryID,
+		TagIDs:          req.TagIDs,
+		Source:          req.Source,
+		Status:          req.Status,
+		Confidence:      req.Confidence,
+		CoverURL:        req.CoverURL,
+		Blocks:          blocks,
 	})
 	if err != nil {
 		writeServiceError(c, err)

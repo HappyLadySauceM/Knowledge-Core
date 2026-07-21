@@ -102,17 +102,18 @@ type CreateDocumentRequest struct {
 }
 
 type UpdateDocumentRequest struct {
-	Slug       *string               `json:"slug"`
-	Title      *string               `json:"title"`
-	Summary    *string               `json:"summary"`
-	Content    *string               `json:"content"`
-	CategoryID *int64                `json:"category_id"`
-	TagIDs     *[]int64              `json:"tag_ids"`
-	Source     *string               `json:"source"`
-	Status     *string               `json:"status"`
-	Confidence *float64              `json:"confidence"`
-	CoverURL   *string               `json:"cover_url"`
-	Blocks     *[]DocumentBlockInput `json:"blocks"`
+	ExpectedVersion *int64                `json:"expected_version"`
+	Slug            *string               `json:"slug"`
+	Title           *string               `json:"title"`
+	Summary         *string               `json:"summary"`
+	Content         *string               `json:"content"`
+	CategoryID      *int64                `json:"category_id"`
+	TagIDs          *[]int64              `json:"tag_ids"`
+	Source          *string               `json:"source"`
+	Status          *string               `json:"status"`
+	Confidence      *float64              `json:"confidence"`
+	CoverURL        *string               `json:"cover_url"`
+	Blocks          *[]DocumentBlockInput `json:"blocks"`
 }
 
 type DocumentBlockInput struct {

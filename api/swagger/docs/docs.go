@@ -2130,6 +2130,65 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/documents/slug/{slug}": {
+            "get": {
+                "description": "Get a published document by its stable slug.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Documents"
+                ],
+                "summary": "Get published document by slug",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Document slug",
+                        "name": "slug",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/common.SwaggerResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/v1.DocumentResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/common.SwaggerErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/common.SwaggerErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/common.SwaggerErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/documents/{id}": {
             "get": {
                 "description": "Get a published document by id.",
@@ -3078,6 +3137,9 @@ const docTemplate = `{
                 },
                 "cover_url": {
                     "type": "string"
+                },
+                "expected_version": {
+                    "type": "integer"
                 },
                 "slug": {
                     "type": "string"

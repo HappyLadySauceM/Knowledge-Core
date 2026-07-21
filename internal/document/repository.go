@@ -30,8 +30,12 @@ func (r *Repository) List(ctx context.Context, query ListQuery) (ListResult, err
 
 	offset := (query.Page - 1) * query.PageSize
 	listArgs := append(append([]any{}, args...), query.PageSize, offset)
+	orderBy := "d.updated_at DESC, d.id DESC"
+	if query.Status == StatusPublished {
+		orderBy = "d.published_at DESC NULLS LAST, d.id DESC"
+	}
 	rows, err := r.db.QueryContext(ctx, documentSelectSQL+where+`
-ORDER BY d.updated_at DESC, d.id DESC
+ORDER BY `+orderBy+`
 LIMIT $`+strconv.Itoa(len(args)+1)+` OFFSET $`+strconv.Itoa(len(args)+2), listArgs...)
 	if err != nil {
 		return ListResult{}, apperrors.Wrap(apperrors.InternalError, err)
@@ -68,6 +72,20 @@ func (r *Repository) GetByID(ctx context.Context, id int64) (Document, error) {
 		return Document{}, err
 	}
 	tags, err := r.listDocumentTags(ctx, id)
+	if err != nil {
+		return Document{}, err
+	}
+	item.Tags = tags
+	return item, nil
+}
+
+func (r *Repository) GetBySlug(ctx context.Context, slug string) (Document, error) {
+	row := r.db.QueryRowContext(ctx, documentSelectSQL+` WHERE d.slug = $1`, slug)
+	item, err := scanDocument(row)
+	if err != nil {
+		return Document{}, err
+	}
+	tags, err := r.listDocumentTags(ctx, item.ID)
 	if err != nil {
 		return Document{}, err
 	}
@@ -153,7 +171,7 @@ RETURNING id`,
 	return r.GetByID(ctx, id)
 }
 
-func (r *Repository) Update(ctx context.Context, id int64, next record, blocks []Block, revisionContent string) (Document, error) {
+func (r *Repository) Update(ctx context.Context, id int64, next record, blocks []Block, revisionContent string, expectedVersion *int64) (Document, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return Document{}, apperrors.Wrap(apperrors.InternalError, err)
@@ -165,10 +183,10 @@ UPDATE documents
 SET slug = $1, title = $2, summary = $3, category_id = NULLIF($4, 0),
     source = $5, status = $6, confidence = $7, word_count = $8, search_text = $9,
     cover_url = $10, current_version = $11, updated_at = $12, published_at = $13
-WHERE id = $14`,
+	WHERE id = $14 AND ($15 = 0 OR current_version = $15)`,
 		next.Slug, next.Title, next.Summary, next.CategoryID, next.Source, next.Status,
 		next.Confidence, next.WordCount, next.SearchText, next.CoverURL, next.CurrentVersion,
-		next.UpdatedAt, formatMaybeTime(next.PublishedAt), id)
+		next.UpdatedAt, formatMaybeTime(next.PublishedAt), id, expectedVersionValue(expectedVersion))
 	if err != nil {
 		if postgres.IsConstraintViolation(err) {
 			return Document{}, apperrors.Conflict
@@ -180,6 +198,9 @@ WHERE id = $14`,
 		return Document{}, apperrors.Wrap(apperrors.InternalError, err)
 	}
 	if affected == 0 {
+		if expectedVersion != nil {
+			return Document{}, apperrors.Conflict
+		}
 		return Document{}, apperrors.NotFound
 	}
 	if err := replaceDocumentBlocksTx(ctx, tx, id, blocks); err != nil {
@@ -197,6 +218,13 @@ WHERE id = $14`,
 		return Document{}, apperrors.Wrap(apperrors.InternalError, err)
 	}
 	return r.GetByID(ctx, id)
+}
+
+func expectedVersionValue(version *int64) int64 {
+	if version == nil {
+		return 0
+	}
+	return *version
 }
 
 func (r *Repository) ApplyOps(ctx context.Context, documentID, actorID int64, ops []Operation) (ApplyOpsResult, error) {

@@ -96,17 +96,18 @@ type CreateCommand struct {
 }
 
 type UpdateCommand struct {
-	Slug       *string
-	Title      *string
-	Summary    *string
-	Content    *string
-	CategoryID *int64
-	TagIDs     *[]int64
-	Source     *string
-	Status     *string
-	Confidence *float64
-	CoverURL   *string
-	Blocks     *[]BlockInput
+	ExpectedVersion *int64
+	Slug            *string
+	Title           *string
+	Summary         *string
+	Content         *string
+	CategoryID      *int64
+	TagIDs          *[]int64
+	Source          *string
+	Status          *string
+	Confidence      *float64
+	CoverURL        *string
+	Blocks          *[]BlockInput
 }
 
 type Block struct {
@@ -169,6 +170,7 @@ type ApplyOpsResult struct {
 type DocumentService interface {
 	ListPublic(ctx context.Context, query ListQuery) (ListResult, error)
 	GetPublic(ctx context.Context, id int64) (Detail, error)
+	GetPublicBySlug(ctx context.Context, slug string) (Detail, error)
 	ListAdmin(ctx context.Context, actor user.User, query ListQuery) (ListResult, error)
 	CreateAdmin(ctx context.Context, actor user.User, cmd CreateCommand) (Detail, error)
 	GetAdmin(ctx context.Context, actor user.User, id int64) (Detail, error)

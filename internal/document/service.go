@@ -35,10 +35,25 @@ func (s *Service) GetPublic(ctx context.Context, id int64) (Detail, error) {
 	if err != nil {
 		return Detail{}, err
 	}
+	return s.publicDetail(ctx, item)
+}
+
+func (s *Service) GetPublicBySlug(ctx context.Context, slug string) (Detail, error) {
+	if strings.TrimSpace(slug) == "" {
+		return Detail{}, apperrors.InvalidRequest
+	}
+	item, err := s.repo.GetBySlug(ctx, slug)
+	if err != nil {
+		return Detail{}, err
+	}
+	return s.publicDetail(ctx, item)
+}
+
+func (s *Service) publicDetail(ctx context.Context, item Document) (Detail, error) {
 	if item.Status != StatusPublished {
 		return Detail{}, apperrors.NotFound
 	}
-	content, blocks, err := s.repo.GetPublishedRevision(ctx, id)
+	content, blocks, err := s.repo.GetPublishedRevision(ctx, item.ID)
 	if err != nil {
 		return Detail{}, err
 	}
@@ -100,6 +115,9 @@ func (s *Service) UpdateAdmin(ctx context.Context, actor user.User, id int64, cm
 	if err != nil {
 		return Detail{}, err
 	}
+	if cmd.ExpectedVersion != nil && *cmd.ExpectedVersion != current.CurrentVersion {
+		return Detail{}, apperrors.Conflict
+	}
 	next, _, _, blocks, content, err := s.normalizeUpdate(ctx, current, cmd)
 	if err != nil {
 		return Detail{}, err
@@ -114,7 +132,7 @@ func (s *Service) UpdateAdmin(ctx context.Context, actor user.User, id int64, cm
 			return Detail{}, apperrors.Conflict
 		}
 	}
-	updated, err := s.repo.Update(ctx, id, next, blocks, content)
+	updated, err := s.repo.Update(ctx, id, next, blocks, content, cmd.ExpectedVersion)
 	if err != nil {
 		return Detail{}, err
 	}

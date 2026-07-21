@@ -440,6 +440,8 @@ definitions:
         type: string
       cover_url:
         type: string
+      expected_version:
+        type: integer
       slug:
         type: string
       source:
@@ -1855,6 +1857,42 @@ paths:
           schema:
             $ref: '#/definitions/common.SwaggerErrorResponse'
       summary: Get published document
+      tags:
+      - Documents
+  /api/v1/documents/slug/{slug}:
+    get:
+      description: Get a published document by its stable slug.
+      parameters:
+      - description: Document slug
+        in: path
+        name: slug
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/common.SwaggerResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/v1.DocumentResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/common.SwaggerErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/common.SwaggerErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/common.SwaggerErrorResponse'
+      summary: Get published document by slug
       tags:
       - Documents
   /api/v1/tags:
