@@ -85,6 +85,9 @@ func TestDefaultAdminCanLogin(t *testing.T) {
 	if token.User.Role != internaluser.RoleAdmin || token.Scope != "role:admin" {
 		t.Fatalf("admin login returned wrong user/scope: %+v", token)
 	}
+	if !token.User.MustChangePassword {
+		t.Fatalf("bootstrap admin should require password change on first login")
+	}
 }
 
 func TestLogoutRevokesRefreshToken(t *testing.T) {

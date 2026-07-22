@@ -186,7 +186,20 @@ func (h *documentHarness) loginAdmin(t *testing.T) v1.TokenResponse {
 		"username": "admin",
 		"password": "ChangeMe_123456!",
 	}, "")
-	return decodeEnvelopeData[v1.TokenResponse](t, response, http.StatusOK, apperrors.MessageOK)
+	token := decodeEnvelopeData[v1.TokenResponse](t, response, http.StatusOK, apperrors.MessageOK)
+	if !token.User.MustChangePassword {
+		return token
+	}
+	change := h.request(t, http.MethodPut, "/api/v1/users/me/password", map[string]any{
+		"old_password": "ChangeMe_123456!",
+		"new_password": "AdminPass_123456!",
+	}, token.AccessToken)
+	decodeEnvelopeData[any](t, change, http.StatusOK, apperrors.MessageOK)
+	login := h.request(t, http.MethodPost, "/api/v1/auth/login", map[string]any{
+		"username": "admin",
+		"password": "AdminPass_123456!",
+	}, "")
+	return decodeEnvelopeData[v1.TokenResponse](t, login, http.StatusOK, apperrors.MessageOK)
 }
 
 func (h *documentHarness) registerUser(t *testing.T, username string) v1.TokenResponse {

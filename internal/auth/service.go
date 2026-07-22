@@ -117,13 +117,16 @@ func (s *Service) EnsureAdmin(ctx context.Context) error {
 	if err != nil {
 		return apperrors.Wrap(apperrors.InternalError, err)
 	}
-	if _, err := s.users.CreateWithRole(ctx, adminUsername, "", string(hash), user.RoleAdmin); err != nil {
+	if _, err := s.users.CreateWithRole(ctx, adminUsername, "", string(hash), user.RoleAdmin, true); err != nil {
 		return err
 	}
 	if generated {
-		klog.Info("bootstrap admin user created with a random password; set KNOWLEDGE_CORE_ADMIN_PASSWORD to control it. Username: admin")
+		klog.InfoS("bootstrap admin user created with generated password; set KNOWLEDGE_CORE_ADMIN_PASSWORD to control it",
+			"username", adminUsername,
+			"password", password)
 	} else {
-		klog.Info("bootstrap admin user created from KNOWLEDGE_CORE_ADMIN_PASSWORD")
+		klog.InfoS("bootstrap admin user created from KNOWLEDGE_CORE_ADMIN_PASSWORD; password change required on first login",
+			"username", adminUsername)
 	}
 	return nil
 }

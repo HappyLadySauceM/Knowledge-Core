@@ -21,19 +21,19 @@ func NewRepository(db *sql.DB) *Repository {
 }
 
 func (r *Repository) Create(ctx context.Context, username, email, passwordHash string) (User, error) {
-	return r.CreateWithRole(ctx, username, email, passwordHash, RoleUser)
+	return r.CreateWithRole(ctx, username, email, passwordHash, RoleUser, false)
 }
 
 // CreateWithRole creates a user with an explicit role (used for admin bootstrap).
 // CreateWithRole 使用显式角色创建用户（用于 admin 引导）。
-func (r *Repository) CreateWithRole(ctx context.Context, username, email, passwordHash, role string) (User, error) {
+func (r *Repository) CreateWithRole(ctx context.Context, username, email, passwordHash, role string, mustChangePassword bool) (User, error) {
 	now := time.Now().UTC()
 	var id int64
 	err := r.db.QueryRowContext(ctx, `
-INSERT INTO users (username, email, avatar, bio, password_hash, role, status, created_at, updated_at)
-VALUES ($1, NULLIF($2, ''), '', '', $3, $4, $5, $6, $7)
+INSERT INTO users (username, email, avatar, bio, password_hash, role, status, must_change_password, created_at, updated_at)
+VALUES ($1, NULLIF($2, ''), '', '', $3, $4, $5, $6, $7, $8)
 RETURNING id`,
-		username, email, passwordHash, role, StatusActive, now, now).Scan(&id)
+		username, email, passwordHash, role, StatusActive, mustChangePassword, now, now).Scan(&id)
 	if err != nil {
 		if postgres.IsUniqueViolation(err) {
 			return User{}, apperrors.Conflict
@@ -199,7 +199,7 @@ func (r *Repository) UpdatePasswordHash(ctx context.Context, id int64, passwordH
 	now := time.Now().UTC()
 	result, err := tx.ExecContext(ctx, `
 UPDATE users
-SET password_hash = $1, token_version = token_version + 1, updated_at = $2
+SET password_hash = $1, must_change_password = false, token_version = token_version + 1, updated_at = $2
 WHERE id = $3`, passwordHash, now, id)
 	if err != nil {
 		return apperrors.Wrap(apperrors.InternalError, err)
@@ -301,18 +301,18 @@ WHERE role = $1 AND status = $2`, RoleAdmin, StatusActive).Scan(&count)
 }
 
 const userSelectSQL = `
-SELECT id, username, COALESCE(email, ''), avatar, bio, role, status, token_version, created_at, updated_at
+SELECT id, username, COALESCE(email, ''), avatar, bio, role, status, must_change_password, token_version, created_at, updated_at
 FROM users`
 
 const recordSelectSQL = `
-SELECT id, username, COALESCE(email, ''), avatar, bio, password_hash, role, status, token_version, created_at, updated_at
+SELECT id, username, COALESCE(email, ''), avatar, bio, password_hash, role, status, must_change_password, token_version, created_at, updated_at
 FROM users`
 
 func scanUser(row interface {
 	Scan(dest ...any) error
 }) (User, error) {
 	var u User
-	err := row.Scan(&u.ID, &u.Username, &u.Email, &u.Avatar, &u.Bio, &u.Role, &u.Status, &u.TokenVersion, &u.CreatedAt, &u.UpdatedAt)
+	err := row.Scan(&u.ID, &u.Username, &u.Email, &u.Avatar, &u.Bio, &u.Role, &u.Status, &u.MustChangePassword, &u.TokenVersion, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return User{}, apperrors.NotFound
@@ -326,7 +326,7 @@ func scanRecord(row interface {
 	Scan(dest ...any) error
 }, missing error) (Record, error) {
 	var record Record
-	err := row.Scan(&record.ID, &record.Username, &record.Email, &record.Avatar, &record.Bio, &record.PasswordHash, &record.Role, &record.Status, &record.TokenVersion, &record.CreatedAt, &record.UpdatedAt)
+	err := row.Scan(&record.ID, &record.Username, &record.Email, &record.Avatar, &record.Bio, &record.PasswordHash, &record.Role, &record.Status, &record.MustChangePassword, &record.TokenVersion, &record.CreatedAt, &record.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return Record{}, missing

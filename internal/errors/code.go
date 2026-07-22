@@ -19,8 +19,9 @@ const (
 	CodeConflict           = "conflict"
 	CodeForbidden          = "forbidden"
 	CodeNotFound           = "not_found"
-	CodeInvalidToken       = "invalid_token"
-	CodeInternalError      = "internal_error"
+	CodeInvalidToken           = "invalid_token"
+	CodeInternalError          = "internal_error"
+	CodePasswordChangeRequired = "password_change_required"
 )
 
 var (
@@ -31,6 +32,7 @@ var (
 	Conflict           = New(CodeConflict, http.StatusConflict, MessageConflict)
 	Forbidden          = New(CodeForbidden, http.StatusForbidden, MessageForbidden)
 	NotFound           = New(CodeNotFound, http.StatusNotFound, MessageNotFound)
-	InvalidToken       = New(CodeInvalidToken, http.StatusUnauthorized, MessageUnauthorized)
-	InternalError      = New(CodeInternalError, http.StatusInternalServerError, MessageInternalError)
+	InvalidToken             = New(CodeInvalidToken, http.StatusUnauthorized, MessageUnauthorized)
+	InternalError            = New(CodeInternalError, http.StatusInternalServerError, MessageInternalError)
+	PasswordChangeRequired   = New(CodePasswordChangeRequired, http.StatusForbidden, CodePasswordChangeRequired)
 )

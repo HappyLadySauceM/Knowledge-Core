@@ -73,6 +73,17 @@ func TestChangePasswordRevokesRefreshToken(t *testing.T) {
 	decodeEnvelopeData[v1.TokenResponse](t, newLogin, http.StatusOK, apperrors.MessageOK)
 }
 
+func TestAdminMustChangePasswordBeforeAdminAccess(t *testing.T) {
+	harness := newUserHarness(t)
+	token := decodeEnvelopeData[v1.TokenResponse](t, harness.login(t, "admin", "ChangeMe_123456!"), http.StatusOK, apperrors.MessageOK)
+	if !token.User.MustChangePassword {
+		t.Fatalf("bootstrap admin should require password change")
+	}
+
+	blocked := harness.request(t, http.MethodGet, "/api/v1/admin/users", nil, token.AccessToken)
+	decodeEnvelopeData[any](t, blocked, http.StatusForbidden, apperrors.CodePasswordChangeRequired)
+}
+
 func TestAdminListGetUpdateDeleteAndResetPassword(t *testing.T) {
 	harness := newUserHarness(t)
 	userToken := harness.registerUserWithEmail(t, "managed-user", "managed@example.com")
@@ -214,8 +225,16 @@ func (h *userHarness) registerUserWithEmail(t *testing.T, username, email string
 
 func (h *userHarness) loginAdmin(t *testing.T) v1.TokenResponse {
 	t.Helper()
-	response := h.login(t, "admin", "ChangeMe_123456!")
-	return decodeEnvelopeData[v1.TokenResponse](t, response, http.StatusOK, apperrors.MessageOK)
+	token := decodeEnvelopeData[v1.TokenResponse](t, h.login(t, "admin", "ChangeMe_123456!"), http.StatusOK, apperrors.MessageOK)
+	if !token.User.MustChangePassword {
+		return token
+	}
+	change := h.request(t, http.MethodPut, "/api/v1/users/me/password", map[string]any{
+		"old_password": "ChangeMe_123456!",
+		"new_password": "AdminPass_123456!",
+	}, token.AccessToken)
+	decodeEnvelopeData[any](t, change, http.StatusOK, apperrors.MessageOK)
+	return decodeEnvelopeData[v1.TokenResponse](t, h.login(t, "admin", "AdminPass_123456!"), http.StatusOK, apperrors.MessageOK)
 }
 
 func (h *userHarness) login(t *testing.T, username, password string) *httptest.ResponseRecorder {

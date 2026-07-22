@@ -50,6 +50,11 @@ func RequireAdmin() gin.HandlerFunc {
 			c.Abort()
 			return
 		}
+		if currentUser.MustChangePassword {
+			common.Error(c, errors.PasswordChangeRequired)
+			c.Abort()
+			return
+		}
 		c.Next()
 	}
 }
