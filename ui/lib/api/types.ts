@@ -80,6 +80,7 @@ export type User = {
   bio: string;
   role: "admin" | "user";
   status: "active" | "disabled";
+  must_change_password?: boolean;
   created_at: string;
   updated_at: string;
 };

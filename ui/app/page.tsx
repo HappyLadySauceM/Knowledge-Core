@@ -10,7 +10,7 @@ export default async function HomePage() {
   return (
     <main>
       <section className="relative flex min-h-[520px] max-h-[680px] h-[68vh] items-end overflow-hidden bg-[#171b22] text-white">
-        <Image src="/images/cover-deep-learning.jpg" alt="知识节点与连接构成的可视化网络" fill priority sizes="100vw" className="object-cover object-center opacity-70" />
+        <Image src="/images/cover-deep-learning.jpg" alt="知识节点与连接构成的可视化网络" fill loading="eager" fetchPriority="high" sizes="100vw" className="object-cover object-center opacity-70" />
         <div className="absolute inset-0 bg-black/35" aria-hidden="true" />
         <div className="relative mx-auto w-full max-w-7xl px-5 pb-16 lg:px-8 lg:pb-20">
           <div className="max-w-3xl">

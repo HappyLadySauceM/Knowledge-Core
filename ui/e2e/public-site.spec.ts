@@ -27,7 +27,9 @@ test("public knowledge flow", async ({ page }, testInfo) => {
 test("mobile navigation exposes primary destinations", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile");
   await page.goto("/");
-  await page.getByRole("button", { name: "打开菜单" }).click();
+  const menuButton = page.getByRole("button", { name: "打开菜单" });
+  await expect(menuButton).toBeEnabled();
+  await menuButton.click();
   const navigation = page.getByRole("navigation", { name: "移动端主导航" });
   await expect(navigation).toBeVisible();
   await expect(navigation.getByRole("link", { name: "关于", exact: true })).toBeVisible();

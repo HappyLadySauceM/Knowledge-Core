@@ -20,16 +20,19 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [ready, setReady] = useState(false);
   const [open, setOpen] = useState(false);
+  const isChangePassword = pathname === "/admin/change-password";
 
   useEffect(() => {
     fetch("/api/session/me", { cache: "no-store" }).then(async (response) => {
       if (!response.ok) return router.replace(`/login?next=${encodeURIComponent(pathname)}`);
       const payload = await response.json() as ApiEnvelope<User>;
       if (payload.data.role !== "admin") return router.replace("/profile");
+      if (payload.data.must_change_password && !isChangePassword) return router.replace("/admin/change-password");
+      if (!payload.data.must_change_password && isChangePassword) return router.replace("/admin");
       setUser(payload.data);
       setReady(true);
     }).catch(() => router.replace(`/login?next=${encodeURIComponent(pathname)}`));
-  }, [pathname, router]);
+  }, [pathname, router, isChangePassword]);
 
   async function logout() {
     await fetch("/api/session/logout", { method: "POST" });
@@ -38,6 +41,8 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   }
 
   if (!ready) return <div className="grid min-h-screen place-items-center bg-[var(--background)] text-sm text-[var(--muted)]">正在验证管理权限...</div>;
+
+  if (isChangePassword) return <main className="min-w-0">{children}</main>;
 
   return (
     <div className="min-h-screen bg-[var(--background)] lg:grid lg:grid-cols-[232px_1fr]">

@@ -3,12 +3,19 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BookOpen, Menu, Search, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { siteConfig } from "@/lib/site";
 
 export function SiteHeader() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setHydrated(true));
+    return () => cancelAnimationFrame(frame);
+  }, []);
+
   if (pathname.startsWith("/admin")) return null;
 
   return (
@@ -30,7 +37,7 @@ export function SiteHeader() {
           <Link href="/login" className="rounded-[var(--radius)] px-3 py-2 text-sm font-medium text-[var(--muted)] hover:bg-[var(--surface-subtle)] hover:text-[var(--foreground)]">登录</Link>
           <Link href="/register" className="rounded-[var(--radius)] bg-[var(--brand)] px-3 py-2 text-sm font-medium text-white hover:bg-[var(--brand-hover)]">注册</Link>
         </div>
-        <button className="grid size-10 place-items-center rounded-lg text-[var(--muted)] hover:bg-[var(--surface-subtle)] md:hidden" type="button" aria-label={open ? "关闭菜单" : "打开菜单"} aria-expanded={open} onClick={() => setOpen((value) => !value)}>
+        <button className="grid size-10 place-items-center rounded-lg text-[var(--muted)] hover:bg-[var(--surface-subtle)] disabled:cursor-wait disabled:opacity-60 md:hidden" type="button" aria-label={open ? "关闭菜单" : "打开菜单"} aria-expanded={open} disabled={!hydrated} onClick={() => setOpen((value) => !value)}>
           {open ? <X size={20} aria-hidden="true" /> : <Menu size={20} aria-hidden="true" />}
         </button>
       </div>
