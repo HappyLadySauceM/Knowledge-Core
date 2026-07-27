@@ -48,7 +48,7 @@ AI Agent 层
 
 ## 技术路线
 
-第一阶段采用 **Hertz API 网关 + Kitex 微服务**。浏览器和桌面客户端只访问 Hertz，服务间同步调用统一使用 Kitex Thrift RPC，异步任务和领域事件使用 NATS。
+第一阶段采用 **Hertz API 网关 + Kitex 微服务**。浏览器和桌面客户端只访问 Hertz，服务间同步调用统一使用 Kitex Thrift RPC，异步任务和领域事件使用 NATS。跨服务基础设施通过 `internal/foundation` 的稳定接口接入，首批 adapter 为 PostgreSQL、Redis、NATS 和 Etcd。
 
 核心约束：
 
@@ -56,7 +56,9 @@ AI Agent 层
 - 每项业务数据只有一个服务 owner；服务之间禁止通过 SQL 读取或修改其他服务的数据。
 - 强一致业务在所属服务的本地事务内完成，跨服务流程使用 RPC 或 Outbox 事件，不引入分布式事务。
 - 对外 HTTP、WebSocket 协议与内部 Thrift IDL 分离，传输对象不得直接下沉为领域模型。
+- JSON 统一使用 `github.com/bytedance/sonic`；Hertz 保持默认 Sonic binding/rendering，业务代码通过 foundation codec 使用 JSON。
 - 所有服务输出 JSON 结构化日志，并透传 `request_id`、`trace_id` 和调用目标。
+- Provider 或连接配置变更通过滚动重启生效，不支持进程内热切换。
 
 ### 服务架构
 
@@ -65,28 +67,28 @@ Web / Desktop
       |
       | HTTP / WebSocket
       v
-api-gateway (Hertz)
+gateway (Hertz)
       |
       | Kitex + Thrift
       +-------------------+-------------------+
       v                   v                   v
-identity-service    knowledge-service    platform-service
+identity            knowledge            platform
       |                   |                   |
       +-------------------+-------------------+
                           |
-          PostgreSQL / Redis / NATS JetStream
+      SQL DB / Redis / NATS / Etcd / OpenTelemetry
 ```
 
 | 服务 | 对外形态 | 职责 | 持久化 owner |
 |---|---|---|---|
-| `api-gateway` | Hertz HTTP / WebSocket | 路由、参数适配、JWT 校验、权限前置检查、限流、响应与错误映射、协作连接管理 | 不持有业务表；仅持有 `gateway:*` Redis 投影和限流键 |
-| `identity-service` | Kitex RPC | 注册、登录、Token 刷新与撤销、用户资料、角色和状态管理 | PostgreSQL `identity` schema、`identity:*` Redis 键 |
-| `knowledge-service` | Kitex RPC | 文档、正文块、操作日志、发布快照、分类、标签、评论、搜索和协作事务 | PostgreSQL `knowledge` schema、`knowledge:*` Redis 键 |
-| `platform-service` | Kitex RPC + NATS consumer | 站点设置、统计投影、导出任务、AI Provider 配置与连接测试 | PostgreSQL `platform` schema、`platform:*` Redis 键 |
+| `gateway` | Hertz HTTP / WebSocket | 路由、参数适配、JWT 校验、权限前置检查、限流、响应与错误映射、协作连接管理 | 不持有业务表；仅持有 `gateway:*` Redis 投影和限流键 |
+| `identity` | Kitex RPC | 注册、登录、Token 刷新与撤销、用户资料、角色和状态管理 | PostgreSQL `identity` schema、`identity:*` Redis 键 |
+| `knowledge` | Kitex RPC | 文档、正文块、操作日志、发布快照、分类、标签、评论、搜索和协作事务 | PostgreSQL `knowledge` schema、`knowledge:*` Redis 键 |
+| `platform` | Kitex RPC + NATS consumer | 站点设置、统计投影、导出任务、AI Provider 配置与连接测试 | PostgreSQL `platform` schema、`platform:*` Redis 键 |
 
 ### 请求与事件流
 
-1. 公开或登录请求进入 `api-gateway`，由网关完成 HTTP 参数解析和身份上下文提取。
+1. 公开或登录请求进入 `gateway`，由网关完成 HTTP 参数解析和身份上下文提取。
 2. 网关通过 Kitex 调用对应 owner 服务；如请求已登录，则将 `request_id` 和原始 Access Token 放入 RPC metadata，Token 不得进入日志、指标或事件。
 3. owner 服务再次执行资源级授权，在本地 PostgreSQL 事务内完成状态变更。
 4. 需要跨服务传播的状态先写入本服务 Outbox，再由投递器发布到 NATS JetStream。
@@ -101,46 +103,56 @@ identity-service    knowledge-service    platform-service
 | HTTP 网关 | Go + Hertz | 承接公开 REST、Studio 管理 API 和 WebSocket，统一处理鉴权与协议适配 |
 | 内部 RPC | Kitex + Thrift | IDL 优先的服务契约，支持中间件、超时、治理和业务异常 |
 | 异步通信 | NATS JetStream + NATS Core | JetStream 承载可靠事件和任务，Core NATS 承载协作实时广播 |
-| 数据访问 | `database/sql` + `pgx` stdlib | 保留显式 SQL、事务和行级锁控制 |
+| JSON 编解码 | `github.com/bytedance/sonic` | 统一 Hertz binding/rendering、事件和配置 JSON；配置与事件严格解码并启用 `UseNumber` |
+| 数据访问 | foundation database 接口 + `database/sql` | 首个 adapter 使用 `pgx` stdlib，保留显式 SQL、事务和行级锁控制 |
 | 前端 | React + Next.js + TypeScript | Markdown 生态成熟、SSR/SSG 支持 |
 | 样式 | Tailwind CSS | 快速迭代，与 Next.js 搭配好 |
 | Markdown 渲染 | remark + rehype 插件链 | 可扩展的 AST 转换 |
 | 主数据库 | PostgreSQL 16 | 支持事务、行级锁、JSONB、全文搜索和协作数据一致性 |
 | 缓存与投影 | Redis 7 | Token 会话、撤销投影、限流和短期缓存，按服务命名空间隔离 |
+| 配置与服务发现 | Etcd | Kitex 注册发现、非敏感应用配置和 Kitex 治理配置，key 空间隔离 |
 | 可观测性 | OpenTelemetry + Prometheus + JSON 日志 | 统一链路、指标和结构化日志上下文 |
 | AI 接口 | OpenAI SDK / Anthropic SDK | 导入分析，后续可替换 |
 
 ### Monorepo 目标结构
 
 ```text
-cmd/
-  api-gateway/
-  identity-service/
-  knowledge-service/
-  platform-service/
-  migrate/
 idl/
-  identity/
-  knowledge/
-  platform/
+  http/v1/
+  rpc/
 internal/
-  gateway/
-  identity/
-  knowledge/
-  platform/
-  platformkit/
+  foundation/
+    codec/json/
+    config/{env,etcd}/
+    database/postgres/
+    messaging/nats/
+    cache/redis/
+    discovery/etcd/
+    observability/
+    health/
+    lifecycle/
 kitex_gen/
+services/
+  gateway/{cmd,biz,internal}/
+  identity/{cmd,internal}/
+  knowledge/{cmd,internal}/
+  platform/{cmd,internal}/
 migrations/
-  identity/
-  knowledge/
-  platform/
+  identity/postgres/
+  knowledge/postgres/
+  platform/postgres/
+scripts/
+  codegen.ps1
+  codegen.sh
 docker/infrastructure/
 ```
 
-- 仓库使用一个 `go.mod`，服务进程按 `cmd/<service>` 分入口。
+- 仓库使用一个 `go.mod`，服务进程入口位于 `services/<service>/cmd/`；依赖通过普通构造函数显式装配，不使用 Wire/Fx。
 - Thrift IDL 是内部 RPC 的唯一契约来源，生成代码统一放在 `kitex_gen/`，不得手工修改。
-- `internal/platformkit` 只放配置、日志、数据库、Redis、NATS、追踪等基础设施能力，不承载业务规则。
+- HTTP IDL 放在 `idl/http/v1/`，内部 Thrift RPC IDL 放在 `idl/rpc/`；Hertz 与 Kitex 生成代码只做传输适配，不写业务规则。
+- `internal/foundation` 只放 JSON、配置、数据库、缓存、消息、注册发现、可观测性和生命周期等基础设施能力，不承载业务规则。
 - 各业务包只能导入自己的领域代码、共享基础设施接口和生成的 RPC 契约，不直接导入其他服务的 repository。
+- 完整接口与装配规则见 [Hertz + Kitex 服务框架设计](./framework-design.md)。
 
 ## HTTP 与 RPC 契约
 
@@ -177,7 +189,8 @@ docker/infrastructure/
 
 - 所有 RPC 必须设置超时并传递取消信号，不允许使用无截止时间的后台 context 发起外部调用。
 - RPC middleware 统一注入日志、追踪、指标和调用方身份；业务 service 不依赖 Hertz request/response 类型。
-- 服务发现第一阶段使用 Docker Compose DNS 和显式地址配置，不引入独立注册中心。
+- Kitex 服务通过 Etcd 注册发现：服务端注入 Kitex 原生 registry，客户端注入 Kitex 原生 resolver。调用方使用稳定服务名，不保存容器 IP。
+- Etcd 同时承载非敏感应用配置和 Kitex 治理配置；数据库凭据、JWT 私钥和 API Key 等敏感值只通过环境变量或 Secret 注入。
 
 ## 数据所有权与迁移
 
@@ -190,24 +203,28 @@ docker/infrastructure/
 
 ### 迁移目录
 
-所有数据库迁移文件放在仓库根目录 `migrations/`，按 owner 服务分目录：
+所有数据库迁移文件放在仓库根目录 `migrations/`，按 owner 服务和 Provider 两级分目录：
 
 ```text
 migrations/
   identity/
-    000001_create_users.up.sql
-    000001_create_users.down.sql
+    postgres/
+      000001_create_users.up.sql
+      000001_create_users.down.sql
   knowledge/
-    000001_create_documents.up.sql
-    000001_create_documents.down.sql
+    postgres/
+      000001_create_documents.up.sql
+      000001_create_documents.down.sql
   platform/
-    000001_create_settings.up.sql
-    000001_create_settings.down.sql
+    postgres/
+      000001_create_settings.up.sql
+      000001_create_settings.down.sql
 ```
 
-- 每个目录独立递增编号，迁移必须提供配对的 `up` 和 `down` 文件。
-- 每个服务只执行自己目录中的迁移，并在自己的 schema 中维护迁移版本。
+- 每个 Provider 目录独立递增编号，迁移必须提供配对的 `up` 和 `down` 文件。
+- 每个服务只执行自己和当前 Provider 目录中的迁移，并在自己的 schema 中维护迁移版本。
 - 迁移通过独立命令在服务启动前执行，服务启动过程不得隐式修改数据库结构。
+- 新数据库 Provider 必须实现对应 repository 方言并建立自己的完整 migration 链；接口抽象不消除 SQL 方言和数据迁移工作。
 - migration 不得创建存储过程、数据库函数或业务状态触发器；时间戳、状态流转和派生字段由代码显式维护。
 - 跨服务变更先保持事件和 RPC 契约向后兼容，再分别发布各服务迁移，不依赖固定启动顺序完成分布式事务。
 
@@ -237,18 +254,18 @@ migrations/
 
 ```powershell
 copy .env.example .env
-docker compose -f docker/infrastructure/docker-compose.yml up -d postgres redis nats
+docker compose -f docker/infrastructure/docker-compose.yml up -d postgres redis nats etcd
 
 # 分别执行各服务迁移
-go run ./cmd/migrate --service identity
-go run ./cmd/migrate --service knowledge
-go run ./cmd/migrate --service platform
+go run ./services/identity/cmd/migrate --provider postgres up
+go run ./services/knowledge/cmd/migrate --provider postgres up
+go run ./services/platform/cmd/migrate --provider postgres up
 
 # 分别启动四个进程
-go run ./cmd/identity-service
-go run ./cmd/knowledge-service
-go run ./cmd/platform-service
-go run ./cmd/api-gateway
+go run ./services/identity/cmd/identity
+go run ./services/knowledge/cmd/knowledge
+go run ./services/platform/cmd/platform
+go run ./services/gateway/cmd/gateway
 ```
 
 本地默认基础设施：
@@ -258,16 +275,17 @@ PostgreSQL: localhost:5432/knowledge_core
 Redis:      localhost:6379
 NATS:       localhost:4222
 JetStream:  enabled
+Etcd:       localhost:2379
 ```
 
 - `.env` 只保存本地覆盖且不得提交；仓库配置文件只包含非敏感默认值。
 - 数据库密码、Ed25519 私钥、AI API Key 等敏感值通过环境变量或 Secret 注入。
-- `identity-service` 持有 JWT 私钥，网关和业务服务只配置公钥。
+- `identity` 持有 JWT 私钥，网关和业务服务只配置公钥。
 - readiness 必须检查本服务必要依赖是否就绪；liveness 只检查进程是否存活。
 
 ## 文档存储模型
 
-本节数据全部由 `knowledge-service` 管理，表位于 PostgreSQL `knowledge` schema。其他服务只能通过 `KnowledgeService` RPC 或知识域事件访问相关能力。
+本节数据全部由 `knowledge` 管理，表位于 PostgreSQL `knowledge` schema。其他服务只能通过 `KnowledgeService` RPC 或知识域事件访问相关能力。
 
 ### documents
 
@@ -302,7 +320,7 @@ Markdown 不是在线编辑的最终存储格式。
 
 ## 用户系统
 
-用户、凭据、Refresh Token 和登录安全状态由 `identity-service` 管理，表位于 PostgreSQL `identity` schema。
+用户、凭据、Refresh Token 和登录安全状态由 `identity` 管理，表位于 PostgreSQL `identity` schema。
 
 ### 用户角色
 
@@ -331,8 +349,8 @@ type User struct {
 
 ### 认证方式
 
-- Access Token 使用 Ed25519 JWT，默认有效期 15 分钟；只有 `identity-service` 持有签名私钥。
-- `api-gateway` 和业务服务持有公钥并校验签名、过期时间及必要 claims；网关额外将 Token 中的 `token_version` 与撤销投影比较，再把原始 Token 透传给 RPC 服务进行二次签名校验和资源级授权。
+- Access Token 使用 Ed25519 JWT，默认有效期 15 分钟；只有 `identity` 持有签名私钥。
+- `gateway` 和业务服务持有公钥并校验签名、过期时间及必要 claims；网关额外将 Token 中的 `token_version` 与撤销投影比较，再把原始 Token 透传给 RPC 服务进行二次签名校验和资源级授权。
 - Refresh Token 明文只返回给客户端，服务端只保存 SHA-256 hash。
 - `identity:*` Redis 命名空间保存活跃 refresh token 会话元数据，PostgreSQL `identity.refresh_tokens` 保留审计与 Redis 故障降级。
 - Refresh 时即使 Redis 命中也会强校验 PostgreSQL 中的撤销、过期、用户状态和 `token_version`。
@@ -375,7 +393,7 @@ PUT    /api/v1/studio/users/:id/password # 重置密码（仅 admin）
 
 ## 评论系统
 
-评论由 `knowledge-service` 管理，和文档归属同一事务边界，表位于 PostgreSQL `knowledge` schema。
+评论由 `knowledge` 管理，和文档归属同一事务边界，表位于 PostgreSQL `knowledge` schema。
 
 ### 数据模型
 
@@ -425,7 +443,7 @@ DELETE /api/v1/studio/comments/:id              # 删除评论（仅 admin）
 
 ## Studio 设置
 
-站点设置和 AI Provider 配置由 `platform-service` 管理，表位于 PostgreSQL `platform` schema。API Key 必须加密存储，对外只返回掩码，不得写入事件或日志。
+站点设置和 AI Provider 配置由 `platform` 管理，表位于 PostgreSQL `platform` schema。AI API Key 只通过环境变量或部署平台 Secret 注入，配置、数据库、事件和日志均不保存明文。
 
 ### 设置项
 
@@ -441,7 +459,7 @@ type SiteSettings struct {
     Theme           string `json:"theme"`             // 主题: "light" | "dark" | "auto"
     AIProvider      string `json:"ai_provider"`       // AI 服务商: "openai" | "anthropic"
     AIModel         string `json:"ai_model"`          // 模型名称
-    APIKey          string `json:"-"`                 // API Key（前端掩码显示）
+    APIKeyConfigured bool  `json:"api_key_configured"` // 仅表示 Secret 是否已配置
     APIBaseURL      string `json:"api_base_url"`     // 自定义 API 地址
 }
 ```
@@ -449,7 +467,7 @@ type SiteSettings struct {
 ### API 路由
 
 ```
-GET  /api/v1/studio/settings         # 获取设置（仅 admin，API Key 脱敏）
+GET  /api/v1/studio/settings         # 获取设置（仅 admin，返回 Secret 是否已配置）
 PUT  /api/v1/studio/settings         # 更新设置（仅 admin）
 POST /api/v1/studio/settings/test-ai # 测试 AI 连接（仅 admin）
 ```
@@ -461,11 +479,11 @@ POST /api/v1/studio/settings/test-ai # 测试 AI 连接（仅 admin）
 | 基本设置 | 站点名称、描述、URL、管理员邮箱、开关注册 |
 | 评论设置 | 是否开启审核、每页评论数 |
 | 外观设置 | 每页文章数、主题选择 |
-| AI 设置 | 服务商选择、模型名称、API Key（掩码）、API 地址、测试连接按钮 |
+| AI 设置 | 服务商选择、模型名称、API 地址、Secret 配置状态、测试连接按钮 |
 
 ## 数据看板
 
-数据看板由 `platform-service` 管理。平台服务消费身份域和知识域事件形成最终一致的统计投影，不通过跨 schema SQL 实时聚合。
+数据看板由 `platform` 管理。平台服务消费身份域和知识域事件形成最终一致的统计投影，不通过跨 schema SQL 实时聚合。
 
 ### 统计指标
 
@@ -490,7 +508,7 @@ GET /api/v1/studio/dashboard/top-articles?limit=10&period=7d # 热门文章
 
 ## 标签与分类管理
 
-分类和标签与文档共同由 `knowledge-service` 管理，表位于 PostgreSQL `knowledge` schema。
+分类和标签与文档共同由 `knowledge` 管理，表位于 PostgreSQL `knowledge` schema。
 
 ### 数据模型
 
@@ -541,7 +559,7 @@ DELETE /api/v1/studio/tags/:id            # 删除标签
 
 ## 文章编辑器
 
-编辑器数据和协作事务由 `knowledge-service` 管理；`api-gateway` 只负责 HTTP/WebSocket 协议适配和连接生命周期。
+编辑器数据和协作事务由 `knowledge` 管理；`gateway` 只负责 HTTP/WebSocket 协议适配和连接生命周期。
 
 ### 编辑器功能
 
@@ -605,7 +623,7 @@ WebSocket 消息类型固定为：`hello`、`snapshot`、`op`、`ack`、`conflic
 
 ## 导出功能
 
-导出由 `platform-service` 管理。平台服务通过 `KnowledgeService` RPC 获取有权限访问的文档快照，不读取 `knowledge` schema。
+导出由 `platform` 管理。平台服务通过 `KnowledgeService` RPC 获取有权限访问的文档快照，不读取 `knowledge` schema。
 
 ### 支持的导出格式
 
@@ -639,9 +657,9 @@ GET    /api/v1/studio/export/download/:task_id  # 下载已完成的导出文件
 
 ### 必做（最小闭环）
 
-1. Hertz `api-gateway` 与三个 Kitex Thrift 服务的单模块 Monorepo 骨架
-2. PostgreSQL `identity`、`knowledge`、`platform` schema 及 `migrations/<service>` 独立迁移链
-3. Redis 服务命名空间、NATS JetStream/Core、Outbox 投递和幂等消费基础设施
+1. Hertz `gateway` 与 `identity`、`knowledge`、`platform` 三个 Kitex Thrift 服务的单模块 Monorepo 骨架
+2. PostgreSQL `identity`、`knowledge`、`platform` schema 及 `migrations/<service>/postgres` 独立迁移链
+3. Foundation 基础设施接口及 PostgreSQL、Redis、NATS、Etcd 首批 adapter
 4. Ed25519 JWT、Refresh Token、撤销事件投影和 Studio 权限控制
 5. PostgreSQL 文档主存储（documents、document_blocks、document_ops、document_revisions）
 6. Web 端文档列表浏览、PostgreSQL 全文搜索和公开阅读
@@ -654,7 +672,7 @@ GET    /api/v1/studio/export/download/:task_id  # 下载已完成的导出文件
 13. 标签与分类管理（Studio CRUD）
 14. 块级协作编辑器（HTTP ops + WebSocket + NATS 实时广播）
 15. 导出功能（Markdown/PDF/JSON/ZIP，批量任务后续接入）
-16. JSON 日志、OpenTelemetry tracing、Prometheus metrics 和健康检查
+16. Sonic JSON codec、JSON 日志、OpenTelemetry tracing、Prometheus metrics 和健康检查
 
 ### 暂不做（后续阶段）
 
@@ -684,3 +702,4 @@ GET    /api/v1/studio/export/download/:task_id  # 下载已完成的导出文件
 7. **渐进式 AI** — AI 辅助但不强制，所有 AI 生成内容用户可审阅、修改和撤销。
 8. **块级协作优先** — 先解决多人协作的幂等、冲突和发布快照，再扩展更细粒度协同。
 9. **开放导入导出** — Markdown 是系统边界格式，方便迁移和备份，但不是在线编辑数据源。
+10. **基础设施隔离** — 业务层依赖稳定接口；连接切换收敛到配置，跨 Provider 切换显式处理 adapter、方言、迁移和数据搬迁。
