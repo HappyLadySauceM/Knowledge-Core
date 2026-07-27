@@ -4,13 +4,16 @@ package gateway
 
 import (
 	"context"
+	"net/http"
 	"time"
 
+	identityrpc "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/identity"
 	gateway "github.com/HappyLadySauce/Knowledge-Core/services/gateway/biz/model/gateway"
 	"github.com/HappyLadySauce/Knowledge-Core/services/gateway/internal/middleware"
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/common/hlog"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
+	"github.com/cloudwego/kitex/pkg/kerrors"
 )
 
 // Live .
@@ -45,4 +48,119 @@ func healthResponse(code int32, message, status, requestID string) *gateway.Heal
 		Data:      &gateway.HealthData{Status: status, Service: "gateway"},
 		RequestID: requestID,
 	}
+}
+
+// Register .
+// @router /api/v1/auth/register [POST]
+func Register(ctx context.Context, c *app.RequestContext) {
+	var req gateway.RegisterRequest
+	if err := c.BindAndValidate(&req); err != nil {
+		writeError(c, http.StatusBadRequest, codeInvalidRequest, "invalid request")
+		return
+	}
+	client, exists := middleware.IdentityClient(c)
+	if !exists {
+		hlog.CtxErrorf(ctx, "Identity client is not configured")
+		writeError(c, http.StatusServiceUnavailable, codeDependencyUnavailable, "service unavailable")
+		return
+	}
+	rpcCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	user, err := client.Register(rpcCtx, &identityrpc.RegisterRequest{
+		Username: req.Username,
+		Email:    req.Email,
+		Password: req.Password,
+	})
+	if err != nil {
+		writeIdentityError(ctx, c, err)
+		return
+	}
+	data := mapUser(user)
+	if data == nil {
+		hlog.CtxErrorf(ctx, "Identity Register returned no user")
+		writeError(c, http.StatusBadGateway, codeDependencyUnavailable, "service unavailable")
+		return
+	}
+	c.JSON(http.StatusCreated, &gateway.RegisterResponse{
+		Code: 0, Message: "ok", Data: data, RequestID: middleware.GetRequestID(c),
+	})
+}
+
+// Login .
+// @router /api/v1/auth/login [POST]
+func Login(ctx context.Context, c *app.RequestContext) {
+	var req gateway.LoginRequest
+	if err := c.BindAndValidate(&req); err != nil {
+		writeError(c, http.StatusBadRequest, codeInvalidRequest, "invalid request")
+		return
+	}
+	client, exists := middleware.IdentityClient(c)
+	if !exists {
+		hlog.CtxErrorf(ctx, "Identity client is not configured")
+		writeError(c, http.StatusServiceUnavailable, codeDependencyUnavailable, "service unavailable")
+		return
+	}
+	rpcCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	authentication, err := client.Authenticate(rpcCtx, &identityrpc.AuthenticateRequest{
+		Identifier: req.Identifier,
+		Password:   req.Password,
+	})
+	if err != nil {
+		writeIdentityError(ctx, c, err)
+		return
+	}
+	if authentication == nil || authentication.AccessToken == "" || authentication.ExpiresAtUnix <= time.Now().UTC().Unix() {
+		hlog.CtxErrorf(ctx, "Identity Authenticate returned an incomplete result")
+		writeError(c, http.StatusBadGateway, codeDependencyUnavailable, "service unavailable")
+		return
+	}
+	data := mapUser(authentication.User)
+	if data == nil {
+		hlog.CtxErrorf(ctx, "Identity Authenticate returned no user")
+		writeError(c, http.StatusBadGateway, codeDependencyUnavailable, "service unavailable")
+		return
+	}
+	c.JSON(http.StatusOK, &gateway.LoginResponse{
+		Code:    0,
+		Message: "ok",
+		Data: &gateway.LoginData{
+			User: data, AccessToken: authentication.AccessToken, TokenType: "Bearer", ExpiresAtUnix: authentication.ExpiresAtUnix,
+		},
+		RequestID: middleware.GetRequestID(c),
+	})
+}
+
+// CurrentUser .
+// @router /api/v1/users/me [GET]
+func CurrentUser(ctx context.Context, c *app.RequestContext) {
+	principal, authenticated := middleware.Principal(c)
+	if !authenticated {
+		writeError(c, http.StatusUnauthorized, codeUnauthorized, "authentication required")
+		return
+	}
+	client, exists := middleware.IdentityClient(c)
+	if !exists {
+		hlog.CtxErrorf(ctx, "Identity client is not configured")
+		writeError(c, http.StatusServiceUnavailable, codeDependencyUnavailable, "service unavailable")
+		return
+	}
+	rpcCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	user, err := client.GetUser(rpcCtx, &identityrpc.GetUserRequest{UserId: principal.UserID})
+	if err != nil {
+		if bizError, ok := kerrors.FromBizStatusError(err); ok && bizError.BizStatusCode() == identityrpc.CodeUserNotFound {
+			writeError(c, http.StatusUnauthorized, codeUnauthorized, "authentication required")
+			return
+		}
+		writeIdentityError(ctx, c, err)
+		return
+	}
+	if user == nil || user.Id != principal.UserID || user.Status != "active" || user.Role != principal.Role || user.TokenVersion != principal.TokenVersion {
+		writeError(c, http.StatusUnauthorized, codeUnauthorized, "authentication required")
+		return
+	}
+	c.JSON(http.StatusOK, &gateway.CurrentUserResponse{
+		Code: 0, Message: "ok", Data: mapUser(user), RequestID: middleware.GetRequestID(c),
+	})
 }

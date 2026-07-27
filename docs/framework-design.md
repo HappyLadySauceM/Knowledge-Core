@@ -1,6 +1,6 @@
 # Knowledge Core - Hertz + Kitex 服务框架设计
 
-> 状态：基础框架 v0.1 已实现。四个进程入口、IDL/代码生成、Foundation 接口与首批 PostgreSQL/Redis/NATS/Etcd adapter 已落地；Identity 已完成用户注册、凭据校验、查询和首条 PostgreSQL migration，Token、其他业务用例、RPC client 和完整可观测性仍按本文继续实现。
+> 状态：基础框架 v0.1 已实现。四个进程入口、IDL/代码生成、Foundation 接口与首批 PostgreSQL/Redis/NATS/Etcd adapter 已落地；Identity 已完成用户注册、凭据校验、Ed25519 Access Token、用户查询和首条 PostgreSQL migration，Gateway 已接通注册、登录和当前用户 HTTP API。Refresh Token、注销、撤销事件投影、其他业务用例和完整可观测性仍按本文继续实现。
 
 ## 1. 设计目标
 

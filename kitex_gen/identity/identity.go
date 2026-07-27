@@ -8,6 +8,22 @@ import (
 	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/common"
 )
 
+const (
+	CodeInvalidInput = 20001
+
+	CodeConflict = 20002
+
+	CodeInvalidCredentials = 20003
+
+	CodeAccountLocked = 20004
+
+	CodeUserDisabled = 20005
+
+	CodeUserNotFound = 20006
+
+	CodeInternal = 20999
+)
+
 type User struct {
 	Id            int64  `thrift:"id,1,required" frugal:"1,required,i64" json:"id"`
 	Username      string `thrift:"username,2,required" frugal:"2,required,string" json:"username"`
@@ -203,6 +219,62 @@ var fieldIDToName_AuthenticateRequest = map[int16]string{
 	2: "password",
 }
 
+type Authentication struct {
+	User          *User  `thrift:"user,1,required" frugal:"1,required,User" json:"user"`
+	AccessToken   string `thrift:"access_token,2,required" frugal:"2,required,string" json:"access_token"`
+	ExpiresAtUnix int64  `thrift:"expires_at_unix,3,required" frugal:"3,required,i64" json:"expires_at_unix"`
+}
+
+func NewAuthentication() *Authentication {
+	return &Authentication{}
+}
+
+func (p *Authentication) InitDefault() {
+}
+
+var Authentication_User_DEFAULT *User
+
+func (p *Authentication) GetUser() (v *User) {
+	if !p.IsSetUser() {
+		return Authentication_User_DEFAULT
+	}
+	return p.User
+}
+
+func (p *Authentication) GetAccessToken() (v string) {
+	return p.AccessToken
+}
+
+func (p *Authentication) GetExpiresAtUnix() (v int64) {
+	return p.ExpiresAtUnix
+}
+func (p *Authentication) SetUser(val *User) {
+	p.User = val
+}
+func (p *Authentication) SetAccessToken(val string) {
+	p.AccessToken = val
+}
+func (p *Authentication) SetExpiresAtUnix(val int64) {
+	p.ExpiresAtUnix = val
+}
+
+func (p *Authentication) IsSetUser() bool {
+	return p.User != nil
+}
+
+func (p *Authentication) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("Authentication(%+v)", *p)
+}
+
+var fieldIDToName_Authentication = map[int16]string{
+	1: "user",
+	2: "access_token",
+	3: "expires_at_unix",
+}
+
 type GetUserRequest struct {
 	UserId int64 `thrift:"user_id,1,required" frugal:"1,required,i64" json:"user_id"`
 }
@@ -237,7 +309,7 @@ type IdentityService interface {
 
 	Register(ctx context.Context, request *RegisterRequest) (r *User, err error)
 
-	Authenticate(ctx context.Context, request *AuthenticateRequest) (r *User, err error)
+	Authenticate(ctx context.Context, request *AuthenticateRequest) (r *Authentication, err error)
 
 	GetUser(ctx context.Context, request *GetUserRequest) (r *User, err error)
 }
@@ -433,7 +505,7 @@ var fieldIDToName_IdentityServiceAuthenticateArgs = map[int16]string{
 }
 
 type IdentityServiceAuthenticateResult struct {
-	Success *User `thrift:"success,0,optional" frugal:"0,optional,User" json:"success,omitempty"`
+	Success *Authentication `thrift:"success,0,optional" frugal:"0,optional,Authentication" json:"success,omitempty"`
 }
 
 func NewIdentityServiceAuthenticateResult() *IdentityServiceAuthenticateResult {
@@ -443,16 +515,16 @@ func NewIdentityServiceAuthenticateResult() *IdentityServiceAuthenticateResult {
 func (p *IdentityServiceAuthenticateResult) InitDefault() {
 }
 
-var IdentityServiceAuthenticateResult_Success_DEFAULT *User
+var IdentityServiceAuthenticateResult_Success_DEFAULT *Authentication
 
-func (p *IdentityServiceAuthenticateResult) GetSuccess() (v *User) {
+func (p *IdentityServiceAuthenticateResult) GetSuccess() (v *Authentication) {
 	if !p.IsSetSuccess() {
 		return IdentityServiceAuthenticateResult_Success_DEFAULT
 	}
 	return p.Success
 }
 func (p *IdentityServiceAuthenticateResult) SetSuccess(x interface{}) {
-	p.Success = x.(*User)
+	p.Success = x.(*Authentication)
 }
 
 func (p *IdentityServiceAuthenticateResult) IsSetSuccess() bool {

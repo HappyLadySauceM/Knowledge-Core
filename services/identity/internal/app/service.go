@@ -30,6 +30,20 @@ type PasswordHasher interface {
 	Compare(hash, password string) (bool, error)
 }
 
+type AccessTokenIssuer interface {
+	Issue(user *domain.User) (AccessToken, error)
+}
+
+type AccessToken struct {
+	Value     string
+	ExpiresAt time.Time
+}
+
+type Authentication struct {
+	User        *domain.User
+	AccessToken AccessToken
+}
+
 type RegisterInput struct {
 	Username string
 	Email    string
@@ -42,21 +56,22 @@ type AuthenticateInput struct {
 }
 
 type Service struct {
-	users     repository.UserRepository
-	hasher    PasswordHasher
-	dummyHash string
-	now       func() time.Time
+	users       repository.UserRepository
+	hasher      PasswordHasher
+	tokenIssuer AccessTokenIssuer
+	dummyHash   string
+	now         func() time.Time
 }
 
-func NewService(users repository.UserRepository, hasher PasswordHasher) (*Service, error) {
-	if users == nil || hasher == nil {
-		return nil, errors.New("create identity service: user repository and password hasher are required")
+func NewService(users repository.UserRepository, hasher PasswordHasher, tokenIssuer AccessTokenIssuer) (*Service, error) {
+	if users == nil || hasher == nil || tokenIssuer == nil {
+		return nil, errors.New("create identity service: user repository, password hasher, and token issuer are required")
 	}
 	dummyHash, err := hasher.Hash("identity-dummy-password")
 	if err != nil {
 		return nil, fmt.Errorf("create identity service dummy password: %w", err)
 	}
-	return &Service{users: users, hasher: hasher, dummyHash: dummyHash, now: time.Now}, nil
+	return &Service{users: users, hasher: hasher, tokenIssuer: tokenIssuer, dummyHash: dummyHash, now: time.Now}, nil
 }
 
 func (s *Service) Register(ctx context.Context, input RegisterInput) (*domain.User, error) {
@@ -84,7 +99,7 @@ func (s *Service) Register(ctx context.Context, input RegisterInput) (*domain.Us
 	return user, nil
 }
 
-func (s *Service) Authenticate(ctx context.Context, input AuthenticateInput) (*domain.User, error) {
+func (s *Service) Authenticate(ctx context.Context, input AuthenticateInput) (*Authentication, error) {
 	identifier := strings.TrimSpace(input.Identifier)
 	if identifier == "" || len(identifier) > 320 || input.Password == "" || len([]byte(input.Password)) > 72 {
 		return nil, ErrInvalidCredentials
@@ -126,7 +141,11 @@ func (s *Service) Authenticate(ctx context.Context, input AuthenticateInput) (*d
 	if err := s.users.RecordLoginSuccess(ctx, user.ID); err != nil {
 		return nil, fmt.Errorf("record login success: %w", err)
 	}
-	return user, nil
+	accessToken, err := s.tokenIssuer.Issue(user)
+	if err != nil {
+		return nil, fmt.Errorf("issue access token: %w", err)
+	}
+	return &Authentication{User: user, AccessToken: accessToken}, nil
 }
 
 func (s *Service) GetUser(ctx context.Context, id int64) (*domain.User, error) {

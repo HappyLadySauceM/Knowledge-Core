@@ -14,7 +14,7 @@ import (
 type Client interface {
 	Ping(ctx context.Context, request *common.PingRequest, callOptions ...callopt.Option) (r *common.PingResponse, err error)
 	Register(ctx context.Context, request *identity.RegisterRequest, callOptions ...callopt.Option) (r *identity.User, err error)
-	Authenticate(ctx context.Context, request *identity.AuthenticateRequest, callOptions ...callopt.Option) (r *identity.User, err error)
+	Authenticate(ctx context.Context, request *identity.AuthenticateRequest, callOptions ...callopt.Option) (r *identity.Authentication, err error)
 	GetUser(ctx context.Context, request *identity.GetUserRequest, callOptions ...callopt.Option) (r *identity.User, err error)
 }
 
@@ -57,7 +57,7 @@ func (p *kIdentityServiceClient) Register(ctx context.Context, request *identity
 	return p.kClient.Register(ctx, request)
 }
 
-func (p *kIdentityServiceClient) Authenticate(ctx context.Context, request *identity.AuthenticateRequest, callOptions ...callopt.Option) (r *identity.User, err error) {
+func (p *kIdentityServiceClient) Authenticate(ctx context.Context, request *identity.AuthenticateRequest, callOptions ...callopt.Option) (r *identity.Authentication, err error) {
 	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
 	return p.kClient.Authenticate(ctx, request)
 }

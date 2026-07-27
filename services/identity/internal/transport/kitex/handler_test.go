@@ -47,17 +47,36 @@ func TestRegisterMapsConflictError(t *testing.T) {
 	}
 }
 
+func TestAuthenticateMapsAccessToken(t *testing.T) {
+	now := time.Date(2026, 7, 27, 3, 0, 0, 0, time.UTC)
+	application := &fakeApplication{authentication: &app.Authentication{
+		User:        testUser(),
+		AccessToken: app.AccessToken{Value: "signed-access-token", ExpiresAt: now.Add(15 * time.Minute)},
+	}}
+	response, err := identitykitex.NewHandler(application).Authenticate(context.Background(), &identityrpc.AuthenticateRequest{
+		Identifier: "alice",
+		Password:   "correct-password",
+	})
+	if err != nil {
+		t.Fatalf("Authenticate() error = %v", err)
+	}
+	if response.User.Id != 42 || response.AccessToken != "signed-access-token" || response.ExpiresAtUnix != now.Add(15*time.Minute).Unix() {
+		t.Fatalf("Authenticate() = %#v", response)
+	}
+}
+
 type fakeApplication struct {
-	user *domain.User
-	err  error
+	user           *domain.User
+	authentication *app.Authentication
+	err            error
 }
 
 func (f *fakeApplication) Register(context.Context, app.RegisterInput) (*domain.User, error) {
 	return f.user, f.err
 }
 
-func (f *fakeApplication) Authenticate(context.Context, app.AuthenticateInput) (*domain.User, error) {
-	return f.user, f.err
+func (f *fakeApplication) Authenticate(context.Context, app.AuthenticateInput) (*app.Authentication, error) {
+	return f.authentication, f.err
 }
 
 func (f *fakeApplication) GetUser(context.Context, int64) (*domain.User, error) {

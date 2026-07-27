@@ -13,7 +13,7 @@ import (
 
 func TestRegisterHashesPasswordAndMapsConflict(t *testing.T) {
 	repositoryFake := &fakeUsers{}
-	service, err := app.NewService(repositoryFake, fakeHasher{})
+	service, err := app.NewService(repositoryFake, fakeHasher{}, fakeTokenIssuer{})
 	if err != nil {
 		t.Fatalf("NewService() error = %v", err)
 	}
@@ -43,7 +43,7 @@ func TestRegisterHashesPasswordAndMapsConflict(t *testing.T) {
 func TestAuthenticateLocksAfterFiveFailures(t *testing.T) {
 	now := time.Date(2026, 7, 27, 3, 0, 0, 0, time.UTC)
 	repositoryFake := &fakeUsers{user: activeUser(now)}
-	service, err := app.NewService(repositoryFake, fakeHasher{})
+	service, err := app.NewService(repositoryFake, fakeHasher{}, fakeTokenIssuer{})
 	if err != nil {
 		t.Fatalf("NewService() error = %v", err)
 	}
@@ -68,22 +68,25 @@ func TestAuthenticateResetsFailures(t *testing.T) {
 	now := time.Now().UTC()
 	repositoryFake := &fakeUsers{user: activeUser(now)}
 	repositoryFake.user.FailedLoginAttempts = 2
-	service, _ := app.NewService(repositoryFake, fakeHasher{})
-	user, err := service.Authenticate(context.Background(), app.AuthenticateInput{
+	service, _ := app.NewService(repositoryFake, fakeHasher{}, fakeTokenIssuer{})
+	authentication, err := service.Authenticate(context.Background(), app.AuthenticateInput{
 		Identifier: "alice@example.com",
 		Password:   "correct-password",
 	})
 	if err != nil {
 		t.Fatalf("Authenticate() error = %v", err)
 	}
-	if user.ID != repositoryFake.user.ID || repositoryFake.user.FailedLoginAttempts != 0 {
-		t.Fatalf("Authenticate() user = %#v", user)
+	if authentication.User.ID != repositoryFake.user.ID || repositoryFake.user.FailedLoginAttempts != 0 {
+		t.Fatalf("Authenticate() result = %#v", authentication)
+	}
+	if authentication.AccessToken.Value == "" || authentication.AccessToken.ExpiresAt.IsZero() {
+		t.Fatalf("Authenticate() token = %#v", authentication.AccessToken)
 	}
 }
 
 func TestAuthenticateMissingUserStillComparesPassword(t *testing.T) {
 	hasher := &recordingHasher{}
-	service, err := app.NewService(&fakeUsers{}, hasher)
+	service, err := app.NewService(&fakeUsers{}, hasher, fakeTokenIssuer{})
 	if err != nil {
 		t.Fatalf("NewService() error = %v", err)
 	}
@@ -102,7 +105,7 @@ func TestAuthenticateMissingUserStillComparesPassword(t *testing.T) {
 func TestAuthenticateDoesNotRevealDisabledUserForWrongPassword(t *testing.T) {
 	repositoryFake := &fakeUsers{user: activeUser(time.Now().UTC())}
 	repositoryFake.user.Status = domain.StatusDisabled
-	service, err := app.NewService(repositoryFake, fakeHasher{})
+	service, err := app.NewService(repositoryFake, fakeHasher{}, fakeTokenIssuer{})
 	if err != nil {
 		t.Fatalf("NewService() error = %v", err)
 	}
@@ -153,6 +156,20 @@ func (*recordingHasher) Hash(password string) (string, error) { return "hashed:"
 func (h *recordingHasher) Compare(string, string) (bool, error) {
 	h.comparisons++
 	return false, nil
+}
+
+type fakeTokenIssuer struct {
+	err error
+}
+
+func (f fakeTokenIssuer) Issue(user *domain.User) (app.AccessToken, error) {
+	if f.err != nil {
+		return app.AccessToken{}, f.err
+	}
+	return app.AccessToken{
+		Value:     "access-token",
+		ExpiresAt: user.UpdatedAt.Add(15 * time.Minute),
+	}, nil
 }
 
 type fakeUsers struct {

@@ -30,6 +30,10 @@ func Run(ctx context.Context) (runErr error) {
 	}
 	logger := observability.NewJSONLogger(os.Stderr, cfg.LogLevel, cfg.Service)
 	observability.InstallCloudWeGoLoggers(os.Stderr, cfg.LogLevel, cfg.Service)
+	accessTokens, err := security.NewAccessTokenIssuer(os.Getenv("KC_IDENTITY_JWT_PRIVATE_KEY"))
+	if err != nil {
+		return fmt.Errorf("configure identity access tokens: %w", err)
+	}
 	if err := migrationpostgres.Up(ctx, cfg.Database.DSN); err != nil {
 		return fmt.Errorf("migrate identity database: %w", err)
 	}
@@ -52,7 +56,7 @@ func Run(ctx context.Context) (runErr error) {
 	if err != nil {
 		return err
 	}
-	application, err := identityapp.NewService(users, passwords)
+	application, err := identityapp.NewService(users, passwords, accessTokens)
 	if err != nil {
 		return err
 	}

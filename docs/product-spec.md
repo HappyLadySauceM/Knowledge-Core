@@ -255,13 +255,29 @@ migrations/
 ```powershell
 copy .env.example .env
 # 在 .env 中填写 KC_POSTGRES_PASSWORD 和 KC_DATABASE_DSN，并将运行时变量加载到各服务进程环境。
+
+# 生成本地 Ed25519 JWT 密钥并注入当前 PowerShell 进程。
+go run ./cmd/keygen | ForEach-Object {
+    $name, $value = $_ -split '=', 2
+    Set-Item -Path "Env:$name" -Value $value
+}
+
 docker compose -f docker/infrastructure/docker-compose.yml up -d postgres redis nats etcd
 
-# 分别启动四个进程
+# 认证 MVP 先启动 Identity 与 Gateway；其他业务切片按需启动。
 go run ./services/identity
-go run ./services/knowledge
-go run ./services/platform
 go run ./services/gateway
+```
+
+认证 MVP 验证：
+
+```powershell
+$body = @{ username = "alice"; email = "alice@example.com"; password = "correct-password" } | ConvertTo-Json
+Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8080/api/v1/auth/register -ContentType application/json -Body $body
+
+$body = @{ identifier = "alice"; password = "correct-password" } | ConvertTo-Json
+$login = Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8080/api/v1/auth/login -ContentType application/json -Body $body
+Invoke-RestMethod -Uri http://127.0.0.1:8080/api/v1/users/me -Headers @{ Authorization = "Bearer $($login.data.access_token)" }
 ```
 
 本地默认基础设施：
@@ -372,6 +388,8 @@ PATCH  /api/v1/studio/users/:id          # 修改用户资料/角色/状态（�
 DELETE /api/v1/studio/users/:id          # 禁用用户（仅 admin）
 PUT    /api/v1/studio/users/:id/password # 重置密码（仅 admin）
 ```
+
+当前认证 MVP 已实现 `register`、`login` 和 `users/me`。`refresh`、`logout`、个人资料修改和 Studio 用户管理仍属于后续切片。
 
 ### 前台与 Studio 的用户体验区分
 

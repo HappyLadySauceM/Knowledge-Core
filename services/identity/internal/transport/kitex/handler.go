@@ -14,18 +14,18 @@ import (
 )
 
 const (
-	CodeInvalidInput       int32 = 10001
-	CodeConflict           int32 = 10002
-	CodeInvalidCredentials int32 = 10003
-	CodeAccountLocked      int32 = 10004
-	CodeUserDisabled       int32 = 10005
-	CodeUserNotFound       int32 = 10006
-	CodeInternal           int32 = 10999
+	CodeInvalidInput       int32 = identityrpc.CodeInvalidInput
+	CodeConflict           int32 = identityrpc.CodeConflict
+	CodeInvalidCredentials int32 = identityrpc.CodeInvalidCredentials
+	CodeAccountLocked      int32 = identityrpc.CodeAccountLocked
+	CodeUserDisabled       int32 = identityrpc.CodeUserDisabled
+	CodeUserNotFound       int32 = identityrpc.CodeUserNotFound
+	CodeInternal           int32 = identityrpc.CodeInternal
 )
 
 type Application interface {
 	Register(ctx context.Context, input app.RegisterInput) (*domain.User, error)
-	Authenticate(ctx context.Context, input app.AuthenticateInput) (*domain.User, error)
+	Authenticate(ctx context.Context, input app.AuthenticateInput) (*app.Authentication, error)
 	GetUser(ctx context.Context, id int64) (*domain.User, error)
 }
 
@@ -64,24 +64,28 @@ func (h *Handler) Register(ctx context.Context, request *identityrpc.RegisterReq
 	return mapUser(user), nil
 }
 
-func (h *Handler) Authenticate(ctx context.Context, request *identityrpc.AuthenticateRequest) (*identityrpc.User, error) {
+func (h *Handler) Authenticate(ctx context.Context, request *identityrpc.AuthenticateRequest) (*identityrpc.Authentication, error) {
 	if request == nil {
 		return nil, kerrors.NewBizStatusError(CodeInvalidInput, "invalid authenticate request")
 	}
 	if h.application == nil {
 		return nil, internalError(ctx, errors.New("identity application is not configured"))
 	}
-	user, err := h.application.Authenticate(ctx, app.AuthenticateInput{
+	authentication, err := h.application.Authenticate(ctx, app.AuthenticateInput{
 		Identifier: request.Identifier,
 		Password:   request.Password,
 	})
 	if err != nil {
 		return nil, mapError(ctx, err)
 	}
-	if user == nil {
-		return nil, internalError(ctx, errors.New("identity authenticate returned no user"))
+	if authentication == nil || authentication.User == nil || authentication.AccessToken.Value == "" || authentication.AccessToken.ExpiresAt.IsZero() {
+		return nil, internalError(ctx, errors.New("identity authenticate returned an incomplete result"))
 	}
-	return mapUser(user), nil
+	return &identityrpc.Authentication{
+		User:          mapUser(authentication.User),
+		AccessToken:   authentication.AccessToken.Value,
+		ExpiresAtUnix: authentication.AccessToken.ExpiresAt.UTC().Unix(),
+	}, nil
 }
 
 func (h *Handler) GetUser(ctx context.Context, request *identityrpc.GetUserRequest) (*identityrpc.User, error) {

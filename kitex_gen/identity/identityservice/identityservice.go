@@ -210,7 +210,7 @@ func (p *kClient) Register(ctx context.Context, request *identity.RegisterReques
 	return _result.GetSuccess(), nil
 }
 
-func (p *kClient) Authenticate(ctx context.Context, request *identity.AuthenticateRequest) (r *identity.User, err error) {
+func (p *kClient) Authenticate(ctx context.Context, request *identity.AuthenticateRequest) (r *identity.Authentication, err error) {
 	var _args identity.IdentityServiceAuthenticateArgs
 	_args.Request = request
 	var _result identity.IdentityServiceAuthenticateResult

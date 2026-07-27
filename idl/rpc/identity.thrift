@@ -2,6 +2,14 @@ namespace go identity
 
 include "common.thrift"
 
+const i32 CodeInvalidInput = 20001
+const i32 CodeConflict = 20002
+const i32 CodeInvalidCredentials = 20003
+const i32 CodeAccountLocked = 20004
+const i32 CodeUserDisabled = 20005
+const i32 CodeUserNotFound = 20006
+const i32 CodeInternal = 20999
+
 struct User {
   1: required i64 id
   2: required string username
@@ -26,6 +34,12 @@ struct AuthenticateRequest {
   2: required string password
 }
 
+struct Authentication {
+  1: required User user
+  2: required string access_token
+  3: required i64 expires_at_unix
+}
+
 struct GetUserRequest {
   1: required i64 user_id
 }
@@ -33,6 +47,6 @@ struct GetUserRequest {
 service IdentityService {
   common.PingResponse Ping(1: common.PingRequest request)
   User Register(1: RegisterRequest request)
-  User Authenticate(1: AuthenticateRequest request)
+  Authentication Authenticate(1: AuthenticateRequest request)
   User GetUser(1: GetUserRequest request)
 }

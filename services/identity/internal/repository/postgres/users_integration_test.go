@@ -11,6 +11,7 @@ import (
 	"github.com/HappyLadySauce/Knowledge-Core/internal/foundation/database"
 	foundationpostgres "github.com/HappyLadySauce/Knowledge-Core/internal/foundation/database/postgres"
 	"github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/app"
+	"github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/domain"
 	migrationpostgres "github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/migration/postgres"
 	identitypostgres "github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/repository/postgres"
 	"github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/security"
@@ -42,7 +43,7 @@ func TestUserRepositoryIntegration(t *testing.T) {
 		t.Fatalf("NewUserRepository() error = %v", err)
 	}
 	hasher, _ := security.NewBcryptHasher(bcrypt.MinCost)
-	service, _ := app.NewService(users, hasher)
+	service, _ := app.NewService(users, hasher, integrationTokenIssuer{})
 	suffix := time.Now().UTC().UnixNano()
 	username := fmt.Sprintf("user_%d", suffix)
 	email := fmt.Sprintf("user_%d@example.com", suffix)
@@ -75,7 +76,7 @@ func TestUserRepositoryIntegration(t *testing.T) {
 		Identifier: email,
 		Password:   "correct-password",
 	})
-	if err != nil || authenticated.ID != registered.ID {
+	if err != nil || authenticated.User.ID != registered.ID || authenticated.AccessToken.Value == "" {
 		t.Fatalf("Authenticate() = %#v, %v", authenticated, err)
 	}
 
@@ -89,4 +90,10 @@ func TestUserRepositoryIntegration(t *testing.T) {
 	if !errors.Is(err, app.ErrAccountLocked) {
 		t.Fatalf("Authenticate() fifth attempt error = %v", err)
 	}
+}
+
+type integrationTokenIssuer struct{}
+
+func (integrationTokenIssuer) Issue(user *domain.User) (app.AccessToken, error) {
+	return app.AccessToken{Value: "integration-access-token", ExpiresAt: user.UpdatedAt.Add(15 * time.Minute)}, nil
 }
