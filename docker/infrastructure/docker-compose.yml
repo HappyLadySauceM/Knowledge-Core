@@ -1,10 +1,10 @@
 services:
   postgres:
-    image: postgres:16
+    image: postgres:16-alpine
     container_name: knowledge-core-postgres
     environment:
       POSTGRES_USER: knowledge_core
-      POSTGRES_PASSWORD: knowledge_core
+      POSTGRES_PASSWORD: ${KC_POSTGRES_PASSWORD:?KC_POSTGRES_PASSWORD is required}
       POSTGRES_DB: knowledge_core
     ports:
       - "5432:5432"
@@ -29,6 +29,42 @@ services:
     volumes:
       - knowledge-core-redis-data:/data
 
+  nats:
+    image: nats:2.11-alpine
+    container_name: knowledge-core-nats
+    command: ["-js", "-sd", "/data", "-m", "8222"]
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8222/healthz | grep -q ok"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - knowledge-core-nats-data:/data
+
+  etcd:
+    image: quay.io/coreos/etcd:v3.6.0
+    container_name: knowledge-core-etcd
+    command:
+      - /usr/local/bin/etcd
+      - --name=knowledge-core-etcd
+      - --data-dir=/etcd-data
+      - --listen-client-urls=http://0.0.0.0:2379
+      - --advertise-client-urls=http://etcd:2379
+    ports:
+      - "2379:2379"
+    healthcheck:
+      test: ["CMD", "etcdctl", "--endpoints=http://127.0.0.1:2379", "endpoint", "health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - knowledge-core-etcd-data:/etcd-data
+
 volumes:
   knowledge-core-postgres-data:
   knowledge-core-redis-data:
+  knowledge-core-nats-data:
+  knowledge-core-etcd-data:

@@ -1,6 +1,6 @@
 # Knowledge Core - Hertz + Kitex 服务框架设计
 
-> 状态：目标架构设计。当前仓库尚未实现本文中的 Go 服务、代码生成脚本与基础设施适配器；本文用于约束后续脚手架和业务开发。
+> 状态：基础框架 v0.1 已实现。四个进程入口、IDL/代码生成、Foundation 接口与首批 PostgreSQL/Redis/NATS/Etcd adapter 已落地；业务用例、仓储、迁移 SQL、RPC client 和完整可观测性仍按本文继续实现。
 
 ## 1. 设计目标
 
@@ -51,7 +51,7 @@ identity          knowledge          platform
 
 Etcd 同时承担三类职责，但 key 空间必须隔离：Kitex 注册发现、应用非敏感配置、Kitex 治理配置。数据库凭据、JWT 私钥、AI API Key 等敏感值只从环境变量或部署平台 Secret 注入。
 
-## 3. 目标目录
+## 3. 目录约定
 
 ```text
 .
@@ -132,7 +132,7 @@ Etcd 同时承担三类职责，但 key 空间必须隔离：Kitex 注册发现�
 `-- docker/infrastructure/
 ```
 
-现有 `api/`、`pkg/`、`proto/` 及旧服务空目录不是目标架构的一部分。实施脚手架时再迁移或删除，本文档阶段不改动这些目录。
+旧 `api/`、`pkg/`、`proto/` 及 `auth`、`user` 空服务目录已清理。目录树中的 `app`、`domain`、`repository`、RPC client、迁移命令和具体迁移 SQL 随对应业务切片建立，不预先创建空包。
 
 ## 4. 依赖方向
 
@@ -570,7 +570,9 @@ MQ 切换同理：新 adapter 必须证明 at-least-once、ack/nack、重投、�
 
 ## 14. 验证门槛
 
-后续框架实现至少需要以下测试：
+当前基础框架已覆盖配置、Sonic codec、生命周期、健康检查、adapter 边界、Hertz 健康路由和 Kitex Ping handler 的单元测试。进入业务实现后还必须补齐：
+
+日常开发统一使用根目录 Makefile：`make fmt` 修改格式，`make fmt-check`、`make vet`、`make lint` 和 `make test` 分别执行检查，`make check` 执行完整本地质量门槛，`make ci` 额外验证 Hertz/Kitex 生成代码没有漂移。`make line` 仅作为 `make lint` 的兼容别名。
 
 - 每个 foundation adapter 的 contract test，使用同一套用例验证接口语义。
 - 每个 repository Provider 的真实数据库 integration test，覆盖事务回滚、唯一约束、分页和锁冲突。

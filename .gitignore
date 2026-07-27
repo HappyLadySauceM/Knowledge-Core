@@ -1,0 +1,16 @@
+.vscode/
+.zed/
+.cursor/
+.codex/
+.cluade/
+
+.env
+.env.*
+!.env.example
+
+data/
+logs/
+bin/
+.tools/
+coverage.out
+*.exe

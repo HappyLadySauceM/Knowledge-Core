@@ -250,10 +250,11 @@ migrations/
 
 ## 本地开发运行
 
-本节描述项目脚手架完成后的目标流程。当前仓库尚未实现对应服务入口、迁移命令和完整 Compose 服务，不应将以下命令视为当前已可运行能力。
+基础脚手架已经提供四个服务入口以及 PostgreSQL、Redis、NATS JetStream、Etcd 的本地 Compose 环境。业务迁移命令和具体迁移 SQL 尚未实现，因此下面的基础设施启动命令可用，迁移与业务验证步骤仍是目标流程。
 
 ```powershell
 copy .env.example .env
+# 在 .env 中填写 KC_POSTGRES_PASSWORD 和 KC_DATABASE_DSN，并将运行时变量加载到各服务进程环境。
 docker compose -f docker/infrastructure/docker-compose.yml up -d postgres redis nats etcd
 
 # 分别执行各服务迁移
