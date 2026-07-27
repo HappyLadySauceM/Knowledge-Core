@@ -1,25 +1,20 @@
 GOLANGCI_LINT_VERSION ?= v2.12.2
-TOOLS_BIN := .tools/bin/$(GOLANGCI_LINT_VERSION)
+GOLANGCI_LINT = go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
 
 ifneq ($(strip $(ComSpec)),)
-EXE := .exe
-INSTALL_GOLANGCI_LINT = powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install-tools.ps1 -Version $(GOLANGCI_LINT_VERSION) -OutputDirectory "$(TOOLS_BIN)"
 CODEGEN = powershell -NoProfile -ExecutionPolicy Bypass -File scripts/codegen.ps1
+CODEGEN_CHECK = $(CODEGEN) -Check
 else
-EXE :=
-INSTALL_GOLANGCI_LINT = bash scripts/install-tools.sh $(GOLANGCI_LINT_VERSION) "$(TOOLS_BIN)"
 CODEGEN = bash scripts/codegen.sh
+CODEGEN_CHECK = $(CODEGEN) --check
 endif
-
-GOLANGCI_LINT := $(TOOLS_BIN)/golangci-lint$(EXE)
 
 .DEFAULT_GOAL := help
 
-.PHONY: help tools fmt fmt-check vet lint line test build tidy generate generate-check check ci
+.PHONY: help fmt fmt-check vet lint line test build tidy generate generate-check check ci
 
 help:
 	@echo Knowledge Core development targets:
-	@echo   make tools           Install pinned development tools locally
 	@echo   make fmt             Format all Go packages
 	@echo   make fmt-check       Check formatting without changing files
 	@echo   make vet             Run go vet
@@ -33,23 +28,17 @@ help:
 	@echo   make check           Run formatting, vet, lint, tests, and build
 	@echo   make ci              Run check plus generated-code drift detection
 
-tools: $(GOLANGCI_LINT)
-
-$(GOLANGCI_LINT):
-	@echo "Installing golangci-lint $(GOLANGCI_LINT_VERSION)..."
-	@$(INSTALL_GOLANGCI_LINT)
-
 fmt:
 	go fmt ./...
 
-fmt-check: $(GOLANGCI_LINT)
-	"$(GOLANGCI_LINT)" fmt --diff
+fmt-check:
+	$(GOLANGCI_LINT) fmt --diff
 
 vet:
 	go vet ./...
 
-lint: $(GOLANGCI_LINT)
-	"$(GOLANGCI_LINT)" run ./...
+lint:
+	$(GOLANGCI_LINT) run ./...
 
 line: lint
 
@@ -65,8 +54,8 @@ tidy:
 generate:
 	$(CODEGEN)
 
-generate-check: generate
-	git diff --exit-code -- kitex_gen services/gateway/biz
+generate-check:
+	$(CODEGEN_CHECK)
 
 check: fmt-check vet lint test build
 

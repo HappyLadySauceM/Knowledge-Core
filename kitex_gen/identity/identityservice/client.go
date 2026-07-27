@@ -5,6 +5,7 @@ package identityservice
 import (
 	"context"
 	common "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/common"
+	identity "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/identity"
 	client "github.com/cloudwego/kitex/client"
 	callopt "github.com/cloudwego/kitex/client/callopt"
 )
@@ -12,6 +13,9 @@ import (
 // Client is designed to provide IDL-compatible methods with call-option parameter for kitex framework.
 type Client interface {
 	Ping(ctx context.Context, request *common.PingRequest, callOptions ...callopt.Option) (r *common.PingResponse, err error)
+	Register(ctx context.Context, request *identity.RegisterRequest, callOptions ...callopt.Option) (r *identity.User, err error)
+	Authenticate(ctx context.Context, request *identity.AuthenticateRequest, callOptions ...callopt.Option) (r *identity.User, err error)
+	GetUser(ctx context.Context, request *identity.GetUserRequest, callOptions ...callopt.Option) (r *identity.User, err error)
 }
 
 // NewClient creates a client for the service defined in IDL.
@@ -46,4 +50,19 @@ type kIdentityServiceClient struct {
 func (p *kIdentityServiceClient) Ping(ctx context.Context, request *common.PingRequest, callOptions ...callopt.Option) (r *common.PingResponse, err error) {
 	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
 	return p.kClient.Ping(ctx, request)
+}
+
+func (p *kIdentityServiceClient) Register(ctx context.Context, request *identity.RegisterRequest, callOptions ...callopt.Option) (r *identity.User, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.Register(ctx, request)
+}
+
+func (p *kIdentityServiceClient) Authenticate(ctx context.Context, request *identity.AuthenticateRequest, callOptions ...callopt.Option) (r *identity.User, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.Authenticate(ctx, request)
+}
+
+func (p *kIdentityServiceClient) GetUser(ctx context.Context, request *identity.GetUserRequest, callOptions ...callopt.Option) (r *identity.User, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.GetUser(ctx, request)
 }

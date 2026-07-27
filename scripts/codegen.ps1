@@ -1,11 +1,46 @@
+param(
+    [switch]$Check
+)
+
 $ErrorActionPreference = "Stop"
 
-Push-Location (Split-Path -Parent $PSScriptRoot)
+$repositoryRoot = Split-Path -Parent $PSScriptRoot
+$generatedRoots = @("kitex_gen", "services/gateway/biz")
+$repositoryPrefix = $repositoryRoot.TrimEnd("\", "/") + [System.IO.Path]::DirectorySeparatorChar
+
+function Get-SHA256 {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    $algorithm = [System.Security.Cryptography.SHA256]::Create()
+    $stream = [System.IO.File]::OpenRead($Path)
+    try {
+        return ([System.BitConverter]::ToString($algorithm.ComputeHash($stream))).Replace("-", "")
+    } finally {
+        $stream.Dispose()
+        $algorithm.Dispose()
+    }
+}
+
+function Get-GeneratedSnapshot {
+    $snapshot = @{}
+    foreach ($root in $generatedRoots) {
+        $absoluteRoot = Join-Path $repositoryRoot $root
+        Get-ChildItem -LiteralPath $absoluteRoot -Recurse -File | ForEach-Object {
+            $relativePath = $_.FullName.Substring($repositoryPrefix.Length).Replace("\", "/")
+            $snapshot[$relativePath] = Get-SHA256 -Path $_.FullName
+        }
+    }
+    return $snapshot
+}
+
+$before = if ($Check) { Get-GeneratedSnapshot } else { $null }
+
+Push-Location $repositoryRoot
 try {
-$module = "github.com/HappyLadySauce/Knowledge-Core"
-$kitexVersion = "v0.16.2"
-$hzVersion = "v0.9.7"
-$thriftgoVersion = "0.4.5"
+    $module = "github.com/HappyLadySauce/Knowledge-Core"
+    $kitexVersion = "v0.16.2"
+    $hzVersion = "v0.9.7"
+    $thriftgoVersion = "0.4.5"
 
 $actualKitexVersion = (& cmd.exe /d /c "kitex --version 2>&1" | Out-String).Trim()
 if ($LASTEXITCODE -ne 0) {
@@ -71,7 +106,24 @@ if ($LASTEXITCODE -ne 0) {
     throw "Hertz generation failed"
 }
 
-gofmt -w kitex_gen services/gateway/biz
+    gofmt -w kitex_gen services/gateway/biz
 } finally {
     Pop-Location
+}
+
+if ($Check) {
+    $after = Get-GeneratedSnapshot
+    $changed = @(
+        @($before.Keys) + @($after.Keys) |
+            Sort-Object -Unique |
+            Where-Object {
+                -not $before.ContainsKey($_) -or
+                -not $after.ContainsKey($_) -or
+                $before[$_] -ne $after[$_]
+            }
+    )
+    if ($changed.Count -ne 0) {
+        $changed | ForEach-Object { Write-Error "generated file changed: $_" }
+        throw "generated code is not up to date"
+    }
 }

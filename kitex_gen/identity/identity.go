@@ -8,8 +8,238 @@ import (
 	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/common"
 )
 
+type User struct {
+	Id            int64  `thrift:"id,1,required" frugal:"1,required,i64" json:"id"`
+	Username      string `thrift:"username,2,required" frugal:"2,required,string" json:"username"`
+	Email         string `thrift:"email,3,required" frugal:"3,required,string" json:"email"`
+	Role          string `thrift:"role,4,required" frugal:"4,required,string" json:"role"`
+	Status        string `thrift:"status,5,required" frugal:"5,required,string" json:"status"`
+	TokenVersion  int64  `thrift:"token_version,6,required" frugal:"6,required,i64" json:"token_version"`
+	Avatar        string `thrift:"avatar,7,required" frugal:"7,required,string" json:"avatar"`
+	Bio           string `thrift:"bio,8,required" frugal:"8,required,string" json:"bio"`
+	CreatedAtUnix int64  `thrift:"created_at_unix,9,required" frugal:"9,required,i64" json:"created_at_unix"`
+	UpdatedAtUnix int64  `thrift:"updated_at_unix,10,required" frugal:"10,required,i64" json:"updated_at_unix"`
+}
+
+func NewUser() *User {
+	return &User{}
+}
+
+func (p *User) InitDefault() {
+}
+
+func (p *User) GetId() (v int64) {
+	return p.Id
+}
+
+func (p *User) GetUsername() (v string) {
+	return p.Username
+}
+
+func (p *User) GetEmail() (v string) {
+	return p.Email
+}
+
+func (p *User) GetRole() (v string) {
+	return p.Role
+}
+
+func (p *User) GetStatus() (v string) {
+	return p.Status
+}
+
+func (p *User) GetTokenVersion() (v int64) {
+	return p.TokenVersion
+}
+
+func (p *User) GetAvatar() (v string) {
+	return p.Avatar
+}
+
+func (p *User) GetBio() (v string) {
+	return p.Bio
+}
+
+func (p *User) GetCreatedAtUnix() (v int64) {
+	return p.CreatedAtUnix
+}
+
+func (p *User) GetUpdatedAtUnix() (v int64) {
+	return p.UpdatedAtUnix
+}
+func (p *User) SetId(val int64) {
+	p.Id = val
+}
+func (p *User) SetUsername(val string) {
+	p.Username = val
+}
+func (p *User) SetEmail(val string) {
+	p.Email = val
+}
+func (p *User) SetRole(val string) {
+	p.Role = val
+}
+func (p *User) SetStatus(val string) {
+	p.Status = val
+}
+func (p *User) SetTokenVersion(val int64) {
+	p.TokenVersion = val
+}
+func (p *User) SetAvatar(val string) {
+	p.Avatar = val
+}
+func (p *User) SetBio(val string) {
+	p.Bio = val
+}
+func (p *User) SetCreatedAtUnix(val int64) {
+	p.CreatedAtUnix = val
+}
+func (p *User) SetUpdatedAtUnix(val int64) {
+	p.UpdatedAtUnix = val
+}
+
+func (p *User) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("User(%+v)", *p)
+}
+
+var fieldIDToName_User = map[int16]string{
+	1:  "id",
+	2:  "username",
+	3:  "email",
+	4:  "role",
+	5:  "status",
+	6:  "token_version",
+	7:  "avatar",
+	8:  "bio",
+	9:  "created_at_unix",
+	10: "updated_at_unix",
+}
+
+type RegisterRequest struct {
+	Username string `thrift:"username,1,required" frugal:"1,required,string" json:"username"`
+	Email    string `thrift:"email,2,required" frugal:"2,required,string" json:"email"`
+	Password string `thrift:"password,3,required" frugal:"3,required,string" json:"password"`
+}
+
+func NewRegisterRequest() *RegisterRequest {
+	return &RegisterRequest{}
+}
+
+func (p *RegisterRequest) InitDefault() {
+}
+
+func (p *RegisterRequest) GetUsername() (v string) {
+	return p.Username
+}
+
+func (p *RegisterRequest) GetEmail() (v string) {
+	return p.Email
+}
+
+func (p *RegisterRequest) GetPassword() (v string) {
+	return p.Password
+}
+func (p *RegisterRequest) SetUsername(val string) {
+	p.Username = val
+}
+func (p *RegisterRequest) SetEmail(val string) {
+	p.Email = val
+}
+func (p *RegisterRequest) SetPassword(val string) {
+	p.Password = val
+}
+
+func (p *RegisterRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("RegisterRequest(%+v)", *p)
+}
+
+var fieldIDToName_RegisterRequest = map[int16]string{
+	1: "username",
+	2: "email",
+	3: "password",
+}
+
+type AuthenticateRequest struct {
+	Identifier string `thrift:"identifier,1,required" frugal:"1,required,string" json:"identifier"`
+	Password   string `thrift:"password,2,required" frugal:"2,required,string" json:"password"`
+}
+
+func NewAuthenticateRequest() *AuthenticateRequest {
+	return &AuthenticateRequest{}
+}
+
+func (p *AuthenticateRequest) InitDefault() {
+}
+
+func (p *AuthenticateRequest) GetIdentifier() (v string) {
+	return p.Identifier
+}
+
+func (p *AuthenticateRequest) GetPassword() (v string) {
+	return p.Password
+}
+func (p *AuthenticateRequest) SetIdentifier(val string) {
+	p.Identifier = val
+}
+func (p *AuthenticateRequest) SetPassword(val string) {
+	p.Password = val
+}
+
+func (p *AuthenticateRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("AuthenticateRequest(%+v)", *p)
+}
+
+var fieldIDToName_AuthenticateRequest = map[int16]string{
+	1: "identifier",
+	2: "password",
+}
+
+type GetUserRequest struct {
+	UserId int64 `thrift:"user_id,1,required" frugal:"1,required,i64" json:"user_id"`
+}
+
+func NewGetUserRequest() *GetUserRequest {
+	return &GetUserRequest{}
+}
+
+func (p *GetUserRequest) InitDefault() {
+}
+
+func (p *GetUserRequest) GetUserId() (v int64) {
+	return p.UserId
+}
+func (p *GetUserRequest) SetUserId(val int64) {
+	p.UserId = val
+}
+
+func (p *GetUserRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("GetUserRequest(%+v)", *p)
+}
+
+var fieldIDToName_GetUserRequest = map[int16]string{
+	1: "user_id",
+}
+
 type IdentityService interface {
 	Ping(ctx context.Context, request *common.PingRequest) (r *common.PingResponse, err error)
+
+	Register(ctx context.Context, request *RegisterRequest) (r *User, err error)
+
+	Authenticate(ctx context.Context, request *AuthenticateRequest) (r *User, err error)
+
+	GetUser(ctx context.Context, request *GetUserRequest) (r *User, err error)
 }
 
 type IdentityServicePingArgs struct {
@@ -85,5 +315,233 @@ func (p *IdentityServicePingResult) String() string {
 }
 
 var fieldIDToName_IdentityServicePingResult = map[int16]string{
+	0: "success",
+}
+
+type IdentityServiceRegisterArgs struct {
+	Request *RegisterRequest `thrift:"request,1" frugal:"1,default,RegisterRequest" json:"request"`
+}
+
+func NewIdentityServiceRegisterArgs() *IdentityServiceRegisterArgs {
+	return &IdentityServiceRegisterArgs{}
+}
+
+func (p *IdentityServiceRegisterArgs) InitDefault() {
+}
+
+var IdentityServiceRegisterArgs_Request_DEFAULT *RegisterRequest
+
+func (p *IdentityServiceRegisterArgs) GetRequest() (v *RegisterRequest) {
+	if !p.IsSetRequest() {
+		return IdentityServiceRegisterArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+func (p *IdentityServiceRegisterArgs) SetRequest(val *RegisterRequest) {
+	p.Request = val
+}
+
+func (p *IdentityServiceRegisterArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *IdentityServiceRegisterArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("IdentityServiceRegisterArgs(%+v)", *p)
+}
+
+var fieldIDToName_IdentityServiceRegisterArgs = map[int16]string{
+	1: "request",
+}
+
+type IdentityServiceRegisterResult struct {
+	Success *User `thrift:"success,0,optional" frugal:"0,optional,User" json:"success,omitempty"`
+}
+
+func NewIdentityServiceRegisterResult() *IdentityServiceRegisterResult {
+	return &IdentityServiceRegisterResult{}
+}
+
+func (p *IdentityServiceRegisterResult) InitDefault() {
+}
+
+var IdentityServiceRegisterResult_Success_DEFAULT *User
+
+func (p *IdentityServiceRegisterResult) GetSuccess() (v *User) {
+	if !p.IsSetSuccess() {
+		return IdentityServiceRegisterResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *IdentityServiceRegisterResult) SetSuccess(x interface{}) {
+	p.Success = x.(*User)
+}
+
+func (p *IdentityServiceRegisterResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *IdentityServiceRegisterResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("IdentityServiceRegisterResult(%+v)", *p)
+}
+
+var fieldIDToName_IdentityServiceRegisterResult = map[int16]string{
+	0: "success",
+}
+
+type IdentityServiceAuthenticateArgs struct {
+	Request *AuthenticateRequest `thrift:"request,1" frugal:"1,default,AuthenticateRequest" json:"request"`
+}
+
+func NewIdentityServiceAuthenticateArgs() *IdentityServiceAuthenticateArgs {
+	return &IdentityServiceAuthenticateArgs{}
+}
+
+func (p *IdentityServiceAuthenticateArgs) InitDefault() {
+}
+
+var IdentityServiceAuthenticateArgs_Request_DEFAULT *AuthenticateRequest
+
+func (p *IdentityServiceAuthenticateArgs) GetRequest() (v *AuthenticateRequest) {
+	if !p.IsSetRequest() {
+		return IdentityServiceAuthenticateArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+func (p *IdentityServiceAuthenticateArgs) SetRequest(val *AuthenticateRequest) {
+	p.Request = val
+}
+
+func (p *IdentityServiceAuthenticateArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *IdentityServiceAuthenticateArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("IdentityServiceAuthenticateArgs(%+v)", *p)
+}
+
+var fieldIDToName_IdentityServiceAuthenticateArgs = map[int16]string{
+	1: "request",
+}
+
+type IdentityServiceAuthenticateResult struct {
+	Success *User `thrift:"success,0,optional" frugal:"0,optional,User" json:"success,omitempty"`
+}
+
+func NewIdentityServiceAuthenticateResult() *IdentityServiceAuthenticateResult {
+	return &IdentityServiceAuthenticateResult{}
+}
+
+func (p *IdentityServiceAuthenticateResult) InitDefault() {
+}
+
+var IdentityServiceAuthenticateResult_Success_DEFAULT *User
+
+func (p *IdentityServiceAuthenticateResult) GetSuccess() (v *User) {
+	if !p.IsSetSuccess() {
+		return IdentityServiceAuthenticateResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *IdentityServiceAuthenticateResult) SetSuccess(x interface{}) {
+	p.Success = x.(*User)
+}
+
+func (p *IdentityServiceAuthenticateResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *IdentityServiceAuthenticateResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("IdentityServiceAuthenticateResult(%+v)", *p)
+}
+
+var fieldIDToName_IdentityServiceAuthenticateResult = map[int16]string{
+	0: "success",
+}
+
+type IdentityServiceGetUserArgs struct {
+	Request *GetUserRequest `thrift:"request,1" frugal:"1,default,GetUserRequest" json:"request"`
+}
+
+func NewIdentityServiceGetUserArgs() *IdentityServiceGetUserArgs {
+	return &IdentityServiceGetUserArgs{}
+}
+
+func (p *IdentityServiceGetUserArgs) InitDefault() {
+}
+
+var IdentityServiceGetUserArgs_Request_DEFAULT *GetUserRequest
+
+func (p *IdentityServiceGetUserArgs) GetRequest() (v *GetUserRequest) {
+	if !p.IsSetRequest() {
+		return IdentityServiceGetUserArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+func (p *IdentityServiceGetUserArgs) SetRequest(val *GetUserRequest) {
+	p.Request = val
+}
+
+func (p *IdentityServiceGetUserArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *IdentityServiceGetUserArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("IdentityServiceGetUserArgs(%+v)", *p)
+}
+
+var fieldIDToName_IdentityServiceGetUserArgs = map[int16]string{
+	1: "request",
+}
+
+type IdentityServiceGetUserResult struct {
+	Success *User `thrift:"success,0,optional" frugal:"0,optional,User" json:"success,omitempty"`
+}
+
+func NewIdentityServiceGetUserResult() *IdentityServiceGetUserResult {
+	return &IdentityServiceGetUserResult{}
+}
+
+func (p *IdentityServiceGetUserResult) InitDefault() {
+}
+
+var IdentityServiceGetUserResult_Success_DEFAULT *User
+
+func (p *IdentityServiceGetUserResult) GetSuccess() (v *User) {
+	if !p.IsSetSuccess() {
+		return IdentityServiceGetUserResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *IdentityServiceGetUserResult) SetSuccess(x interface{}) {
+	p.Success = x.(*User)
+}
+
+func (p *IdentityServiceGetUserResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *IdentityServiceGetUserResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("IdentityServiceGetUserResult(%+v)", *p)
+}
+
+var fieldIDToName_IdentityServiceGetUserResult = map[int16]string{
 	0: "success",
 }

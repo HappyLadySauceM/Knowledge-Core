@@ -133,10 +133,10 @@ internal/
     lifecycle/
 kitex_gen/
 services/
-  gateway/{cmd,biz,internal}/
-  identity/{cmd,internal}/
-  knowledge/{cmd,internal}/
-  platform/{cmd,internal}/
+  gateway/{main.go,biz,internal}/
+  identity/{main.go,internal}/
+  knowledge/{main.go,internal}/
+  platform/{main.go,internal}/
 migrations/
   identity/postgres/
   knowledge/postgres/
@@ -147,7 +147,7 @@ scripts/
 docker/infrastructure/
 ```
 
-- 仓库使用一个 `go.mod`，服务进程入口位于 `services/<service>/cmd/`；依赖通过普通构造函数显式装配，不使用 Wire/Fx。
+- 仓库使用一个 `go.mod`，服务进程入口统一位于 `services/<service>/main.go`；依赖通过普通构造函数显式装配，不使用 Wire/Fx。
 - Thrift IDL 是内部 RPC 的唯一契约来源，生成代码统一放在 `kitex_gen/`，不得手工修改。
 - HTTP IDL 放在 `idl/http/v1/`，内部 Thrift RPC IDL 放在 `idl/rpc/`；Hertz 与 Kitex 生成代码只做传输适配，不写业务规则。
 - `internal/foundation` 只放 JSON、配置、数据库、缓存、消息、注册发现、可观测性和生命周期等基础设施能力，不承载业务规则。
@@ -250,23 +250,18 @@ migrations/
 
 ## 本地开发运行
 
-基础脚手架已经提供四个服务入口以及 PostgreSQL、Redis、NATS JetStream、Etcd 的本地 Compose 环境。业务迁移命令和具体迁移 SQL 尚未实现，因此下面的基础设施启动命令可用，迁移与业务验证步骤仍是目标流程。
+基础脚手架已经提供四个服务入口以及 PostgreSQL、Redis、NATS JetStream、Etcd 的本地 Compose 环境。Identity 首条 PostgreSQL migration 已嵌入服务并在启动时自动执行；Knowledge 与 Platform 的迁移链随对应业务切片建立，并遵循相同启动规则。
 
 ```powershell
 copy .env.example .env
 # 在 .env 中填写 KC_POSTGRES_PASSWORD 和 KC_DATABASE_DSN，并将运行时变量加载到各服务进程环境。
 docker compose -f docker/infrastructure/docker-compose.yml up -d postgres redis nats etcd
 
-# 分别执行各服务迁移
-go run ./services/identity/cmd/migrate --provider postgres up
-go run ./services/knowledge/cmd/migrate --provider postgres up
-go run ./services/platform/cmd/migrate --provider postgres up
-
 # 分别启动四个进程
-go run ./services/identity/cmd/identity
-go run ./services/knowledge/cmd/knowledge
-go run ./services/platform/cmd/platform
-go run ./services/gateway/cmd/gateway
+go run ./services/identity
+go run ./services/knowledge
+go run ./services/platform
+go run ./services/gateway
 ```
 
 本地默认基础设施：

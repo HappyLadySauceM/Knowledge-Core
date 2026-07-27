@@ -4,6 +4,32 @@ set -euo pipefail
 repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repository_root"
 
+check=false
+if [[ "${1:-}" == "--check" ]]; then
+  check=true
+  shift
+fi
+if (( $# != 0 )); then
+  echo "usage: $0 [--check]" >&2
+  exit 2
+fi
+
+snapshot() {
+  find kitex_gen services/gateway/biz -type f -print0 \
+    | sort -z \
+    | while IFS= read -r -d '' file; do
+        hash="$(sha256sum "$file" | awk '{print $1}')"
+        printf '%s  %s\n' "$hash" "$file"
+      done
+}
+
+if $check; then
+  before="$(mktemp)"
+  after="$(mktemp)"
+  trap 'rm -f "$before" "$after"' EXIT
+  snapshot >"$before"
+fi
+
 module="github.com/HappyLadySauce/Knowledge-Core"
 kitex_version="v0.16.2"
 hz_version="v0.9.7"
@@ -57,3 +83,12 @@ else
 fi
 
 gofmt -w kitex_gen services/gateway/biz
+
+if $check; then
+  snapshot >"$after"
+  if ! cmp -s "$before" "$after"; then
+    diff -u "$before" "$after" || true
+    echo "generated code is not up to date" >&2
+    exit 1
+  fi
+fi

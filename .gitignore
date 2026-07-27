@@ -11,6 +11,5 @@
 data/
 logs/
 bin/
-.tools/
 coverage.out
 *.exe

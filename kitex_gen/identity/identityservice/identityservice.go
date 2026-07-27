@@ -21,6 +21,27 @@ var serviceMethods = map[string]kitex.MethodInfo{
 		false,
 		kitex.WithStreamingMode(kitex.StreamingNone),
 	),
+	"Register": kitex.NewMethodInfo(
+		registerHandler,
+		newIdentityServiceRegisterArgs,
+		newIdentityServiceRegisterResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
+	"Authenticate": kitex.NewMethodInfo(
+		authenticateHandler,
+		newIdentityServiceAuthenticateArgs,
+		newIdentityServiceAuthenticateResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
+	"GetUser": kitex.NewMethodInfo(
+		getUserHandler,
+		newIdentityServiceGetUserArgs,
+		newIdentityServiceGetUserResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
 }
 
 var (
@@ -105,6 +126,60 @@ func newIdentityServicePingResult() interface{} {
 	return identity.NewIdentityServicePingResult()
 }
 
+func registerHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*identity.IdentityServiceRegisterArgs)
+	realResult := result.(*identity.IdentityServiceRegisterResult)
+	success, err := handler.(identity.IdentityService).Register(ctx, realArg.Request)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newIdentityServiceRegisterArgs() interface{} {
+	return identity.NewIdentityServiceRegisterArgs()
+}
+
+func newIdentityServiceRegisterResult() interface{} {
+	return identity.NewIdentityServiceRegisterResult()
+}
+
+func authenticateHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*identity.IdentityServiceAuthenticateArgs)
+	realResult := result.(*identity.IdentityServiceAuthenticateResult)
+	success, err := handler.(identity.IdentityService).Authenticate(ctx, realArg.Request)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newIdentityServiceAuthenticateArgs() interface{} {
+	return identity.NewIdentityServiceAuthenticateArgs()
+}
+
+func newIdentityServiceAuthenticateResult() interface{} {
+	return identity.NewIdentityServiceAuthenticateResult()
+}
+
+func getUserHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*identity.IdentityServiceGetUserArgs)
+	realResult := result.(*identity.IdentityServiceGetUserResult)
+	success, err := handler.(identity.IdentityService).GetUser(ctx, realArg.Request)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newIdentityServiceGetUserArgs() interface{} {
+	return identity.NewIdentityServiceGetUserArgs()
+}
+
+func newIdentityServiceGetUserResult() interface{} {
+	return identity.NewIdentityServiceGetUserResult()
+}
+
 type kClient struct {
 	c client.Client
 }
@@ -120,6 +195,36 @@ func (p *kClient) Ping(ctx context.Context, request *common.PingRequest) (r *com
 	_args.Request = request
 	var _result identity.IdentityServicePingResult
 	if err = p.c.Call(ctx, "Ping", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) Register(ctx context.Context, request *identity.RegisterRequest) (r *identity.User, err error) {
+	var _args identity.IdentityServiceRegisterArgs
+	_args.Request = request
+	var _result identity.IdentityServiceRegisterResult
+	if err = p.c.Call(ctx, "Register", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) Authenticate(ctx context.Context, request *identity.AuthenticateRequest) (r *identity.User, err error) {
+	var _args identity.IdentityServiceAuthenticateArgs
+	_args.Request = request
+	var _result identity.IdentityServiceAuthenticateResult
+	if err = p.c.Call(ctx, "Authenticate", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) GetUser(ctx context.Context, request *identity.GetUserRequest) (r *identity.User, err error) {
+	var _args identity.IdentityServiceGetUserArgs
+	_args.Request = request
+	var _result identity.IdentityServiceGetUserResult
+	if err = p.c.Call(ctx, "GetUser", &_args, &_result); err != nil {
 		return
 	}
 	return _result.GetSuccess(), nil

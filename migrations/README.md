@@ -8,11 +8,13 @@ migrations/<service>/<provider>/<version>_<name>.up.sql
 migrations/<service>/<provider>/<version>_<name>.down.sql
 ```
 
-The initial PostgreSQL chains will be created under:
+PostgreSQL migration chains live under:
 
-- `migrations/identity/postgres/`
+- `migrations/identity/postgres/` (Identity users migration implemented)
 - `migrations/knowledge/postgres/`
 - `migrations/platform/postgres/`
 
-Services do not run migrations during startup. A later migration command or
-the deployment pipeline must execute only the current service/provider chain.
+Each owner service embeds its provider-specific SQL files and automatically
+applies all up migrations before repositories, consumers, or network listeners
+start. A migration error or dirty version prevents the service from becoming
+ready. The database driver's migration lock serializes concurrent replicas.

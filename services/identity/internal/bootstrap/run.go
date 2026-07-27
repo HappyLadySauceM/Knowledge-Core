@@ -11,6 +11,10 @@ import (
 	foundationbootstrap "github.com/HappyLadySauce/Knowledge-Core/internal/foundation/bootstrap"
 	"github.com/HappyLadySauce/Knowledge-Core/internal/foundation/observability"
 	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/identity/identityservice"
+	identityapp "github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/app"
+	migrationpostgres "github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/migration/postgres"
+	identitypostgres "github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/repository/postgres"
+	"github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/security"
 	identitykitex "github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/transport/kitex"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/server"
@@ -26,6 +30,10 @@ func Run(ctx context.Context) (runErr error) {
 	}
 	logger := observability.NewJSONLogger(os.Stderr, cfg.LogLevel, cfg.Service)
 	observability.InstallCloudWeGoLoggers(os.Stderr, cfg.LogLevel, cfg.Service)
+	if err := migrationpostgres.Up(ctx, cfg.Database.DSN); err != nil {
+		return fmt.Errorf("migrate identity database: %w", err)
+	}
+	logger.InfoContext(ctx, "identity database migrations completed")
 	resources, err := foundationbootstrap.Open(ctx, cfg, needs)
 	if err != nil {
 		return err
@@ -36,13 +44,25 @@ func Run(ctx context.Context) (runErr error) {
 		defer cancel()
 		runErr = errors.Join(runErr, resources.Close(closeCtx))
 	}()
+	users, err := identitypostgres.NewUserRepository(resources.Database)
+	if err != nil {
+		return err
+	}
+	passwords, err := security.NewBcryptHasher(security.DefaultBcryptCost)
+	if err != nil {
+		return err
+	}
+	application, err := identityapp.NewService(users, passwords)
+	if err != nil {
+		return err
+	}
 
 	address, err := net.ResolveTCPAddr("tcp", cfg.ListenAddress)
 	if err != nil {
 		return fmt.Errorf("resolve identity RPC address: %w", err)
 	}
 	rpcServer := identityservice.NewServer(
-		identitykitex.NewHandler(),
+		identitykitex.NewHandler(application),
 		server.WithServiceAddr(address),
 		server.WithServerBasicInfo(&rpcinfo.EndpointBasicInfo{ServiceName: serviceName}),
 		server.WithRegistry(resources.Registry),

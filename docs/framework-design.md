@@ -1,6 +1,6 @@
 # Knowledge Core - Hertz + Kitex 服务框架设计
 
-> 状态：基础框架 v0.1 已实现。四个进程入口、IDL/代码生成、Foundation 接口与首批 PostgreSQL/Redis/NATS/Etcd adapter 已落地；业务用例、仓储、迁移 SQL、RPC client 和完整可观测性仍按本文继续实现。
+> 状态：基础框架 v0.1 已实现。四个进程入口、IDL/代码生成、Foundation 接口与首批 PostgreSQL/Redis/NATS/Etcd adapter 已落地；Identity 已完成用户注册、凭据校验、查询和首条 PostgreSQL migration，Token、其他业务用例、RPC client 和完整可观测性仍按本文继续实现。
 
 ## 1. 设计目标
 
@@ -68,7 +68,7 @@ Etcd 同时承担三类职责，但 key 空间必须隔离：Kitex 注册发现�
 |-- kitex_gen/                       # Kitex 生成代码，不手工修改
 |-- services/
 |   |-- gateway/
-|   |   |-- cmd/gateway/main.go
+|   |   |-- main.go
 |   |   |-- biz/                     # Hertz 生成的 handler/model/router 适配层
 |   |   `-- internal/
 |   |       |-- app/
@@ -76,9 +76,7 @@ Etcd 同时承担三类职责，但 key 空间必须隔离：Kitex 注册发现�
 |   |       |-- middleware/
 |   |       `-- bootstrap/
 |   |-- identity/
-|   |   |-- cmd/
-|   |   |   |-- identity/main.go
-|   |   |   `-- migrate/main.go
+|   |   |-- main.go
 |   |   `-- internal/
 |   |       |-- app/
 |   |       |-- domain/
@@ -86,9 +84,7 @@ Etcd 同时承担三类职责，但 key 空间必须隔离：Kitex 注册发现�
 |   |       |-- transport/kitex/
 |   |       `-- bootstrap/
 |   |-- knowledge/
-|   |   |-- cmd/
-|   |   |   |-- knowledge/main.go
-|   |   |   `-- migrate/main.go
+|   |   |-- main.go
 |   |   `-- internal/
 |   |       |-- app/
 |   |       |-- domain/
@@ -96,9 +92,7 @@ Etcd 同时承担三类职责，但 key 空间必须隔离：Kitex 注册发现�
 |   |       |-- transport/kitex/
 |   |       `-- bootstrap/
 |   `-- platform/
-|       |-- cmd/
-|       |   |-- platform/main.go
-|       |   `-- migrate/main.go
+|       |-- main.go
 |       `-- internal/
 |           |-- app/
 |           |-- domain/
@@ -466,15 +460,16 @@ func NewDatabaseProvider(name string) (database.Provider, error) {
 
 1. 解析命令行、环境变量与 bootstrap 配置，初始化最小 stderr logger。
 2. 创建 Sonic codec、正式 logger 和 OpenTelemetry providers。
-3. 连接 Etcd，读取 common/service/Kitex 配置，严格解码并校验强类型配置。
-4. 创建数据库、缓存、消息和对象存储等必要 adapter，执行 `Ping`。
-5. 创建 Kitex registry/resolver、RPC clients、repositories 和 application services。
-6. 创建 Outbox publisher、消息 consumers 和 Hertz/Kitex transport handlers。
-7. 注册生命周期与健康检查；启动后台 worker 和 consumer。
-8. 启动 Kitex server 或 Hertz server。Kitex 服务使用 Etcd registry 发布实例。
-9. 所有必需依赖与监听端口成功后将 readiness 置为 ready。
+3. 使用已校验的数据库配置执行本服务、本 Provider 的嵌入式 up migration。
+4. 连接 Etcd，读取 common/service/Kitex 配置，严格解码并校验强类型配置。
+5. 创建数据库、缓存、消息和对象存储等必要 adapter，执行 `Ping`。
+6. 创建 Kitex registry/resolver、RPC clients、repositories 和 application services。
+7. 创建 Outbox publisher、消息 consumers 和 Hertz/Kitex transport handlers。
+8. 注册生命周期与健康检查；启动后台 worker 和 consumer。
+9. 启动 Kitex server 或 Hertz server。Kitex 服务使用 Etcd registry 发布实例。
+10. 所有必需依赖与监听端口成功后将 readiness 置为 ready。
 
-任一步失败都必须按已创建资源的逆序关闭并以非零状态退出。服务启动不隐式执行数据库迁移。
+服务启动先执行本服务、本 Provider 的嵌入式数据库 migration，再初始化其他基础设施和传输层。任一步失败都必须按已创建资源的逆序关闭并以非零状态退出；migration 失败时服务不得进入 serving 状态。
 
 ### 8.2 退出
 
@@ -511,13 +506,13 @@ func NewDatabaseProvider(name string) (database.Provider, error) {
 
 ## 11. 代码生成
 
-`scripts/codegen.ps1` 与 `scripts/codegen.sh` 必须执行相同版本、相同参数的生成流程：
+`scripts/codegen.ps1` 与 `scripts/codegen.sh` 必须执行相同版本、相同参数的生成流程；两个脚本都通过 `--check`（PowerShell 为 `-Check`）在生成前后比较文件快照：
 
 1. 校验 `hz`、`kitex` 和 Thrift 插件版本。
 2. 从 `idl/http/v1/` 生成 Hertz model、handler 和 router。
 3. 从 `idl/rpc/` 生成 `kitex_gen/` 客户端和服务端契约。
 4. 执行格式化，并检查生成结果没有超出约定目录。
-5. CI 重新生成并执行 `git diff --exit-code`，防止 IDL 与生成代码不一致。
+5. CI 重新生成并比较生成目录快照，防止 IDL 与生成代码不一致，同时不受工作区中其他未提交修改影响。
 
 生成器版本通过仓库工具依赖或脚本常量固定。生成代码评审关注 IDL 差异，禁止以手工修改生成文件修复问题。
 
@@ -539,7 +534,9 @@ migrations/identity/postgres/000001_create_users.down.sql
 
 - 每个服务只能执行自己的目录，Provider 必须与运行时数据库 Provider 一致。
 - 每条迁移提供配对的 up/down；不可逆变更必须在评审中显式说明恢复方式。
-- 服务启动不自动迁移，迁移由发布流程中的独立命令执行。
+- migration SQL 通过服务所属的 Go package 嵌入二进制；服务启动时自动执行当前 Provider 的全部 up migration。
+- 自动迁移必须在 repository、消息消费者和网络监听启动前完成；失败或 dirty version 必须阻止服务启动。
+- 多实例并发启动依赖数据库 migration driver 的互斥锁串行执行，不自行实现分布式锁。
 - 新 Provider 必须建立自己的完整 migration 链，不能直接假设 PostgreSQL migration 可运行。
 - 跨版本发布遵循 expand/migrate/contract，先兼容旧代码，再回填数据，最后移除旧结构。
 
@@ -572,7 +569,9 @@ MQ 切换同理：新 adapter 必须证明 at-least-once、ack/nack、重投、�
 
 当前基础框架已覆盖配置、Sonic codec、生命周期、健康检查、adapter 边界、Hertz 健康路由和 Kitex Ping handler 的单元测试。进入业务实现后还必须补齐：
 
-日常开发统一使用根目录 Makefile：`make fmt` 修改格式，`make fmt-check`、`make vet`、`make lint` 和 `make test` 分别执行检查，`make check` 执行完整本地质量门槛，`make ci` 额外验证 Hertz/Kitex 生成代码没有漂移。`make line` 仅作为 `make lint` 的兼容别名。
+日常开发统一使用根目录 Makefile：`make fmt` 修改格式，`make fmt-check`、`make vet`、`make lint` 和 `make test` 分别执行检查，`make check` 执行完整本地质量门槛，`make ci` 额外验证 Hertz/Kitex 生成代码没有漂移。`make line` 仅作为 `make lint` 的兼容别名。golangci-lint 由固定版本的 `go run` 调用，不在仓库内维护工具二进制。
+
+Identity 使用 `KC_DATABASE_DSN` 在启动阶段自动应用嵌入二进制的 PostgreSQL migration；成功后才继续初始化 repository 和 Kitex server。migration 不属于通用 Makefile 目标。
 
 - 每个 foundation adapter 的 contract test，使用同一套用例验证接口语义。
 - 每个 repository Provider 的真实数据库 integration test，覆盖事务回滚、唯一约束、分页和锁冲突。
