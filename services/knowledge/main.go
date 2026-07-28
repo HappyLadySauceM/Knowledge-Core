@@ -1,16 +1,16 @@
 package main
 
 import (
-	"context"
 	"os"
 
+	"github.com/HappyLadySauce/Knowledge-Core/internal/foundation/command"
 	"github.com/HappyLadySauce/Knowledge-Core/internal/foundation/observability"
 	"github.com/HappyLadySauce/Knowledge-Core/services/knowledge/internal/bootstrap"
 )
 
 func main() {
-	if err := bootstrap.Run(context.Background()); err != nil {
-		observability.NewJSONLogger(os.Stderr, "error", "knowledge").Error("knowledge failed", "error", err)
+	if err := command.Execute("knowledge", bootstrap.Run); err != nil {
+		observability.NewBootstrapLogger(os.Stderr, "knowledge").Error("knowledge failed", "error", err)
 		os.Exit(1)
 	}
 }

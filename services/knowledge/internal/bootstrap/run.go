@@ -4,11 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net"
 	"os"
 
 	foundationbootstrap "github.com/HappyLadySauce/Knowledge-Core/internal/foundation/bootstrap"
+	"github.com/HappyLadySauce/Knowledge-Core/internal/foundation/lifecycle"
 	"github.com/HappyLadySauce/Knowledge-Core/internal/foundation/observability"
 	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/knowledge/knowledgeservice"
 	knowledgekitex "github.com/HappyLadySauce/Knowledge-Core/services/knowledge/internal/transport/kitex"
@@ -24,35 +24,70 @@ func Run(ctx context.Context) (runErr error) {
 	if err != nil {
 		return err
 	}
-	logger := observability.NewJSONLogger(os.Stderr, cfg.LogLevel, cfg.Service)
-	observability.InstallCloudWeGoLoggers(os.Stderr, cfg.LogLevel, cfg.Service)
+	cfg.Observability.Output = os.Stderr
+	telemetry, err := observability.New(ctx, cfg.Observability)
+	if err != nil {
+		return err
+	}
+	telemetry.InstallCloudWeGo()
+	logger := telemetry.Logger().With("component", "bootstrap")
+	cleanup := func(closeCtx context.Context) error { return telemetry.Shutdown(closeCtx) }
+	defer func() {
+		if cleanup == nil {
+			return
+		}
+		closeCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
+		defer cancel()
+		runErr = errors.Join(runErr, cleanup(closeCtx))
+	}()
 	resources, err := foundationbootstrap.Open(ctx, cfg, needs)
 	if err != nil {
 		return err
 	}
-	defer func() {
-		resources.SetServing(false)
-		closeCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
-		defer cancel()
-		runErr = errors.Join(runErr, resources.Close(closeCtx))
-	}()
+	cleanup = func(closeCtx context.Context) error {
+		return errors.Join(resources.Close(closeCtx), telemetry.Shutdown(closeCtx))
+	}
 
 	address, err := net.ResolveTCPAddr("tcp", cfg.ListenAddress)
 	if err != nil {
 		return fmt.Errorf("resolve knowledge RPC address: %w", err)
 	}
+	exitSignal := make(chan error, 1)
 	rpcServer := knowledgeservice.NewServer(
 		knowledgekitex.NewHandler(),
 		server.WithServiceAddr(address),
 		server.WithServerBasicInfo(&rpcinfo.EndpointBasicInfo{ServiceName: serviceName}),
 		server.WithRegistry(resources.Registry),
 		server.WithExitWaitTime(cfg.ShutdownTimeout),
+		server.WithExitSignal(func() <-chan error { return exitSignal }),
+		server.WithMiddleware(observability.KitexServerMiddleware(telemetry)),
 	)
-	resources.SetServing(true)
-	logger.LogAttrs(ctx, slog.LevelInfo, "knowledge RPC server starting", slog.String("address", cfg.ListenAddress))
-	if err := rpcServer.Run(); err != nil {
-		return fmt.Errorf("run knowledge RPC server: %w", err)
-	}
-	logger.InfoContext(ctx, "knowledge RPC server stopped")
-	return nil
+	managedCleanup := cleanup
+	cleanup = nil
+	runErr = lifecycle.Run(ctx, cfg.ShutdownTimeout, lifecycle.Process{
+		SetServing: func(serving bool) {
+			resources.SetServing(serving)
+			phase := "draining"
+			if serving {
+				phase = "ready"
+			}
+			logger.InfoContext(ctx, "knowledge lifecycle changed", "event", "application", "phase", phase, "address", cfg.ListenAddress)
+		},
+		Serve: func() error {
+			if serveErr := rpcServer.Run(); serveErr != nil {
+				return fmt.Errorf("run knowledge RPC server: %w", serveErr)
+			}
+			return nil
+		},
+		Shutdown: func(context.Context) error {
+			select {
+			case exitSignal <- nil:
+			default:
+			}
+			return nil
+		},
+		Close: managedCleanup,
+	})
+	logger.InfoContext(context.Background(), "knowledge RPC server stopped", "event", "application", "phase", "stopped")
+	return runErr
 }

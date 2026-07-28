@@ -1,6 +1,6 @@
 # Knowledge Core - Hertz + Kitex 服务框架设计
 
-> 状态：基础框架 v0.1 已实现。四个进程入口、IDL/代码生成、Foundation 接口与首批 PostgreSQL/Redis/NATS/Etcd adapter 已落地；Identity 已完成用户注册、凭据校验、Ed25519 Access Token、用户查询和首条 PostgreSQL migration，Gateway 已接通注册、登录和当前用户 HTTP API。Refresh Token、注销、撤销事件投影、其他业务用例和完整可观测性仍按本文继续实现。
+> 状态：基础框架 v0.1 已实现。四个 Cobra 进程入口、统一生命周期、IDL/代码生成、Foundation 接口与首批 PostgreSQL/Redis/NATS/Etcd adapter 已落地；统一 JSON 日志和 HTTP/Kitex OpenTelemetry tracing 已接入。Identity 已完成用户注册、凭据校验、Ed25519 Access Token、用户查询和首条 PostgreSQL migration，Gateway 已接通注册、登录和当前用户 HTTP API。Refresh Token、注销、撤销事件投影、其他业务用例和 Prometheus metrics 仍按本文继续实现。
 
 ## 1. 设计目标
 
@@ -101,6 +101,7 @@ Etcd 同时承担三类职责，但 key 空间必须隔离：Kitex 注册发现�
 |           `-- bootstrap/
 |-- internal/
 |   `-- foundation/
+|       |-- command/
 |       |-- codec/json/
 |       |-- config/
 |       |   |-- env/
@@ -371,10 +372,14 @@ Thrift RPC 使用 Kitex 生成的协议编解码，不经过 JSON codec。
 
 ### 5.7 可观测性、健康与生命周期
 
-- `observability` 统一创建 JSON logger、OpenTelemetry tracer/meter provider 和 Prometheus exporter。
-- HTTP、RPC 和消息 middleware 透传 `request_id`、`trace_id`、调用方服务与稳定错误码。
+- `observability` 以标准库 `log/slog` 为唯一日志核心，应用日志及 Hertz/Kitex 框架日志共享同一 JSON handler、等级和输出目标。
+- 固定日志字段包含 `service`、`environment`、`component`、`event`；有上下文时自动补充 `request_id`、`trace_id`、`span_id` 和 `user_id`。密码、Token、DSN、API Key、正文及 payload 按字段名统一脱敏。
+- HTTP access log 只记录方法、IDL 路由模板、状态码、耗时和响应大小；Kitex access log 只记录调用角色、服务、方法、耗时、结果及稳定业务码，不记录请求/响应 DTO。
+- OpenTelemetry 使用 W3C `traceparent`、`tracestate` 和 baggage，在 Hertz 与 Kitex metadata 间传播。配置绝对 OTLP gRPC URL 时启用批量导出；endpoint 为空时使用 no-op provider，不建立外部连接。
+- trace sampling 使用 `ParentBased(TraceIDRatioBased)`；入口默认采样率为 `1`，子调用遵循父 span 的采样决定。span attribute 不保存完整 URL、query、Token、正文或连接串。
 - `health` 分离 `/health/live` 与 `/health/ready`；liveness 不依赖外部组件，readiness 检查本服务必要依赖和配置状态。
-- `lifecycle` 管理带名称的启动/退出 hook、超时和逆序关闭，不允许各 adapter 自行捕获进程信号。
+- `command` 使用 Cobra 构建每个独立服务的根命令，由根命令统一捕获 `SIGINT`/`SIGTERM` 并取消服务上下文；当前不增加 `serve` 或 `migrate` 子命令。
+- `lifecycle` 统一执行 ready、serve、drain、transport shutdown 和 resource close。传输层 drain 与资源关闭使用独立超时，不允许 adapter、Hertz 或 Kitex bootstrap 自行捕获进程信号。
 - Token、密码、DSN、API Key、事件敏感 payload 和完整用户正文不得进入日志、指标 label 或 trace attribute。
 
 ## 6. 配置与 Etcd 约定
@@ -421,6 +426,10 @@ KC_MESSAGING_REALTIME_PROVIDER=nats
 KC_NATS_URL=nats://localhost:4222
 KC_CONFIG_PROVIDER=etcd
 KC_ETCD_ENDPOINTS=http://localhost:2379
+KC_SHUTDOWN_TIMEOUT=10s
+KC_LOG_LEVEL=info
+KC_OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
+KC_OTEL_TRACE_SAMPLE_RATIO=1
 ```
 
 所有服务使用同一字段命名规则，但每个进程只解析自己需要的配置。连接配置不得通过 RPC 或事件传播。
@@ -458,7 +467,7 @@ func NewDatabaseProvider(name string) (database.Provider, error) {
 
 ### 8.1 启动
 
-1. 解析命令行、环境变量与 bootstrap 配置，初始化最小 stderr logger。
+1. Cobra 根命令建立进程信号上下文；解析环境变量与 bootstrap 配置，初始化最小 stderr logger。
 2. 创建 Sonic codec、正式 logger 和 OpenTelemetry providers。
 3. 使用已校验的数据库配置执行本服务、本 Provider 的嵌入式 up migration。
 4. 连接 Etcd，读取 common/service/Kitex 配置，严格解码并校验强类型配置。
@@ -479,7 +488,7 @@ func NewDatabaseProvider(name string) (database.Provider, error) {
 4. 暂停消息拉取，等待已开始的 handler 完成 ack/nack。
 5. 停止 Outbox publisher 和后台 worker。
 6. 逆序关闭 RPC clients、Broker、cache、database 和 Etcd client。
-7. flush 日志、trace 和 metrics exporter 后退出。
+7. 使用独立资源关闭超时 flush trace exporter 后退出；JSON 日志直接写入进程 stderr，不维护异步缓冲区。
 
 所有 drain 步骤必须有独立超时，不能因单个外部依赖失联无限阻塞。
 
@@ -487,6 +496,8 @@ func NewDatabaseProvider(name string) (database.Provider, error) {
 
 - HTTP IDL 位于 `idl/http/v1/`，只描述公开 API、Studio API、健康接口及请求/响应 DTO。
 - Hertz 生成内容保留在 `services/gateway/biz/`；手写 application/client/bootstrap 代码放在 `internal/`。
+- `services/gateway/biz/router/router.go` 是唯一手写注册入口，按固定顺序安装全局 middleware 后调用 `GeneratedRegister`；URL 与 handler 映射仍以 IDL 生成路由为唯一事实来源。
+- 路由级认证/角色策略通过生成器保留的 middleware 函数挂载；受保护 API 不得只依赖 handler 内部检查。
 - handler 负责 binding、字段级校验、身份上下文提取、RPC DTO 映射和统一响应，不访问数据库。
 - middleware 顺序固定为 recovery、request ID、trace、access log、CORS、安全头、限流、认证、授权前置检查。
 - 统一响应与产品规格一致；文件流和 WebSocket upgrade 不套 JSON envelope。
@@ -500,7 +511,7 @@ func NewDatabaseProvider(name string) (database.Provider, error) {
 - 生成代码统一放 `kitex_gen/`；生成的 handler 骨架迁入对应服务的 `transport/kitex` 后只做适配。
 - Kitex server 使用 Etcd registry；Kitex client 使用 Etcd resolver 和稳定服务名。
 - 每个 client 必须配置 deadline、连接超时、重试边界和熔断策略。非幂等调用默认不自动重试。
-- metadata 仅传递 request/trace、调用方身份和必要认证上下文；原始 Token 不得写入日志。
+- metadata 使用 persistent metainfo 传递 `x-request-id`、W3C trace/baggage、调用方身份和必要认证上下文；原始 Token 不得写入日志。
 - 业务异常使用 Kitex `BizStatusError` 映射稳定错误码；基础设施错误在边界处转换，不泄漏 SQL、地址或堆栈。
 - IDL 字段只追加不复用编号，删除字段时保留编号；破坏性变更新建版本或新方法。
 
@@ -567,7 +578,7 @@ MQ 切换同理：新 adapter 必须证明 at-least-once、ack/nack、重投、�
 
 ## 14. 验证门槛
 
-当前基础框架已覆盖配置、Sonic codec、生命周期、健康检查、adapter 边界、Hertz 健康路由和 Kitex Ping handler 的单元测试。进入业务实现后还必须补齐：
+当前基础框架已覆盖 Cobra 命令上下文、生命周期关闭顺序、日志脱敏、HTTP/Kitex trace 父子关系、Gateway 路由门面、认证/角色策略、配置、Sonic codec、健康检查、adapter 边界和 Kitex Ping handler 的单元测试。进入业务实现后还必须补齐：
 
 日常开发统一使用根目录 Makefile：`make fmt` 修改格式，`make fmt-check`、`make vet`、`make lint` 和 `make test` 分别执行检查，`make check` 执行完整本地质量门槛，`make ci` 额外验证 Hertz/Kitex 生成代码没有漂移。`make line` 仅作为 `make lint` 的兼容别名。golangci-lint 由固定版本的 `go run` 调用，不在仓库内维护工具二进制。
 

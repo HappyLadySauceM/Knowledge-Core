@@ -4,16 +4,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"os"
 
 	foundationauth "github.com/HappyLadySauce/Knowledge-Core/internal/foundation/auth"
 	foundationbootstrap "github.com/HappyLadySauce/Knowledge-Core/internal/foundation/bootstrap"
+	"github.com/HappyLadySauce/Knowledge-Core/internal/foundation/lifecycle"
 	"github.com/HappyLadySauce/Knowledge-Core/internal/foundation/observability"
 	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/common"
 	"github.com/HappyLadySauce/Knowledge-Core/services/gateway/biz/router"
 	gatewayclient "github.com/HappyLadySauce/Knowledge-Core/services/gateway/internal/client"
 	"github.com/HappyLadySauce/Knowledge-Core/services/gateway/internal/middleware"
+	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/app/server"
 )
 
@@ -30,8 +31,22 @@ func Run(ctx context.Context) (runErr error) {
 		return err
 	}
 
-	logger := observability.NewJSONLogger(os.Stderr, cfg.LogLevel, cfg.Service)
-	observability.InstallCloudWeGoLoggers(os.Stderr, cfg.LogLevel, cfg.Service)
+	cfg.Observability.Output = os.Stderr
+	telemetry, err := observability.New(ctx, cfg.Observability)
+	if err != nil {
+		return err
+	}
+	telemetry.InstallCloudWeGo()
+	logger := telemetry.Logger().With("component", "bootstrap")
+	cleanup := func(closeCtx context.Context) error { return telemetry.Shutdown(closeCtx) }
+	defer func() {
+		if cleanup == nil {
+			return
+		}
+		closeCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
+		defer cancel()
+		runErr = errors.Join(runErr, cleanup(closeCtx))
+	}()
 	accessTokenVerifier, err := foundationauth.NewVerifier(os.Getenv("KC_GATEWAY_JWT_PUBLIC_KEY"))
 	if err != nil {
 		return fmt.Errorf("configure gateway access tokens: %w", err)
@@ -40,13 +55,10 @@ func Run(ctx context.Context) (runErr error) {
 	if err != nil {
 		return err
 	}
-	defer func() {
-		resources.SetServing(false)
-		closeCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
-		defer cancel()
-		runErr = errors.Join(runErr, resources.Close(closeCtx))
-	}()
-	identityClient, err := gatewayclient.NewIdentity(resources.Resolver)
+	cleanup = func(closeCtx context.Context) error {
+		return errors.Join(resources.Close(closeCtx), telemetry.Shutdown(closeCtx))
+	}
+	identityClient, err := gatewayclient.NewIdentity(resources.Resolver, telemetry)
 	if err != nil {
 		return fmt.Errorf("create gateway Identity client: %w", err)
 	}
@@ -68,16 +80,34 @@ func Run(ctx context.Context) (runErr error) {
 		server.WithExitWaitTime(cfg.ShutdownTimeout),
 		server.WithMaxRequestBodySize(4<<20),
 	)
-	hertz.Use(
-		middleware.RequestID(),
-		middleware.Authentication(accessTokenVerifier),
-		middleware.Dependencies(middleware.RuntimeDependencies{Health: resources.Health, Identity: identityClient}),
-	)
-	router.GeneratedRegister(hertz)
+	if err := router.Register(hertz, router.Config{
+		Logger: telemetry.Logger(),
+		Tracing: observability.HertzServerMiddleware(telemetry, func(_ context.Context, request *app.RequestContext) bool {
+			return string(request.Path()) == "/health/live" || string(request.Path()) == "/health/ready"
+		}),
+		Verifier: accessTokenVerifier,
+		Dependencies: middleware.RuntimeDependencies{
+			Health: resources.Health, Identity: identityClient,
+		},
+	}); err != nil {
+		return err
+	}
 
-	resources.SetServing(true)
-	logger.LogAttrs(ctx, slog.LevelInfo, "gateway starting", slog.String("address", cfg.ListenAddress))
-	hertz.Spin()
-	logger.InfoContext(ctx, "gateway stopped")
-	return nil
+	managedCleanup := cleanup
+	cleanup = nil
+	runErr = lifecycle.Run(ctx, cfg.ShutdownTimeout, lifecycle.Process{
+		SetServing: func(serving bool) {
+			resources.SetServing(serving)
+			phase := "draining"
+			if serving {
+				phase = "ready"
+			}
+			logger.InfoContext(ctx, "gateway lifecycle changed", "event", "application", "phase", phase, "address", cfg.ListenAddress)
+		},
+		Serve:    hertz.Run,
+		Shutdown: hertz.Shutdown,
+		Close:    managedCleanup,
+	})
+	logger.InfoContext(context.Background(), "gateway stopped", "event", "application", "phase", "stopped")
+	return runErr
 }

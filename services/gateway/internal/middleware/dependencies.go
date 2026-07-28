@@ -2,15 +2,16 @@ package middleware
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
-	"fmt"
+	"log/slog"
+	"net/http"
 	"strings"
 	"time"
 
 	foundationauth "github.com/HappyLadySauce/Knowledge-Core/internal/foundation/auth"
 	"github.com/HappyLadySauce/Knowledge-Core/internal/foundation/health"
+	"github.com/HappyLadySauce/Knowledge-Core/internal/foundation/observability"
 	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/identity/identityservice"
+	gatewaymodel "github.com/HappyLadySauce/Knowledge-Core/services/gateway/biz/model/gateway"
 	"github.com/cloudwego/hertz/pkg/app"
 )
 
@@ -19,6 +20,8 @@ const (
 	identityClientKey = "knowledge-core.identity-client"
 	principalKey      = "knowledge-core.auth-principal"
 	requestIDKey      = "knowledge-core.request-id"
+	codeUnauthorized  = int32(10003)
+	codeForbidden     = int32(10005)
 )
 
 type RuntimeDependencies struct {
@@ -46,6 +49,7 @@ func Authentication(verifier TokenVerifier) app.HandlerFunc {
 			if len(parts) == 2 && strings.EqualFold(parts[0], "Bearer") {
 				if principal, err := verifier.Verify(parts[1]); err == nil {
 					request.Set(principalKey, principal)
+					ctx = observability.WithUserID(ctx, principal.UserID)
 				}
 			}
 		}
@@ -56,11 +60,95 @@ func Authentication(verifier TokenVerifier) app.HandlerFunc {
 func RequestID() app.HandlerFunc {
 	return func(ctx context.Context, request *app.RequestContext) {
 		requestID := string(request.GetHeader("X-Request-ID"))
-		if requestID == "" || len(requestID) > 64 {
-			requestID = newRequestID()
+		if !validRequestID(requestID) {
+			requestID = observability.NewRequestID()
 		}
 		request.Set(requestIDKey, requestID)
 		request.Header("X-Request-ID", requestID)
+		ctx = observability.WithRequestID(ctx, requestID)
+		request.Next(ctx)
+	}
+}
+
+func validRequestID(value string) bool {
+	if value == "" || len(value) > 64 {
+		return false
+	}
+	for _, character := range value {
+		if (character >= 'a' && character <= 'z') ||
+			(character >= 'A' && character <= 'Z') ||
+			(character >= '0' && character <= '9') ||
+			character == '-' || character == '_' || character == '.' {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+func AccessLog(logger *slog.Logger) app.HandlerFunc {
+	return func(ctx context.Context, request *app.RequestContext) {
+		started := time.Now()
+		request.Next(ctx)
+		route := request.FullPath()
+		if route == "" {
+			route = "unmatched"
+		}
+		status := request.Response.StatusCode()
+		level := slog.LevelInfo
+		outcome := "success"
+		switch {
+		case strings.HasPrefix(route, "/health/"):
+			level = slog.LevelDebug
+		case status >= http.StatusInternalServerError:
+			level = slog.LevelError
+			outcome = "server_error"
+		case status == http.StatusTooManyRequests:
+			level = slog.LevelWarn
+			outcome = "client_error"
+		case status >= http.StatusBadRequest:
+			outcome = "client_error"
+		}
+		logger.LogAttrs(ctx, level, "HTTP request",
+			slog.String("component", "hertz"),
+			slog.String("event", "http_request"),
+			slog.String("http_method", string(request.Method())),
+			slog.String("http_route", route),
+			slog.Int("http_status", status),
+			slog.String("outcome", outcome),
+			slog.Int64("duration_ms", time.Since(started).Milliseconds()),
+			slog.Int("response_bytes", len(request.Response.Body())),
+		)
+	}
+}
+
+func RequireAuthenticated() app.HandlerFunc {
+	return func(ctx context.Context, request *app.RequestContext) {
+		if _, authenticated := Principal(request); !authenticated {
+			writeAuthorizationError(request, http.StatusUnauthorized, codeUnauthorized, "authentication required")
+			return
+		}
+		request.Next(ctx)
+	}
+}
+
+func RequireRoles(roles ...string) app.HandlerFunc {
+	allowed := make(map[string]struct{}, len(roles))
+	for _, role := range roles {
+		if role = strings.TrimSpace(role); role != "" {
+			allowed[role] = struct{}{}
+		}
+	}
+	return func(ctx context.Context, request *app.RequestContext) {
+		principal, authenticated := Principal(request)
+		if !authenticated {
+			writeAuthorizationError(request, http.StatusUnauthorized, codeUnauthorized, "authentication required")
+			return
+		}
+		if _, exists := allowed[principal.Role]; !exists {
+			writeAuthorizationError(request, http.StatusForbidden, codeForbidden, "permission denied")
+			return
+		}
 		request.Next(ctx)
 	}
 }
@@ -91,10 +179,11 @@ func GetRequestID(request *app.RequestContext) string {
 	return ""
 }
 
-func newRequestID() string {
-	var bytes [16]byte
-	if _, err := rand.Read(bytes[:]); err == nil {
-		return hex.EncodeToString(bytes[:])
-	}
-	return fmt.Sprintf("fallback-%d", time.Now().UTC().UnixNano())
+func writeAuthorizationError(request *app.RequestContext, status int, code int32, message string) {
+	request.AbortWithStatusJSON(status, &gatewaymodel.ErrorResponse{
+		Code:      code,
+		Message:   message,
+		Data:      &gatewaymodel.EmptyData{},
+		RequestID: GetRequestID(request),
+	})
 }

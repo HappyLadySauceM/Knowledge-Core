@@ -3,6 +3,7 @@
 package gateway
 
 import (
+	"github.com/HappyLadySauce/Knowledge-Core/services/gateway/internal/middleware"
 	"github.com/cloudwego/hertz/pkg/app"
 )
 
@@ -57,6 +58,5 @@ func _usersMw() []app.HandlerFunc {
 }
 
 func _currentuserMw() []app.HandlerFunc {
-	// your code...
-	return nil
+	return []app.HandlerFunc{middleware.RequireAuthenticated()}
 }

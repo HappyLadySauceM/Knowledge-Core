@@ -12,6 +12,7 @@ import (
 	"github.com/HappyLadySauce/Knowledge-Core/internal/foundation/database"
 	discoveryetcd "github.com/HappyLadySauce/Knowledge-Core/internal/foundation/discovery/etcd"
 	natsadapter "github.com/HappyLadySauce/Knowledge-Core/internal/foundation/messaging/nats"
+	"github.com/HappyLadySauce/Knowledge-Core/internal/foundation/observability"
 )
 
 type Needs struct {
@@ -28,8 +29,8 @@ type Config struct {
 	Environment     string
 	Service         string
 	ListenAddress   string
-	LogLevel        string
 	ShutdownTimeout time.Duration
+	Observability   observability.Config
 
 	DatabaseProvider string
 	Database         database.Config
@@ -56,15 +57,23 @@ func loadConfig(service, listenVariable, defaultAddress string, needs Needs, loo
 		Environment:               valueOrDefault(lookup, "KC_ENV", "local"),
 		Service:                   service,
 		ListenAddress:             valueOrDefault(lookup, listenVariable, defaultAddress),
-		LogLevel:                  valueOrDefault(lookup, "KC_LOG_LEVEL", "info"),
 		DatabaseProvider:          valueOrDefault(lookup, "KC_DATABASE_PROVIDER", "postgres"),
 		CacheProvider:             valueOrDefault(lookup, "KC_CACHE_PROVIDER", "redis"),
 		DurableMessagingProvider:  valueOrDefault(lookup, "KC_MESSAGING_DURABLE_PROVIDER", "nats"),
 		RealtimeMessagingProvider: valueOrDefault(lookup, "KC_MESSAGING_REALTIME_PROVIDER", "nats"),
 		ConfigProvider:            valueOrDefault(lookup, "KC_CONFIG_PROVIDER", "etcd"),
 	}
+	config.Observability = observability.Config{
+		Service:      config.Service,
+		Environment:  config.Environment,
+		Level:        valueOrDefault(lookup, "KC_LOG_LEVEL", "info"),
+		OTLPEndpoint: valueOrDefault(lookup, "KC_OTEL_EXPORTER_OTLP_ENDPOINT", ""),
+	}
 
 	var err error
+	if config.Observability.SampleRatio, err = floatValue(lookup, "KC_OTEL_TRACE_SAMPLE_RATIO", 1); err != nil {
+		return Config{}, err
+	}
 	if config.ShutdownTimeout, err = durationValue(lookup, "KC_SHUTDOWN_TIMEOUT", 10*time.Second); err != nil {
 		return Config{}, err
 	}
@@ -141,7 +150,7 @@ func (c Config) Validate(needs Needs) error {
 	case c.ShutdownTimeout <= 0:
 		return errors.New("validate bootstrap config: shutdown timeout must be positive")
 	default:
-		return nil
+		return c.Observability.Validate()
 	}
 }
 
@@ -170,6 +179,18 @@ func intValue(lookup LookupFunc, key string, fallback int) (int, error) {
 		return fallback, nil
 	}
 	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return 0, fmt.Errorf("parse %s: %w", key, err)
+	}
+	return parsed, nil
+}
+
+func floatValue(lookup LookupFunc, key string, fallback float64) (float64, error) {
+	value, exists := lookup(key)
+	if !exists || value == "" {
+		return fallback, nil
+	}
+	parsed, err := strconv.ParseFloat(value, 64)
 	if err != nil {
 		return 0, fmt.Errorf("parse %s: %w", key, err)
 	}

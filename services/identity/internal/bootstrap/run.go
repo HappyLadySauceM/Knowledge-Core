@@ -4,11 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net"
 	"os"
 
 	foundationbootstrap "github.com/HappyLadySauce/Knowledge-Core/internal/foundation/bootstrap"
+	"github.com/HappyLadySauce/Knowledge-Core/internal/foundation/lifecycle"
 	"github.com/HappyLadySauce/Knowledge-Core/internal/foundation/observability"
 	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/identity/identityservice"
 	identityapp "github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/app"
@@ -28,8 +28,22 @@ func Run(ctx context.Context) (runErr error) {
 	if err != nil {
 		return err
 	}
-	logger := observability.NewJSONLogger(os.Stderr, cfg.LogLevel, cfg.Service)
-	observability.InstallCloudWeGoLoggers(os.Stderr, cfg.LogLevel, cfg.Service)
+	cfg.Observability.Output = os.Stderr
+	telemetry, err := observability.New(ctx, cfg.Observability)
+	if err != nil {
+		return err
+	}
+	telemetry.InstallCloudWeGo()
+	logger := telemetry.Logger().With("component", "bootstrap")
+	cleanup := func(closeCtx context.Context) error { return telemetry.Shutdown(closeCtx) }
+	defer func() {
+		if cleanup == nil {
+			return
+		}
+		closeCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
+		defer cancel()
+		runErr = errors.Join(runErr, cleanup(closeCtx))
+	}()
 	accessTokens, err := security.NewAccessTokenIssuer(os.Getenv("KC_IDENTITY_JWT_PRIVATE_KEY"))
 	if err != nil {
 		return fmt.Errorf("configure identity access tokens: %w", err)
@@ -42,12 +56,9 @@ func Run(ctx context.Context) (runErr error) {
 	if err != nil {
 		return err
 	}
-	defer func() {
-		resources.SetServing(false)
-		closeCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
-		defer cancel()
-		runErr = errors.Join(runErr, resources.Close(closeCtx))
-	}()
+	cleanup = func(closeCtx context.Context) error {
+		return errors.Join(resources.Close(closeCtx), telemetry.Shutdown(closeCtx))
+	}
 	users, err := identitypostgres.NewUserRepository(resources.Database)
 	if err != nil {
 		return err
@@ -65,18 +76,42 @@ func Run(ctx context.Context) (runErr error) {
 	if err != nil {
 		return fmt.Errorf("resolve identity RPC address: %w", err)
 	}
+	exitSignal := make(chan error, 1)
 	rpcServer := identityservice.NewServer(
 		identitykitex.NewHandler(application),
 		server.WithServiceAddr(address),
 		server.WithServerBasicInfo(&rpcinfo.EndpointBasicInfo{ServiceName: serviceName}),
 		server.WithRegistry(resources.Registry),
 		server.WithExitWaitTime(cfg.ShutdownTimeout),
+		server.WithExitSignal(func() <-chan error { return exitSignal }),
+		server.WithMiddleware(observability.KitexServerMiddleware(telemetry)),
 	)
-	resources.SetServing(true)
-	logger.LogAttrs(ctx, slog.LevelInfo, "identity RPC server starting", slog.String("address", cfg.ListenAddress))
-	if err := rpcServer.Run(); err != nil {
-		return fmt.Errorf("run identity RPC server: %w", err)
-	}
-	logger.InfoContext(ctx, "identity RPC server stopped")
-	return nil
+	managedCleanup := cleanup
+	cleanup = nil
+	runErr = lifecycle.Run(ctx, cfg.ShutdownTimeout, lifecycle.Process{
+		SetServing: func(serving bool) {
+			resources.SetServing(serving)
+			phase := "draining"
+			if serving {
+				phase = "ready"
+			}
+			logger.InfoContext(ctx, "identity lifecycle changed", "event", "application", "phase", phase, "address", cfg.ListenAddress)
+		},
+		Serve: func() error {
+			if serveErr := rpcServer.Run(); serveErr != nil {
+				return fmt.Errorf("run identity RPC server: %w", serveErr)
+			}
+			return nil
+		},
+		Shutdown: func(context.Context) error {
+			select {
+			case exitSignal <- nil:
+			default:
+			}
+			return nil
+		},
+		Close: managedCleanup,
+	})
+	logger.InfoContext(context.Background(), "identity RPC server stopped", "event", "application", "phase", "stopped")
+	return runErr
 }

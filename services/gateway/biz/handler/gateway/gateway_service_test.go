@@ -5,6 +5,8 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/base64"
+	"io"
+	"log/slog"
 	"strings"
 	"testing"
 	"time"
@@ -16,6 +18,7 @@ import (
 	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/identity/identityservice"
 	"github.com/HappyLadySauce/Knowledge-Core/services/gateway/biz/router"
 	"github.com/HappyLadySauce/Knowledge-Core/services/gateway/internal/middleware"
+	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/app/server"
 	"github.com/cloudwego/hertz/pkg/common/ut"
 	"github.com/cloudwego/kitex/client/callopt"
@@ -26,8 +29,7 @@ func TestHealthRoutes(t *testing.T) {
 	registry := health.NewRegistry()
 	registry.SetServing(true)
 	engine := server.New()
-	engine.Use(middleware.RequestID(), middleware.Dependencies(middleware.RuntimeDependencies{Health: registry}))
-	router.GeneratedRegister(engine)
+	registerRoutes(t, engine, staticVerifier{}, middleware.RuntimeDependencies{Health: registry, Identity: &fakeIdentityClient{}})
 
 	live := ut.PerformRequest(engine.Engine, "GET", "/health/live", nil)
 	if live.Code != 200 || !strings.Contains(live.Body.String(), `"status":"live"`) {
@@ -152,13 +154,21 @@ func newAuthenticatedEngine(t *testing.T, client *fakeIdentityClient) (*server.H
 	registry := health.NewRegistry()
 	registry.SetServing(true)
 	engine := server.New()
-	engine.Use(
-		middleware.RequestID(),
-		middleware.Authentication(verifier),
-		middleware.Dependencies(middleware.RuntimeDependencies{Health: registry, Identity: client}),
-	)
-	router.GeneratedRegister(engine)
+	registerRoutes(t, engine, verifier, middleware.RuntimeDependencies{Health: registry, Identity: client})
 	return engine, issued.Value
+}
+
+func registerRoutes(t *testing.T, engine *server.Hertz, verifier middleware.TokenVerifier, dependencies middleware.RuntimeDependencies) {
+	t.Helper()
+	tracing := func(ctx context.Context, request *app.RequestContext) { request.Next(ctx) }
+	if err := router.Register(engine, router.Config{
+		Logger:       slog.New(slog.NewJSONHandler(io.Discard, nil)),
+		Tracing:      tracing,
+		Verifier:     verifier,
+		Dependencies: dependencies,
+	}); err != nil {
+		t.Fatalf("Register() error = %v", err)
+	}
 }
 
 func performJSON(engine *server.Hertz, method, path, body string) *ut.ResponseRecorder {
@@ -189,6 +199,12 @@ type fakeIdentityClient struct {
 	user           *identityrpc.User
 	authentication *identityrpc.Authentication
 	err            error
+}
+
+type staticVerifier struct{}
+
+func (staticVerifier) Verify(string) (foundationauth.Principal, error) {
+	return foundationauth.Principal{}, nil
 }
 
 func (f *fakeIdentityClient) Ping(context.Context, *common.PingRequest, ...callopt.Option) (*common.PingResponse, error) {

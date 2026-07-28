@@ -5,191 +5,106 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"sync"
 
 	"github.com/cloudwego/hertz/pkg/common/hlog"
 	"github.com/cloudwego/kitex/pkg/klog"
 )
 
-type logCore struct {
-	mu      sync.RWMutex
-	output  io.Writer
-	level   *slog.LevelVar
-	service string
-	logger  *slog.Logger
+type frameworkLogger struct {
+	logger *slog.Logger
+	level  *slog.LevelVar
 }
 
-func newLogCore(output io.Writer, level string, service string) *logCore {
-	var parsed slog.Level
-	if err := parsed.UnmarshalText([]byte(level)); err != nil {
-		parsed = slog.LevelInfo
-	}
-	levelVar := &slog.LevelVar{}
-	levelVar.Set(parsed)
-	core := &logCore{output: output, level: levelVar, service: service}
-	core.rebuild()
-	return core
+func (l *frameworkLogger) log(ctx context.Context, level slog.Level, message string) {
+	l.logger.Log(ctx, level, message)
 }
 
-func (c *logCore) rebuild() {
-	c.logger = slog.New(slog.NewJSONHandler(c.output, &slog.HandlerOptions{Level: c.level})).With(
-		"service", c.service,
-		"component", "cloudwego",
-	)
+func (l *frameworkLogger) Trace(v ...interface{}) {
+	l.log(context.Background(), slog.LevelDebug, fmt.Sprint(v...))
+}
+func (l *frameworkLogger) Debug(v ...interface{}) {
+	l.log(context.Background(), slog.LevelDebug, fmt.Sprint(v...))
+}
+func (l *frameworkLogger) Info(v ...interface{}) {
+	l.log(context.Background(), slog.LevelInfo, fmt.Sprint(v...))
+}
+func (l *frameworkLogger) Notice(v ...interface{}) {
+	l.log(context.Background(), slog.LevelInfo, fmt.Sprint(v...))
+}
+func (l *frameworkLogger) Warn(v ...interface{}) {
+	l.log(context.Background(), slog.LevelWarn, fmt.Sprint(v...))
+}
+func (l *frameworkLogger) Error(v ...interface{}) {
+	l.log(context.Background(), slog.LevelError, fmt.Sprint(v...))
+}
+func (l *frameworkLogger) Fatal(v ...interface{}) {
+	l.log(context.Background(), slog.LevelError, fmt.Sprint(v...))
 }
 
-func (c *logCore) log(ctx context.Context, level slog.Level, message string) {
-	c.mu.RLock()
-	logger := c.logger
-	c.mu.RUnlock()
-	logger.Log(ctx, level, message)
+func (l *frameworkLogger) Tracef(format string, v ...interface{}) { l.Trace(fmt.Sprintf(format, v...)) }
+func (l *frameworkLogger) Debugf(format string, v ...interface{}) { l.Debug(fmt.Sprintf(format, v...)) }
+func (l *frameworkLogger) Infof(format string, v ...interface{})  { l.Info(fmt.Sprintf(format, v...)) }
+func (l *frameworkLogger) Noticef(format string, v ...interface{}) {
+	l.Notice(fmt.Sprintf(format, v...))
+}
+func (l *frameworkLogger) Warnf(format string, v ...interface{})  { l.Warn(fmt.Sprintf(format, v...)) }
+func (l *frameworkLogger) Errorf(format string, v ...interface{}) { l.Error(fmt.Sprintf(format, v...)) }
+func (l *frameworkLogger) Fatalf(format string, v ...interface{}) { l.Fatal(fmt.Sprintf(format, v...)) }
+
+func (l *frameworkLogger) CtxTracef(ctx context.Context, format string, v ...interface{}) {
+	l.log(ctx, slog.LevelDebug, fmt.Sprintf(format, v...))
+}
+func (l *frameworkLogger) CtxDebugf(ctx context.Context, format string, v ...interface{}) {
+	l.log(ctx, slog.LevelDebug, fmt.Sprintf(format, v...))
+}
+func (l *frameworkLogger) CtxInfof(ctx context.Context, format string, v ...interface{}) {
+	l.log(ctx, slog.LevelInfo, fmt.Sprintf(format, v...))
+}
+func (l *frameworkLogger) CtxNoticef(ctx context.Context, format string, v ...interface{}) {
+	l.log(ctx, slog.LevelInfo, fmt.Sprintf(format, v...))
+}
+func (l *frameworkLogger) CtxWarnf(ctx context.Context, format string, v ...interface{}) {
+	l.log(ctx, slog.LevelWarn, fmt.Sprintf(format, v...))
+}
+func (l *frameworkLogger) CtxErrorf(ctx context.Context, format string, v ...interface{}) {
+	l.log(ctx, slog.LevelError, fmt.Sprintf(format, v...))
+}
+func (l *frameworkLogger) CtxFatalf(ctx context.Context, format string, v ...interface{}) {
+	l.log(ctx, slog.LevelError, fmt.Sprintf(format, v...))
 }
 
-func (c *logCore) setOutput(output io.Writer) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.output = output
-	c.rebuild()
+type HertzLogger struct{ *frameworkLogger }
+
+func (l *HertzLogger) SetLevel(level hlog.Level) { l.level.Set(mapFrameworkLevel(int(level))) }
+func (l *HertzLogger) SetOutput(io.Writer)       {}
+
+type KitexLogger struct{ *frameworkLogger }
+
+func (l *KitexLogger) SetLevel(level klog.Level) { l.level.Set(mapFrameworkLevel(int(level))) }
+func (l *KitexLogger) SetOutput(io.Writer)       {}
+
+func installCloudWeGoLoggers(runtime *Runtime) {
+	hlog.SetLogger(&HertzLogger{frameworkLogger: &frameworkLogger{
+		logger: runtime.Logger().With("component", "hertz"),
+		level:  runtime.level,
+	}})
+	klog.SetLogger(&KitexLogger{frameworkLogger: &frameworkLogger{
+		logger: runtime.Logger().With("component", "kitex"),
+		level:  runtime.level,
+	}})
 }
 
-func (c *logCore) setLevel(level int) {
+func mapFrameworkLevel(level int) slog.Level {
 	switch {
 	case level <= 1:
-		c.level.Set(slog.LevelDebug)
+		return slog.LevelDebug
 	case level <= 3:
-		c.level.Set(slog.LevelInfo)
+		return slog.LevelInfo
 	case level == 4:
-		c.level.Set(slog.LevelWarn)
+		return slog.LevelWarn
 	default:
-		c.level.Set(slog.LevelError)
+		return slog.LevelError
 	}
-}
-
-type HertzLogger struct{ core *logCore }
-
-func NewHertzLogger(output io.Writer, level, service string) *HertzLogger {
-	return &HertzLogger{core: newLogCore(output, level, service)}
-}
-
-func (l *HertzLogger) Trace(v ...interface{}) {
-	l.core.log(context.Background(), slog.LevelDebug, fmt.Sprint(v...))
-}
-func (l *HertzLogger) Debug(v ...interface{}) {
-	l.core.log(context.Background(), slog.LevelDebug, fmt.Sprint(v...))
-}
-func (l *HertzLogger) Info(v ...interface{}) {
-	l.core.log(context.Background(), slog.LevelInfo, fmt.Sprint(v...))
-}
-func (l *HertzLogger) Notice(v ...interface{}) {
-	l.core.log(context.Background(), slog.LevelInfo, fmt.Sprint(v...))
-}
-func (l *HertzLogger) Warn(v ...interface{}) {
-	l.core.log(context.Background(), slog.LevelWarn, fmt.Sprint(v...))
-}
-func (l *HertzLogger) Error(v ...interface{}) {
-	l.core.log(context.Background(), slog.LevelError, fmt.Sprint(v...))
-}
-func (l *HertzLogger) Fatal(v ...interface{}) {
-	l.core.log(context.Background(), slog.LevelError, fmt.Sprint(v...))
-}
-
-func (l *HertzLogger) Tracef(format string, v ...interface{})  { l.Trace(fmt.Sprintf(format, v...)) }
-func (l *HertzLogger) Debugf(format string, v ...interface{})  { l.Debug(fmt.Sprintf(format, v...)) }
-func (l *HertzLogger) Infof(format string, v ...interface{})   { l.Info(fmt.Sprintf(format, v...)) }
-func (l *HertzLogger) Noticef(format string, v ...interface{}) { l.Notice(fmt.Sprintf(format, v...)) }
-func (l *HertzLogger) Warnf(format string, v ...interface{})   { l.Warn(fmt.Sprintf(format, v...)) }
-func (l *HertzLogger) Errorf(format string, v ...interface{})  { l.Error(fmt.Sprintf(format, v...)) }
-func (l *HertzLogger) Fatalf(format string, v ...interface{})  { l.Fatal(fmt.Sprintf(format, v...)) }
-
-func (l *HertzLogger) CtxTracef(ctx context.Context, format string, v ...interface{}) {
-	l.core.log(ctx, slog.LevelDebug, fmt.Sprintf(format, v...))
-}
-func (l *HertzLogger) CtxDebugf(ctx context.Context, format string, v ...interface{}) {
-	l.core.log(ctx, slog.LevelDebug, fmt.Sprintf(format, v...))
-}
-func (l *HertzLogger) CtxInfof(ctx context.Context, format string, v ...interface{}) {
-	l.core.log(ctx, slog.LevelInfo, fmt.Sprintf(format, v...))
-}
-func (l *HertzLogger) CtxNoticef(ctx context.Context, format string, v ...interface{}) {
-	l.core.log(ctx, slog.LevelInfo, fmt.Sprintf(format, v...))
-}
-func (l *HertzLogger) CtxWarnf(ctx context.Context, format string, v ...interface{}) {
-	l.core.log(ctx, slog.LevelWarn, fmt.Sprintf(format, v...))
-}
-func (l *HertzLogger) CtxErrorf(ctx context.Context, format string, v ...interface{}) {
-	l.core.log(ctx, slog.LevelError, fmt.Sprintf(format, v...))
-}
-func (l *HertzLogger) CtxFatalf(ctx context.Context, format string, v ...interface{}) {
-	l.core.log(ctx, slog.LevelError, fmt.Sprintf(format, v...))
-}
-
-func (l *HertzLogger) SetLevel(level hlog.Level)  { l.core.setLevel(int(level)) }
-func (l *HertzLogger) SetOutput(output io.Writer) { l.core.setOutput(output) }
-
-type KitexLogger struct{ core *logCore }
-
-func NewKitexLogger(output io.Writer, level, service string) *KitexLogger {
-	return &KitexLogger{core: newLogCore(output, level, service)}
-}
-
-func (l *KitexLogger) Trace(v ...interface{}) {
-	l.core.log(context.Background(), slog.LevelDebug, fmt.Sprint(v...))
-}
-func (l *KitexLogger) Debug(v ...interface{}) {
-	l.core.log(context.Background(), slog.LevelDebug, fmt.Sprint(v...))
-}
-func (l *KitexLogger) Info(v ...interface{}) {
-	l.core.log(context.Background(), slog.LevelInfo, fmt.Sprint(v...))
-}
-func (l *KitexLogger) Notice(v ...interface{}) {
-	l.core.log(context.Background(), slog.LevelInfo, fmt.Sprint(v...))
-}
-func (l *KitexLogger) Warn(v ...interface{}) {
-	l.core.log(context.Background(), slog.LevelWarn, fmt.Sprint(v...))
-}
-func (l *KitexLogger) Error(v ...interface{}) {
-	l.core.log(context.Background(), slog.LevelError, fmt.Sprint(v...))
-}
-func (l *KitexLogger) Fatal(v ...interface{}) {
-	l.core.log(context.Background(), slog.LevelError, fmt.Sprint(v...))
-}
-
-func (l *KitexLogger) Tracef(format string, v ...interface{})  { l.Trace(fmt.Sprintf(format, v...)) }
-func (l *KitexLogger) Debugf(format string, v ...interface{})  { l.Debug(fmt.Sprintf(format, v...)) }
-func (l *KitexLogger) Infof(format string, v ...interface{})   { l.Info(fmt.Sprintf(format, v...)) }
-func (l *KitexLogger) Noticef(format string, v ...interface{}) { l.Notice(fmt.Sprintf(format, v...)) }
-func (l *KitexLogger) Warnf(format string, v ...interface{})   { l.Warn(fmt.Sprintf(format, v...)) }
-func (l *KitexLogger) Errorf(format string, v ...interface{})  { l.Error(fmt.Sprintf(format, v...)) }
-func (l *KitexLogger) Fatalf(format string, v ...interface{})  { l.Fatal(fmt.Sprintf(format, v...)) }
-
-func (l *KitexLogger) CtxTracef(ctx context.Context, format string, v ...interface{}) {
-	l.core.log(ctx, slog.LevelDebug, fmt.Sprintf(format, v...))
-}
-func (l *KitexLogger) CtxDebugf(ctx context.Context, format string, v ...interface{}) {
-	l.core.log(ctx, slog.LevelDebug, fmt.Sprintf(format, v...))
-}
-func (l *KitexLogger) CtxInfof(ctx context.Context, format string, v ...interface{}) {
-	l.core.log(ctx, slog.LevelInfo, fmt.Sprintf(format, v...))
-}
-func (l *KitexLogger) CtxNoticef(ctx context.Context, format string, v ...interface{}) {
-	l.core.log(ctx, slog.LevelInfo, fmt.Sprintf(format, v...))
-}
-func (l *KitexLogger) CtxWarnf(ctx context.Context, format string, v ...interface{}) {
-	l.core.log(ctx, slog.LevelWarn, fmt.Sprintf(format, v...))
-}
-func (l *KitexLogger) CtxErrorf(ctx context.Context, format string, v ...interface{}) {
-	l.core.log(ctx, slog.LevelError, fmt.Sprintf(format, v...))
-}
-func (l *KitexLogger) CtxFatalf(ctx context.Context, format string, v ...interface{}) {
-	l.core.log(ctx, slog.LevelError, fmt.Sprintf(format, v...))
-}
-
-func (l *KitexLogger) SetLevel(level klog.Level)  { l.core.setLevel(int(level)) }
-func (l *KitexLogger) SetOutput(output io.Writer) { l.core.setOutput(output) }
-
-func InstallCloudWeGoLoggers(output io.Writer, level, service string) {
-	hlog.SetLogger(NewHertzLogger(output, level, service))
-	klog.SetLogger(NewKitexLogger(output, level, service))
 }
 
 var _ hlog.FullLogger = (*HertzLogger)(nil)

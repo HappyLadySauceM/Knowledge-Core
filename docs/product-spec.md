@@ -58,6 +58,8 @@ AI Agent 层
 - 对外 HTTP、WebSocket 协议与内部 Thrift IDL 分离，传输对象不得直接下沉为领域模型。
 - JSON 统一使用 `github.com/bytedance/sonic`；Hertz 保持默认 Sonic binding/rendering，业务代码通过 foundation codec 使用 JSON。
 - 所有服务输出 JSON 结构化日志，并透传 `request_id`、`trace_id` 和调用目标。
+- 四个服务均以 Cobra 根命令运行，由统一生命周期捕获退出信号、摘除 readiness、排空传输层并关闭资源；不提供独立 `serve` 或 `migrate` 子命令。
+- OpenTelemetry 使用 W3C 上下文传播和 OTLP gRPC 导出；endpoint 为空时关闭导出，采样采用 ParentBased ratio 策略。
 - Provider 或连接配置变更通过滚动重启生效，不支持进程内热切换。
 
 ### 服务架构
@@ -131,6 +133,7 @@ internal/
     observability/
     health/
     lifecycle/
+    command/
 kitex_gen/
 services/
   gateway/{main.go,biz,internal}/
@@ -268,6 +271,8 @@ docker compose -f docker/infrastructure/docker-compose.yml up -d postgres redis 
 go run ./services/identity
 go run ./services/gateway
 ```
+
+服务入口是无额外子命令的 Cobra 根命令，所以上述运行方式保持不变；`Ctrl+C`、`SIGINT` 和 `SIGTERM` 均进入统一优雅退出流程。日志默认以 JSON 写入 stderr。设置 `KC_OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4317` 可启用 OTLP gRPC trace 导出，`KC_OTEL_TRACE_SAMPLE_RATIO` 控制入口采样率。
 
 认证 MVP 验证：
 
