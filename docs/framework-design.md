@@ -1,6 +1,6 @@
 # Knowledge Core - Hertz + Kitex 服务框架设计
 
-> 状态：基础框架 v0.1 已实现。四个 Cobra 进程入口、统一生命周期、IDL/代码生成、Foundation 接口与首批 PostgreSQL/Redis/NATS/Etcd adapter 已落地；统一 JSON 日志和 HTTP/Kitex OpenTelemetry tracing 已接入。Identity 已完成用户注册、凭据校验、Ed25519 Access Token、用户查询和首条 PostgreSQL migration，Gateway 已接通注册、登录和当前用户 HTTP API。Refresh Token、注销、撤销事件投影、其他业务用例和 Prometheus metrics 仍按本文继续实现。
+> 状态：基础框架 v0.1 已实现。四个 Cobra 进程入口、统一生命周期、IDL/代码生成、`internal` 基础设施接口与首批 PostgreSQL/Redis/NATS/Etcd adapter 已落地；统一 JSON 日志和 HTTP/Kitex OpenTelemetry tracing 已接入。Identity 已完成用户注册、凭据校验、Ed25519 Access Token、用户查询和首条 PostgreSQL migration，Gateway 已接通注册、登录和当前用户 HTTP API。Refresh Token、注销、撤销事件投影、其他业务用例和 Prometheus metrics 仍按本文继续实现。
 
 ## 1. 设计目标
 
@@ -100,23 +100,22 @@ Etcd 同时承担三类职责，但 key 空间必须隔离：Kitex 注册发现�
 |           |-- transport/kitex/
 |           `-- bootstrap/
 |-- internal/
-|   `-- foundation/
-|       |-- command/
-|       |-- codec/json/
-|       |-- config/
-|       |   |-- env/
-|       |   `-- etcd/
-|       |-- database/
-|       |   `-- postgres/
-|       |-- messaging/
-|       |   `-- nats/
-|       |-- cache/
-|       |   `-- redis/
-|       |-- discovery/
-|       |   `-- etcd/
-|       |-- observability/
-|       |-- health/
-|       `-- lifecycle/
+|   |-- command/
+|   |-- codec/json/
+|   |-- config/
+|   |   |-- env/
+|   |   `-- etcd/
+|   |-- database/
+|   |   `-- postgres/
+|   |-- messaging/
+|   |   `-- nats/
+|   |-- cache/
+|   |   `-- redis/
+|   |-- discovery/
+|   |   `-- etcd/
+|   |-- observability/
+|   |-- health/
+|   `-- lifecycle/
 |-- migrations/
 |   |-- identity/postgres/
 |   |-- knowledge/postgres/
@@ -141,7 +140,7 @@ transport (Hertz / Kitex / consumer)
               domain
                  ^
                  |
-repository interface / foundation interface
+repository interface / internal interface
                  ^
                  |
 adapter (PostgreSQL / Redis / NATS / Etcd)
@@ -150,14 +149,14 @@ adapter (PostgreSQL / Redis / NATS / Etcd)
 必须遵守以下规则：
 
 1. `domain` 只包含实体、值对象、领域规则和领域错误，不导入 Hertz、Kitex 或具体基础设施 SDK。
-2. `app` 编排用例、事务与权限，只依赖本服务 repository 接口和 `internal/foundation` 的小接口。
-3. repository 接口由使用它的服务定义；SQL 实现位于同一服务的 `repository/<provider>`，不放入公共 foundation。
-4. `internal/foundation` 只提供跨服务基础能力、接口和首批 adapter，不包含用户、文档、评论等业务概念。
+2. `app` 编排用例、事务与权限，只依赖本服务 repository 接口和 `internal` 的小接口。
+3. repository 接口由使用它的服务定义；SQL 实现位于同一服务的 `repository/<provider>`，不放入公共 `internal` 包。
+4. `internal` 只提供跨服务基础能力、接口和首批 adapter，不包含用户、文档、评论等业务概念。
 5. Hertz/Kitex 生成代码和 handler 只做参数校验、DTO 映射、上下文传递和错误映射，不实现业务规则。
 6. 一个服务不得导入另一个服务的 `internal` 包，也不得直接访问另一个服务的数据表。
 7. `kitex_gen` 和 Hertz 生成文件不得手工修改；所有可重复生成步骤由 `scripts/codegen.*` 固化。
 
-## 5. Foundation 接口
+## 5. Internal 基础设施接口
 
 以下代码表达接口边界，最终实现时可根据 Go 编译约束微调命名，但不得扩大业务层对具体 SDK 的依赖。
 
@@ -325,7 +324,7 @@ type WatchSource interface {
 
 ### 5.5 注册与发现
 
-Kitex 注册与发现直接使用 Kitex 原生 `registry.Registry` 和 `discovery.Resolver` 契约，不再包一层自定义接口。`internal/foundation/discovery/etcd` 只负责：
+Kitex 注册与发现直接使用 Kitex 原生 `registry.Registry` 和 `discovery.Resolver` 契约，不再包一层自定义接口。`internal/discovery/etcd` 只负责：
 
 - 根据 bootstrap 配置创建 Etcd client。
 - 构造 `github.com/kitex-contrib/registry-etcd` 提供的 registry 和 resolver。
@@ -364,7 +363,7 @@ type Codec interface {
 - 普通 HTTP 响应和内部 DTO 使用 `sonic.ConfigDefault`。
 - Hertz 的 `ctx.JSON`、JSON binding 和渲染保持默认 Sonic 路径。
 - 配置和事件 envelope 同时启用 `DisallowUnknownFields` 与 `UseNumber`，既拒绝版本契约之外的字段，也避免无类型数字先转成 `float64`。
-- 业务代码通过 foundation codec 或传输层 helper 使用 JSON，不直接散落 `sonic.Marshal`、`sonic.Unmarshal`。
+- 业务代码通过 `internal/codec/json` 或传输层 helper 使用 JSON，不直接散落 `sonic.Marshal`、`sonic.Unmarshal`。
 - 生产构建不得使用将 Hertz JSON 实现切回标准库的 `stdjson` build tag。
 - 所有外部 JSON DTO 必须有显式字段 tag；不得依赖未导出字段或 map 迭代顺序。
 
@@ -409,7 +408,7 @@ Etcd endpoint、Etcd 认证凭据和 TLS bootstrap 信息不能从 Etcd 自身�
 |---|---|---|
 | 静态 | Provider 类型、DSN/endpoint、凭据、监听地址、服务名、TLS 身份、Etcd bootstrap | 校验后启动，变更需滚动重启 |
 | 动态 | RPC 超时/重试/熔断、限流阈值、日志级别、功能开关 | Etcd watch，校验成功后原子替换快照 |
-| 业务数据 | 站点设置、AI Provider 选择、用户偏好 | 由 owner 服务持久化，不进入 foundation 配置 |
+| 业务数据 | 站点设置、AI Provider 选择、用户偏好 | 由 owner 服务持久化，不进入共享 `internal` 配置 |
 
 动态更新必须先完整解析和校验，再以不可变快照一次替换。更新失败时继续使用最后一个有效版本并上报指标；不得留下部分字段已更新的状态。
 
@@ -440,7 +439,7 @@ KC_OTEL_TRACE_SAMPLE_RATIO=1
 
 ```go
 func Build(ctx context.Context, cfg Config) (*Application, error) {
-    // 1. foundation adapters
+    // 1. internal adapters
     // 2. repositories and RPC clients
     // 3. application services
     // 4. Hertz/Kitex handlers and consumers
@@ -506,7 +505,7 @@ func NewDatabaseProvider(name string) (database.Provider, error) {
 
 ## 10. Kitex RPC 规则
 
-- RPC Thrift IDL 位于 `idl/rpc/`，公共标量、分页和业务状态结构放在 `common.thrift`。
+- RPC Thrift IDL 位于 `idl/rpc/v1/`，公共标量、分页和业务状态结构放在 `common.thrift`。
 - 每个 owner 服务只维护自己的 service definition；跨域复用通过 IDL include，不复制结构。
 - 生成代码统一放 `kitex_gen/`；生成的 handler 骨架迁入对应服务的 `transport/kitex` 后只做适配。
 - Kitex server 使用 Etcd registry；Kitex client 使用 Etcd resolver 和稳定服务名。
@@ -521,7 +520,7 @@ func NewDatabaseProvider(name string) (database.Provider, error) {
 
 1. 校验 `hz`、`kitex` 和 Thrift 插件版本。
 2. 从 `idl/http/v1/` 生成 Hertz model、handler 和 router。
-3. 从 `idl/rpc/` 生成 `kitex_gen/` 客户端和服务端契约。
+3. 从 `idl/rpc/v1/` 生成 `kitex_gen/` 客户端和服务端契约。
 4. 执行格式化，并检查生成结果没有超出约定目录。
 5. CI 重新生成并比较生成目录快照，防止 IDL 与生成代码不一致，同时不受工作区中其他未提交修改影响。
 
@@ -584,7 +583,7 @@ MQ 切换同理：新 adapter 必须证明 at-least-once、ack/nack、重投、�
 
 Identity 使用 `KC_DATABASE_DSN` 在启动阶段自动应用嵌入二进制的 PostgreSQL migration；成功后才继续初始化 repository 和 Kitex server。migration 不属于通用 Makefile 目标。
 
-- 每个 foundation adapter 的 contract test，使用同一套用例验证接口语义。
+- 每个共享 `internal` adapter 的 contract test，使用同一套用例验证接口语义。
 - 每个 repository Provider 的真实数据库 integration test，覆盖事务回滚、唯一约束、分页和锁冲突。
 - DurableBroker 测试覆盖重复投递、Nack 重投、最大次数、死信和 consumer 重启。
 - Config 测试覆盖优先级、未知字段、动态更新失败保留旧快照和 Secret 不进入 Etcd。

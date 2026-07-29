@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	foundationauth "github.com/HappyLadySauce/Knowledge-Core/internal/foundation/auth"
-	"github.com/HappyLadySauce/Knowledge-Core/internal/foundation/health"
+	auth "github.com/HappyLadySauce/Knowledge-Core/internal/auth"
+	"github.com/HappyLadySauce/Knowledge-Core/internal/health"
 	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/common"
 	identityrpc "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/identity"
 	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/identity/identityservice"
@@ -130,11 +130,11 @@ func newAuthenticatedEngine(t *testing.T, client *fakeIdentityClient) (*server.H
 	if err != nil {
 		t.Fatalf("GenerateKey() error = %v", err)
 	}
-	issuer, err := foundationauth.NewIssuer(base64.StdEncoding.EncodeToString(privateKey), 15*time.Minute)
+	issuer, err := auth.NewIssuer(base64.StdEncoding.EncodeToString(privateKey), 15*time.Minute)
 	if err != nil {
 		t.Fatalf("NewIssuer() error = %v", err)
 	}
-	issued, err := issuer.Issue(foundationauth.Principal{
+	issued, err := issuer.Issue(auth.Principal{
 		UserID:       client.user.Id,
 		Role:         client.user.Role,
 		TokenVersion: client.user.TokenVersion,
@@ -147,7 +147,7 @@ func newAuthenticatedEngine(t *testing.T, client *fakeIdentityClient) (*server.H
 		AccessToken:   issued.Value,
 		ExpiresAtUnix: issued.ExpiresAt.Unix(),
 	}
-	verifier, err := foundationauth.NewVerifier(base64.StdEncoding.EncodeToString(publicKey))
+	verifier, err := auth.NewVerifier(base64.StdEncoding.EncodeToString(publicKey))
 	if err != nil {
 		t.Fatalf("NewVerifier() error = %v", err)
 	}
@@ -203,8 +203,8 @@ type fakeIdentityClient struct {
 
 type staticVerifier struct{}
 
-func (staticVerifier) Verify(string) (foundationauth.Principal, error) {
-	return foundationauth.Principal{}, nil
+func (staticVerifier) Verify(string) (auth.Principal, error) {
+	return auth.Principal{}, nil
 }
 
 func (f *fakeIdentityClient) Ping(context.Context, *common.PingRequest, ...callopt.Option) (*common.PingResponse, error) {

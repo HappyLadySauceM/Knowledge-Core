@@ -68,7 +68,7 @@ if ($actualThriftgoVersion -ne $thriftgoVersion) {
 
 $rpcIDLs = @("identity", "knowledge", "platform")
 foreach ($idl in $rpcIDLs) {
-    & kitex -module $module -I idl/rpc "idl/rpc/$idl.thrift"
+    & kitex -module $module -I idl/rpc/v1 "idl/rpc/v1/$idl.thrift"
     if ($LASTEXITCODE -ne 0) {
         throw "kitex generation failed for $idl"
     }

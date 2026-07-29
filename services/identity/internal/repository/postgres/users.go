@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/HappyLadySauce/Knowledge-Core/internal/foundation/database"
+	"github.com/HappyLadySauce/Knowledge-Core/internal/database"
 	"github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/domain"
 	"github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/repository"
 	"github.com/jackc/pgx/v5/pgconn"

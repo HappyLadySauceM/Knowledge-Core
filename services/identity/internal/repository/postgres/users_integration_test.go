@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/HappyLadySauce/Knowledge-Core/internal/foundation/database"
-	foundationpostgres "github.com/HappyLadySauce/Knowledge-Core/internal/foundation/database/postgres"
+	"github.com/HappyLadySauce/Knowledge-Core/internal/database"
+	postgresadapter "github.com/HappyLadySauce/Knowledge-Core/internal/database/postgres"
 	"github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/app"
 	"github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/domain"
 	migrationpostgres "github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/migration/postgres"
@@ -28,7 +28,7 @@ func TestUserRepositoryIntegration(t *testing.T) {
 	if err := migrationpostgres.Up(ctx, dsn); err != nil {
 		t.Fatalf("migration Up() error = %v", err)
 	}
-	db, err := foundationpostgres.NewProvider().Open(ctx, database.Config{
+	db, err := postgresadapter.NewProvider().Open(ctx, database.Config{
 		DSN:          dsn,
 		MaxOpenConns: 4,
 		MaxIdleConns: 1,

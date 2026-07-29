@@ -7,9 +7,9 @@ import (
 	"net"
 	"os"
 
-	foundationbootstrap "github.com/HappyLadySauce/Knowledge-Core/internal/foundation/bootstrap"
-	"github.com/HappyLadySauce/Knowledge-Core/internal/foundation/lifecycle"
-	"github.com/HappyLadySauce/Knowledge-Core/internal/foundation/observability"
+	internalbootstrap "github.com/HappyLadySauce/Knowledge-Core/internal/bootstrap"
+	"github.com/HappyLadySauce/Knowledge-Core/internal/lifecycle"
+	"github.com/HappyLadySauce/Knowledge-Core/internal/observability"
 	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/identity/identityservice"
 	identityapp "github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/app"
 	migrationpostgres "github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/migration/postgres"
@@ -23,8 +23,8 @@ import (
 const serviceName = "knowledge-core.identity"
 
 func Run(ctx context.Context) (runErr error) {
-	needs := foundationbootstrap.Needs{Database: true, Cache: true, DurableMessaging: true, ConfigSource: true, Registry: true}
-	cfg, err := foundationbootstrap.LoadConfig("identity", "KC_IDENTITY_RPC_ADDR", ":8881", needs)
+	needs := internalbootstrap.Needs{Database: true, Cache: true, DurableMessaging: true, ConfigSource: true, Registry: true}
+	cfg, err := internalbootstrap.LoadConfig("identity", "KC_IDENTITY_RPC_ADDR", ":8881", needs)
 	if err != nil {
 		return err
 	}
@@ -52,7 +52,7 @@ func Run(ctx context.Context) (runErr error) {
 		return fmt.Errorf("migrate identity database: %w", err)
 	}
 	logger.InfoContext(ctx, "identity database migrations completed")
-	resources, err := foundationbootstrap.Open(ctx, cfg, needs)
+	resources, err := internalbootstrap.Open(ctx, cfg, needs)
 	if err != nil {
 		return err
 	}

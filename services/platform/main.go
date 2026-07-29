@@ -3,8 +3,8 @@ package main
 import (
 	"os"
 
-	"github.com/HappyLadySauce/Knowledge-Core/internal/foundation/command"
-	"github.com/HappyLadySauce/Knowledge-Core/internal/foundation/observability"
+	"github.com/HappyLadySauce/Knowledge-Core/internal/command"
+	"github.com/HappyLadySauce/Knowledge-Core/internal/observability"
 	"github.com/HappyLadySauce/Knowledge-Core/services/platform/internal/bootstrap"
 )
 

@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	foundationauth "github.com/HappyLadySauce/Knowledge-Core/internal/foundation/auth"
-	"github.com/HappyLadySauce/Knowledge-Core/internal/foundation/health"
-	"github.com/HappyLadySauce/Knowledge-Core/internal/foundation/observability"
+	auth "github.com/HappyLadySauce/Knowledge-Core/internal/auth"
+	"github.com/HappyLadySauce/Knowledge-Core/internal/health"
+	"github.com/HappyLadySauce/Knowledge-Core/internal/observability"
 	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/identity/identityservice"
 	gatewaymodel "github.com/HappyLadySauce/Knowledge-Core/services/gateway/biz/model/gateway"
 	"github.com/cloudwego/hertz/pkg/app"
@@ -30,7 +30,7 @@ type RuntimeDependencies struct {
 }
 
 type TokenVerifier interface {
-	Verify(value string) (foundationauth.Principal, error)
+	Verify(value string) (auth.Principal, error)
 }
 
 func Dependencies(dependencies RuntimeDependencies) app.HandlerFunc {
@@ -165,9 +165,9 @@ func IdentityClient(request *app.RequestContext) (identityservice.Client, bool) 
 	return client, exists && ok && client != nil
 }
 
-func Principal(request *app.RequestContext) (foundationauth.Principal, bool) {
+func Principal(request *app.RequestContext) (auth.Principal, bool) {
 	value, exists := request.Get(principalKey)
-	principal, ok := value.(foundationauth.Principal)
+	principal, ok := value.(auth.Principal)
 	return principal, exists && ok && principal.UserID > 0
 }
 

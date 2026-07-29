@@ -7,9 +7,9 @@ import (
 	"net"
 	"os"
 
-	foundationbootstrap "github.com/HappyLadySauce/Knowledge-Core/internal/foundation/bootstrap"
-	"github.com/HappyLadySauce/Knowledge-Core/internal/foundation/lifecycle"
-	"github.com/HappyLadySauce/Knowledge-Core/internal/foundation/observability"
+	internalbootstrap "github.com/HappyLadySauce/Knowledge-Core/internal/bootstrap"
+	"github.com/HappyLadySauce/Knowledge-Core/internal/lifecycle"
+	"github.com/HappyLadySauce/Knowledge-Core/internal/observability"
 	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/knowledge/knowledgeservice"
 	knowledgekitex "github.com/HappyLadySauce/Knowledge-Core/services/knowledge/internal/transport/kitex"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -19,8 +19,8 @@ import (
 const serviceName = "knowledge-core.knowledge"
 
 func Run(ctx context.Context) (runErr error) {
-	needs := foundationbootstrap.Needs{Database: true, Cache: true, DurableMessaging: true, ConfigSource: true, Registry: true}
-	cfg, err := foundationbootstrap.LoadConfig("knowledge", "KC_KNOWLEDGE_RPC_ADDR", ":8882", needs)
+	needs := internalbootstrap.Needs{Database: true, Cache: true, DurableMessaging: true, ConfigSource: true, Registry: true}
+	cfg, err := internalbootstrap.LoadConfig("knowledge", "KC_KNOWLEDGE_RPC_ADDR", ":8882", needs)
 	if err != nil {
 		return err
 	}
@@ -40,7 +40,7 @@ func Run(ctx context.Context) (runErr error) {
 		defer cancel()
 		runErr = errors.Join(runErr, cleanup(closeCtx))
 	}()
-	resources, err := foundationbootstrap.Open(ctx, cfg, needs)
+	resources, err := internalbootstrap.Open(ctx, cfg, needs)
 	if err != nil {
 		return err
 	}

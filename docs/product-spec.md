@@ -48,7 +48,7 @@ AI Agent 层
 
 ## 技术路线
 
-第一阶段采用 **Hertz API 网关 + Kitex 微服务**。浏览器和桌面客户端只访问 Hertz，服务间同步调用统一使用 Kitex Thrift RPC，异步任务和领域事件使用 NATS。跨服务基础设施通过 `internal/foundation` 的稳定接口接入，首批 adapter 为 PostgreSQL、Redis、NATS 和 Etcd。
+第一阶段采用 **Hertz API 网关 + Kitex 微服务**。浏览器和桌面客户端只访问 Hertz，服务间同步调用统一使用 Kitex Thrift RPC，异步任务和领域事件使用 NATS。跨服务基础设施通过 `internal` 下的稳定接口接入，首批 adapter 为 PostgreSQL、Redis、NATS 和 Etcd。
 
 核心约束：
 
@@ -56,7 +56,7 @@ AI Agent 层
 - 每项业务数据只有一个服务 owner；服务之间禁止通过 SQL 读取或修改其他服务的数据。
 - 强一致业务在所属服务的本地事务内完成，跨服务流程使用 RPC 或 Outbox 事件，不引入分布式事务。
 - 对外 HTTP、WebSocket 协议与内部 Thrift IDL 分离，传输对象不得直接下沉为领域模型。
-- JSON 统一使用 `github.com/bytedance/sonic`；Hertz 保持默认 Sonic binding/rendering，业务代码通过 foundation codec 使用 JSON。
+- JSON 统一使用 `github.com/bytedance/sonic`；Hertz 保持默认 Sonic binding/rendering，业务代码通过 `internal/codec/json` 使用 JSON。
 - 所有服务输出 JSON 结构化日志，并透传 `request_id`、`trace_id` 和调用目标。
 - 四个服务均以 Cobra 根命令运行，由统一生命周期捕获退出信号、摘除 readiness、排空传输层并关闭资源；不提供独立 `serve` 或 `migrate` 子命令。
 - OpenTelemetry 使用 W3C 上下文传播和 OTLP gRPC 导出；endpoint 为空时关闭导出，采样采用 ParentBased ratio 策略。
@@ -106,7 +106,7 @@ identity            knowledge            platform
 | 内部 RPC | Kitex + Thrift | IDL 优先的服务契约，支持中间件、超时、治理和业务异常 |
 | 异步通信 | NATS JetStream + NATS Core | JetStream 承载可靠事件和任务，Core NATS 承载协作实时广播 |
 | JSON 编解码 | `github.com/bytedance/sonic` | 统一 Hertz binding/rendering、事件和配置 JSON；配置与事件严格解码并启用 `UseNumber` |
-| 数据访问 | foundation database 接口 + `database/sql` | 首个 adapter 使用 `pgx` stdlib，保留显式 SQL、事务和行级锁控制 |
+| 数据访问 | `internal/database` 接口 + `database/sql` | 首个 adapter 使用 `pgx` stdlib，保留显式 SQL、事务和行级锁控制 |
 | 前端 | React + Next.js + TypeScript | Markdown 生态成熟、SSR/SSG 支持 |
 | 样式 | Tailwind CSS | 快速迭代，与 Next.js 搭配好 |
 | Markdown 渲染 | remark + rehype 插件链 | 可扩展的 AST 转换 |
@@ -121,19 +121,18 @@ identity            knowledge            platform
 ```text
 idl/
   http/v1/
-  rpc/
+  rpc/v1/
 internal/
-  foundation/
-    codec/json/
-    config/{env,etcd}/
-    database/postgres/
-    messaging/nats/
-    cache/redis/
-    discovery/etcd/
-    observability/
-    health/
-    lifecycle/
-    command/
+  codec/json/
+  config/{env,etcd}/
+  database/postgres/
+  messaging/nats/
+  cache/redis/
+  discovery/etcd/
+  observability/
+  health/
+  lifecycle/
+  command/
 kitex_gen/
 services/
   gateway/{main.go,biz,internal}/
@@ -152,8 +151,8 @@ docker/infrastructure/
 
 - 仓库使用一个 `go.mod`，服务进程入口统一位于 `services/<service>/main.go`；依赖通过普通构造函数显式装配，不使用 Wire/Fx。
 - Thrift IDL 是内部 RPC 的唯一契约来源，生成代码统一放在 `kitex_gen/`，不得手工修改。
-- HTTP IDL 放在 `idl/http/v1/`，内部 Thrift RPC IDL 放在 `idl/rpc/`；Hertz 与 Kitex 生成代码只做传输适配，不写业务规则。
-- `internal/foundation` 只放 JSON、配置、数据库、缓存、消息、注册发现、可观测性和生命周期等基础设施能力，不承载业务规则。
+- HTTP IDL 放在 `idl/http/v1/`，内部 Thrift RPC IDL 放在 `idl/rpc/v1/`；Hertz 与 Kitex 生成代码只做传输适配，不写业务规则。
+- `internal` 下的共享包只放 JSON、配置、数据库、缓存、消息、注册发现、可观测性和生命周期等基础设施能力，不承载业务规则。
 - 各业务包只能导入自己的领域代码、共享基础设施接口和生成的 RPC 契约，不直接导入其他服务的 repository。
 - 完整接口与装配规则见 [Hertz + Kitex 服务框架设计](./framework-design.md)。
 
@@ -259,11 +258,8 @@ migrations/
 copy .env.example .env
 # 在 .env 中填写 KC_POSTGRES_PASSWORD 和 KC_DATABASE_DSN，并将运行时变量加载到各服务进程环境。
 
-# 生成本地 Ed25519 JWT 密钥并注入当前 PowerShell 进程。
-go run ./cmd/keygen | ForEach-Object {
-    $name, $value = $_ -split '=', 2
-    Set-Item -Path "Env:$name" -Value $value
-}
+# 通过本地 Secret 管理器或安全密钥生成流程，将 Base64 编码的 Ed25519 私钥和公钥
+# 分别注入 KC_IDENTITY_JWT_PRIVATE_KEY 与 KC_GATEWAY_JWT_PUBLIC_KEY。
 
 docker compose -f docker/infrastructure/docker-compose.yml up -d postgres redis nats etcd
 
@@ -678,7 +674,7 @@ GET    /api/v1/studio/export/download/:task_id  # 下载已完成的导出文件
 
 1. Hertz `gateway` 与 `identity`、`knowledge`、`platform` 三个 Kitex Thrift 服务的单模块 Monorepo 骨架
 2. PostgreSQL `identity`、`knowledge`、`platform` schema 及 `migrations/<service>/postgres` 独立迁移链
-3. Foundation 基础设施接口及 PostgreSQL、Redis、NATS、Etcd 首批 adapter
+3. `internal` 基础设施接口及 PostgreSQL、Redis、NATS、Etcd 首批 adapter
 4. Ed25519 JWT、Refresh Token、撤销事件投影和 Studio 权限控制
 5. PostgreSQL 文档主存储（documents、document_blocks、document_ops、document_revisions）
 6. Web 端文档列表浏览、PostgreSQL 全文搜索和公开阅读

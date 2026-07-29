@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	foundationauth "github.com/HappyLadySauce/Knowledge-Core/internal/foundation/auth"
-	"github.com/HappyLadySauce/Knowledge-Core/internal/foundation/observability"
+	auth "github.com/HappyLadySauce/Knowledge-Core/internal/auth"
+	"github.com/HappyLadySauce/Knowledge-Core/internal/observability"
 	"github.com/HappyLadySauce/Knowledge-Core/services/gateway/internal/middleware"
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/app/server"
@@ -63,15 +63,15 @@ func TestRequireRolesEnforcesAuthenticationAndRole(t *testing.T) {
 	tests := []struct {
 		name       string
 		header     string
-		principal  foundationauth.Principal
+		principal  auth.Principal
 		verifyErr  error
 		wantStatus int
 		wantCalled bool
 	}{
 		{name: "missing token", wantStatus: 401},
 		{name: "invalid token", header: "Bearer invalid", verifyErr: errors.New("invalid"), wantStatus: 401},
-		{name: "wrong role", header: "Bearer user", principal: foundationauth.Principal{UserID: 1, Role: "user"}, wantStatus: 403},
-		{name: "allowed role", header: "Bearer admin", principal: foundationauth.Principal{UserID: 1, Role: "admin"}, wantStatus: 200, wantCalled: true},
+		{name: "wrong role", header: "Bearer user", principal: auth.Principal{UserID: 1, Role: "user"}, wantStatus: 403},
+		{name: "allowed role", header: "Bearer admin", principal: auth.Principal{UserID: 1, Role: "admin"}, wantStatus: 200, wantCalled: true},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -106,10 +106,10 @@ func TestRequestIDReplacesUnsafeValue(t *testing.T) {
 }
 
 type fakeVerifier struct {
-	principal foundationauth.Principal
+	principal auth.Principal
 	err       error
 }
 
-func (v fakeVerifier) Verify(string) (foundationauth.Principal, error) {
+func (v fakeVerifier) Verify(string) (auth.Principal, error) {
 	return v.principal, v.err
 }

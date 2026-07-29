@@ -4,7 +4,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/HappyLadySauce/Knowledge-Core/internal/foundation/observability"
+	"github.com/HappyLadySauce/Knowledge-Core/internal/observability"
 	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/identity/identityservice"
 	kitexclient "github.com/cloudwego/kitex/client"
 	"github.com/cloudwego/kitex/pkg/discovery"

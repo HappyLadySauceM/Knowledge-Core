@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"os"
 
-	foundationauth "github.com/HappyLadySauce/Knowledge-Core/internal/foundation/auth"
-	foundationbootstrap "github.com/HappyLadySauce/Knowledge-Core/internal/foundation/bootstrap"
-	"github.com/HappyLadySauce/Knowledge-Core/internal/foundation/lifecycle"
-	"github.com/HappyLadySauce/Knowledge-Core/internal/foundation/observability"
+	auth "github.com/HappyLadySauce/Knowledge-Core/internal/auth"
+	internalbootstrap "github.com/HappyLadySauce/Knowledge-Core/internal/bootstrap"
+	"github.com/HappyLadySauce/Knowledge-Core/internal/lifecycle"
+	"github.com/HappyLadySauce/Knowledge-Core/internal/observability"
 	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/common"
 	"github.com/HappyLadySauce/Knowledge-Core/services/gateway/biz/router"
 	gatewayclient "github.com/HappyLadySauce/Knowledge-Core/services/gateway/internal/client"
@@ -19,14 +19,14 @@ import (
 )
 
 func Run(ctx context.Context) (runErr error) {
-	needs := foundationbootstrap.Needs{
+	needs := internalbootstrap.Needs{
 		Cache:             true,
 		DurableMessaging:  true,
 		RealtimeMessaging: true,
 		ConfigSource:      true,
 		Resolver:          true,
 	}
-	cfg, err := foundationbootstrap.LoadConfig("gateway", "KC_GATEWAY_HTTP_ADDR", ":8080", needs)
+	cfg, err := internalbootstrap.LoadConfig("gateway", "KC_GATEWAY_HTTP_ADDR", ":8080", needs)
 	if err != nil {
 		return err
 	}
@@ -47,11 +47,11 @@ func Run(ctx context.Context) (runErr error) {
 		defer cancel()
 		runErr = errors.Join(runErr, cleanup(closeCtx))
 	}()
-	accessTokenVerifier, err := foundationauth.NewVerifier(os.Getenv("KC_GATEWAY_JWT_PUBLIC_KEY"))
+	accessTokenVerifier, err := auth.NewVerifier(os.Getenv("KC_GATEWAY_JWT_PUBLIC_KEY"))
 	if err != nil {
 		return fmt.Errorf("configure gateway access tokens: %w", err)
 	}
-	resources, err := foundationbootstrap.Open(ctx, cfg, needs)
+	resources, err := internalbootstrap.Open(ctx, cfg, needs)
 	if err != nil {
 		return err
 	}
