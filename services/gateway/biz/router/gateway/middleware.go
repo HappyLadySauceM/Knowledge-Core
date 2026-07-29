@@ -60,3 +60,67 @@ func _usersMw() []app.HandlerFunc {
 func _currentuserMw() []app.HandlerFunc {
 	return []app.HandlerFunc{middleware.RequireAuthenticated()}
 }
+
+func _listpublisheddocumentsMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _documentsMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _getpublisheddocumentMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _studioMw() []app.HandlerFunc {
+	return []app.HandlerFunc{middleware.RequireRoles("admin")}
+}
+
+func _listdocumentsMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _createdocumentMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _documents0Mw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _deletedocumentMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _getdocumentMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _updatedocumentMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _document_idMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _applydocumentoperationMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _setdocumentstatusMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}

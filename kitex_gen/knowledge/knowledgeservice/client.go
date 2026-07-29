@@ -5,6 +5,7 @@ package knowledgeservice
 import (
 	"context"
 	common "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/common"
+	knowledge "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/knowledge"
 	client "github.com/cloudwego/kitex/client"
 	callopt "github.com/cloudwego/kitex/client/callopt"
 )
@@ -12,6 +13,15 @@ import (
 // Client is designed to provide IDL-compatible methods with call-option parameter for kitex framework.
 type Client interface {
 	Ping(ctx context.Context, request *common.PingRequest, callOptions ...callopt.Option) (r *common.PingResponse, err error)
+	ListPublishedDocuments(ctx context.Context, request *knowledge.DocumentListRequest, callOptions ...callopt.Option) (r *knowledge.DocumentList, err error)
+	ListDocuments(ctx context.Context, request *knowledge.DocumentListRequest, callOptions ...callopt.Option) (r *knowledge.DocumentList, err error)
+	GetPublishedDocument(ctx context.Context, request *knowledge.DocumentIDRequest, callOptions ...callopt.Option) (r *knowledge.DocumentDetail, err error)
+	CreateDocument(ctx context.Context, request *knowledge.CreateDocumentRequest, callOptions ...callopt.Option) (r *knowledge.DocumentDetail, err error)
+	GetDocument(ctx context.Context, request *knowledge.DocumentIDRequest, callOptions ...callopt.Option) (r *knowledge.DocumentDetail, err error)
+	UpdateDocument(ctx context.Context, request *knowledge.UpdateDocumentRequest, callOptions ...callopt.Option) (r *knowledge.DocumentDetail, err error)
+	DeleteDocument(ctx context.Context, request *knowledge.DocumentIDRequest, callOptions ...callopt.Option) (r *knowledge.Document, err error)
+	SetDocumentStatus(ctx context.Context, request *knowledge.SetDocumentStatusRequest, callOptions ...callopt.Option) (r *knowledge.Document, err error)
+	ApplyDocumentOperation(ctx context.Context, request *knowledge.ApplyDocumentOperationRequest, callOptions ...callopt.Option) (r *knowledge.DocumentOperationAck, err error)
 }
 
 // NewClient creates a client for the service defined in IDL.
@@ -46,4 +56,49 @@ type kKnowledgeServiceClient struct {
 func (p *kKnowledgeServiceClient) Ping(ctx context.Context, request *common.PingRequest, callOptions ...callopt.Option) (r *common.PingResponse, err error) {
 	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
 	return p.kClient.Ping(ctx, request)
+}
+
+func (p *kKnowledgeServiceClient) ListPublishedDocuments(ctx context.Context, request *knowledge.DocumentListRequest, callOptions ...callopt.Option) (r *knowledge.DocumentList, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.ListPublishedDocuments(ctx, request)
+}
+
+func (p *kKnowledgeServiceClient) ListDocuments(ctx context.Context, request *knowledge.DocumentListRequest, callOptions ...callopt.Option) (r *knowledge.DocumentList, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.ListDocuments(ctx, request)
+}
+
+func (p *kKnowledgeServiceClient) GetPublishedDocument(ctx context.Context, request *knowledge.DocumentIDRequest, callOptions ...callopt.Option) (r *knowledge.DocumentDetail, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.GetPublishedDocument(ctx, request)
+}
+
+func (p *kKnowledgeServiceClient) CreateDocument(ctx context.Context, request *knowledge.CreateDocumentRequest, callOptions ...callopt.Option) (r *knowledge.DocumentDetail, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.CreateDocument(ctx, request)
+}
+
+func (p *kKnowledgeServiceClient) GetDocument(ctx context.Context, request *knowledge.DocumentIDRequest, callOptions ...callopt.Option) (r *knowledge.DocumentDetail, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.GetDocument(ctx, request)
+}
+
+func (p *kKnowledgeServiceClient) UpdateDocument(ctx context.Context, request *knowledge.UpdateDocumentRequest, callOptions ...callopt.Option) (r *knowledge.DocumentDetail, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.UpdateDocument(ctx, request)
+}
+
+func (p *kKnowledgeServiceClient) DeleteDocument(ctx context.Context, request *knowledge.DocumentIDRequest, callOptions ...callopt.Option) (r *knowledge.Document, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.DeleteDocument(ctx, request)
+}
+
+func (p *kKnowledgeServiceClient) SetDocumentStatus(ctx context.Context, request *knowledge.SetDocumentStatusRequest, callOptions ...callopt.Option) (r *knowledge.Document, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.SetDocumentStatus(ctx, request)
+}
+
+func (p *kKnowledgeServiceClient) ApplyDocumentOperation(ctx context.Context, request *knowledge.ApplyDocumentOperationRequest, callOptions ...callopt.Option) (r *knowledge.DocumentOperationAck, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.ApplyDocumentOperation(ctx, request)
 }

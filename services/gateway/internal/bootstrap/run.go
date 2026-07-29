@@ -74,6 +74,22 @@ func Run(ctx context.Context) (runErr error) {
 	}); err != nil {
 		return err
 	}
+	knowledgeClient, err := gatewayclient.NewKnowledge(resources.Resolver, telemetry)
+	if err != nil {
+		return fmt.Errorf("create gateway Knowledge client: %w", err)
+	}
+	if err := resources.Health.Add("knowledge-rpc", func(checkCtx context.Context) error {
+		response, pingErr := knowledgeClient.Ping(checkCtx, &common.PingRequest{})
+		if pingErr != nil {
+			return pingErr
+		}
+		if response == nil || response.Status != "ok" {
+			return errors.New("knowledge RPC health check returned an invalid response")
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
 
 	hertz := server.Default(
 		server.WithHostPorts(cfg.ListenAddress),
@@ -87,7 +103,7 @@ func Run(ctx context.Context) (runErr error) {
 		}),
 		Verifier: accessTokenVerifier,
 		Dependencies: middleware.RuntimeDependencies{
-			Health: resources.Health, Identity: identityClient,
+			Health: resources.Health, Identity: identityClient, Knowledge: knowledgeClient,
 		},
 	}); err != nil {
 		return err

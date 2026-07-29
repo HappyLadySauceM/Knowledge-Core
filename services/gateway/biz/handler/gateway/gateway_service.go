@@ -7,7 +7,10 @@ import (
 	"net/http"
 	"time"
 
+	auth "github.com/HappyLadySauce/Knowledge-Core/internal/auth"
 	identityrpc "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/identity"
+	knowledgerpc "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/knowledge"
+	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/knowledge/knowledgeservice"
 	gateway "github.com/HappyLadySauce/Knowledge-Core/services/gateway/biz/model/gateway"
 	"github.com/HappyLadySauce/Knowledge-Core/services/gateway/internal/middleware"
 	"github.com/cloudwego/hertz/pkg/app"
@@ -163,4 +166,361 @@ func CurrentUser(ctx context.Context, c *app.RequestContext) {
 	c.JSON(http.StatusOK, &gateway.CurrentUserResponse{
 		Code: 0, Message: "ok", Data: mapUser(user), RequestID: middleware.GetRequestID(c),
 	})
+}
+
+// ListPublishedDocuments .
+// @router /api/v1/documents [GET]
+func ListPublishedDocuments(ctx context.Context, c *app.RequestContext) {
+	var req gateway.DocumentListRequest
+	if err := c.BindAndValidate(&req); err != nil {
+		writeError(c, http.StatusBadRequest, codeInvalidRequest, "invalid request")
+		return
+	}
+	client, ok := knowledgeClient(ctx, c)
+	if !ok {
+		return
+	}
+	rpcCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	response, err := client.ListPublishedDocuments(rpcCtx, &knowledgerpc.DocumentListRequest{
+		Query: req.Query, Page: req.Page, PageSize: req.PageSize,
+	})
+	if err != nil {
+		writeKnowledgeError(ctx, c, err)
+		return
+	}
+	data := mapKnowledgeList(response)
+	if data == nil {
+		dependencyFailure(ctx, c, "Knowledge ListPublishedDocuments returned no response")
+		return
+	}
+	c.JSON(http.StatusOK, &gateway.DocumentListResponse{Code: 0, Message: "ok", Data: data, RequestID: middleware.GetRequestID(c)})
+}
+
+// GetPublishedDocument .
+// @router /api/v1/documents/:document_id [GET]
+func GetPublishedDocument(ctx context.Context, c *app.RequestContext) {
+	var req gateway.DocumentIDRequest
+	if err := c.BindAndValidate(&req); err != nil {
+		writeError(c, http.StatusBadRequest, codeInvalidRequest, "invalid request")
+		return
+	}
+	client, ok := knowledgeClient(ctx, c)
+	if !ok {
+		return
+	}
+	rpcCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	response, err := client.GetPublishedDocument(rpcCtx, &knowledgerpc.DocumentIDRequest{DocumentId: req.DocumentID})
+	if err != nil {
+		writeKnowledgeError(ctx, c, err)
+		return
+	}
+	data := mapKnowledgeDetail(response)
+	if data == nil {
+		dependencyFailure(ctx, c, "Knowledge GetPublishedDocument returned no document")
+		return
+	}
+	c.JSON(http.StatusOK, &gateway.DocumentDetailResponse{Code: 0, Message: "ok", Data: data, RequestID: middleware.GetRequestID(c)})
+}
+
+// ListDocuments .
+// @router /api/v1/studio/documents [GET]
+func ListDocuments(ctx context.Context, c *app.RequestContext) {
+	var req gateway.DocumentListRequest
+	if err := c.BindAndValidate(&req); err != nil {
+		writeError(c, http.StatusBadRequest, codeInvalidRequest, "invalid request")
+		return
+	}
+	client, rpcCtx, cancel, ok := authorizedKnowledgeClient(ctx, c)
+	if !ok {
+		return
+	}
+	defer cancel()
+	response, err := client.ListDocuments(rpcCtx, &knowledgerpc.DocumentListRequest{Query: req.Query, Page: req.Page, PageSize: req.PageSize})
+	if err != nil {
+		writeKnowledgeError(ctx, c, err)
+		return
+	}
+	data := mapKnowledgeList(response)
+	if data == nil {
+		dependencyFailure(ctx, c, "Knowledge ListDocuments returned no response")
+		return
+	}
+	c.JSON(http.StatusOK, &gateway.DocumentListResponse{Code: 0, Message: "ok", Data: data, RequestID: middleware.GetRequestID(c)})
+}
+
+// CreateDocument .
+// @router /api/v1/studio/documents [POST]
+func CreateDocument(ctx context.Context, c *app.RequestContext) {
+	var req gateway.CreateDocumentRequest
+	if err := c.BindAndValidate(&req); err != nil {
+		writeError(c, http.StatusBadRequest, codeInvalidRequest, "invalid request")
+		return
+	}
+	client, rpcCtx, cancel, ok := authorizedKnowledgeClient(ctx, c)
+	if !ok {
+		return
+	}
+	defer cancel()
+	response, err := client.CreateDocument(rpcCtx, &knowledgerpc.CreateDocumentRequest{Title: req.Title, Summary: req.Summary})
+	if err != nil {
+		writeKnowledgeError(ctx, c, err)
+		return
+	}
+	data := mapKnowledgeDetail(response)
+	if data == nil {
+		dependencyFailure(ctx, c, "Knowledge CreateDocument returned no document")
+		return
+	}
+	c.JSON(http.StatusCreated, &gateway.DocumentDetailResponse{Code: 0, Message: "ok", Data: data, RequestID: middleware.GetRequestID(c)})
+}
+
+// GetDocument .
+// @router /api/v1/studio/documents/:document_id [GET]
+func GetDocument(ctx context.Context, c *app.RequestContext) {
+	var req gateway.DocumentIDRequest
+	if err := c.BindAndValidate(&req); err != nil {
+		writeError(c, http.StatusBadRequest, codeInvalidRequest, "invalid request")
+		return
+	}
+	client, rpcCtx, cancel, ok := authorizedKnowledgeClient(ctx, c)
+	if !ok {
+		return
+	}
+	defer cancel()
+	response, err := client.GetDocument(rpcCtx, &knowledgerpc.DocumentIDRequest{DocumentId: req.DocumentID})
+	if err != nil {
+		writeKnowledgeError(ctx, c, err)
+		return
+	}
+	data := mapKnowledgeDetail(response)
+	if data == nil {
+		dependencyFailure(ctx, c, "Knowledge GetDocument returned no document")
+		return
+	}
+	c.JSON(http.StatusOK, &gateway.DocumentDetailResponse{Code: 0, Message: "ok", Data: data, RequestID: middleware.GetRequestID(c)})
+}
+
+// UpdateDocument .
+// @router /api/v1/studio/documents/:document_id [PATCH]
+func UpdateDocument(ctx context.Context, c *app.RequestContext) {
+	var req gateway.UpdateDocumentRequest
+	if err := c.BindAndValidate(&req); err != nil {
+		writeError(c, http.StatusBadRequest, codeInvalidRequest, "invalid request")
+		return
+	}
+	client, rpcCtx, cancel, ok := authorizedKnowledgeClient(ctx, c)
+	if !ok {
+		return
+	}
+	defer cancel()
+	response, err := client.UpdateDocument(rpcCtx, &knowledgerpc.UpdateDocumentRequest{DocumentId: req.DocumentID, Title: req.Title, Summary: req.Summary})
+	if err != nil {
+		writeKnowledgeError(ctx, c, err)
+		return
+	}
+	data := mapKnowledgeDetail(response)
+	if data == nil {
+		dependencyFailure(ctx, c, "Knowledge UpdateDocument returned no document")
+		return
+	}
+	c.JSON(http.StatusOK, &gateway.DocumentDetailResponse{Code: 0, Message: "ok", Data: data, RequestID: middleware.GetRequestID(c)})
+}
+
+// DeleteDocument .
+// @router /api/v1/studio/documents/:document_id [DELETE]
+func DeleteDocument(ctx context.Context, c *app.RequestContext) {
+	var req gateway.DocumentIDRequest
+	if err := c.BindAndValidate(&req); err != nil {
+		writeError(c, http.StatusBadRequest, codeInvalidRequest, "invalid request")
+		return
+	}
+	client, rpcCtx, cancel, ok := authorizedKnowledgeClient(ctx, c)
+	if !ok {
+		return
+	}
+	defer cancel()
+	response, err := client.DeleteDocument(rpcCtx, &knowledgerpc.DocumentIDRequest{DocumentId: req.DocumentID})
+	if err != nil {
+		writeKnowledgeError(ctx, c, err)
+		return
+	}
+	data := mapKnowledgeDocument(response)
+	if data == nil {
+		dependencyFailure(ctx, c, "Knowledge DeleteDocument returned no document")
+		return
+	}
+	c.JSON(http.StatusOK, &gateway.DocumentResponse{Code: 0, Message: "ok", Data: data, RequestID: middleware.GetRequestID(c)})
+}
+
+// SetDocumentStatus .
+// @router /api/v1/studio/documents/:document_id/status [PATCH]
+func SetDocumentStatus(ctx context.Context, c *app.RequestContext) {
+	var req gateway.SetDocumentStatusRequest
+	if err := c.BindAndValidate(&req); err != nil {
+		writeError(c, http.StatusBadRequest, codeInvalidRequest, "invalid request")
+		return
+	}
+	client, rpcCtx, cancel, ok := authorizedKnowledgeClient(ctx, c)
+	if !ok {
+		return
+	}
+	defer cancel()
+	response, err := client.SetDocumentStatus(rpcCtx, &knowledgerpc.SetDocumentStatusRequest{DocumentId: req.DocumentID, Status: req.Status})
+	if err != nil {
+		writeKnowledgeError(ctx, c, err)
+		return
+	}
+	data := mapKnowledgeDocument(response)
+	if data == nil {
+		dependencyFailure(ctx, c, "Knowledge SetDocumentStatus returned no document")
+		return
+	}
+	c.JSON(http.StatusOK, &gateway.DocumentResponse{Code: 0, Message: "ok", Data: data, RequestID: middleware.GetRequestID(c)})
+}
+
+// ApplyDocumentOperation .
+// @router /api/v1/studio/documents/:document_id/ops [POST]
+func ApplyDocumentOperation(ctx context.Context, c *app.RequestContext) {
+	var req gateway.ApplyDocumentOperationRequest
+	if err := c.BindAndValidate(&req); err != nil {
+		writeError(c, http.StatusBadRequest, codeInvalidRequest, "invalid request")
+		return
+	}
+	client, rpcCtx, cancel, ok := authorizedKnowledgeClient(ctx, c)
+	if !ok {
+		return
+	}
+	defer cancel()
+	response, err := client.ApplyDocumentOperation(rpcCtx, &knowledgerpc.ApplyDocumentOperationRequest{
+		DocumentId: req.DocumentID, OpId: req.OpID, BaseDocumentVersion: req.BaseDocumentVersion,
+		BlockId: req.BlockID, BaseBlockVersion: req.BaseBlockVersion, PositionKey: req.PositionKey,
+		ContentJson: req.ContentJSON, TextContent: req.TextContent,
+	})
+	if err != nil {
+		writeKnowledgeError(ctx, c, err)
+		return
+	}
+	if response == nil {
+		dependencyFailure(ctx, c, "Knowledge ApplyDocumentOperation returned no response")
+		return
+	}
+	c.JSON(http.StatusOK, &gateway.DocumentOperationAckResponse{
+		Code: 0, Message: "ok",
+		Data: &gateway.DocumentOperationAckData{
+			DocumentID: response.DocumentId, OpID: response.OpId, DocumentVersion: response.DocumentVersion,
+			BlockVersion: response.BlockVersion, Duplicate: response.Duplicate,
+		},
+		RequestID: middleware.GetRequestID(c),
+	})
+}
+
+func knowledgeClient(ctx context.Context, c *app.RequestContext) (knowledgeservice.Client, bool) {
+	client, exists := middleware.KnowledgeClient(c)
+	if !exists {
+		dependencyFailure(ctx, c, "Knowledge client is not configured")
+		return nil, false
+	}
+	return client, true
+}
+
+func authorizedKnowledgeClient(
+	ctx context.Context,
+	c *app.RequestContext,
+) (knowledgeservice.Client, context.Context, context.CancelFunc, bool) {
+	client, exists := knowledgeClient(ctx, c)
+	if !exists {
+		return nil, nil, func() {}, false
+	}
+	token, authenticated := middleware.AccessToken(c)
+	if !authenticated {
+		writeError(c, http.StatusUnauthorized, codeUnauthorized, "authentication required")
+		return nil, nil, func() {}, false
+	}
+	rpcCtx, cancel := context.WithTimeout(auth.WithAccessToken(ctx, token), 3*time.Second)
+	return client, rpcCtx, cancel, true
+}
+
+func dependencyFailure(ctx context.Context, c *app.RequestContext, message string) {
+	hlog.CtxErrorf(ctx, "%s", message)
+	writeError(c, http.StatusServiceUnavailable, codeDependencyUnavailable, "service unavailable")
+}
+
+func writeKnowledgeError(ctx context.Context, c *app.RequestContext, err error) {
+	bizError, ok := kerrors.FromBizStatusError(err)
+	if !ok {
+		hlog.CtxErrorf(ctx, "Knowledge RPC request failed: %v", err)
+		writeError(c, http.StatusServiceUnavailable, codeDependencyUnavailable, "service unavailable")
+		return
+	}
+	switch bizError.BizStatusCode() {
+	case knowledgerpc.CodeInvalidInput:
+		writeError(c, http.StatusBadRequest, knowledgerpc.CodeInvalidInput, "invalid request")
+	case knowledgerpc.CodeNotFound:
+		writeError(c, http.StatusNotFound, knowledgerpc.CodeNotFound, "document not found")
+	case knowledgerpc.CodeConflict:
+		writeError(c, http.StatusConflict, knowledgerpc.CodeConflict, "document version conflict")
+	case knowledgerpc.CodeForbidden:
+		writeError(c, http.StatusForbidden, knowledgerpc.CodeForbidden, "permission denied")
+	default:
+		hlog.CtxErrorf(ctx, "Knowledge RPC returned business code %d", bizError.BizStatusCode())
+		writeError(c, http.StatusBadGateway, codeDependencyUnavailable, "service unavailable")
+	}
+}
+
+func mapKnowledgeList(list *knowledgerpc.DocumentList) *gateway.DocumentListData {
+	if list == nil {
+		return nil
+	}
+	items := make([]*gateway.DocumentData, 0, len(list.Items))
+	for _, document := range list.Items {
+		mapped := mapKnowledgeDocument(document)
+		if mapped == nil {
+			return nil
+		}
+		items = append(items, mapped)
+	}
+	return &gateway.DocumentListData{Items: items, Total: list.Total, Page: list.Page, PageSize: list.PageSize}
+}
+
+func mapKnowledgeDetail(detail *knowledgerpc.DocumentDetail) *gateway.DocumentDetailData {
+	if detail == nil {
+		return nil
+	}
+	document := mapKnowledgeDocument(detail.Document)
+	if document == nil {
+		return nil
+	}
+	blocks := make([]*gateway.DocumentBlockData, 0, len(detail.Blocks))
+	for _, block := range detail.Blocks {
+		mapped := mapKnowledgeBlock(block)
+		if mapped == nil {
+			return nil
+		}
+		blocks = append(blocks, mapped)
+	}
+	return &gateway.DocumentDetailData{Document: document, Blocks: blocks}
+}
+
+func mapKnowledgeDocument(document *knowledgerpc.Document) *gateway.DocumentData {
+	if document == nil {
+		return nil
+	}
+	return &gateway.DocumentData{
+		ID: document.Id, Title: document.Title, Summary: document.Summary, Slug: document.Slug,
+		Status: document.Status, AuthorID: document.AuthorId, CurrentVersion: document.CurrentVersion,
+		PublishedAtUnix: document.PublishedAtUnix, CreatedAtUnix: document.CreatedAtUnix, UpdatedAtUnix: document.UpdatedAtUnix,
+	}
+}
+
+func mapKnowledgeBlock(block *knowledgerpc.DocumentBlock) *gateway.DocumentBlockData {
+	if block == nil {
+		return nil
+	}
+	return &gateway.DocumentBlockData{
+		BlockID: block.BlockId, DocumentID: block.DocumentId, PositionKey: block.PositionKey, Type: block.Type,
+		ContentJSON: block.ContentJson, TextContent: block.TextContent, Version: block.Version,
+		UpdatedBy: block.UpdatedBy, UpdatedAtUnix: block.UpdatedAtUnix,
+	}
 }

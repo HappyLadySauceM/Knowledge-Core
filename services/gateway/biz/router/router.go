@@ -30,6 +30,8 @@ func Register(engine *server.Hertz, cfg Config) error {
 		return errors.New("register gateway routes: health registry is required")
 	case cfg.Dependencies.Identity == nil:
 		return errors.New("register gateway routes: Identity client is required")
+	case cfg.Dependencies.Knowledge == nil:
+		return errors.New("register gateway routes: Knowledge client is required")
 	}
 	engine.Use(
 		middleware.RequestID(),

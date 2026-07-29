@@ -7,10 +7,15 @@ import (
 	"net"
 	"os"
 
+	auth "github.com/HappyLadySauce/Knowledge-Core/internal/auth"
 	internalbootstrap "github.com/HappyLadySauce/Knowledge-Core/internal/bootstrap"
+	jsoncodec "github.com/HappyLadySauce/Knowledge-Core/internal/codec/json"
 	"github.com/HappyLadySauce/Knowledge-Core/internal/lifecycle"
 	"github.com/HappyLadySauce/Knowledge-Core/internal/observability"
 	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/knowledge/knowledgeservice"
+	knowledgeapp "github.com/HappyLadySauce/Knowledge-Core/services/knowledge/internal/app"
+	migrationpostgres "github.com/HappyLadySauce/Knowledge-Core/services/knowledge/internal/migration/postgres"
+	knowledgepostgres "github.com/HappyLadySauce/Knowledge-Core/services/knowledge/internal/repository/postgres"
 	knowledgekitex "github.com/HappyLadySauce/Knowledge-Core/services/knowledge/internal/transport/kitex"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/server"
@@ -40,12 +45,25 @@ func Run(ctx context.Context) (runErr error) {
 		defer cancel()
 		runErr = errors.Join(runErr, cleanup(closeCtx))
 	}()
+	accessTokenVerifier, err := auth.NewVerifier(os.Getenv("KC_KNOWLEDGE_JWT_PUBLIC_KEY"))
+	if err != nil {
+		return fmt.Errorf("configure knowledge access token verifier: %w", err)
+	}
+	if err := migrationpostgres.Up(ctx, cfg.Database.DSN); err != nil {
+		return fmt.Errorf("migrate knowledge database: %w", err)
+	}
+	logger.InfoContext(ctx, "knowledge database migrations completed")
 	resources, err := internalbootstrap.Open(ctx, cfg, needs)
 	if err != nil {
 		return err
 	}
 	cleanup = func(closeCtx context.Context) error {
 		return errors.Join(resources.Close(closeCtx), telemetry.Shutdown(closeCtx))
+	}
+	documents := knowledgepostgres.NewDocumentRepository()
+	application, err := knowledgeapp.NewService(resources.Database, documents, jsoncodec.New())
+	if err != nil {
+		return err
 	}
 
 	address, err := net.ResolveTCPAddr("tcp", cfg.ListenAddress)
@@ -54,7 +72,7 @@ func Run(ctx context.Context) (runErr error) {
 	}
 	exitSignal := make(chan error, 1)
 	rpcServer := knowledgeservice.NewServer(
-		knowledgekitex.NewHandler(),
+		knowledgekitex.NewHandler(application, accessTokenVerifier),
 		server.WithServiceAddr(address),
 		server.WithServerBasicInfo(&rpcinfo.EndpointBasicInfo{ServiceName: serviceName}),
 		server.WithRegistry(resources.Registry),

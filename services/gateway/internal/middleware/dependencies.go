@@ -11,22 +11,26 @@ import (
 	"github.com/HappyLadySauce/Knowledge-Core/internal/health"
 	"github.com/HappyLadySauce/Knowledge-Core/internal/observability"
 	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/identity/identityservice"
+	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/knowledge/knowledgeservice"
 	gatewaymodel "github.com/HappyLadySauce/Knowledge-Core/services/gateway/biz/model/gateway"
 	"github.com/cloudwego/hertz/pkg/app"
 )
 
 const (
-	healthRegistryKey = "knowledge-core.health-registry"
-	identityClientKey = "knowledge-core.identity-client"
-	principalKey      = "knowledge-core.auth-principal"
-	requestIDKey      = "knowledge-core.request-id"
-	codeUnauthorized  = int32(10003)
-	codeForbidden     = int32(10005)
+	healthRegistryKey  = "knowledge-core.health-registry"
+	identityClientKey  = "knowledge-core.identity-client"
+	knowledgeClientKey = "knowledge-core.knowledge-client"
+	principalKey       = "knowledge-core.auth-principal"
+	accessTokenKey     = "knowledge-core.auth-access-token"
+	requestIDKey       = "knowledge-core.request-id"
+	codeUnauthorized   = int32(10003)
+	codeForbidden      = int32(10005)
 )
 
 type RuntimeDependencies struct {
-	Health   *health.Registry
-	Identity identityservice.Client
+	Health    *health.Registry
+	Identity  identityservice.Client
+	Knowledge knowledgeservice.Client
 }
 
 type TokenVerifier interface {
@@ -37,6 +41,7 @@ func Dependencies(dependencies RuntimeDependencies) app.HandlerFunc {
 	return func(ctx context.Context, request *app.RequestContext) {
 		request.Set(healthRegistryKey, dependencies.Health)
 		request.Set(identityClientKey, dependencies.Identity)
+		request.Set(knowledgeClientKey, dependencies.Knowledge)
 		request.Next(ctx)
 	}
 }
@@ -49,6 +54,7 @@ func Authentication(verifier TokenVerifier) app.HandlerFunc {
 			if len(parts) == 2 && strings.EqualFold(parts[0], "Bearer") {
 				if principal, err := verifier.Verify(parts[1]); err == nil {
 					request.Set(principalKey, principal)
+					request.Set(accessTokenKey, parts[1])
 					ctx = observability.WithUserID(ctx, principal.UserID)
 				}
 			}
@@ -165,10 +171,22 @@ func IdentityClient(request *app.RequestContext) (identityservice.Client, bool) 
 	return client, exists && ok && client != nil
 }
 
+func KnowledgeClient(request *app.RequestContext) (knowledgeservice.Client, bool) {
+	value, exists := request.Get(knowledgeClientKey)
+	client, ok := value.(knowledgeservice.Client)
+	return client, exists && ok && client != nil
+}
+
 func Principal(request *app.RequestContext) (auth.Principal, bool) {
 	value, exists := request.Get(principalKey)
 	principal, ok := value.(auth.Principal)
 	return principal, exists && ok && principal.UserID > 0
+}
+
+func AccessToken(request *app.RequestContext) (string, bool) {
+	value, exists := request.Get(accessTokenKey)
+	token, ok := value.(string)
+	return token, exists && ok && token != ""
 }
 
 func GetRequestID(request *app.RequestContext) string {

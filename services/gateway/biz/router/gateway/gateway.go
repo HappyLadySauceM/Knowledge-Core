@@ -21,10 +21,31 @@ func Register(r *server.Hertz) {
 		_api := root.Group("/api", _apiMw()...)
 		{
 			_v1 := _api.Group("/v1", _v1Mw()...)
+			_v1.GET("/documents", append(_listpublisheddocumentsMw(), gateway.ListPublishedDocuments)...)
 			{
 				_auth := _v1.Group("/auth", _authMw()...)
 				_auth.POST("/login", append(_loginMw(), gateway.Login)...)
 				_auth.POST("/register", append(_registerMw(), gateway.Register)...)
+			}
+			{
+				_documents := _v1.Group("/documents", _documentsMw()...)
+				_documents.GET("/:document_id", append(_getpublisheddocumentMw(), gateway.GetPublishedDocument)...)
+			}
+			{
+				_studio := _v1.Group("/studio", _studioMw()...)
+				_studio.GET("/documents", append(_listdocumentsMw(), gateway.ListDocuments)...)
+				_studio.POST("/documents", append(_createdocumentMw(), gateway.CreateDocument)...)
+				{
+					_documents0 := _studio.Group("/documents", _documents0Mw()...)
+					_documents0.DELETE("/:document_id", append(_deletedocumentMw(), gateway.DeleteDocument)...)
+					_documents0.GET("/:document_id", append(_getdocumentMw(), gateway.GetDocument)...)
+					_documents0.PATCH("/:document_id", append(_updatedocumentMw(), gateway.UpdateDocument)...)
+					{
+						_document_id := _documents0.Group("/:document_id", _document_idMw()...)
+						_document_id.POST("/ops", append(_applydocumentoperationMw(), gateway.ApplyDocumentOperation)...)
+						_document_id.PATCH("/status", append(_setdocumentstatusMw(), gateway.SetDocumentStatus)...)
+					}
+				}
 			}
 			{
 				_users := _v1.Group("/users", _usersMw()...)

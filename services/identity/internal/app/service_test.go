@@ -102,6 +102,27 @@ func TestAuthenticateMissingUserStillComparesPassword(t *testing.T) {
 	}
 }
 
+func TestEnsureBootstrapAdminCreatesOnlyTheFirstAdministrator(t *testing.T) {
+	repositoryFake := &fakeUsers{}
+	service, err := app.NewService(repositoryFake, fakeHasher{}, fakeTokenIssuer{})
+	if err != nil {
+		t.Fatalf("NewService() error = %v", err)
+	}
+	created, err := service.EnsureBootstrapAdmin(context.Background(), app.BootstrapAdminInput{
+		Username: "admin", Email: "admin@example.com", Password: "correct-password",
+	})
+	if err != nil || !created {
+		t.Fatalf("EnsureBootstrapAdmin() = %v, %v", created, err)
+	}
+	if repositoryFake.user == nil || repositoryFake.user.Role != domain.RoleAdmin || repositoryFake.user.PasswordHash != "hashed:correct-password" {
+		t.Fatalf("bootstrap user = %#v", repositoryFake.user)
+	}
+	created, err = service.EnsureBootstrapAdmin(context.Background(), app.BootstrapAdminInput{})
+	if err != nil || created {
+		t.Fatalf("second EnsureBootstrapAdmin() = %v, %v", created, err)
+	}
+}
+
 func TestAuthenticateDoesNotRevealDisabledUserForWrongPassword(t *testing.T) {
 	repositoryFake := &fakeUsers{user: activeUser(time.Now().UTC())}
 	repositoryFake.user.Status = domain.StatusDisabled
@@ -175,6 +196,13 @@ func (f fakeTokenIssuer) Issue(user *domain.User) (app.AccessToken, error) {
 type fakeUsers struct {
 	user      *domain.User
 	createErr error
+}
+
+func (f *fakeUsers) CountAdmins(context.Context) (int64, error) {
+	if f.user != nil && f.user.Role == domain.RoleAdmin {
+		return 1, nil
+	}
+	return 0, nil
 }
 
 func (f *fakeUsers) Create(_ context.Context, user *domain.User) error {

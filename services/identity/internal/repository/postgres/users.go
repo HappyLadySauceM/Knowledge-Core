@@ -62,6 +62,14 @@ func (r *UserRepository) Create(ctx context.Context, user *domain.User) error {
 	return fmt.Errorf("insert identity user: %w", err)
 }
 
+func (r *UserRepository) CountAdmins(ctx context.Context) (int64, error) {
+	var count int64
+	if err := r.db.QueryRowContext(ctx, `SELECT count(*) FROM identity.users WHERE role = 'admin'`).Scan(&count); err != nil {
+		return 0, fmt.Errorf("count identity administrators: %w", err)
+	}
+	return count, nil
+}
+
 func (r *UserRepository) FindByID(ctx context.Context, id int64) (*domain.User, error) {
 	query := `SELECT ` + userColumns + ` FROM identity.users WHERE id = $1`
 	return scanUser(r.db.QueryRowContext(ctx, query, id))

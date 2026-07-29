@@ -225,7 +225,7 @@ migrations/
 
 - 每个 Provider 目录独立递增编号，迁移必须提供配对的 `up` 和 `down` 文件。
 - 每个服务只执行自己和当前 Provider 目录中的迁移，并在自己的 schema 中维护迁移版本。
-- 迁移通过独立命令在服务启动前执行，服务启动过程不得隐式修改数据库结构。
+- migration SQL 由 owner 服务嵌入二进制，并在本服务启动、repository 和网络监听建立前自动执行；失败或 dirty version 必须阻止服务进入 ready。
 - 新数据库 Provider 必须实现对应 repository 方言并建立自己的完整 migration 链；接口抽象不消除 SQL 方言和数据迁移工作。
 - migration 不得创建存储过程、数据库函数或业务状态触发器；时间戳、状态流转和派生字段由代码显式维护。
 - 跨服务变更先保持事件和 RPC 契约向后兼容，再分别发布各服务迁移，不依赖固定启动顺序完成分布式事务。
@@ -252,19 +252,22 @@ migrations/
 
 ## 本地开发运行
 
-基础脚手架已经提供四个服务入口以及 PostgreSQL、Redis、NATS JetStream、Etcd 的本地 Compose 环境。Identity 首条 PostgreSQL migration 已嵌入服务并在启动时自动执行；Knowledge 与 Platform 的迁移链随对应业务切片建立，并遵循相同启动规则。
+基础脚手架已经提供四个服务入口以及 PostgreSQL、Redis、NATS JetStream、Etcd 的本地 Compose 环境。Identity 与 Knowledge 的 PostgreSQL migration 已嵌入服务并在启动时自动执行；Platform 的迁移链随对应业务切片建立，并遵循相同启动规则。
 
 ```powershell
 copy .env.example .env
 # 在 .env 中填写 KC_POSTGRES_PASSWORD 和 KC_DATABASE_DSN，并将运行时变量加载到各服务进程环境。
 
 # 通过本地 Secret 管理器或安全密钥生成流程，将 Base64 编码的 Ed25519 私钥和公钥
-# 分别注入 KC_IDENTITY_JWT_PRIVATE_KEY 与 KC_GATEWAY_JWT_PUBLIC_KEY。
+# 分别注入 KC_IDENTITY_JWT_PRIVATE_KEY、KC_GATEWAY_JWT_PUBLIC_KEY 与 KC_KNOWLEDGE_JWT_PUBLIC_KEY。
+# 首次启动 Identity 时还需通过 Secret 注入 KC_IDENTITY_BOOTSTRAP_ADMIN_USERNAME、
+# KC_IDENTITY_BOOTSTRAP_ADMIN_EMAIL 与 KC_IDENTITY_BOOTSTRAP_ADMIN_PASSWORD；已有管理员后不再使用这些值。
 
 docker compose -f docker/infrastructure/docker-compose.yml up -d postgres redis nats etcd
 
-# 认证 MVP 先启动 Identity 与 Gateway；其他业务切片按需启动。
+# 文档 MVP 启动 Identity、Knowledge 与 Gateway。
 go run ./services/identity
+go run ./services/knowledge
 go run ./services/gateway
 ```
 

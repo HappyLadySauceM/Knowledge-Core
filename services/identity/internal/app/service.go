@@ -55,6 +55,12 @@ type AuthenticateInput struct {
 	Password   string
 }
 
+type BootstrapAdminInput struct {
+	Username string
+	Email    string
+	Password string
+}
+
 type Service struct {
 	users       repository.UserRepository
 	hasher      PasswordHasher
@@ -97,6 +103,41 @@ func (s *Service) Register(ctx context.Context, input RegisterInput) (*domain.Us
 		}
 	}
 	return user, nil
+}
+
+// EnsureBootstrapAdmin creates the first administrator from Secret-provided
+// credentials. It never changes an existing administrator.
+func (s *Service) EnsureBootstrapAdmin(ctx context.Context, input BootstrapAdminInput) (bool, error) {
+	count, err := s.users.CountAdmins(ctx)
+	if err != nil {
+		return false, fmt.Errorf("count bootstrap administrators: %w", err)
+	}
+	if count > 0 {
+		return false, nil
+	}
+	user, err := domain.NewUser(input.Username, input.Email)
+	if err != nil {
+		return false, err
+	}
+	if err := domain.ValidatePassword(input.Password); err != nil {
+		return false, err
+	}
+	user.Role = domain.RoleAdmin
+	user.PasswordHash, err = s.hasher.Hash(input.Password)
+	if err != nil {
+		return false, fmt.Errorf("hash bootstrap administrator password: %w", err)
+	}
+	if err := s.users.Create(ctx, user); err != nil {
+		switch {
+		case errors.Is(err, repository.ErrUsernameConflict), errors.Is(err, repository.ErrEmailConflict):
+			count, countErr := s.users.CountAdmins(ctx)
+			if countErr == nil && count > 0 {
+				return false, nil
+			}
+		}
+		return false, fmt.Errorf("create bootstrap administrator: %w", err)
+	}
+	return true, nil
 }
 
 func (s *Service) Authenticate(ctx context.Context, input AuthenticateInput) (*Authentication, error) {

@@ -71,6 +71,17 @@ func Run(ctx context.Context) (runErr error) {
 	if err != nil {
 		return err
 	}
+	createdAdmin, err := application.EnsureBootstrapAdmin(ctx, identityapp.BootstrapAdminInput{
+		Username: os.Getenv("KC_IDENTITY_BOOTSTRAP_ADMIN_USERNAME"),
+		Email:    os.Getenv("KC_IDENTITY_BOOTSTRAP_ADMIN_EMAIL"),
+		Password: os.Getenv("KC_IDENTITY_BOOTSTRAP_ADMIN_PASSWORD"),
+	})
+	if err != nil {
+		return fmt.Errorf("bootstrap identity administrator: %w", err)
+	}
+	if createdAdmin {
+		logger.InfoContext(ctx, "identity bootstrap administrator created", "event", "bootstrap_admin")
+	}
 
 	address, err := net.ResolveTCPAddr("tcp", cfg.ListenAddress)
 	if err != nil {

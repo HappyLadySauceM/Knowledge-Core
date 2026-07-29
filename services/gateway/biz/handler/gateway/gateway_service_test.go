@@ -16,6 +16,8 @@ import (
 	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/common"
 	identityrpc "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/identity"
 	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/identity/identityservice"
+	knowledgerpc "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/knowledge"
+	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/knowledge/knowledgeservice"
 	"github.com/HappyLadySauce/Knowledge-Core/services/gateway/biz/router"
 	"github.com/HappyLadySauce/Knowledge-Core/services/gateway/internal/middleware"
 	"github.com/cloudwego/hertz/pkg/app"
@@ -124,6 +126,20 @@ func TestRegisterMapsIdentityConflict(t *testing.T) {
 	}
 }
 
+func TestDocumentRoutesExposePublicReadsAndProtectStudio(t *testing.T) {
+	client := &fakeIdentityClient{user: testRPCUser()}
+	engine, token := newAuthenticatedEngine(t, client)
+	publicList := ut.PerformRequest(engine.Engine, "GET", "/api/v1/documents", nil)
+	if publicList.Code != 200 || !strings.Contains(publicList.Body.String(), `"code":0`) {
+		t.Fatalf("public document list = %d %s", publicList.Code, publicList.Body.String())
+	}
+	studioList := ut.PerformRequest(engine.Engine, "GET", "/api/v1/studio/documents", nil,
+		ut.Header{Key: "Authorization", Value: "Bearer " + token})
+	if studioList.Code != 403 || !strings.Contains(studioList.Body.String(), `"code":10005`) {
+		t.Fatalf("studio document list = %d %s", studioList.Code, studioList.Body.String())
+	}
+}
+
 func newAuthenticatedEngine(t *testing.T, client *fakeIdentityClient) (*server.Hertz, string) {
 	t.Helper()
 	publicKey, privateKey, err := ed25519.GenerateKey(rand.Reader)
@@ -160,6 +176,9 @@ func newAuthenticatedEngine(t *testing.T, client *fakeIdentityClient) (*server.H
 
 func registerRoutes(t *testing.T, engine *server.Hertz, verifier middleware.TokenVerifier, dependencies middleware.RuntimeDependencies) {
 	t.Helper()
+	if dependencies.Knowledge == nil {
+		dependencies.Knowledge = &fakeKnowledgeClient{}
+	}
 	tracing := func(ctx context.Context, request *app.RequestContext) { request.Next(ctx) }
 	if err := router.Register(engine, router.Config{
 		Logger:       slog.New(slog.NewJSONHandler(io.Discard, nil)),
@@ -224,3 +243,49 @@ func (f *fakeIdentityClient) GetUser(context.Context, *identityrpc.GetUserReques
 }
 
 var _ identityservice.Client = (*fakeIdentityClient)(nil)
+
+type fakeKnowledgeClient struct {
+	err error
+}
+
+func (f *fakeKnowledgeClient) Ping(context.Context, *common.PingRequest, ...callopt.Option) (*common.PingResponse, error) {
+	return &common.PingResponse{Service: "knowledge", Status: "ok"}, f.err
+}
+
+func (f *fakeKnowledgeClient) ListPublishedDocuments(context.Context, *knowledgerpc.DocumentListRequest, ...callopt.Option) (*knowledgerpc.DocumentList, error) {
+	return &knowledgerpc.DocumentList{Items: make([]*knowledgerpc.Document, 0)}, f.err
+}
+
+func (f *fakeKnowledgeClient) ListDocuments(context.Context, *knowledgerpc.DocumentListRequest, ...callopt.Option) (*knowledgerpc.DocumentList, error) {
+	return &knowledgerpc.DocumentList{Items: make([]*knowledgerpc.Document, 0)}, f.err
+}
+
+func (f *fakeKnowledgeClient) GetPublishedDocument(context.Context, *knowledgerpc.DocumentIDRequest, ...callopt.Option) (*knowledgerpc.DocumentDetail, error) {
+	return nil, f.err
+}
+
+func (f *fakeKnowledgeClient) CreateDocument(context.Context, *knowledgerpc.CreateDocumentRequest, ...callopt.Option) (*knowledgerpc.DocumentDetail, error) {
+	return nil, f.err
+}
+
+func (f *fakeKnowledgeClient) GetDocument(context.Context, *knowledgerpc.DocumentIDRequest, ...callopt.Option) (*knowledgerpc.DocumentDetail, error) {
+	return nil, f.err
+}
+
+func (f *fakeKnowledgeClient) UpdateDocument(context.Context, *knowledgerpc.UpdateDocumentRequest, ...callopt.Option) (*knowledgerpc.DocumentDetail, error) {
+	return nil, f.err
+}
+
+func (f *fakeKnowledgeClient) DeleteDocument(context.Context, *knowledgerpc.DocumentIDRequest, ...callopt.Option) (*knowledgerpc.Document, error) {
+	return nil, f.err
+}
+
+func (f *fakeKnowledgeClient) SetDocumentStatus(context.Context, *knowledgerpc.SetDocumentStatusRequest, ...callopt.Option) (*knowledgerpc.Document, error) {
+	return nil, f.err
+}
+
+func (f *fakeKnowledgeClient) ApplyDocumentOperation(context.Context, *knowledgerpc.ApplyDocumentOperationRequest, ...callopt.Option) (*knowledgerpc.DocumentOperationAck, error) {
+	return nil, f.err
+}
+
+var _ knowledgeservice.Client = (*fakeKnowledgeClient)(nil)

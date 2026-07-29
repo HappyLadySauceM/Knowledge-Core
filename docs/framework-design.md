@@ -1,6 +1,6 @@
 # Knowledge Core - Hertz + Kitex 服务框架设计
 
-> 状态：基础框架 v0.1 已实现。四个 Cobra 进程入口、统一生命周期、IDL/代码生成、`internal` 基础设施接口与首批 PostgreSQL/Redis/NATS/Etcd adapter 已落地；统一 JSON 日志和 HTTP/Kitex OpenTelemetry tracing 已接入。Identity 已完成用户注册、凭据校验、Ed25519 Access Token、用户查询和首条 PostgreSQL migration，Gateway 已接通注册、登录和当前用户 HTTP API。Refresh Token、注销、撤销事件投影、其他业务用例和 Prometheus metrics 仍按本文继续实现。
+> 状态：基础框架 v0.1 已实现。四个 Cobra 进程入口、统一生命周期、IDL/代码生成、`internal` 基础设施接口与首批 PostgreSQL/Redis/NATS/Etcd adapter 已落地；统一 JSON 日志和 HTTP/Kitex OpenTelemetry tracing 已接入。Identity 已完成用户注册、凭据校验、Ed25519 Access Token、用户查询、首次管理员初始化和首条 PostgreSQL migration；Knowledge 已完成文档、块操作、发布 revision 的 PostgreSQL 存储及迁移。Gateway 已接通认证与文档 HTTP API。Refresh Token、注销、撤销事件投影、NATS 协作、其他业务用例和 Prometheus metrics 仍按本文继续实现。
 
 ## 1. 设计目标
 
@@ -61,10 +61,11 @@ Etcd 同时承担三类职责，但 key 空间必须隔离：Kitex 注册发现�
 |   |   `-- v1/
 |   |       `-- gateway.thrift
 |   `-- rpc/
-|       |-- common.thrift
-|       |-- identity.thrift
-|       |-- knowledge.thrift
-|       `-- platform.thrift
+|       `-- v1/
+|           |-- common.thrift
+|           |-- identity.thrift
+|           |-- knowledge.thrift
+|           `-- platform.thrift
 |-- kitex_gen/                       # Kitex 生成代码，不手工修改
 |-- services/
 |   |-- gateway/
