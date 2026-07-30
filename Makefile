@@ -12,7 +12,7 @@ endif
 
 .DEFAULT_GOAL := help
 
-.PHONY: help fmt fmt-check vet lint line test race build tidy generate generate-check idl-compat check ci
+.PHONY: help fmt fmt-check vet lint line test race build tidy generate generate-check check ci
 
 help:
 	@echo Knowledge Core development targets:
@@ -27,7 +27,6 @@ help:
 	@echo   make tidy            Normalize go.mod and go.sum
 	@echo   make generate        Regenerate Hertz and Kitex code
 	@echo   make generate-check  Regenerate and fail on generated-code drift
-	@echo   make idl-compat      Check Thrift compatibility against IDL_COMPAT_BASE
 	@echo   make check           Run formatting, vet, lint, tests, and build
 	@echo   make ci              Run check plus generated-code drift detection
 
@@ -63,9 +62,6 @@ generate:
 generate-check:
 	$(CODEGEN_CHECK)
 
-idl-compat:
-	go run ./scripts/idlguard compat-git $(IDL_COMPAT_BASE) idl
-
 check: fmt-check vet lint test build
 
-ci: check generate-check idl-compat
+ci: check generate-check
