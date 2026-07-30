@@ -19,13 +19,13 @@ func NewIdentity(resolver discovery.Resolver, runtime *observability.Runtime) (i
 	if runtime == nil {
 		return nil, errors.New("create Identity client: observability runtime is required")
 	}
-	client, err := identityservice.NewClient(
-		IdentityServiceName,
+	options := []kitexclient.Option{
 		kitexclient.WithResolver(resolver),
-		kitexclient.WithConnectTimeout(500*time.Millisecond),
-		kitexclient.WithRPCTimeout(3*time.Second),
-		kitexclient.WithMiddleware(observability.KitexClientMiddleware(runtime)),
-	)
+		kitexclient.WithConnectTimeout(500 * time.Millisecond),
+		kitexclient.WithRPCTimeout(3 * time.Second),
+	}
+	options = append(options, observability.KitexClientOptions(runtime)...)
+	client, err := identityservice.NewClient(IdentityServiceName, options...)
 	if err != nil {
 		return nil, err
 	}

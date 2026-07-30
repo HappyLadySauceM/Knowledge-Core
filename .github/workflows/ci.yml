@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: knowledge_core
+          POSTGRES_PASSWORD: knowledge_core_ci
+          POSTGRES_DB: knowledge_core
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U knowledge_core -d knowledge_core"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:8-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      KC_TEST_DATABASE_DSN: postgres://knowledge_core:knowledge_core_ci@127.0.0.1:5432/knowledge_core?sslmode=disable
+      KC_TEST_REDIS_ADDRESS: 127.0.0.1:6379
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install pinned generators
+        run: |
+          go install github.com/cloudwego/kitex/tool/cmd/kitex@v0.16.2
+          go install github.com/cloudwego/hertz/cmd/hz@v0.9.7
+          go install github.com/cloudwego/thriftgo@v0.4.5
+
+      - name: Run quality gates
+        env:
+          IDL_COMPAT_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          base_revision="$IDL_COMPAT_BASE"
+          if [[ -z "$base_revision" || "$base_revision" =~ ^0+$ ]]; then
+            base_revision="$(git rev-list --max-parents=0 HEAD | tail -n 1)"
+          fi
+          make ci IDL_COMPAT_BASE="$base_revision"
+
+      - name: Run race detector
+        run: make race

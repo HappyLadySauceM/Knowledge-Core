@@ -6,20 +6,13 @@ import (
 	"time"
 
 	auth "github.com/HappyLadySauce/Knowledge-Core/internal/auth"
+	"github.com/HappyLadySauce/Knowledge-Core/internal/health"
+	"github.com/HappyLadySauce/Knowledge-Core/internal/rpcerror"
 	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/common"
 	knowledgerpc "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/knowledge"
 	knowledgeapp "github.com/HappyLadySauce/Knowledge-Core/services/knowledge/internal/app"
 	"github.com/HappyLadySauce/Knowledge-Core/services/knowledge/internal/domain"
-	"github.com/cloudwego/kitex/pkg/kerrors"
-	"github.com/cloudwego/kitex/pkg/klog"
-)
-
-const (
-	CodeInvalidInput = knowledgerpc.CodeInvalidInput
-	CodeNotFound     = knowledgerpc.CodeNotFound
-	CodeConflict     = knowledgerpc.CodeConflict
-	CodeForbidden    = knowledgerpc.CodeForbidden
-	CodeInternal     = knowledgerpc.CodeInternal
+	knowledgeerrors "github.com/HappyLadySauce/Knowledge-Core/services/knowledge/internal/errors"
 )
 
 type Application interface {
@@ -41,16 +34,21 @@ type TokenVerifier interface {
 type Handler struct {
 	application Application
 	verifier    TokenVerifier
+	health      *health.Registry
 }
 
-func NewHandler(application Application, verifier TokenVerifier) *Handler {
-	return &Handler{application: application, verifier: verifier}
+func NewHandler(application Application, verifier TokenVerifier, registry *health.Registry) *Handler {
+	return &Handler{application: application, verifier: verifier, health: registry}
 }
 
-func (h *Handler) Ping(context.Context, *common.PingRequest) (*common.PingResponse, error) {
+func (h *Handler) Ping(ctx context.Context, _ *common.PingRequest) (*common.PingResponse, error) {
+	status := "not_ready"
+	if h != nil && h.health != nil && h.health.Ready(ctx) == nil {
+		status = "ok"
+	}
 	return &common.PingResponse{
 		Service:  "knowledge",
-		Status:   "ok",
+		Status:   status,
 		UnixTime: time.Now().UTC().Unix(),
 	}, nil
 }
@@ -60,11 +58,11 @@ func (h *Handler) ListPublishedDocuments(ctx context.Context, request *knowledge
 		return nil, invalidRequest("invalid document list request")
 	}
 	if h.application == nil {
-		return nil, internalError(ctx, errors.New("knowledge application is not configured"))
+		return nil, internalError(errors.New("knowledge application is not configured"))
 	}
 	result, err := h.application.ListPublished(ctx, mapListInput(request))
 	if err != nil {
-		return nil, mapError(ctx, err)
+		return nil, mapError(err)
 	}
 	return mapList(result), nil
 }
@@ -78,7 +76,7 @@ func (h *Handler) ListDocuments(ctx context.Context, request *knowledgerpc.Docum
 	}
 	result, err := h.application.List(ctx, mapListInput(request))
 	if err != nil {
-		return nil, mapError(ctx, err)
+		return nil, mapError(err)
 	}
 	return mapList(result), nil
 }
@@ -88,11 +86,11 @@ func (h *Handler) GetPublishedDocument(ctx context.Context, request *knowledgerp
 		return nil, invalidRequest("invalid document request")
 	}
 	if h.application == nil {
-		return nil, internalError(ctx, errors.New("knowledge application is not configured"))
+		return nil, internalError(errors.New("knowledge application is not configured"))
 	}
 	detail, err := h.application.GetPublished(ctx, request.DocumentId)
 	if err != nil {
-		return nil, mapError(ctx, err)
+		return nil, mapError(err)
 	}
 	return mapDetail(detail), nil
 }
@@ -109,7 +107,7 @@ func (h *Handler) CreateDocument(ctx context.Context, request *knowledgerpc.Crea
 		Title: request.Title, Summary: request.GetSummary(), AuthorID: principal.UserID,
 	})
 	if err != nil {
-		return nil, mapError(ctx, err)
+		return nil, mapError(err)
 	}
 	return mapDetail(detail), nil
 }
@@ -123,7 +121,7 @@ func (h *Handler) GetDocument(ctx context.Context, request *knowledgerpc.Documen
 	}
 	detail, err := h.application.Get(ctx, request.DocumentId)
 	if err != nil {
-		return nil, mapError(ctx, err)
+		return nil, mapError(err)
 	}
 	return mapDetail(detail), nil
 }
@@ -141,7 +139,7 @@ func (h *Handler) UpdateDocument(ctx context.Context, request *knowledgerpc.Upda
 		Summary:    request.Summary,
 	})
 	if err != nil {
-		return nil, mapError(ctx, err)
+		return nil, mapError(err)
 	}
 	return mapDetail(detail), nil
 }
@@ -155,7 +153,7 @@ func (h *Handler) DeleteDocument(ctx context.Context, request *knowledgerpc.Docu
 	}
 	document, err := h.application.Delete(ctx, request.DocumentId)
 	if err != nil {
-		return nil, mapError(ctx, err)
+		return nil, mapError(err)
 	}
 	return mapDocument(document), nil
 }
@@ -170,7 +168,7 @@ func (h *Handler) SetDocumentStatus(ctx context.Context, request *knowledgerpc.S
 	}
 	document, err := h.application.SetStatus(ctx, request.DocumentId, request.Status, principal.UserID)
 	if err != nil {
-		return nil, mapError(ctx, err)
+		return nil, mapError(err)
 	}
 	return mapDocument(document), nil
 }
@@ -195,7 +193,7 @@ func (h *Handler) ApplyDocumentOperation(ctx context.Context, request *knowledge
 		ActorID:             principal.UserID,
 	})
 	if err != nil {
-		return nil, mapError(ctx, err)
+		return nil, mapError(err)
 	}
 	return &knowledgerpc.DocumentOperationAck{
 		DocumentId:      ack.DocumentID,
@@ -208,11 +206,14 @@ func (h *Handler) ApplyDocumentOperation(ctx context.Context, request *knowledge
 
 func (h *Handler) authorizeAdmin(ctx context.Context) (auth.Principal, error) {
 	if h.application == nil || h.verifier == nil {
-		return auth.Principal{}, internalError(ctx, errors.New("knowledge authorization is not configured"))
+		return auth.Principal{}, internalError(errors.New("knowledge authorization is not configured"))
 	}
 	principal, err := h.verifier.Verify(auth.AccessToken(ctx))
-	if err != nil || principal.Role != "admin" {
-		return auth.Principal{}, kerrors.NewBizStatusError(CodeForbidden, "permission denied")
+	if err != nil {
+		return auth.Principal{}, rpcStatus(knowledgeerrors.Forbidden, err)
+	}
+	if principal.Role != "admin" {
+		return auth.Principal{}, rpcStatus(knowledgeerrors.Forbidden, errors.New("knowledge administrator role is required"))
 	}
 	return principal, nil
 }
@@ -289,24 +290,27 @@ func mapBlock(block *domain.Block) *knowledgerpc.DocumentBlock {
 }
 
 func invalidRequest(message string) error {
-	return kerrors.NewBizStatusError(CodeInvalidInput, message)
+	return rpcStatus(knowledgeerrors.InvalidInput, errors.New(message))
 }
 
-func mapError(ctx context.Context, err error) error {
+func mapError(err error) error {
 	var validationError *domain.ValidationError
 	switch {
 	case errors.As(err, &validationError):
-		return kerrors.NewBizStatusError(CodeInvalidInput, validationError.Error())
+		return rpcStatus(knowledgeerrors.InvalidInput, err)
 	case errors.Is(err, knowledgeapp.ErrDocumentNotFound):
-		return kerrors.NewBizStatusError(CodeNotFound, "document not found")
+		return rpcStatus(knowledgeerrors.NotFound, err)
 	case errors.Is(err, knowledgeapp.ErrVersionConflict):
-		return kerrors.NewBizStatusError(CodeConflict, "document version conflict")
+		return rpcStatus(knowledgeerrors.Conflict, err)
 	default:
-		return internalError(ctx, err)
+		return internalError(err)
 	}
 }
 
-func internalError(ctx context.Context, err error) error {
-	klog.CtxErrorf(ctx, "knowledge request failed: %v", err)
-	return kerrors.NewBizStatusError(CodeInternal, "internal service error")
+func internalError(err error) error {
+	return rpcStatus(knowledgeerrors.Internal, err)
+}
+
+func rpcStatus(mapping knowledgeerrors.Mapping, cause error) error {
+	return rpcerror.New(mapping.Code(), mapping.Definition(), cause)
 }

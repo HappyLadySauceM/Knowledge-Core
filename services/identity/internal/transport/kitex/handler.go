@@ -5,22 +5,14 @@ import (
 	"errors"
 	"time"
 
+	auth "github.com/HappyLadySauce/Knowledge-Core/internal/auth"
+	"github.com/HappyLadySauce/Knowledge-Core/internal/health"
+	"github.com/HappyLadySauce/Knowledge-Core/internal/rpcerror"
 	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/common"
 	identityrpc "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/identity"
 	"github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/app"
 	"github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/domain"
-	"github.com/cloudwego/kitex/pkg/kerrors"
-	"github.com/cloudwego/kitex/pkg/klog"
-)
-
-const (
-	CodeInvalidInput       int32 = identityrpc.CodeInvalidInput
-	CodeConflict           int32 = identityrpc.CodeConflict
-	CodeInvalidCredentials int32 = identityrpc.CodeInvalidCredentials
-	CodeAccountLocked      int32 = identityrpc.CodeAccountLocked
-	CodeUserDisabled       int32 = identityrpc.CodeUserDisabled
-	CodeUserNotFound       int32 = identityrpc.CodeUserNotFound
-	CodeInternal           int32 = identityrpc.CodeInternal
+	identityerrors "github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/errors"
 )
 
 type Application interface {
@@ -29,26 +21,38 @@ type Application interface {
 	GetUser(ctx context.Context, id int64) (*domain.User, error)
 }
 
-type Handler struct {
-	application Application
+type TokenVerifier interface {
+	Verify(value string) (auth.Principal, error)
 }
 
-func NewHandler(application Application) *Handler { return &Handler{application: application} }
+type Handler struct {
+	application Application
+	verifier    TokenVerifier
+	health      *health.Registry
+}
 
-func (h *Handler) Ping(context.Context, *common.PingRequest) (*common.PingResponse, error) {
+func NewHandler(application Application, verifier TokenVerifier, registry *health.Registry) *Handler {
+	return &Handler{application: application, verifier: verifier, health: registry}
+}
+
+func (h *Handler) Ping(ctx context.Context, _ *common.PingRequest) (*common.PingResponse, error) {
+	status := "not_ready"
+	if h != nil && h.health != nil && h.health.Ready(ctx) == nil {
+		status = "ok"
+	}
 	return &common.PingResponse{
 		Service:  "identity",
-		Status:   "ok",
+		Status:   status,
 		UnixTime: time.Now().UTC().Unix(),
 	}, nil
 }
 
 func (h *Handler) Register(ctx context.Context, request *identityrpc.RegisterRequest) (*identityrpc.User, error) {
 	if request == nil {
-		return nil, kerrors.NewBizStatusError(CodeInvalidInput, "invalid register request")
+		return nil, rpcStatus(identityerrors.InvalidInput, errors.New("identity register request is nil"))
 	}
 	if h.application == nil {
-		return nil, internalError(ctx, errors.New("identity application is not configured"))
+		return nil, internalError(errors.New("identity application is not configured"))
 	}
 	user, err := h.application.Register(ctx, app.RegisterInput{
 		Username: request.Username,
@@ -56,30 +60,30 @@ func (h *Handler) Register(ctx context.Context, request *identityrpc.RegisterReq
 		Password: request.Password,
 	})
 	if err != nil {
-		return nil, mapError(ctx, err)
+		return nil, mapError(err)
 	}
 	if user == nil {
-		return nil, internalError(ctx, errors.New("identity register returned no user"))
+		return nil, internalError(errors.New("identity register returned no user"))
 	}
 	return mapUser(user), nil
 }
 
 func (h *Handler) Authenticate(ctx context.Context, request *identityrpc.AuthenticateRequest) (*identityrpc.Authentication, error) {
 	if request == nil {
-		return nil, kerrors.NewBizStatusError(CodeInvalidInput, "invalid authenticate request")
+		return nil, rpcStatus(identityerrors.InvalidInput, errors.New("identity authenticate request is nil"))
 	}
 	if h.application == nil {
-		return nil, internalError(ctx, errors.New("identity application is not configured"))
+		return nil, internalError(errors.New("identity application is not configured"))
 	}
 	authentication, err := h.application.Authenticate(ctx, app.AuthenticateInput{
 		Identifier: request.Identifier,
 		Password:   request.Password,
 	})
 	if err != nil {
-		return nil, mapError(ctx, err)
+		return nil, mapError(err)
 	}
 	if authentication == nil || authentication.User == nil || authentication.AccessToken.Value == "" || authentication.AccessToken.ExpiresAt.IsZero() {
-		return nil, internalError(ctx, errors.New("identity authenticate returned an incomplete result"))
+		return nil, internalError(errors.New("identity authenticate returned an incomplete result"))
 	}
 	return &identityrpc.Authentication{
 		User:          mapUser(authentication.User),
@@ -90,19 +94,37 @@ func (h *Handler) Authenticate(ctx context.Context, request *identityrpc.Authent
 
 func (h *Handler) GetUser(ctx context.Context, request *identityrpc.GetUserRequest) (*identityrpc.User, error) {
 	if request == nil {
-		return nil, kerrors.NewBizStatusError(CodeInvalidInput, "invalid get-user request")
+		return nil, rpcStatus(identityerrors.InvalidInput, errors.New("identity get-user request is nil"))
 	}
-	if h.application == nil {
-		return nil, internalError(ctx, errors.New("identity application is not configured"))
+	principal, err := h.authenticate(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if principal.UserID != request.UserId {
+		return nil, rpcStatus(identityerrors.Forbidden, errors.New("identity token subject does not match requested user"))
 	}
 	user, err := h.application.GetUser(ctx, request.UserId)
 	if err != nil {
-		return nil, mapError(ctx, err)
+		return nil, mapError(err)
 	}
 	if user == nil {
-		return nil, internalError(ctx, errors.New("identity get-user returned no user"))
+		return nil, internalError(errors.New("identity get-user returned no user"))
+	}
+	if user.Status != domain.StatusActive || user.TokenVersion != principal.TokenVersion {
+		return nil, rpcStatus(identityerrors.Unauthenticated, errors.New("identity token no longer matches active user state"))
 	}
 	return mapUser(user), nil
+}
+
+func (h *Handler) authenticate(ctx context.Context) (auth.Principal, error) {
+	if h.application == nil || h.verifier == nil {
+		return auth.Principal{}, internalError(errors.New("identity authorization is not configured"))
+	}
+	principal, err := h.verifier.Verify(auth.AccessToken(ctx))
+	if err != nil {
+		return auth.Principal{}, rpcStatus(identityerrors.Unauthenticated, err)
+	}
+	return principal, nil
 }
 
 func mapUser(user *domain.User) *identityrpc.User {
@@ -120,27 +142,30 @@ func mapUser(user *domain.User) *identityrpc.User {
 	}
 }
 
-func mapError(ctx context.Context, err error) error {
+func mapError(err error) error {
 	var validationError *domain.ValidationError
 	switch {
 	case errors.As(err, &validationError):
-		return kerrors.NewBizStatusError(CodeInvalidInput, validationError.Error())
+		return rpcStatus(identityerrors.InvalidInput, err)
 	case errors.Is(err, app.ErrUsernameConflict), errors.Is(err, app.ErrEmailConflict):
-		return kerrors.NewBizStatusError(CodeConflict, err.Error())
+		return rpcStatus(identityerrors.Conflict, err)
 	case errors.Is(err, app.ErrInvalidCredentials):
-		return kerrors.NewBizStatusError(CodeInvalidCredentials, "invalid credentials")
+		return rpcStatus(identityerrors.InvalidCredentials, err)
 	case errors.Is(err, app.ErrAccountLocked):
-		return kerrors.NewBizStatusError(CodeAccountLocked, "account is temporarily locked")
+		return rpcStatus(identityerrors.AccountLocked, err)
 	case errors.Is(err, app.ErrUserDisabled):
-		return kerrors.NewBizStatusError(CodeUserDisabled, "user is disabled")
+		return rpcStatus(identityerrors.UserDisabled, err)
 	case errors.Is(err, app.ErrUserNotFound):
-		return kerrors.NewBizStatusError(CodeUserNotFound, "user not found")
+		return rpcStatus(identityerrors.UserNotFound, err)
 	default:
-		return internalError(ctx, err)
+		return internalError(err)
 	}
 }
 
-func internalError(ctx context.Context, err error) error {
-	klog.CtxErrorf(ctx, "identity request failed: %v", err)
-	return kerrors.NewBizStatusError(CodeInternal, "internal service error")
+func internalError(err error) error {
+	return rpcStatus(identityerrors.Internal, err)
+}
+
+func rpcStatus(mapping identityerrors.Mapping, cause error) error {
+	return rpcerror.New(mapping.Code(), mapping.Definition(), cause)
 }

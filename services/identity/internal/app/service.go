@@ -127,17 +127,11 @@ func (s *Service) EnsureBootstrapAdmin(ctx context.Context, input BootstrapAdmin
 	if err != nil {
 		return false, fmt.Errorf("hash bootstrap administrator password: %w", err)
 	}
-	if err := s.users.Create(ctx, user); err != nil {
-		switch {
-		case errors.Is(err, repository.ErrUsernameConflict), errors.Is(err, repository.ErrEmailConflict):
-			count, countErr := s.users.CountAdmins(ctx)
-			if countErr == nil && count > 0 {
-				return false, nil
-			}
-		}
+	created, err := s.users.CreateFirstAdmin(ctx, user)
+	if err != nil {
 		return false, fmt.Errorf("create bootstrap administrator: %w", err)
 	}
-	return true, nil
+	return created, nil
 }
 
 func (s *Service) Authenticate(ctx context.Context, input AuthenticateInput) (*Authentication, error) {
@@ -173,14 +167,15 @@ func (s *Service) Authenticate(ctx context.Context, input AuthenticateInput) (*A
 		}
 		return nil, ErrInvalidCredentials
 	}
+	user, err = s.users.CompleteLoginSuccess(ctx, user.ID, now)
+	if err != nil {
+		return nil, fmt.Errorf("record login success: %w", err)
+	}
 	if user.Status != domain.StatusActive {
 		return nil, ErrUserDisabled
 	}
 	if user.IsLocked(now) {
 		return nil, ErrAccountLocked
-	}
-	if err := s.users.RecordLoginSuccess(ctx, user.ID); err != nil {
-		return nil, fmt.Errorf("record login success: %w", err)
 	}
 	accessToken, err := s.tokenIssuer.Issue(user)
 	if err != nil {

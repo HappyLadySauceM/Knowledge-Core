@@ -1,6 +1,6 @@
 # Knowledge Core - Hertz + Kitex 服务框架设计
 
-> 状态：基础框架 v0.1 已实现。四个 Cobra 进程入口、统一生命周期、IDL/代码生成、`internal` 基础设施接口与首批 PostgreSQL/Redis/NATS/Etcd adapter 已落地；统一 JSON 日志和 HTTP/Kitex OpenTelemetry tracing 已接入。Identity 已完成用户注册、凭据校验、Ed25519 Access Token、用户查询、首次管理员初始化和首条 PostgreSQL migration；Knowledge 已完成文档、块操作、发布 revision 的 PostgreSQL 存储及迁移。Gateway 已接通认证与文档 HTTP API。Refresh Token、注销、撤销事件投影、NATS 协作、其他业务用例和 Prometheus metrics 仍按本文继续实现。
+> 状态：基础框架 v0.1 已实现。四个 Cobra 进程入口、统一生命周期、可重复代码生成与 IDL 兼容检查、共享错误内核、JSON 日志和 HTTP/Kitex OpenTelemetry tracing 已落地。Gateway 已接通认证与文档 HTTP API，并具备统一 recovery/错误响应、JSON 404/405、安全头、CORS、可信代理和 Redis 限流；Identity 已完成注册、凭据校验、Ed25519 Access Token、self-only 用户查询及首条 PostgreSQL migration；Knowledge 已完成文档级串行操作、幂等重放校验和 published revision 快照。Refresh Token、注销、撤销事件投影、NATS 协作、Etcd 动态配置消费者、其他业务用例和 Prometheus metrics 仍按本文继续实现。
 
 ## 1. 设计目标
 
@@ -40,12 +40,23 @@ identity          knowledge          platform
        SQL DB / Redis / NATS / Etcd / OTel
 ```
 
-| 进程 | 传输入口 | 主要职责 |
+| 进程 | 当前传输入口 | 主要职责 |
 |---|---|---|
-| `gateway` | Hertz HTTP/WebSocket、NATS consumer | 外部协议适配、JWT 前置校验、限流、错误映射、协作连接 |
-| `identity` | Kitex RPC、NATS publisher | 认证、Token、用户、角色和状态 |
-| `knowledge` | Kitex RPC、NATS publisher/consumer | 文档、块操作、发布、分类、标签、评论和搜索 |
-| `platform` | Kitex RPC、NATS consumer | 设置、统计投影、导出任务和 AI Provider 管理 |
+| `gateway` | Hertz HTTP | 外部协议适配、JWT 前置校验、限流、错误映射；WebSocket/NATS 协作后续接入 |
+| `identity` | Kitex RPC | 认证、Token、用户、角色和状态；NATS publisher 后续接入 |
+| `knowledge` | Kitex RPC | 文档、块操作、发布、分类、标签、评论和搜索；NATS publisher/consumer 后续接入 |
+| `platform` | Kitex RPC | 当前提供 Ping 与生命周期骨架；设置、投影、导出和 NATS consumer 随业务切片接入 |
+
+进程仅装配已有消费者所需的依赖：
+
+| 进程 | 当前必需依赖 | Etcd 用途 |
+|---|---|---|
+| `gateway` | Redis、Etcd | Kitex resolver；Redis 承载限流，故障时失败关闭 |
+| `identity` | PostgreSQL、Etcd | Kitex registry |
+| `knowledge` | PostgreSQL、Etcd | Kitex registry |
+| `platform` | Etcd | Kitex registry |
+
+NATS 与 Etcd 配置 source 的 adapter 已存在，但当前没有 publisher、consumer 或动态配置快照消费者，因此各进程不启动这些连接。Etcd registry/resolver 是独立用途，仍按上表启动。
 
 认证与用户资料属于同一身份一致性边界，原先可能拆分的 `auth`、`user` 仅作为 `identity` 内部模块，不建立独立进程或跨模块 RPC。
 
@@ -101,6 +112,7 @@ Etcd 同时承担三类职责，但 key 空间必须隔离：Kitex 注册发现�
 |           |-- transport/kitex/
 |           `-- bootstrap/
 |-- internal/
+|   |-- apperror/
 |   |-- command/
 |   |-- codec/json/
 |   |-- config/
@@ -115,6 +127,8 @@ Etcd 同时承担三类职责，但 key 空间必须隔离：Kitex 注册发现�
 |   |-- discovery/
 |   |   `-- etcd/
 |   |-- observability/
+|   |-- rpcerror/
+|   |-- idlguard/
 |   |-- health/
 |   `-- lifecycle/
 |-- migrations/
@@ -123,7 +137,9 @@ Etcd 同时承担三类职责，但 key 空间必须隔离：Kitex 注册发现�
 |   `-- platform/postgres/
 |-- scripts/
 |   |-- codegen.ps1
-|   `-- codegen.sh
+|   |-- codegen.sh
+|   |-- generated-files.txt
+|   `-- idlguard/
 `-- docker/infrastructure/
 ```
 
@@ -267,6 +283,8 @@ type RealtimeBus interface {
 
 首个 adapter 使用 NATS JetStream 实现 `DurableBroker`，使用 NATS Core 实现 `RealtimeBus`。
 
+上述是消息接口与 adapter 契约。当前服务尚无 Outbox publisher、consumer 或协作广播消费者，bootstrap 不打开 NATS 连接；接入首个真实消费者时再将对应 `Needs` 显式置为启用。
+
 ### 5.3 缓存
 
 ```go
@@ -310,7 +328,7 @@ type WatchSource interface {
 }
 ```
 
-配置模块负责合并 Source、解码为服务私有的强类型 `Config`、执行校验并发布不可变快照。只有 Etcd 等动态来源实现 `WatchSource`，环境变量和本地文件不需要伪造 watch 能力。业务代码不得按字符串 key 到处读取全局配置。
+配置模块负责合并 Source、解码为服务私有的强类型 `Config`、执行校验并发布不可变快照。只有 Etcd 等动态来源实现 `WatchSource`，环境变量和本地文件不需要伪造 watch 能力。业务代码不得按字符串 key 到处读取全局配置。当前尚无动态配置快照消费者，因此各服务不打开 Etcd config source；Etcd registry/resolver 不受此限制。
 
 配置优先级从低到高为：
 
@@ -375,12 +393,19 @@ Thrift RPC 使用 Kitex 生成的协议编解码，不经过 JSON codec。
 - `observability` 以标准库 `log/slog` 为唯一日志核心，应用日志及 Hertz/Kitex 框架日志共享同一 JSON handler、等级和输出目标。
 - 固定日志字段包含 `service`、`environment`、`component`、`event`；有上下文时自动补充 `request_id`、`trace_id`、`span_id` 和 `user_id`。密码、Token、DSN、API Key、正文及 payload 按字段名统一脱敏。
 - HTTP access log 只记录方法、IDL 路由模板、状态码、耗时和响应大小；Kitex access log 只记录调用角色、服务、方法、耗时、结果及稳定业务码，不记录请求/响应 DTO。
-- OpenTelemetry 使用 W3C `traceparent`、`tracestate` 和 baggage，在 Hertz 与 Kitex metadata 间传播。配置绝对 OTLP gRPC URL 时启用批量导出；endpoint 为空时使用 no-op provider，不建立外部连接。
+- OpenTelemetry 使用 W3C `traceparent`、`tracestate` 和 baggage，在 Hertz 与 Kitex metadata 间传播。配置绝对 OTLP gRPC URL 时启用批量导出；endpoint 为空时仍创建本地 SDK `TracerProvider` 以生成有效 trace/span ID，但不创建 exporter 或外部连接。
 - trace sampling 使用 `ParentBased(TraceIDRatioBased)`；入口默认采样率为 `1`，子调用遵循父 span 的采样决定。span attribute 不保存完整 URL、query、Token、正文或连接串。
 - `health` 分离 `/health/live` 与 `/health/ready`；liveness 不依赖外部组件，readiness 检查本服务必要依赖和配置状态。
 - `command` 使用 Cobra 构建每个独立服务的根命令，由根命令统一捕获 `SIGINT`/`SIGTERM` 并取消服务上下文；当前不增加 `serve` 或 `migrate` 子命令。
 - `lifecycle` 统一执行 ready、serve、drain、transport shutdown 和 resource close。传输层 drain 与资源关闭使用独立超时，不允许 adapter、Hertz 或 Kitex bootstrap 自行捕获进程信号。
 - Token、密码、DSN、API Key、事件敏感 payload 和完整用户正文不得进入日志、指标 label 或 trace attribute。
+
+### 5.8 错误模型
+
+- `internal/apperror` 提供跨服务共享的不可变错误内核。`Definition` 固定稳定 key、kind 和安全 message，运行时 `Error` 可保留 cause；传输层不得把 cause 序列化给客户端。
+- Gateway、Identity 与 Knowledge 维护服务私有错误目录和数字码域，避免共享包包含业务概念；Platform 在业务方法落地时按同一规则建立目录。码域仍为 `1xxxx`、`2xxxx`、`3xxxx`、`4xxxx`。
+- `internal/rpcerror` 将应用错误包装为 Kitex `BizStatusError`。线上只传输数字 code、安全 message、`error_key` 和 `error_kind`，进程内通过 `Unwrap` 保留 cause 链，供集中日志记录和 `errors.Is/As` 使用。
+- Gateway 统一将 error kind 映射为 HTTP 状态，并只输出安全 envelope。未知业务码、SQL/连接错误、堆栈和上游原始错误不得透出。
 
 ## 6. 配置与 Etcd 约定
 
@@ -405,13 +430,15 @@ Etcd endpoint、Etcd 认证凭据和 TLS bootstrap 信息不能从 Etcd 自身�
 
 ### 6.2 静态与动态配置
 
-| 类别 | 示例 | 生效方式 |
+| 类别 | 示例 | 目标生效方式 |
 |---|---|---|
 | 静态 | Provider 类型、DSN/endpoint、凭据、监听地址、服务名、TLS 身份、Etcd bootstrap | 校验后启动，变更需滚动重启 |
 | 动态 | RPC 超时/重试/熔断、限流阈值、日志级别、功能开关 | Etcd watch，校验成功后原子替换快照 |
 | 业务数据 | 站点设置、AI Provider 选择、用户偏好 | 由 owner 服务持久化，不进入共享 `internal` 配置 |
 
 动态更新必须先完整解析和校验，再以不可变快照一次替换。更新失败时继续使用最后一个有效版本并上报指标；不得留下部分字段已更新的状态。
+
+该表描述目标配置契约。当前没有动态配置消费者，`ConfigSource` 不参与四个进程的依赖装配；RPC 超时、限流和日志级别仍从启动配置读取，变更需重启。Etcd 当前仅用于 Kitex registry/resolver。
 
 ### 6.3 Provider 配置示例
 
@@ -426,13 +453,22 @@ KC_MESSAGING_REALTIME_PROVIDER=nats
 KC_NATS_URL=nats://localhost:4222
 KC_CONFIG_PROVIDER=etcd
 KC_ETCD_ENDPOINTS=http://localhost:2379
+KC_IDENTITY_JWT_PRIVATE_KEY=<secret>
+KC_IDENTITY_JWT_PUBLIC_KEY=<secret>
+KC_GATEWAY_JWT_PUBLIC_KEY=<secret>
+KC_KNOWLEDGE_JWT_PUBLIC_KEY=<secret>
+KC_GATEWAY_TRUSTED_PROXY_CIDRS=10.0.0.0/8
+KC_GATEWAY_CORS_ALLOWED_ORIGINS=http://localhost:3000
+KC_GATEWAY_RATE_LIMIT_WINDOW=1m
+KC_GATEWAY_RATE_LIMIT_GLOBAL=300
+KC_GATEWAY_RATE_LIMIT_AUTH=20
 KC_SHUTDOWN_TIMEOUT=10s
 KC_LOG_LEVEL=info
 KC_OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
 KC_OTEL_TRACE_SAMPLE_RATIO=1
 ```
 
-所有服务使用同一字段命名规则，但每个进程只解析自己需要的配置。连接配置不得通过 RPC 或事件传播。
+所有服务使用同一字段命名规则，但每个进程只解析自己需要的配置。`KC_NATS_URL` 与 `KC_CONFIG_PROVIDER` 当前仅保留 adapter 配置，尚未触发对应连接；连接配置不得通过 RPC 或事件传播。
 
 ## 7. 显式依赖装配
 
@@ -469,24 +505,24 @@ func NewDatabaseProvider(name string) (database.Provider, error) {
 
 1. Cobra 根命令建立进程信号上下文；解析环境变量与 bootstrap 配置，初始化最小 stderr logger。
 2. 创建 Sonic codec、正式 logger 和 OpenTelemetry providers。
-3. 使用已校验的数据库配置执行本服务、本 Provider 的嵌入式 up migration。
-4. 连接 Etcd，读取 common/service/Kitex 配置，严格解码并校验强类型配置。
-5. 创建数据库、缓存、消息和对象存储等必要 adapter，执行 `Ping`。
-6. 创建 Kitex registry/resolver、RPC clients、repositories 和 application services。
-7. 创建 Outbox publisher、消息 consumers 和 Hertz/Kitex transport handlers。
-8. 注册生命周期与健康检查；启动后台 worker 和 consumer。
+3. 根据进程 `Needs` 选择依赖；Identity 与 Knowledge 使用已校验的数据库配置执行本服务 PostgreSQL up migration，Gateway 与 Platform 跳过数据库初始化。
+4. 按需创建 Etcd registry 或 resolver。当前不读取 Etcd common/service 动态配置，因为没有快照消费者。
+5. 创建必要 adapter 并执行 `Ping`：Gateway 打开 Redis，Identity/Knowledge 打开 PostgreSQL，Platform 不打开数据 adapter。
+6. 创建 RPC clients、repositories 和 application services。
+7. 创建 Hertz/Kitex transport handlers；Outbox publisher、消息 consumer 和后台 worker 仅在对应业务消费者落地后启动。
+8. 注册生命周期与健康检查，并将已打开的必要依赖纳入 readiness。
 9. 启动 Kitex server 或 Hertz server。Kitex 服务使用 Etcd registry 发布实例。
 10. 所有必需依赖与监听端口成功后将 readiness 置为 ready。
 
-服务启动先执行本服务、本 Provider 的嵌入式数据库 migration，再初始化其他基础设施和传输层。任一步失败都必须按已创建资源的逆序关闭并以非零状态退出；migration 失败时服务不得进入 serving 状态。
+需要数据库的服务先执行本服务、本 Provider 的嵌入式 migration，再初始化 repository 和传输层。任一步失败都必须按已创建资源的逆序关闭并以非零状态退出；migration 失败时服务不得进入 serving 状态。未被 `Needs` 选中的 NATS、Etcd config source、cache 或 database 不应仅因全局环境变量存在而连接。
 
 ### 8.2 退出
 
 1. 收到退出信号后立即将 readiness 置为 not ready。
 2. 停止接收新 HTTP/RPC 请求并注销 Kitex 实例。
 3. 在超时内完成在途请求；关闭 WebSocket 接入。
-4. 暂停消息拉取，等待已开始的 handler 完成 ack/nack。
-5. 停止 Outbox publisher 和后台 worker。
+4. 若已启动消息能力，则暂停拉取并等待已开始的 handler 完成 ack/nack。
+5. 若已启动 Outbox publisher 或后台 worker，则按生命周期顺序停止。
 6. 逆序关闭 RPC clients、Broker、cache、database 和 Etcd client。
 7. 使用独立资源关闭超时 flush trace exporter 后退出；JSON 日志直接写入进程 stderr，不维护异步缓冲区。
 
@@ -497,11 +533,13 @@ func NewDatabaseProvider(name string) (database.Provider, error) {
 - HTTP IDL 位于 `idl/http/v1/`，只描述公开 API、Studio API、健康接口及请求/响应 DTO。
 - Hertz 生成内容保留在 `services/gateway/biz/`；手写 application/client/bootstrap 代码放在 `internal/`。
 - `services/gateway/biz/router/router.go` 是唯一手写注册入口，按固定顺序安装全局 middleware 后调用 `GeneratedRegister`；URL 与 handler 映射仍以 IDL 生成路由为唯一事实来源。
-- 路由级认证/角色策略通过生成器保留的 middleware 函数挂载；受保护 API 不得只依赖 handler 内部检查。
+- 当前全局注册顺序为 request ID、trace、access log、JSON recovery、安全响应头、CORS、Redis 限流、可选 Token 解析、运行时依赖注入。JSON recovery 处理后续 middleware 与 handler 的 panic，Hertz engine panic handler 兜底处理它之前的 request ID、trace 和 access log panic；路由级认证/角色策略随后通过生成器保留的 middleware 函数挂载，受保护 API 不得只依赖 handler 内部检查。
 - handler 负责 binding、字段级校验、身份上下文提取、RPC DTO 映射和统一响应，不访问数据库。
-- middleware 顺序固定为 recovery、request ID、trace、access log、CORS、安全头、限流、认证、授权前置检查。
-- 统一响应与产品规格一致；文件流和 WebSocket upgrade 不套 JSON envelope。
-- 读取请求体时设置大小上限；JSON binding 错误返回稳定网关错误码，不回显原始请求体。
+- Gateway 为每个响应写入 `X-Request-ID` 与 `X-Trace-ID`；JSON envelope 包含 `request_id` 和可选 `trace_id`。request ID 关联单次 HTTP 请求，trace ID 关联跨 HTTP/Kitex span 的链路；客户端通过 W3C `traceparent` 续接链路，而不是注入 `X-Trace-ID`。
+- 统一响应与产品规格一致；panic、未匹配路由和不支持的方法分别由 recovery、JSON `NoRoute` 和 JSON `NoMethod` 返回安全错误。文件流和 WebSocket upgrade 不套 JSON envelope。
+- Hertz 请求体上限为 4 MiB；JSON binding 错误返回稳定网关错误码，不回显原始请求体。
+- `X-Forwarded-For`/`X-Real-IP` 只在远端地址属于 `KC_GATEWAY_TRUSTED_PROXY_CIDRS` 时参与 client IP 解析；可信代理必须覆盖并输出单值 `X-Forwarded-Proto`，逗号链式值不会参与同源判断。CORS 仅允许同源或 `KC_GATEWAY_CORS_ALLOWED_ORIGINS` 中的精确 origin，并同时输出安全响应头。
+- 全局与登录端点限流使用 Redis 原子计数。Redis 不可用时业务请求返回依赖不可用并失败关闭；超限返回 `429` 和 `Retry-After`，不得静默 fail-open。`/health/live` 与 `/health/ready` 绕过业务限流，liveness 始终只反映进程存活，readiness 仍通过健康注册表检查必要依赖。
 - WebSocket 只由 gateway 终止，持久化操作必须经 `KnowledgeService` RPC 成功后才返回 ack。
 
 ## 10. Kitex RPC 规则
@@ -510,22 +548,25 @@ func NewDatabaseProvider(name string) (database.Provider, error) {
 - 每个 owner 服务只维护自己的 service definition；跨域复用通过 IDL include，不复制结构。
 - 生成代码统一放 `kitex_gen/`；生成的 handler 骨架迁入对应服务的 `transport/kitex` 后只做适配。
 - Kitex server 使用 Etcd registry；Kitex client 使用 Etcd resolver 和稳定服务名。
+- 所有 Thrift unary RPC 统一使用 TTHeader；client/server 必须成对安装 Kitex `transmeta` TTHeader handler。该线协议承载 persistent metainfo、BizStatusError 和超时，禁止退回无法传输这些字段的纯 Framed Thrift。
 - 每个 client 必须配置 deadline、连接超时、重试边界和熔断策略。非幂等调用默认不自动重试。
 - metadata 使用 persistent metainfo 传递 `x-request-id`、W3C trace/baggage、调用方身份和必要认证上下文；原始 Token 不得写入日志。
-- 业务异常使用 Kitex `BizStatusError` 映射稳定错误码；基础设施错误在边界处转换，不泄漏 SQL、地址或堆栈。
+- 业务异常使用 `internal/rpcerror` 构造 Kitex `BizStatusError`，线上仅包含稳定 code、安全 message、`error_key` 与 `error_kind`；基础设施错误在边界处转换，本地 cause 仅供脱敏日志和错误链判断，不泄漏 SQL、地址或堆栈。
+- Gateway 验证 Access Token，并通过 Identity `GetUser` 校验用户状态与 `token_version` 新鲜度。`GetUser` 还会自行验证 metadata 中的原始 Token，并限制只能查询 subject 本人。Knowledge handler 仍验证透传 JWT 的签名和 admin role，但不会自行向 Identity 查询 `token_version`；该新鲜度边界信任 Gateway 失败关闭，部署层必须禁止非受信调用方直连 Knowledge RPC。
 - IDL 字段只追加不复用编号，删除字段时保留编号；破坏性变更新建版本或新方法。
 
 ## 11. 代码生成
 
-`scripts/codegen.ps1` 与 `scripts/codegen.sh` 必须执行相同版本、相同参数的生成流程；两个脚本都通过 `--check`（PowerShell 为 `-Check`）在生成前后比较文件快照：
+`scripts/codegen.ps1` 与 `scripts/codegen.sh` 执行相同版本、相同参数的生成流程。`scripts/generated-files.txt` 是生成器拥有文件的唯一清单；新增、遗漏或越界输出都会使生成检查失败。
 
 1. 校验 `hz`、`kitex` 和 Thrift 插件版本。
-2. 从 `idl/http/v1/` 生成 Hertz model、handler 和 router。
-3. 从 `idl/rpc/v1/` 生成 `kitex_gen/` 客户端和服务端契约。
-4. 执行格式化，并检查生成结果没有超出约定目录。
-5. CI 重新生成并比较生成目录快照，防止 IDL 与生成代码不一致，同时不受工作区中其他未提交修改影响。
+2. 从 `idl/http/v1/` 生成 Hertz model 和生成路由；手写 handler 与 `router.go` 不属于生成器所有权。
+3. 通过 thriftgo AST 动态发现 `idl/rpc/v1/` 下包含 service 的全部 IDL，并生成 `kitex_gen/` 客户端和服务端契约。
+4. 执行格式化，并将实际输出与 `scripts/generated-files.txt` 比较。
+5. `--check`（PowerShell 为 `-Check`）复制工作树到临时目录（不复制 `.git`），清空可重建的 Kitex/Hertz model 目录后完整重生成，再比较文件哈希；该过程不修改当前工作树，也会检测手写 Hertz handler/router 被生成器意外改动。
+6. CI 从 Git 基线运行 IDL compatibility guard。字段删除、重命名、类型或 requiredness 改变、新增 required 字段、service 方法删除或签名改变、HTTP `api.*` 路由/绑定 annotation 改变，以及不兼容的 enum、typedef、constant 变化都会阻断合并；兼容的 optional 追加允许通过。PR 使用目标分支 SHA，push 使用事件的完整 `before` SHA，避免多提交 push 只检查最后一个提交。
 
-生成器版本通过仓库工具依赖或脚本常量固定。生成代码评审关注 IDL 差异，禁止以手工修改生成文件修复问题。
+生成器版本通过脚本常量固定。生成代码评审关注 IDL 差异，禁止以手工修改生成文件修复问题；`make idl-compat IDL_COMPAT_BASE=<revision>` 可在本地使用同一 Git 基线检查。
 
 ## 12. 数据迁移规则
 
@@ -546,6 +587,7 @@ migrations/identity/postgres/000001_create_users.down.sql
 - 每个服务只能执行自己的目录，Provider 必须与运行时数据库 Provider 一致。
 - 每条迁移提供配对的 up/down；不可逆变更必须在评审中显式说明恢复方式。
 - migration SQL 通过服务所属的 Go package 嵌入二进制；服务启动时自动执行当前 Provider 的全部 up migration。
+- Knowledge migration 在 CI 临时数据库中执行 `up/down/up` 往返；`published_revision_id` 通过复合外键保证 revision 与 document ownership 一致，不能仅依赖读取查询过滤异常数据。
 - 自动迁移必须在 repository、消息消费者和网络监听启动前完成；失败或 dirty version 必须阻止服务启动。
 - 多实例并发启动依赖数据库 migration driver 的互斥锁串行执行，不自行实现分布式锁。
 - 新 Provider 必须建立自己的完整 migration 链，不能直接假设 PostgreSQL migration 可运行。
@@ -578,11 +620,11 @@ MQ 切换同理：新 adapter 必须证明 at-least-once、ack/nack、重投、�
 
 ## 14. 验证门槛
 
-当前基础框架已覆盖 Cobra 命令上下文、生命周期关闭顺序、日志脱敏、HTTP/Kitex trace 父子关系、Gateway 路由门面、认证/角色策略、配置、Sonic codec、健康检查、adapter 边界和 Kitex Ping handler 的单元测试。进入业务实现后还必须补齐：
+当前基础框架已覆盖 Cobra 命令上下文、生命周期关闭顺序、日志脱敏、HTTP/Kitex trace 父子关系及无 exporter 的本地 trace ID、共享错误/RPC 状态、Gateway metadata/recovery/统一错误与安全边界、认证/角色策略、配置、Sonic codec、健康检查、IDL compatibility guard、Knowledge 幂等操作与发布快照，以及 adapter 边界和 Kitex Ping handler 的测试。进入后续业务实现还必须继续补齐：
 
-日常开发统一使用根目录 Makefile：`make fmt` 修改格式，`make fmt-check`、`make vet`、`make lint` 和 `make test` 分别执行检查，`make check` 执行完整本地质量门槛，`make ci` 额外验证 Hertz/Kitex 生成代码没有漂移。`make line` 仅作为 `make lint` 的兼容别名。golangci-lint 由固定版本的 `go run` 调用，不在仓库内维护工具二进制。
+日常开发统一使用根目录 Makefile：`make fmt` 修改格式，`make fmt-check`、`make vet`、`make lint`、`make test`、`make race` 和 `make build` 分别执行检查。`make check` 执行常规本地质量门槛；`make ci` 额外执行临时树生成漂移检查和基于 `IDL_COMPAT_BASE` 的 IDL 兼容检查，CI workflow 另行运行 race detector。`make line` 仅作为 `make lint` 的兼容别名。golangci-lint 由固定版本的 `go run` 调用，不在仓库内维护工具二进制。
 
-Identity 使用 `KC_DATABASE_DSN` 在启动阶段自动应用嵌入二进制的 PostgreSQL migration；成功后才继续初始化 repository 和 Kitex server。migration 不属于通用 Makefile 目标。
+Identity 与 Knowledge 使用 `KC_DATABASE_DSN` 在启动阶段自动应用各自嵌入二进制的 PostgreSQL migration；成功后才继续初始化 repository 和 Kitex server。migration 不属于通用 Makefile 目标，真实 PostgreSQL integration test 需要测试 DSN，未配置时跳过。
 
 - 每个共享 `internal` adapter 的 contract test，使用同一套用例验证接口语义。
 - 每个 repository Provider 的真实数据库 integration test，覆盖事务回滚、唯一约束、分页和锁冲突。

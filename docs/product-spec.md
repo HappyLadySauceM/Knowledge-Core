@@ -48,7 +48,7 @@ AI Agent 层
 
 ## 技术路线
 
-第一阶段采用 **Hertz API 网关 + Kitex 微服务**。浏览器和桌面客户端只访问 Hertz，服务间同步调用统一使用 Kitex Thrift RPC，异步任务和领域事件使用 NATS。跨服务基础设施通过 `internal` 下的稳定接口接入，首批 adapter 为 PostgreSQL、Redis、NATS 和 Etcd。
+第一阶段采用 **Hertz API 网关 + Kitex 微服务**。浏览器和桌面客户端只访问 Hertz，服务间同步调用统一使用 Kitex Thrift RPC；异步任务和领域事件的目标通道是 NATS。跨服务基础设施通过 `internal` 下的稳定接口接入，首批 adapter 为 PostgreSQL、Redis、NATS 和 Etcd。当前进程只启用已有用例实际消费的依赖，NATS publisher/consumer 与 Etcd 动态配置尚未接线，因此启动服务不会连接这两类未消费能力；Etcd 注册发现仍正常启用。
 
 核心约束：
 
@@ -59,7 +59,7 @@ AI Agent 层
 - JSON 统一使用 `github.com/bytedance/sonic`；Hertz 保持默认 Sonic binding/rendering，业务代码通过 `internal/codec/json` 使用 JSON。
 - 所有服务输出 JSON 结构化日志，并透传 `request_id`、`trace_id` 和调用目标。
 - 四个服务均以 Cobra 根命令运行，由统一生命周期捕获退出信号、摘除 readiness、排空传输层并关闭资源；不提供独立 `serve` 或 `migrate` 子命令。
-- OpenTelemetry 使用 W3C 上下文传播和 OTLP gRPC 导出；endpoint 为空时关闭导出，采样采用 ParentBased ratio 策略。
+- OpenTelemetry 使用 W3C 上下文传播和 OTLP gRPC 导出；endpoint 为空时仍使用本地 SDK `TracerProvider` 生成 trace/span ID，但不建立 exporter 连接；采样采用 ParentBased ratio 策略。
 - Provider 或连接配置变更通过滚动重启生效，不支持进程内热切换。
 
 ### 服务架构
@@ -81,14 +81,25 @@ identity            knowledge            platform
       SQL DB / Redis / NATS / Etcd / OpenTelemetry
 ```
 
-| 服务 | 对外形态 | 职责 | 持久化 owner |
+| 服务 | 目标对外形态 | 职责 | 持久化 owner |
 |---|---|---|---|
 | `gateway` | Hertz HTTP / WebSocket | 路由、参数适配、JWT 校验、权限前置检查、限流、响应与错误映射、协作连接管理 | 不持有业务表；仅持有 `gateway:*` Redis 投影和限流键 |
 | `identity` | Kitex RPC | 注册、登录、Token 刷新与撤销、用户资料、角色和状态管理 | PostgreSQL `identity` schema、`identity:*` Redis 键 |
 | `knowledge` | Kitex RPC | 文档、正文块、操作日志、发布快照、分类、标签、评论、搜索和协作事务 | PostgreSQL `knowledge` schema、`knowledge:*` Redis 键 |
 | `platform` | Kitex RPC + NATS consumer | 站点设置、统计投影、导出任务、AI Provider 配置与连接测试 | PostgreSQL `platform` schema、`platform:*` Redis 键 |
 
+当前已启用的进程依赖按用例收敛如下；未列出的 adapter 不会仅因环境变量存在而启动：
+
+| 进程 | 当前必需依赖 |
+|---|---|
+| `gateway` | Redis、Etcd resolver |
+| `identity` | PostgreSQL、Etcd registry |
+| `knowledge` | PostgreSQL、Etcd registry |
+| `platform` | Etcd registry |
+
 ### 请求与事件流
+
+以下描述阶段目标。当前已接通 HTTP -> Kitex -> PostgreSQL 主链路；Outbox 投递、NATS consumer 和 WebSocket 协作仍属于后续切片。
 
 1. 公开或登录请求进入 `gateway`，由网关完成 HTTP 参数解析和身份上下文提取。
 2. 网关通过 Kitex 调用对应 owner 服务；如请求已登录，则将 `request_id` 和原始 Access Token 放入 RPC metadata，Token 不得进入日志、指标或事件。
@@ -172,12 +183,15 @@ docker/infrastructure/
   "code": 0,
   "message": "ok",
   "data": {},
-  "request_id": "01J..."
+  "request_id": "01J...",
+  "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736"
 }
 ```
 
 - `code` 为稳定数字错误码，`0` 表示成功；`1xxxx`、`2xxxx`、`3xxxx`、`4xxxx` 分别保留给网关、身份、知识和平台域。
-- Kitex handler 使用 `BizStatusError` 返回业务异常，网关负责映射 HTTP 状态、对外 message 和数字错误码。
+- `request_id` 标识一次 Gateway HTTP 请求，可接受符合约束的客户端值或由 Gateway 生成；`trace_id` 是可选兼容字段，标识跨 HTTP/RPC span 的分布式链路。Gateway 同时在每个响应头写入 `X-Request-ID` 和 `X-Trace-ID`。
+- 通用不可变错误内核位于 `internal/apperror`；各服务维护自己的错误目录、稳定 `error_key` 和数字码域。Kitex 使用 `BizStatusError` 仅传输安全 message、数字 code、`error_key` 与 `error_kind`，本地错误链保留原始 cause。
+- Gateway 按错误 kind 统一映射 HTTP 状态、对外 message 和数字错误码；未知上游错误按依赖失败处理，不泄露内部实现细节。
 - 内部根因、SQL、堆栈、连接串和敏感 payload 不进入 HTTP 或 WebSocket 响应，只写入受控 JSON 日志。
 - 文件下载成功时直接返回文件流；失败时返回统一 JSON 错误结构。
 
@@ -193,6 +207,7 @@ docker/infrastructure/
 - RPC middleware 统一注入日志、追踪、指标和调用方身份；业务 service 不依赖 Hertz request/response 类型。
 - Kitex 服务通过 Etcd 注册发现：服务端注入 Kitex 原生 registry，客户端注入 Kitex 原生 resolver。调用方使用稳定服务名，不保存容器 IP。
 - Etcd 同时承载非敏感应用配置和 Kitex 治理配置；数据库凭据、JWT 私钥和 API Key 等敏感值只通过环境变量或 Secret 注入。
+- 当前认证信任边界由 Gateway 负责验证 Access Token，并通过 Identity `GetUser` 校验用户状态与 `token_version` 新鲜度。Identity `GetUser` 自身验证 Gateway 透传的 Token metadata，且只允许查询 Token subject 对应的本人；Knowledge handler 仍验证透传 JWT 的签名和 admin role，但直接 RPC 位于可信服务网络边界，不自行向 Identity 查询 `token_version` 新鲜度。
 
 ## 数据所有权与迁移
 
@@ -232,6 +247,8 @@ migrations/
 
 ## NATS 事件规范
 
+本节定义后续事件切片的目标契约。当前四个进程均未启动 NATS publisher/consumer，以下 stream、subject 和投递流程尚未成为运行时依赖。
+
 - 可靠领域事件进入 `KC_EVENTS` stream，subject 格式为 `kc.events.<domain>.<aggregate>.<action>.v1`。
 - 异步任务进入 `KC_TASKS` stream，subject 格式为 `kc.tasks.<domain>.<action>.v1`。
 - 协作临时消息使用 `kc.realtime.documents.<document_id>`，不进入 JetStream。
@@ -252,18 +269,19 @@ migrations/
 
 ## 本地开发运行
 
-基础脚手架已经提供四个服务入口以及 PostgreSQL、Redis、NATS JetStream、Etcd 的本地 Compose 环境。Identity 与 Knowledge 的 PostgreSQL migration 已嵌入服务并在启动时自动执行；Platform 的迁移链随对应业务切片建立，并遵循相同启动规则。
+基础脚手架已经提供四个服务入口以及 PostgreSQL、Redis、NATS JetStream、Etcd 的本地 Compose 环境。Identity 与 Knowledge 的 PostgreSQL migration 已嵌入服务并在启动时自动执行；Platform 当前只注册 Kitex 服务，迁移链随对应业务切片建立。NATS 基础设施可用于后续事件开发，但当前服务没有 publisher/consumer，不要求随文档 MVP 启动。
 
 ```powershell
 copy .env.example .env
 # 在 .env 中填写 KC_POSTGRES_PASSWORD 和 KC_DATABASE_DSN，并将运行时变量加载到各服务进程环境。
 
 # 通过本地 Secret 管理器或安全密钥生成流程，将 Base64 编码的 Ed25519 私钥和公钥
-# 分别注入 KC_IDENTITY_JWT_PRIVATE_KEY、KC_GATEWAY_JWT_PUBLIC_KEY 与 KC_KNOWLEDGE_JWT_PUBLIC_KEY。
+# 分别注入 KC_IDENTITY_JWT_PRIVATE_KEY、KC_IDENTITY_JWT_PUBLIC_KEY、
+# KC_GATEWAY_JWT_PUBLIC_KEY 与 KC_KNOWLEDGE_JWT_PUBLIC_KEY。
 # 首次启动 Identity 时还需通过 Secret 注入 KC_IDENTITY_BOOTSTRAP_ADMIN_USERNAME、
 # KC_IDENTITY_BOOTSTRAP_ADMIN_EMAIL 与 KC_IDENTITY_BOOTSTRAP_ADMIN_PASSWORD；已有管理员后不再使用这些值。
 
-docker compose -f docker/infrastructure/docker-compose.yml up -d postgres redis nats etcd
+docker compose -f docker/infrastructure/docker-compose.yml up -d postgres redis etcd
 
 # 文档 MVP 启动 Identity、Knowledge 与 Gateway。
 go run ./services/identity
@@ -289,14 +307,14 @@ Invoke-RestMethod -Uri http://127.0.0.1:8080/api/v1/users/me -Headers @{ Authori
 ```text
 PostgreSQL: localhost:5432/knowledge_core
 Redis:      localhost:6379
-NATS:       localhost:4222
-JetStream:  enabled
+NATS:       localhost:4222（后续事件/协作切片按需启动）
+JetStream:  enabled（Compose 能力，当前进程未接线）
 Etcd:       localhost:2379
 ```
 
 - `.env` 只保存本地覆盖且不得提交；仓库配置文件只包含非敏感默认值。
 - 数据库密码、Ed25519 私钥、AI API Key 等敏感值通过环境变量或 Secret 注入。
-- `identity` 持有 JWT 私钥，网关和业务服务只配置公钥。
+- `identity` 独占 JWT 私钥；Gateway、Identity 与 Knowledge 分别使用公钥做入口校验、`GetUser` 二次校验和 Knowledge admin role 校验。Gateway 对受保护请求失败关闭地保证 `token_version` 新鲜度，Knowledge 不再重复查询 Identity。
 - readiness 必须检查本服务必要依赖是否就绪；liveness 只检查进程是否存活。
 
 ## 文档存储模型
@@ -312,19 +330,19 @@ Etcd:       localhost:2379
 
 ### document_blocks
 
-- 保存正文块：`block_id, document_id, parent_id, position_key, type, content_json, text_content, version, updated_by, updated_at`。
+- 保存正文块：`block_id, document_id, position_key, type, content_json, text_content, version, updated_by, updated_at`。
 - `content_json` 使用 JSONB，当前 MVP 以 paragraph 块为主。
-- 同一文档内不同块可以并发编辑；同一块版本不匹配返回冲突。
+- 当前采用文档级串行版本：同一文档的操作按 `current_version` 串行提交，任何基础文档版本不匹配都返回冲突；块版本用于补充检测目标块是否过期，不承诺不同块并行提交。
 
 ### document_ops
 
-- 保存协作操作日志：`op_id, document_id, actor_id, base_document_version, block_id, op_type, payload_json, document_version, block_version, created_at`。
-- `op_id` 全局唯一，用于幂等提交。重复提交同一 `op_id` 返回原始 ack，不重复修改正文。
+- 保存协作操作日志：`op_id, document_id, actor_id, base_document_version, base_block_version, block_id, op_type, payload_json, document_version, block_version, created_at`。
+- `op_id` 全局唯一，用于幂等提交。只有 `document_id`、actor、基础文档/块版本、块 ID、操作类型及完整 payload 均与首次请求一致时，重复 `op_id` 才返回原始 ack；任一字段不同均返回冲突。
 
 ### document_revisions
 
-- 保存发布快照或手动快照。
-- 前台公开详情只读取最新已发布 revision，继续编辑草稿不会影响公开内容。
+- 保存发布快照或手动快照；发布事务从一致快照读取 metadata 与 blocks，并创建不可变 revision。
+- `documents.published_revision_id` 明确指向当前公开 revision。前台详情和搜索都读取该 revision，继续编辑草稿不会影响公开内容。
 
 ## Markdown 导入/导出
 
@@ -366,13 +384,12 @@ type User struct {
 ### 认证方式
 
 - Access Token 使用 Ed25519 JWT，默认有效期 15 分钟；只有 `identity` 持有签名私钥。
-- `gateway` 和业务服务持有公钥并校验签名、过期时间及必要 claims；网关额外将 Token 中的 `token_version` 与撤销投影比较，再把原始 Token 透传给 RPC 服务进行二次签名校验和资源级授权。
+- `gateway` 使用公钥校验签名、过期时间及必要 claims；受保护请求再将原始 Token 通过 RPC metadata 传给 Identity `GetUser`，由 Identity 使用 `KC_IDENTITY_JWT_PUBLIC_KEY` 二次验证签名、限制 self-only 查询，并以 PostgreSQL 用户状态和 `token_version` 校验新鲜度。Knowledge handler 使用 `KC_KNOWLEDGE_JWT_PUBLIC_KEY` 验证透传 Token 和 admin role，但直接 RPC 当前信任 Gateway 已完成新鲜度检查，不再向 Identity 查询 `token_version`。
 - Refresh Token 明文只返回给客户端，服务端只保存 SHA-256 hash。
 - `identity:*` Redis 命名空间保存活跃 refresh token 会话元数据，PostgreSQL `identity.refresh_tokens` 保留审计与 Redis 故障降级。
 - Refresh 时即使 Redis 命中也会强校验 PostgreSQL 中的撤销、过期、用户状态和 `token_version`。
-- 修改密码、禁用用户、角色或状态变化会在同一身份服务事务内递增 `token_version`、撤销全部 refresh token，并写入 Outbox。
-- 身份服务发布 `token-version.changed` CloudEvent；网关消费后更新 `gateway:auth:version:<user_id>` 撤销投影，使已签发 Access Token 秒级失效。
-- Studio 和其他写接口无法读取撤销投影时必须失败关闭并返回服务暂不可用；公开匿名读取不受影响。
+- 后续实现修改密码、禁用用户、角色或状态变化时，将在同一身份服务事务内递增 `token_version`、撤销全部 refresh token，并写入 Outbox。
+- `token-version.changed` CloudEvent 与 `gateway:auth:version:<user_id>` 撤销投影属于后续 NATS 切片。当前受保护请求通过 Identity `GetUser` 查询 PostgreSQL 状态和版本；该新鲜度校验失败时 Gateway 失败关闭，公开匿名读取不受影响。
 
 ### API 路由
 
@@ -586,7 +603,7 @@ DELETE /api/v1/studio/tags/:id            # 删除标签
 - 支持 metadata 编辑（分类、标签、标题、摘要、发布状态）
 - 工具栏：加粗、斜体、标题(H1-H3)、代码块、链接、图片、引用、列表、表格
 - 自动保存通过 `POST /api/v1/studio/documents/:id/ops` 或 WebSocket `op` 消息提交。
-- 多人实时协作使用 WebSocket：同文档不同块可以并发编辑，同一块版本冲突返回 conflict。
+- 多人实时协作的 WebSocket 广播属于后续切片；当前持久化提交采用文档级串行版本，同一文档任一过期操作均返回 conflict，不提供不同块并行提交保证。
 - 发布/草稿状态通过 `PATCH /api/v1/studio/documents/:id` 修改 `status`。
 - AI 辅助（摘要、标签、续写）属于后续阶段。
 
@@ -632,11 +649,11 @@ POST   /api/v1/studio/documents/:id/ops           # HTTP 块级操作提交
 GET    /api/v1/studio/documents/:id/collab        # WebSocket 协作通道
 ```
 
-WebSocket 消息类型固定为：`hello`、`snapshot`、`op`、`ack`、`conflict`、`presence`、`error`。
+后续 WebSocket 协作切片的消息类型固定为：`hello`、`snapshot`、`op`、`ack`、`conflict`、`presence`、`error`。
 
 - `op` 必须携带全局唯一 `op_id` 和基础版本；知识服务只在事务提交成功后返回 `ack`。
-- 重复 `op_id` 返回首次提交的原始 `ack`，不重复修改文档或发布广播。
-- `conflict` 返回当前块版本和安全冲突快照；`error` 使用数字 `code`、安全 `message` 和 `request_id`。
+- 重复 `op_id` 仅在完整操作请求与首次提交一致时返回原始 `ack`，不重复修改文档或发布广播；相同 `op_id` 携带不同请求返回 conflict。
+- `conflict` 返回当前文档/块版本和安全冲突快照；`error` 使用数字 `code`、安全 `message`、`request_id` 和可选 `trace_id`。
 - 网关实例通过 `kc.realtime.documents.<document_id>` 广播已提交操作和 presence；消息丢失后客户端通过 snapshot/ops 恢复。
 
 ## 导出功能
@@ -718,6 +735,6 @@ GET    /api/v1/studio/export/download/:task_id  # 下载已完成的导出文件
 5. **安全默认关闭** — 身份状态不可验证、Studio 撤销投影不可用或资源权限不明确时拒绝请求，不降级绕过鉴权。
 6. **可观测性内建** — HTTP、RPC、事件和数据库调用统一关联 request/trace 上下文，错误根因进入脱敏 JSON 日志。
 7. **渐进式 AI** — AI 辅助但不强制，所有 AI 生成内容用户可审阅、修改和撤销。
-8. **块级协作优先** — 先解决多人协作的幂等、冲突和发布快照，再扩展更细粒度协同。
+8. **一致性优先** — 当前以文档级串行版本解决操作幂等、冲突和发布快照；更细粒度的并发协同必须在引入明确算法和兼容协议后再开放。
 9. **开放导入导出** — Markdown 是系统边界格式，方便迁移和备份，但不是在线编辑数据源。
 10. **基础设施隔离** — 业务层依赖稳定接口；连接切换收敛到配置，跨 Provider 切换显式处理 adapter、方言、迁移和数据搬迁。

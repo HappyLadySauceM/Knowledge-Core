@@ -6,6 +6,8 @@ import (
 	"encoding/hex"
 	"fmt"
 	"time"
+
+	"go.opentelemetry.io/otel/trace"
 )
 
 type contextKey uint8
@@ -43,6 +45,28 @@ func UserID(ctx context.Context) int64 {
 	}
 	userID, _ := ctx.Value(userIDContextKey).(int64)
 	return userID
+}
+
+func TraceID(ctx context.Context) string {
+	if ctx == nil {
+		return ""
+	}
+	spanContext := trace.SpanContextFromContext(ctx)
+	if !spanContext.IsValid() {
+		return ""
+	}
+	return spanContext.TraceID().String()
+}
+
+func SpanID(ctx context.Context) string {
+	if ctx == nil {
+		return ""
+	}
+	spanContext := trace.SpanContextFromContext(ctx)
+	if !spanContext.IsValid() {
+		return ""
+	}
+	return spanContext.SpanID().String()
 }
 
 func NewRequestID() string {

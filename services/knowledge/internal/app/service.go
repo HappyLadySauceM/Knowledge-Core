@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
@@ -115,16 +116,24 @@ func (s *Service) Get(ctx context.Context, documentID int64) (*domain.Detail, er
 	if documentID <= 0 {
 		return nil, &domain.ValidationError{Field: "document_id", Reason: "must be positive"}
 	}
-	document, err := s.documents.FindByID(ctx, s.database, documentID)
-	if errors.Is(err, repository.ErrDocumentNotFound) {
-		return nil, ErrDocumentNotFound
-	}
-	if err != nil {
-		return nil, fmt.Errorf("get document: %w", err)
-	}
-	blocks, err := s.documents.ListBlocks(ctx, s.database, documentID)
-	if err != nil {
-		return nil, fmt.Errorf("get document blocks: %w", err)
+	var document *domain.Document
+	var blocks []*domain.Block
+	if err := s.withTransactionOptions(ctx, &sql.TxOptions{
+		Isolation: sql.LevelRepeatableRead,
+		ReadOnly:  true,
+	}, func(transaction database.Tx) error {
+		var err error
+		document, err = s.documents.FindByID(ctx, transaction, documentID)
+		if err != nil {
+			return err
+		}
+		blocks, err = s.documents.ListBlocks(ctx, transaction, documentID)
+		if err != nil {
+			return fmt.Errorf("get document blocks: %w", err)
+		}
+		return nil
+	}); err != nil {
+		return nil, mapDocumentError("get document", err)
 	}
 	return &domain.Detail{Document: document, Blocks: blocks}, nil
 }
@@ -201,11 +210,19 @@ func (s *Service) SetStatus(ctx context.Context, documentID int64, status string
 			if marshalErr != nil {
 				return fmt.Errorf("encode document revision: %w", marshalErr)
 			}
-			if err := s.documents.SaveRevision(ctx, transaction, document, actorID, contentJSON); err != nil {
+			revisionID, revisionErr := s.documents.SaveRevision(ctx, transaction, document, actorID, contentJSON)
+			if revisionErr != nil {
+				return revisionErr
+			}
+			if revisionID <= 0 {
+				return errors.New("save document revision returned an invalid ID")
+			}
+			if err := s.documents.SetStatus(ctx, transaction, document, status, &revisionID); err != nil {
 				return err
 			}
+			return nil
 		}
-		return s.documents.SetStatus(ctx, transaction, document, status)
+		return s.documents.SetStatus(ctx, transaction, document, status, nil)
 	}); err != nil {
 		return nil, mapDocumentError("set document status", err)
 	}
@@ -216,22 +233,19 @@ func (s *Service) ApplyOperation(ctx context.Context, operation domain.Operation
 	if err := operation.Validate(); err != nil {
 		return domain.OperationAck{}, err
 	}
-	if ack, err := s.documents.FindOperation(ctx, s.database, operation.OperationID); err == nil {
-		if ack.DocumentID != operation.DocumentID {
-			return domain.OperationAck{}, ErrVersionConflict
-		}
-		return ack, nil
-	} else if !errors.Is(err, repository.ErrOperationNotFound) {
-		return domain.OperationAck{}, fmt.Errorf("find existing document operation: %w", err)
-	}
+	operation.PositionKey = strings.TrimSpace(operation.PositionKey)
 
 	var ack domain.OperationAck
 	if err := s.withTransaction(ctx, func(transaction database.Tx) error {
-		var err error
-		if ack, err = s.documents.FindOperation(ctx, transaction, operation.OperationID); err == nil {
-			if ack.DocumentID != operation.DocumentID {
+		if err := s.documents.LockOperation(ctx, transaction, operation.OperationID); err != nil {
+			return err
+		}
+		stored, err := s.documents.FindOperation(ctx, transaction, operation.OperationID)
+		if err == nil {
+			if stored.Type != "upsert_block" || stored.Operation != operation {
 				return ErrVersionConflict
 			}
+			ack = stored.Ack
 			return nil
 		} else if !errors.Is(err, repository.ErrOperationNotFound) {
 			return err
@@ -257,7 +271,7 @@ func (s *Service) ApplyOperation(ctx context.Context, operation domain.Operation
 		} else {
 			block.Version++
 		}
-		block.PositionKey = strings.TrimSpace(operation.PositionKey)
+		block.PositionKey = operation.PositionKey
 		block.ContentJSON = operation.ContentJSON
 		block.TextContent = operation.TextContent
 		block.UpdatedBy = operation.ActorID
@@ -289,13 +303,21 @@ func (s *Service) ApplyOperation(ctx context.Context, operation domain.Operation
 }
 
 func (s *Service) withTransaction(ctx context.Context, fn func(database.Tx) error) (runErr error) {
-	transaction, err := s.database.BeginTx(ctx, nil)
+	return s.withTransactionOptions(ctx, nil, fn)
+}
+
+func (s *Service) withTransactionOptions(
+	ctx context.Context,
+	options *sql.TxOptions,
+	fn func(database.Tx) error,
+) (runErr error) {
+	transaction, err := s.database.BeginTx(ctx, options)
 	if err != nil {
 		return fmt.Errorf("begin knowledge transaction: %w", err)
 	}
 	defer func() {
-		if runErr != nil {
-			runErr = errors.Join(runErr, transaction.Rollback())
+		if rollbackErr := transaction.Rollback(); rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
+			runErr = errors.Join(runErr, fmt.Errorf("rollback knowledge transaction: %w", rollbackErr))
 		}
 	}()
 	if err := fn(transaction); err != nil {

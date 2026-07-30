@@ -153,15 +153,7 @@ func parseLevel(value string) (slog.Level, error) {
 }
 
 func newTracerProvider(ctx context.Context, cfg Config) (trace.TracerProvider, *sdktrace.TracerProvider, error) {
-	if cfg.OTLPEndpoint == "" {
-		return noop.NewTracerProvider(), nil, nil
-	}
-	exporter, err := otlptracegrpc.New(ctx, otlptracegrpc.WithEndpointURL(cfg.OTLPEndpoint))
-	if err != nil {
-		return nil, nil, fmt.Errorf("create OTLP trace exporter: %w", err)
-	}
-	res, err := resource.Merge(resource.Default(), resource.NewWithAttributes(
-		semconv.SchemaURL,
+	res, err := resource.Merge(resource.Default(), resource.NewSchemaless(
 		semconv.ServiceName(cfg.Service),
 		semconv.DeploymentEnvironmentName(cfg.Environment),
 		attribute.String("service.namespace", "knowledge-core"),
@@ -169,11 +161,18 @@ func newTracerProvider(ctx context.Context, cfg Config) (trace.TracerProvider, *
 	if err != nil {
 		return nil, nil, fmt.Errorf("create OpenTelemetry resource: %w", err)
 	}
-	provider := sdktrace.NewTracerProvider(
-		sdktrace.WithBatcher(exporter),
+	options := []sdktrace.TracerProviderOption{
 		sdktrace.WithResource(res),
 		sdktrace.WithSampler(sdktrace.ParentBased(sdktrace.TraceIDRatioBased(cfg.SampleRatio))),
-	)
+	}
+	if cfg.OTLPEndpoint != "" {
+		exporter, exporterErr := otlptracegrpc.New(ctx, otlptracegrpc.WithEndpointURL(cfg.OTLPEndpoint))
+		if exporterErr != nil {
+			return nil, nil, fmt.Errorf("create OTLP trace exporter: %w", exporterErr)
+		}
+		options = append(options, sdktrace.WithBatcher(exporter))
+	}
+	provider := sdktrace.NewTracerProvider(options...)
 	return provider, provider, nil
 }
 

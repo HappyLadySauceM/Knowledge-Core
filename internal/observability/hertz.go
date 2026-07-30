@@ -31,6 +31,9 @@ func HertzServerMiddleware(runtime *Runtime, ignore HertzIgnoreFunc) app.Handler
 			trace.WithAttributes(attribute.String("http.request.method", method)),
 		)
 		defer span.End()
+		if traceID := TraceID(ctx); traceID != "" {
+			request.Header("X-Trace-ID", traceID)
+		}
 
 		request.Next(ctx)
 

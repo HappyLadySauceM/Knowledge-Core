@@ -19,13 +19,13 @@ func NewKnowledge(resolver discovery.Resolver, runtime *observability.Runtime) (
 	if runtime == nil {
 		return nil, errors.New("create Knowledge client: observability runtime is required")
 	}
-	client, err := knowledgeservice.NewClient(
-		KnowledgeServiceName,
+	options := []kitexclient.Option{
 		kitexclient.WithResolver(resolver),
-		kitexclient.WithConnectTimeout(500*time.Millisecond),
-		kitexclient.WithRPCTimeout(3*time.Second),
-		kitexclient.WithMiddleware(observability.KitexClientMiddleware(runtime)),
-	)
+		kitexclient.WithConnectTimeout(500 * time.Millisecond),
+		kitexclient.WithRPCTimeout(3 * time.Second),
+	}
+	options = append(options, observability.KitexClientOptions(runtime)...)
+	client, err := knowledgeservice.NewClient(KnowledgeServiceName, options...)
 	if err != nil {
 		return nil, err
 	}

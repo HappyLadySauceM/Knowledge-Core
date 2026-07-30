@@ -8,6 +8,8 @@ const i32 CodeInvalidCredentials = 20003
 const i32 CodeAccountLocked = 20004
 const i32 CodeUserDisabled = 20005
 const i32 CodeUserNotFound = 20006
+const i32 CodeUnauthenticated = 20007
+const i32 CodeForbidden = 20008
 const i32 CodeInternal = 20999
 
 struct User {

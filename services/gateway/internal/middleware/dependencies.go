@@ -2,33 +2,33 @@ package middleware
 
 import (
 	"context"
-	"log/slog"
-	"net/http"
 	"strings"
 	"time"
 
 	auth "github.com/HappyLadySauce/Knowledge-Core/internal/auth"
+	"github.com/HappyLadySauce/Knowledge-Core/internal/cache"
 	"github.com/HappyLadySauce/Knowledge-Core/internal/health"
 	"github.com/HappyLadySauce/Knowledge-Core/internal/observability"
+	identityrpc "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/identity"
 	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/identity/identityservice"
 	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/knowledge/knowledgeservice"
-	gatewaymodel "github.com/HappyLadySauce/Knowledge-Core/services/gateway/biz/model/gateway"
 	"github.com/cloudwego/hertz/pkg/app"
+	"github.com/cloudwego/hertz/pkg/common/hlog"
 )
 
 const (
 	healthRegistryKey  = "knowledge-core.health-registry"
+	cacheStoreKey      = "knowledge-core.cache-store"
 	identityClientKey  = "knowledge-core.identity-client"
 	knowledgeClientKey = "knowledge-core.knowledge-client"
 	principalKey       = "knowledge-core.auth-principal"
 	accessTokenKey     = "knowledge-core.auth-access-token"
-	requestIDKey       = "knowledge-core.request-id"
-	codeUnauthorized   = int32(10003)
-	codeForbidden      = int32(10005)
+	identityUserKey    = "knowledge-core.auth-identity-user"
 )
 
 type RuntimeDependencies struct {
 	Health    *health.Registry
+	Cache     cache.KVStore
 	Identity  identityservice.Client
 	Knowledge knowledgeservice.Client
 }
@@ -40,6 +40,7 @@ type TokenVerifier interface {
 func Dependencies(dependencies RuntimeDependencies) app.HandlerFunc {
 	return func(ctx context.Context, request *app.RequestContext) {
 		request.Set(healthRegistryKey, dependencies.Health)
+		request.Set(cacheStoreKey, dependencies.Cache)
 		request.Set(identityClientKey, dependencies.Identity)
 		request.Set(knowledgeClientKey, dependencies.Knowledge)
 		request.Next(ctx)
@@ -63,75 +64,9 @@ func Authentication(verifier TokenVerifier) app.HandlerFunc {
 	}
 }
 
-func RequestID() app.HandlerFunc {
-	return func(ctx context.Context, request *app.RequestContext) {
-		requestID := string(request.GetHeader("X-Request-ID"))
-		if !validRequestID(requestID) {
-			requestID = observability.NewRequestID()
-		}
-		request.Set(requestIDKey, requestID)
-		request.Header("X-Request-ID", requestID)
-		ctx = observability.WithRequestID(ctx, requestID)
-		request.Next(ctx)
-	}
-}
-
-func validRequestID(value string) bool {
-	if value == "" || len(value) > 64 {
-		return false
-	}
-	for _, character := range value {
-		if (character >= 'a' && character <= 'z') ||
-			(character >= 'A' && character <= 'Z') ||
-			(character >= '0' && character <= '9') ||
-			character == '-' || character == '_' || character == '.' {
-			continue
-		}
-		return false
-	}
-	return true
-}
-
-func AccessLog(logger *slog.Logger) app.HandlerFunc {
-	return func(ctx context.Context, request *app.RequestContext) {
-		started := time.Now()
-		request.Next(ctx)
-		route := request.FullPath()
-		if route == "" {
-			route = "unmatched"
-		}
-		status := request.Response.StatusCode()
-		level := slog.LevelInfo
-		outcome := "success"
-		switch {
-		case strings.HasPrefix(route, "/health/"):
-			level = slog.LevelDebug
-		case status >= http.StatusInternalServerError:
-			level = slog.LevelError
-			outcome = "server_error"
-		case status == http.StatusTooManyRequests:
-			level = slog.LevelWarn
-			outcome = "client_error"
-		case status >= http.StatusBadRequest:
-			outcome = "client_error"
-		}
-		logger.LogAttrs(ctx, level, "HTTP request",
-			slog.String("component", "hertz"),
-			slog.String("event", "http_request"),
-			slog.String("http_method", string(request.Method())),
-			slog.String("http_route", route),
-			slog.Int("http_status", status),
-			slog.String("outcome", outcome),
-			slog.Int64("duration_ms", time.Since(started).Milliseconds()),
-			slog.Int("response_bytes", len(request.Response.Body())),
-		)
-	}
-}
-
 func RequireAuthenticated() app.HandlerFunc {
 	return func(ctx context.Context, request *app.RequestContext) {
-		if _, authenticated := Principal(request); !authenticated {
-			writeAuthorizationError(request, http.StatusUnauthorized, codeUnauthorized, "authentication required")
+		if _, authenticated := refreshAuthenticatedUser(ctx, request); !authenticated {
 			return
 		}
 		request.Next(ctx)
@@ -146,17 +81,23 @@ func RequireRoles(roles ...string) app.HandlerFunc {
 		}
 	}
 	return func(ctx context.Context, request *app.RequestContext) {
-		principal, authenticated := Principal(request)
+		_, authenticated := refreshAuthenticatedUser(ctx, request)
 		if !authenticated {
-			writeAuthorizationError(request, http.StatusUnauthorized, codeUnauthorized, "authentication required")
 			return
 		}
+		principal, _ := Principal(request)
 		if _, exists := allowed[principal.Role]; !exists {
-			writeAuthorizationError(request, http.StatusForbidden, codeForbidden, "permission denied")
+			WriteError(request, ErrPermissionDenied)
 			return
 		}
 		request.Next(ctx)
 	}
+}
+
+func CacheStore(request *app.RequestContext) (cache.KVStore, bool) {
+	value, exists := request.Get(cacheStoreKey)
+	store, ok := value.(cache.KVStore)
+	return store, exists && ok && store != nil
 }
 
 func HealthRegistry(request *app.RequestContext) (*health.Registry, bool) {
@@ -189,19 +130,49 @@ func AccessToken(request *app.RequestContext) (string, bool) {
 	return token, exists && ok && token != ""
 }
 
-func GetRequestID(request *app.RequestContext) string {
-	value, exists := request.Get(requestIDKey)
-	if requestID, ok := value.(string); exists && ok {
-		return requestID
-	}
-	return ""
+func IdentityUser(request *app.RequestContext) (*identityrpc.User, bool) {
+	value, exists := request.Get(identityUserKey)
+	user, ok := value.(*identityrpc.User)
+	return user, exists && ok && user != nil
 }
 
-func writeAuthorizationError(request *app.RequestContext, status int, code int32, message string) {
-	request.AbortWithStatusJSON(status, &gatewaymodel.ErrorResponse{
-		Code:      code,
-		Message:   message,
-		Data:      &gatewaymodel.EmptyData{},
-		RequestID: GetRequestID(request),
+func refreshAuthenticatedUser(ctx context.Context, request *app.RequestContext) (*identityrpc.User, bool) {
+	principal, authenticated := Principal(request)
+	token, hasToken := AccessToken(request)
+	if !authenticated || !hasToken {
+		WriteError(request, ErrAuthenticationRequired)
+		return nil, false
+	}
+	if user, exists := IdentityUser(request); exists {
+		return user, true
+	}
+	client, exists := IdentityClient(request)
+	if !exists {
+		hlog.CtxErrorf(ctx, "Identity client is not configured")
+		WriteError(request, ErrDependencyUnavailable)
+		return nil, false
+	}
+
+	rpcCtx, cancel := context.WithTimeout(auth.WithAccessToken(ctx, token), 3*time.Second)
+	defer cancel()
+	user, err := client.GetUser(rpcCtx, &identityrpc.GetUserRequest{UserId: principal.UserID})
+	if err != nil {
+		WriteIdentityError(ctx, request, err)
+		return nil, false
+	}
+	if user == nil || user.Role == "" {
+		hlog.CtxErrorf(ctx, "Identity GetUser returned an invalid user")
+		WriteError(request, ErrInvalidUpstreamResponse)
+		return nil, false
+	}
+	if user.Id != principal.UserID || user.Status != "active" || user.TokenVersion != principal.TokenVersion {
+		WriteError(request, ErrAuthenticationRequired)
+		return nil, false
+	}
+
+	request.Set(principalKey, auth.Principal{
+		UserID: user.Id, Role: user.Role, TokenVersion: user.TokenVersion,
 	})
+	request.Set(identityUserKey, user)
+	return user, true
 }

@@ -84,6 +84,55 @@ func TestAuthenticateResetsFailures(t *testing.T) {
 	}
 }
 
+func TestAuthenticateRejectsLockEstablishedBeforeLoginCompletion(t *testing.T) {
+	now := time.Date(2026, 7, 27, 3, 0, 0, 0, time.UTC)
+	lockedUser := activeUser(now)
+	lockedUntil := now.Add(15 * time.Minute)
+	lockedUser.LockedUntil = &lockedUntil
+	repositoryFake := &fakeUsers{user: activeUser(now), completedUser: lockedUser}
+	issuer := &recordingTokenIssuer{}
+	service, err := app.NewService(repositoryFake, fakeHasher{}, issuer)
+	if err != nil {
+		t.Fatalf("NewService() error = %v", err)
+	}
+	service.SetClock(func() time.Time { return now })
+
+	_, err = service.Authenticate(context.Background(), app.AuthenticateInput{
+		Identifier: "alice@example.com",
+		Password:   "correct-password",
+	})
+	if !errors.Is(err, app.ErrAccountLocked) {
+		t.Fatalf("Authenticate() error = %v, want account locked", err)
+	}
+	if issuer.calls != 0 {
+		t.Fatalf("token issuer calls = %d, want 0", issuer.calls)
+	}
+}
+
+func TestAuthenticateIssuesTokenFromLatestUserState(t *testing.T) {
+	now := time.Date(2026, 7, 27, 3, 0, 0, 0, time.UTC)
+	latestUser := activeUser(now)
+	latestUser.TokenVersion = 4
+	repositoryFake := &fakeUsers{user: activeUser(now), completedUser: latestUser}
+	issuer := &recordingTokenIssuer{}
+	service, err := app.NewService(repositoryFake, fakeHasher{}, issuer)
+	if err != nil {
+		t.Fatalf("NewService() error = %v", err)
+	}
+	service.SetClock(func() time.Time { return now })
+
+	authentication, err := service.Authenticate(context.Background(), app.AuthenticateInput{
+		Identifier: "alice@example.com",
+		Password:   "correct-password",
+	})
+	if err != nil {
+		t.Fatalf("Authenticate() error = %v", err)
+	}
+	if authentication.User.TokenVersion != 4 || issuer.user == nil || issuer.user.TokenVersion != 4 {
+		t.Fatalf("Authenticate() user = %#v, issued user = %#v", authentication.User, issuer.user)
+	}
+}
+
 func TestAuthenticateMissingUserStillComparesPassword(t *testing.T) {
 	hasher := &recordingHasher{}
 	service, err := app.NewService(&fakeUsers{}, hasher, fakeTokenIssuer{})
@@ -193,9 +242,21 @@ func (f fakeTokenIssuer) Issue(user *domain.User) (app.AccessToken, error) {
 	}, nil
 }
 
+type recordingTokenIssuer struct {
+	calls int
+	user  *domain.User
+}
+
+func (i *recordingTokenIssuer) Issue(user *domain.User) (app.AccessToken, error) {
+	i.calls++
+	i.user = user
+	return app.AccessToken{Value: "access-token", ExpiresAt: user.UpdatedAt.Add(15 * time.Minute)}, nil
+}
+
 type fakeUsers struct {
-	user      *domain.User
-	createErr error
+	user          *domain.User
+	completedUser *domain.User
+	createErr     error
 }
 
 func (f *fakeUsers) CountAdmins(context.Context) (int64, error) {
@@ -214,6 +275,16 @@ func (f *fakeUsers) Create(_ context.Context, user *domain.User) error {
 	user.UpdatedAt = user.CreatedAt
 	f.user = user
 	return nil
+}
+
+func (f *fakeUsers) CreateFirstAdmin(ctx context.Context, user *domain.User) (bool, error) {
+	if f.user != nil && f.user.Role == domain.RoleAdmin {
+		return false, nil
+	}
+	if err := f.Create(ctx, user); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func (f *fakeUsers) FindByID(context.Context, int64) (*domain.User, error) {
@@ -239,10 +310,14 @@ func (f *fakeUsers) RecordLoginFailure(_ context.Context, _ int64, _ time.Time, 
 	return false, nil
 }
 
-func (f *fakeUsers) RecordLoginSuccess(context.Context, int64) error {
+func (f *fakeUsers) CompleteLoginSuccess(context.Context, int64, time.Time) (*domain.User, error) {
+	if f.completedUser != nil {
+		f.user = f.completedUser
+		return f.completedUser, nil
+	}
 	f.user.FailedLoginAttempts = 0
 	f.user.LockedUntil = nil
-	return nil
+	return f.user, nil
 }
 
 var _ repository.UserRepository = (*fakeUsers)(nil)

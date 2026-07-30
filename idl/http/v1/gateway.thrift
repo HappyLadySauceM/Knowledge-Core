@@ -9,6 +9,7 @@ struct ErrorResponse {
   2: required string message (api.body="message")
   3: required EmptyData data (api.body="data")
   4: required string request_id (api.body="request_id")
+  5: optional string trace_id (api.body="trace_id")
 }
 
 struct HealthData {
@@ -21,6 +22,7 @@ struct HealthResponse {
   2: required string message (api.body="message")
   3: required HealthData data (api.body="data")
   4: required string request_id (api.body="request_id")
+  5: optional string trace_id (api.body="trace_id")
 }
 
 struct UserData {
@@ -46,6 +48,7 @@ struct RegisterResponse {
   2: required string message (api.body="message")
   3: required UserData data (api.body="data")
   4: required string request_id (api.body="request_id")
+  5: optional string trace_id (api.body="trace_id")
 }
 
 struct LoginRequest {
@@ -65,6 +68,7 @@ struct LoginResponse {
   2: required string message (api.body="message")
   3: required LoginData data (api.body="data")
   4: required string request_id (api.body="request_id")
+  5: optional string trace_id (api.body="trace_id")
 }
 
 struct CurrentUserRequest {}
@@ -74,6 +78,7 @@ struct CurrentUserResponse {
   2: required string message (api.body="message")
   3: required UserData data (api.body="data")
   4: required string request_id (api.body="request_id")
+  5: optional string trace_id (api.body="trace_id")
 }
 
 struct DocumentData {
@@ -163,6 +168,7 @@ struct DocumentResponse {
   2: required string message (api.body="message")
   3: required DocumentData data (api.body="data")
   4: required string request_id (api.body="request_id")
+  5: optional string trace_id (api.body="trace_id")
 }
 
 struct DocumentDetailResponse {
@@ -170,6 +176,7 @@ struct DocumentDetailResponse {
   2: required string message (api.body="message")
   3: required DocumentDetailData data (api.body="data")
   4: required string request_id (api.body="request_id")
+  5: optional string trace_id (api.body="trace_id")
 }
 
 struct DocumentListResponse {
@@ -177,6 +184,7 @@ struct DocumentListResponse {
   2: required string message (api.body="message")
   3: required DocumentListData data (api.body="data")
   4: required string request_id (api.body="request_id")
+  5: optional string trace_id (api.body="trace_id")
 }
 
 struct DocumentOperationAckResponse {
@@ -184,6 +192,7 @@ struct DocumentOperationAckResponse {
   2: required string message (api.body="message")
   3: required DocumentOperationAckData data (api.body="data")
   4: required string request_id (api.body="request_id")
+  5: optional string trace_id (api.body="trace_id")
 }
 
 service GatewayService {

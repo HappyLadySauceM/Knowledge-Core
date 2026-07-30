@@ -16,13 +16,12 @@ import (
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/common/hlog"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
-	"github.com/cloudwego/kitex/pkg/kerrors"
 )
 
 // Live .
 // @router /health/live [GET]
 func Live(ctx context.Context, c *app.RequestContext) {
-	c.JSON(consts.StatusOK, healthResponse(0, "ok", "live", middleware.GetRequestID(c)))
+	c.JSON(consts.StatusOK, healthResponse(0, "ok", "live", c))
 }
 
 // Ready .
@@ -31,25 +30,33 @@ func Ready(ctx context.Context, c *app.RequestContext) {
 	registry, exists := middleware.HealthRegistry(c)
 	if !exists {
 		hlog.CtxErrorf(ctx, "health registry is not configured")
-		c.JSON(consts.StatusServiceUnavailable, healthResponse(10001, "service unavailable", "not_ready", middleware.GetRequestID(c)))
+		writeNotReady(c)
 		return
 	}
 	checkCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 	if err := registry.Ready(checkCtx); err != nil {
 		hlog.CtxWarnf(ctx, "readiness check failed: %v", err)
-		c.JSON(consts.StatusServiceUnavailable, healthResponse(10001, "service unavailable", "not_ready", middleware.GetRequestID(c)))
+		writeNotReady(c)
 		return
 	}
-	c.JSON(consts.StatusOK, healthResponse(0, "ok", "ready", middleware.GetRequestID(c)))
+	c.JSON(consts.StatusOK, healthResponse(0, "ok", "ready", c))
 }
 
-func healthResponse(code int32, message, status, requestID string) *gateway.HealthResponse {
+func writeNotReady(c *app.RequestContext) {
+	responseError := middleware.ErrNotReady
+	c.JSON(responseError.Status(), healthResponse(
+		responseError.Code(), responseError.Definition().SafeMessage(), "not_ready", c,
+	))
+}
+
+func healthResponse(code int32, message, status string, c *app.RequestContext) *gateway.HealthResponse {
 	return &gateway.HealthResponse{
 		Code:      code,
 		Message:   message,
 		Data:      &gateway.HealthData{Status: status, Service: "gateway"},
-		RequestID: requestID,
+		RequestID: middleware.GetRequestID(c),
+		TraceID:   middleware.TraceIDPointer(c),
 	}
 }
 
@@ -58,13 +65,13 @@ func healthResponse(code int32, message, status, requestID string) *gateway.Heal
 func Register(ctx context.Context, c *app.RequestContext) {
 	var req gateway.RegisterRequest
 	if err := c.BindAndValidate(&req); err != nil {
-		writeError(c, http.StatusBadRequest, codeInvalidRequest, "invalid request")
+		middleware.WriteError(c, middleware.ErrInvalidRequest)
 		return
 	}
 	client, exists := middleware.IdentityClient(c)
 	if !exists {
 		hlog.CtxErrorf(ctx, "Identity client is not configured")
-		writeError(c, http.StatusServiceUnavailable, codeDependencyUnavailable, "service unavailable")
+		middleware.WriteError(c, middleware.ErrDependencyUnavailable)
 		return
 	}
 	rpcCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
@@ -75,17 +82,17 @@ func Register(ctx context.Context, c *app.RequestContext) {
 		Password: req.Password,
 	})
 	if err != nil {
-		writeIdentityError(ctx, c, err)
+		middleware.WriteIdentityError(ctx, c, err)
 		return
 	}
 	data := mapUser(user)
 	if data == nil {
 		hlog.CtxErrorf(ctx, "Identity Register returned no user")
-		writeError(c, http.StatusBadGateway, codeDependencyUnavailable, "service unavailable")
+		middleware.WriteError(c, middleware.ErrInvalidUpstreamResponse)
 		return
 	}
 	c.JSON(http.StatusCreated, &gateway.RegisterResponse{
-		Code: 0, Message: "ok", Data: data, RequestID: middleware.GetRequestID(c),
+		Code: 0, Message: "ok", Data: data, RequestID: middleware.GetRequestID(c), TraceID: middleware.TraceIDPointer(c),
 	})
 }
 
@@ -94,13 +101,13 @@ func Register(ctx context.Context, c *app.RequestContext) {
 func Login(ctx context.Context, c *app.RequestContext) {
 	var req gateway.LoginRequest
 	if err := c.BindAndValidate(&req); err != nil {
-		writeError(c, http.StatusBadRequest, codeInvalidRequest, "invalid request")
+		middleware.WriteError(c, middleware.ErrInvalidRequest)
 		return
 	}
 	client, exists := middleware.IdentityClient(c)
 	if !exists {
 		hlog.CtxErrorf(ctx, "Identity client is not configured")
-		writeError(c, http.StatusServiceUnavailable, codeDependencyUnavailable, "service unavailable")
+		middleware.WriteError(c, middleware.ErrDependencyUnavailable)
 		return
 	}
 	rpcCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
@@ -110,18 +117,18 @@ func Login(ctx context.Context, c *app.RequestContext) {
 		Password:   req.Password,
 	})
 	if err != nil {
-		writeIdentityError(ctx, c, err)
+		middleware.WriteIdentityError(ctx, c, err)
 		return
 	}
 	if authentication == nil || authentication.AccessToken == "" || authentication.ExpiresAtUnix <= time.Now().UTC().Unix() {
 		hlog.CtxErrorf(ctx, "Identity Authenticate returned an incomplete result")
-		writeError(c, http.StatusBadGateway, codeDependencyUnavailable, "service unavailable")
+		middleware.WriteError(c, middleware.ErrInvalidUpstreamResponse)
 		return
 	}
 	data := mapUser(authentication.User)
 	if data == nil {
 		hlog.CtxErrorf(ctx, "Identity Authenticate returned no user")
-		writeError(c, http.StatusBadGateway, codeDependencyUnavailable, "service unavailable")
+		middleware.WriteError(c, middleware.ErrInvalidUpstreamResponse)
 		return
 	}
 	c.JSON(http.StatusOK, &gateway.LoginResponse{
@@ -131,40 +138,21 @@ func Login(ctx context.Context, c *app.RequestContext) {
 			User: data, AccessToken: authentication.AccessToken, TokenType: "Bearer", ExpiresAtUnix: authentication.ExpiresAtUnix,
 		},
 		RequestID: middleware.GetRequestID(c),
+		TraceID:   middleware.TraceIDPointer(c),
 	})
 }
 
 // CurrentUser .
 // @router /api/v1/users/me [GET]
 func CurrentUser(ctx context.Context, c *app.RequestContext) {
-	principal, authenticated := middleware.Principal(c)
-	if !authenticated {
-		writeError(c, http.StatusUnauthorized, codeUnauthorized, "authentication required")
-		return
-	}
-	client, exists := middleware.IdentityClient(c)
+	user, exists := middleware.IdentityUser(c)
 	if !exists {
-		hlog.CtxErrorf(ctx, "Identity client is not configured")
-		writeError(c, http.StatusServiceUnavailable, codeDependencyUnavailable, "service unavailable")
-		return
-	}
-	rpcCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
-	defer cancel()
-	user, err := client.GetUser(rpcCtx, &identityrpc.GetUserRequest{UserId: principal.UserID})
-	if err != nil {
-		if bizError, ok := kerrors.FromBizStatusError(err); ok && bizError.BizStatusCode() == identityrpc.CodeUserNotFound {
-			writeError(c, http.StatusUnauthorized, codeUnauthorized, "authentication required")
-			return
-		}
-		writeIdentityError(ctx, c, err)
-		return
-	}
-	if user == nil || user.Id != principal.UserID || user.Status != "active" || user.Role != principal.Role || user.TokenVersion != principal.TokenVersion {
-		writeError(c, http.StatusUnauthorized, codeUnauthorized, "authentication required")
+		hlog.CtxErrorf(ctx, "fresh Identity user is not available")
+		middleware.WriteError(c, middleware.ErrInternal)
 		return
 	}
 	c.JSON(http.StatusOK, &gateway.CurrentUserResponse{
-		Code: 0, Message: "ok", Data: mapUser(user), RequestID: middleware.GetRequestID(c),
+		Code: 0, Message: "ok", Data: mapUser(user), RequestID: middleware.GetRequestID(c), TraceID: middleware.TraceIDPointer(c),
 	})
 }
 
@@ -173,7 +161,7 @@ func CurrentUser(ctx context.Context, c *app.RequestContext) {
 func ListPublishedDocuments(ctx context.Context, c *app.RequestContext) {
 	var req gateway.DocumentListRequest
 	if err := c.BindAndValidate(&req); err != nil {
-		writeError(c, http.StatusBadRequest, codeInvalidRequest, "invalid request")
+		middleware.WriteError(c, middleware.ErrInvalidRequest)
 		return
 	}
 	client, ok := knowledgeClient(ctx, c)
@@ -186,7 +174,7 @@ func ListPublishedDocuments(ctx context.Context, c *app.RequestContext) {
 		Query: req.Query, Page: req.Page, PageSize: req.PageSize,
 	})
 	if err != nil {
-		writeKnowledgeError(ctx, c, err)
+		middleware.WriteKnowledgeError(ctx, c, err)
 		return
 	}
 	data := mapKnowledgeList(response)
@@ -194,7 +182,7 @@ func ListPublishedDocuments(ctx context.Context, c *app.RequestContext) {
 		dependencyFailure(ctx, c, "Knowledge ListPublishedDocuments returned no response")
 		return
 	}
-	c.JSON(http.StatusOK, &gateway.DocumentListResponse{Code: 0, Message: "ok", Data: data, RequestID: middleware.GetRequestID(c)})
+	c.JSON(http.StatusOK, &gateway.DocumentListResponse{Code: 0, Message: "ok", Data: data, RequestID: middleware.GetRequestID(c), TraceID: middleware.TraceIDPointer(c)})
 }
 
 // GetPublishedDocument .
@@ -202,7 +190,7 @@ func ListPublishedDocuments(ctx context.Context, c *app.RequestContext) {
 func GetPublishedDocument(ctx context.Context, c *app.RequestContext) {
 	var req gateway.DocumentIDRequest
 	if err := c.BindAndValidate(&req); err != nil {
-		writeError(c, http.StatusBadRequest, codeInvalidRequest, "invalid request")
+		middleware.WriteError(c, middleware.ErrInvalidRequest)
 		return
 	}
 	client, ok := knowledgeClient(ctx, c)
@@ -213,7 +201,7 @@ func GetPublishedDocument(ctx context.Context, c *app.RequestContext) {
 	defer cancel()
 	response, err := client.GetPublishedDocument(rpcCtx, &knowledgerpc.DocumentIDRequest{DocumentId: req.DocumentID})
 	if err != nil {
-		writeKnowledgeError(ctx, c, err)
+		middleware.WriteKnowledgeError(ctx, c, err)
 		return
 	}
 	data := mapKnowledgeDetail(response)
@@ -221,7 +209,7 @@ func GetPublishedDocument(ctx context.Context, c *app.RequestContext) {
 		dependencyFailure(ctx, c, "Knowledge GetPublishedDocument returned no document")
 		return
 	}
-	c.JSON(http.StatusOK, &gateway.DocumentDetailResponse{Code: 0, Message: "ok", Data: data, RequestID: middleware.GetRequestID(c)})
+	c.JSON(http.StatusOK, &gateway.DocumentDetailResponse{Code: 0, Message: "ok", Data: data, RequestID: middleware.GetRequestID(c), TraceID: middleware.TraceIDPointer(c)})
 }
 
 // ListDocuments .
@@ -229,7 +217,7 @@ func GetPublishedDocument(ctx context.Context, c *app.RequestContext) {
 func ListDocuments(ctx context.Context, c *app.RequestContext) {
 	var req gateway.DocumentListRequest
 	if err := c.BindAndValidate(&req); err != nil {
-		writeError(c, http.StatusBadRequest, codeInvalidRequest, "invalid request")
+		middleware.WriteError(c, middleware.ErrInvalidRequest)
 		return
 	}
 	client, rpcCtx, cancel, ok := authorizedKnowledgeClient(ctx, c)
@@ -239,7 +227,7 @@ func ListDocuments(ctx context.Context, c *app.RequestContext) {
 	defer cancel()
 	response, err := client.ListDocuments(rpcCtx, &knowledgerpc.DocumentListRequest{Query: req.Query, Page: req.Page, PageSize: req.PageSize})
 	if err != nil {
-		writeKnowledgeError(ctx, c, err)
+		middleware.WriteKnowledgeError(ctx, c, err)
 		return
 	}
 	data := mapKnowledgeList(response)
@@ -247,7 +235,7 @@ func ListDocuments(ctx context.Context, c *app.RequestContext) {
 		dependencyFailure(ctx, c, "Knowledge ListDocuments returned no response")
 		return
 	}
-	c.JSON(http.StatusOK, &gateway.DocumentListResponse{Code: 0, Message: "ok", Data: data, RequestID: middleware.GetRequestID(c)})
+	c.JSON(http.StatusOK, &gateway.DocumentListResponse{Code: 0, Message: "ok", Data: data, RequestID: middleware.GetRequestID(c), TraceID: middleware.TraceIDPointer(c)})
 }
 
 // CreateDocument .
@@ -255,7 +243,7 @@ func ListDocuments(ctx context.Context, c *app.RequestContext) {
 func CreateDocument(ctx context.Context, c *app.RequestContext) {
 	var req gateway.CreateDocumentRequest
 	if err := c.BindAndValidate(&req); err != nil {
-		writeError(c, http.StatusBadRequest, codeInvalidRequest, "invalid request")
+		middleware.WriteError(c, middleware.ErrInvalidRequest)
 		return
 	}
 	client, rpcCtx, cancel, ok := authorizedKnowledgeClient(ctx, c)
@@ -265,7 +253,7 @@ func CreateDocument(ctx context.Context, c *app.RequestContext) {
 	defer cancel()
 	response, err := client.CreateDocument(rpcCtx, &knowledgerpc.CreateDocumentRequest{Title: req.Title, Summary: req.Summary})
 	if err != nil {
-		writeKnowledgeError(ctx, c, err)
+		middleware.WriteKnowledgeError(ctx, c, err)
 		return
 	}
 	data := mapKnowledgeDetail(response)
@@ -273,7 +261,7 @@ func CreateDocument(ctx context.Context, c *app.RequestContext) {
 		dependencyFailure(ctx, c, "Knowledge CreateDocument returned no document")
 		return
 	}
-	c.JSON(http.StatusCreated, &gateway.DocumentDetailResponse{Code: 0, Message: "ok", Data: data, RequestID: middleware.GetRequestID(c)})
+	c.JSON(http.StatusCreated, &gateway.DocumentDetailResponse{Code: 0, Message: "ok", Data: data, RequestID: middleware.GetRequestID(c), TraceID: middleware.TraceIDPointer(c)})
 }
 
 // GetDocument .
@@ -281,7 +269,7 @@ func CreateDocument(ctx context.Context, c *app.RequestContext) {
 func GetDocument(ctx context.Context, c *app.RequestContext) {
 	var req gateway.DocumentIDRequest
 	if err := c.BindAndValidate(&req); err != nil {
-		writeError(c, http.StatusBadRequest, codeInvalidRequest, "invalid request")
+		middleware.WriteError(c, middleware.ErrInvalidRequest)
 		return
 	}
 	client, rpcCtx, cancel, ok := authorizedKnowledgeClient(ctx, c)
@@ -291,7 +279,7 @@ func GetDocument(ctx context.Context, c *app.RequestContext) {
 	defer cancel()
 	response, err := client.GetDocument(rpcCtx, &knowledgerpc.DocumentIDRequest{DocumentId: req.DocumentID})
 	if err != nil {
-		writeKnowledgeError(ctx, c, err)
+		middleware.WriteKnowledgeError(ctx, c, err)
 		return
 	}
 	data := mapKnowledgeDetail(response)
@@ -299,7 +287,7 @@ func GetDocument(ctx context.Context, c *app.RequestContext) {
 		dependencyFailure(ctx, c, "Knowledge GetDocument returned no document")
 		return
 	}
-	c.JSON(http.StatusOK, &gateway.DocumentDetailResponse{Code: 0, Message: "ok", Data: data, RequestID: middleware.GetRequestID(c)})
+	c.JSON(http.StatusOK, &gateway.DocumentDetailResponse{Code: 0, Message: "ok", Data: data, RequestID: middleware.GetRequestID(c), TraceID: middleware.TraceIDPointer(c)})
 }
 
 // UpdateDocument .
@@ -307,7 +295,7 @@ func GetDocument(ctx context.Context, c *app.RequestContext) {
 func UpdateDocument(ctx context.Context, c *app.RequestContext) {
 	var req gateway.UpdateDocumentRequest
 	if err := c.BindAndValidate(&req); err != nil {
-		writeError(c, http.StatusBadRequest, codeInvalidRequest, "invalid request")
+		middleware.WriteError(c, middleware.ErrInvalidRequest)
 		return
 	}
 	client, rpcCtx, cancel, ok := authorizedKnowledgeClient(ctx, c)
@@ -317,7 +305,7 @@ func UpdateDocument(ctx context.Context, c *app.RequestContext) {
 	defer cancel()
 	response, err := client.UpdateDocument(rpcCtx, &knowledgerpc.UpdateDocumentRequest{DocumentId: req.DocumentID, Title: req.Title, Summary: req.Summary})
 	if err != nil {
-		writeKnowledgeError(ctx, c, err)
+		middleware.WriteKnowledgeError(ctx, c, err)
 		return
 	}
 	data := mapKnowledgeDetail(response)
@@ -325,7 +313,7 @@ func UpdateDocument(ctx context.Context, c *app.RequestContext) {
 		dependencyFailure(ctx, c, "Knowledge UpdateDocument returned no document")
 		return
 	}
-	c.JSON(http.StatusOK, &gateway.DocumentDetailResponse{Code: 0, Message: "ok", Data: data, RequestID: middleware.GetRequestID(c)})
+	c.JSON(http.StatusOK, &gateway.DocumentDetailResponse{Code: 0, Message: "ok", Data: data, RequestID: middleware.GetRequestID(c), TraceID: middleware.TraceIDPointer(c)})
 }
 
 // DeleteDocument .
@@ -333,7 +321,7 @@ func UpdateDocument(ctx context.Context, c *app.RequestContext) {
 func DeleteDocument(ctx context.Context, c *app.RequestContext) {
 	var req gateway.DocumentIDRequest
 	if err := c.BindAndValidate(&req); err != nil {
-		writeError(c, http.StatusBadRequest, codeInvalidRequest, "invalid request")
+		middleware.WriteError(c, middleware.ErrInvalidRequest)
 		return
 	}
 	client, rpcCtx, cancel, ok := authorizedKnowledgeClient(ctx, c)
@@ -343,7 +331,7 @@ func DeleteDocument(ctx context.Context, c *app.RequestContext) {
 	defer cancel()
 	response, err := client.DeleteDocument(rpcCtx, &knowledgerpc.DocumentIDRequest{DocumentId: req.DocumentID})
 	if err != nil {
-		writeKnowledgeError(ctx, c, err)
+		middleware.WriteKnowledgeError(ctx, c, err)
 		return
 	}
 	data := mapKnowledgeDocument(response)
@@ -351,7 +339,7 @@ func DeleteDocument(ctx context.Context, c *app.RequestContext) {
 		dependencyFailure(ctx, c, "Knowledge DeleteDocument returned no document")
 		return
 	}
-	c.JSON(http.StatusOK, &gateway.DocumentResponse{Code: 0, Message: "ok", Data: data, RequestID: middleware.GetRequestID(c)})
+	c.JSON(http.StatusOK, &gateway.DocumentResponse{Code: 0, Message: "ok", Data: data, RequestID: middleware.GetRequestID(c), TraceID: middleware.TraceIDPointer(c)})
 }
 
 // SetDocumentStatus .
@@ -359,7 +347,7 @@ func DeleteDocument(ctx context.Context, c *app.RequestContext) {
 func SetDocumentStatus(ctx context.Context, c *app.RequestContext) {
 	var req gateway.SetDocumentStatusRequest
 	if err := c.BindAndValidate(&req); err != nil {
-		writeError(c, http.StatusBadRequest, codeInvalidRequest, "invalid request")
+		middleware.WriteError(c, middleware.ErrInvalidRequest)
 		return
 	}
 	client, rpcCtx, cancel, ok := authorizedKnowledgeClient(ctx, c)
@@ -369,7 +357,7 @@ func SetDocumentStatus(ctx context.Context, c *app.RequestContext) {
 	defer cancel()
 	response, err := client.SetDocumentStatus(rpcCtx, &knowledgerpc.SetDocumentStatusRequest{DocumentId: req.DocumentID, Status: req.Status})
 	if err != nil {
-		writeKnowledgeError(ctx, c, err)
+		middleware.WriteKnowledgeError(ctx, c, err)
 		return
 	}
 	data := mapKnowledgeDocument(response)
@@ -377,7 +365,7 @@ func SetDocumentStatus(ctx context.Context, c *app.RequestContext) {
 		dependencyFailure(ctx, c, "Knowledge SetDocumentStatus returned no document")
 		return
 	}
-	c.JSON(http.StatusOK, &gateway.DocumentResponse{Code: 0, Message: "ok", Data: data, RequestID: middleware.GetRequestID(c)})
+	c.JSON(http.StatusOK, &gateway.DocumentResponse{Code: 0, Message: "ok", Data: data, RequestID: middleware.GetRequestID(c), TraceID: middleware.TraceIDPointer(c)})
 }
 
 // ApplyDocumentOperation .
@@ -385,7 +373,7 @@ func SetDocumentStatus(ctx context.Context, c *app.RequestContext) {
 func ApplyDocumentOperation(ctx context.Context, c *app.RequestContext) {
 	var req gateway.ApplyDocumentOperationRequest
 	if err := c.BindAndValidate(&req); err != nil {
-		writeError(c, http.StatusBadRequest, codeInvalidRequest, "invalid request")
+		middleware.WriteError(c, middleware.ErrInvalidRequest)
 		return
 	}
 	client, rpcCtx, cancel, ok := authorizedKnowledgeClient(ctx, c)
@@ -399,7 +387,7 @@ func ApplyDocumentOperation(ctx context.Context, c *app.RequestContext) {
 		ContentJson: req.ContentJSON, TextContent: req.TextContent,
 	})
 	if err != nil {
-		writeKnowledgeError(ctx, c, err)
+		middleware.WriteKnowledgeError(ctx, c, err)
 		return
 	}
 	if response == nil {
@@ -413,13 +401,15 @@ func ApplyDocumentOperation(ctx context.Context, c *app.RequestContext) {
 			BlockVersion: response.BlockVersion, Duplicate: response.Duplicate,
 		},
 		RequestID: middleware.GetRequestID(c),
+		TraceID:   middleware.TraceIDPointer(c),
 	})
 }
 
 func knowledgeClient(ctx context.Context, c *app.RequestContext) (knowledgeservice.Client, bool) {
 	client, exists := middleware.KnowledgeClient(c)
 	if !exists {
-		dependencyFailure(ctx, c, "Knowledge client is not configured")
+		hlog.CtxErrorf(ctx, "Knowledge client is not configured")
+		middleware.WriteError(c, middleware.ErrDependencyUnavailable)
 		return nil, false
 	}
 	return client, true
@@ -435,7 +425,7 @@ func authorizedKnowledgeClient(
 	}
 	token, authenticated := middleware.AccessToken(c)
 	if !authenticated {
-		writeError(c, http.StatusUnauthorized, codeUnauthorized, "authentication required")
+		middleware.WriteError(c, middleware.ErrAuthenticationRequired)
 		return nil, nil, func() {}, false
 	}
 	rpcCtx, cancel := context.WithTimeout(auth.WithAccessToken(ctx, token), 3*time.Second)
@@ -444,29 +434,7 @@ func authorizedKnowledgeClient(
 
 func dependencyFailure(ctx context.Context, c *app.RequestContext, message string) {
 	hlog.CtxErrorf(ctx, "%s", message)
-	writeError(c, http.StatusServiceUnavailable, codeDependencyUnavailable, "service unavailable")
-}
-
-func writeKnowledgeError(ctx context.Context, c *app.RequestContext, err error) {
-	bizError, ok := kerrors.FromBizStatusError(err)
-	if !ok {
-		hlog.CtxErrorf(ctx, "Knowledge RPC request failed: %v", err)
-		writeError(c, http.StatusServiceUnavailable, codeDependencyUnavailable, "service unavailable")
-		return
-	}
-	switch bizError.BizStatusCode() {
-	case knowledgerpc.CodeInvalidInput:
-		writeError(c, http.StatusBadRequest, knowledgerpc.CodeInvalidInput, "invalid request")
-	case knowledgerpc.CodeNotFound:
-		writeError(c, http.StatusNotFound, knowledgerpc.CodeNotFound, "document not found")
-	case knowledgerpc.CodeConflict:
-		writeError(c, http.StatusConflict, knowledgerpc.CodeConflict, "document version conflict")
-	case knowledgerpc.CodeForbidden:
-		writeError(c, http.StatusForbidden, knowledgerpc.CodeForbidden, "permission denied")
-	default:
-		hlog.CtxErrorf(ctx, "Knowledge RPC returned business code %d", bizError.BizStatusCode())
-		writeError(c, http.StatusBadGateway, codeDependencyUnavailable, "service unavailable")
-	}
+	middleware.WriteError(c, middleware.ErrInvalidUpstreamResponse)
 }
 
 func mapKnowledgeList(list *knowledgerpc.DocumentList) *gateway.DocumentListData {

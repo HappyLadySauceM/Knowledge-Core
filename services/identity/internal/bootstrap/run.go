@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 
+	auth "github.com/HappyLadySauce/Knowledge-Core/internal/auth"
 	internalbootstrap "github.com/HappyLadySauce/Knowledge-Core/internal/bootstrap"
 	"github.com/HappyLadySauce/Knowledge-Core/internal/lifecycle"
 	"github.com/HappyLadySauce/Knowledge-Core/internal/observability"
@@ -23,7 +24,7 @@ import (
 const serviceName = "knowledge-core.identity"
 
 func Run(ctx context.Context) (runErr error) {
-	needs := internalbootstrap.Needs{Database: true, Cache: true, DurableMessaging: true, ConfigSource: true, Registry: true}
+	needs := internalbootstrap.Needs{Database: true, Registry: true}
 	cfg, err := internalbootstrap.LoadConfig("identity", "KC_IDENTITY_RPC_ADDR", ":8881", needs)
 	if err != nil {
 		return err
@@ -47,6 +48,10 @@ func Run(ctx context.Context) (runErr error) {
 	accessTokens, err := security.NewAccessTokenIssuer(os.Getenv("KC_IDENTITY_JWT_PRIVATE_KEY"))
 	if err != nil {
 		return fmt.Errorf("configure identity access tokens: %w", err)
+	}
+	accessTokenVerifier, err := auth.NewVerifier(os.Getenv("KC_IDENTITY_JWT_PUBLIC_KEY"))
+	if err != nil {
+		return fmt.Errorf("configure identity access token verification: %w", err)
 	}
 	if err := migrationpostgres.Up(ctx, cfg.Database.DSN); err != nil {
 		return fmt.Errorf("migrate identity database: %w", err)
@@ -88,14 +93,16 @@ func Run(ctx context.Context) (runErr error) {
 		return fmt.Errorf("resolve identity RPC address: %w", err)
 	}
 	exitSignal := make(chan error, 1)
-	rpcServer := identityservice.NewServer(
-		identitykitex.NewHandler(application),
+	serverOptions := []server.Option{
 		server.WithServiceAddr(address),
 		server.WithServerBasicInfo(&rpcinfo.EndpointBasicInfo{ServiceName: serviceName}),
 		server.WithRegistry(resources.Registry),
 		server.WithExitWaitTime(cfg.ShutdownTimeout),
 		server.WithExitSignal(func() <-chan error { return exitSignal }),
-		server.WithMiddleware(observability.KitexServerMiddleware(telemetry)),
+	}
+	serverOptions = append(serverOptions, observability.KitexServerOptions(telemetry)...)
+	rpcServer := identityservice.NewServer(
+		identitykitex.NewHandler(application, accessTokenVerifier, resources.Health), serverOptions...,
 	)
 	managedCleanup := cleanup
 	cleanup = nil

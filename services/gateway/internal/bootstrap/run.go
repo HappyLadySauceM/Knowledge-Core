@@ -20,13 +20,14 @@ import (
 
 func Run(ctx context.Context) (runErr error) {
 	needs := internalbootstrap.Needs{
-		Cache:             true,
-		DurableMessaging:  true,
-		RealtimeMessaging: true,
-		ConfigSource:      true,
-		Resolver:          true,
+		Cache:    true,
+		Resolver: true,
 	}
 	cfg, err := internalbootstrap.LoadConfig("gateway", "KC_GATEWAY_HTTP_ADDR", ":8080", needs)
+	if err != nil {
+		return err
+	}
+	middlewareConfig, err := middleware.LoadConfig(os.LookupEnv)
 	if err != nil {
 		return err
 	}
@@ -91,20 +92,25 @@ func Run(ctx context.Context) (runErr error) {
 		return err
 	}
 
-	hertz := server.Default(
+	hertz := server.New(
 		server.WithHostPorts(cfg.ListenAddress),
 		server.WithExitWaitTime(cfg.ShutdownTimeout),
 		server.WithMaxRequestBodySize(4<<20),
+		server.WithHandleMethodNotAllowed(true),
+		server.WithRedirectTrailingSlash(false),
 	)
+	hertz.SetClientIPFunc(app.ClientIPWithOption(app.ClientIPOptions{
+		RemoteIPHeaders: []string{"X-Forwarded-For", "X-Real-IP"},
+		TrustedCIDRs:    middlewareConfig.TrustedProxyCIDRs,
+	}))
 	if err := router.Register(hertz, router.Config{
-		Logger: telemetry.Logger(),
-		Tracing: observability.HertzServerMiddleware(telemetry, func(_ context.Context, request *app.RequestContext) bool {
-			return string(request.Path()) == "/health/live" || string(request.Path()) == "/health/ready"
-		}),
+		Logger:   telemetry.Logger(),
+		Tracing:  observability.HertzServerMiddleware(telemetry, nil),
 		Verifier: accessTokenVerifier,
 		Dependencies: middleware.RuntimeDependencies{
-			Health: resources.Health, Identity: identityClient, Knowledge: knowledgeClient,
+			Health: resources.Health, Cache: resources.Cache, Identity: identityClient, Knowledge: knowledgeClient,
 		},
+		Middleware: middlewareConfig,
 	}); err != nil {
 		return err
 	}

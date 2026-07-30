@@ -21,6 +21,10 @@ const (
 
 	CodeUserNotFound = 20006
 
+	CodeUnauthenticated = 20007
+
+	CodeForbidden = 20008
+
 	CodeInternal = 20999
 )
 

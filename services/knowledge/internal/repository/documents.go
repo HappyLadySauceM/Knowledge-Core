@@ -26,15 +26,22 @@ type DocumentRepository interface {
 	FindBlock(ctx context.Context, executor database.Executor, documentID int64, blockID string) (*domain.Block, error)
 	UpdateMetadata(ctx context.Context, executor database.Executor, document *domain.Document) error
 	Delete(ctx context.Context, executor database.Executor, id int64) error
-	SetStatus(ctx context.Context, executor database.Executor, document *domain.Document, status string) error
-	FindOperation(ctx context.Context, executor database.Executor, operationID string) (domain.OperationAck, error)
+	SetStatus(ctx context.Context, executor database.Executor, document *domain.Document, status string, publishedRevisionID *int64) error
+	LockOperation(ctx context.Context, executor database.Executor, operationID string) error
+	FindOperation(ctx context.Context, executor database.Executor, operationID string) (StoredOperation, error)
 	SaveBlock(ctx context.Context, executor database.Executor, block *domain.Block) error
 	IncrementVersion(ctx context.Context, executor database.Executor, document *domain.Document) error
 	SaveOperation(ctx context.Context, executor database.Executor, operation domain.Operation, ack domain.OperationAck, payloadJSON []byte) error
-	SaveRevision(ctx context.Context, executor database.Executor, document *domain.Document, actorID int64, contentJSON []byte) error
+	SaveRevision(ctx context.Context, executor database.Executor, document *domain.Document, actorID int64, contentJSON []byte) (int64, error)
 }
 
 type PublishedDocument struct {
 	Document    *domain.Document
 	ContentJSON []byte
+}
+
+type StoredOperation struct {
+	Operation domain.Operation
+	Ack       domain.OperationAck
+	Type      string
 }

@@ -24,7 +24,7 @@ import (
 const serviceName = "knowledge-core.knowledge"
 
 func Run(ctx context.Context) (runErr error) {
-	needs := internalbootstrap.Needs{Database: true, Cache: true, DurableMessaging: true, ConfigSource: true, Registry: true}
+	needs := internalbootstrap.Needs{Database: true, Registry: true}
 	cfg, err := internalbootstrap.LoadConfig("knowledge", "KC_KNOWLEDGE_RPC_ADDR", ":8882", needs)
 	if err != nil {
 		return err
@@ -71,14 +71,16 @@ func Run(ctx context.Context) (runErr error) {
 		return fmt.Errorf("resolve knowledge RPC address: %w", err)
 	}
 	exitSignal := make(chan error, 1)
-	rpcServer := knowledgeservice.NewServer(
-		knowledgekitex.NewHandler(application, accessTokenVerifier),
+	serverOptions := []server.Option{
 		server.WithServiceAddr(address),
 		server.WithServerBasicInfo(&rpcinfo.EndpointBasicInfo{ServiceName: serviceName}),
 		server.WithRegistry(resources.Registry),
 		server.WithExitWaitTime(cfg.ShutdownTimeout),
 		server.WithExitSignal(func() <-chan error { return exitSignal }),
-		server.WithMiddleware(observability.KitexServerMiddleware(telemetry)),
+	}
+	serverOptions = append(serverOptions, observability.KitexServerOptions(telemetry)...)
+	rpcServer := knowledgeservice.NewServer(
+		knowledgekitex.NewHandler(application, accessTokenVerifier, resources.Health), serverOptions...,
 	)
 	managedCleanup := cleanup
 	cleanup = nil

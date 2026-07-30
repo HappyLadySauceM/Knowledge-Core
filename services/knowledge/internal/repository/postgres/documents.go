@@ -55,13 +55,8 @@ func (r *DocumentRepository) FindPublishedByID(ctx context.Context, executor dat
 		SELECT d.id, r.title, r.summary, COALESCE(d.slug, ''), d.status, d.author_id,
 		       r.version, d.published_at, d.created_at, r.created_at, r.content_json::text
         FROM knowledge.documents d
-        JOIN LATERAL (
-            SELECT title, summary, version, content_json, created_at
-            FROM knowledge.document_revisions
-            WHERE document_id = d.id
-            ORDER BY created_at DESC, id DESC
-            LIMIT 1
-        ) r ON TRUE
+		JOIN knowledge.document_revisions r
+		  ON r.id = d.published_revision_id AND r.document_id = d.id
         WHERE d.id = $1 AND d.status = 'published'`, id)
 	document := &domain.Document{}
 	var contentJSON []byte
@@ -94,14 +89,11 @@ func (r *DocumentRepository) List(ctx context.Context, executor database.Executo
 	selectColumns := `d.id, d.title, d.summary, COALESCE(d.slug, ''), d.status, d.author_id,
         d.current_version, d.published_at, d.created_at, d.updated_at`
 	if publishedOnly {
-		join = `JOIN LATERAL (
-            SELECT title, summary, version, created_at FROM knowledge.document_revisions
-            WHERE document_id = d.id
-            ORDER BY created_at DESC, id DESC LIMIT 1
-        ) r ON TRUE`
+		join = `JOIN knowledge.document_revisions r
+			ON r.id = d.published_revision_id AND r.document_id = d.id`
 		where = `WHERE d.status = 'published' AND (
-            $1 = '' OR to_tsvector('simple', r.title || ' ' || r.summary) @@ websearch_to_tsquery('simple', $1)
-        )`
+			$1 = '' OR r.search_vector @@ websearch_to_tsquery('simple', $1)
+		)`
 		selectColumns = `d.id, r.title, r.summary, COALESCE(d.slug, ''), d.status, d.author_id,
 			r.version, d.published_at, d.created_at, r.created_at`
 		orderBy = "d.published_at DESC, d.id DESC"
@@ -182,17 +174,24 @@ func (r *DocumentRepository) Delete(ctx context.Context, executor database.Execu
 	return requireRows(result, repository.ErrDocumentNotFound, "delete knowledge document")
 }
 
-func (r *DocumentRepository) SetStatus(ctx context.Context, executor database.Executor, document *domain.Document, status string) error {
+func (r *DocumentRepository) SetStatus(
+	ctx context.Context,
+	executor database.Executor,
+	document *domain.Document,
+	status string,
+	publishedRevisionID *int64,
+) error {
 	if executor == nil || document == nil {
 		return errors.New("set knowledge document status: executor and document are required")
 	}
 	updated, err := scanDocument(executor.QueryRowContext(ctx, `
         UPDATE knowledge.documents
         SET status = $2,
-            published_at = CASE WHEN $2 = 'published' THEN CURRENT_TIMESTAMP ELSE NULL END,
-            updated_at = CURRENT_TIMESTAMP
+			published_revision_id = $3,
+			published_at = CASE WHEN $2 = 'published' THEN CURRENT_TIMESTAMP ELSE NULL END,
+			updated_at = CURRENT_TIMESTAMP
         WHERE id = $1
-        RETURNING `+documentColumns, document.ID, status))
+		RETURNING `+documentColumns, document.ID, status, publishedRevisionID))
 	if err != nil {
 		return err
 	}
@@ -200,18 +199,47 @@ func (r *DocumentRepository) SetStatus(ctx context.Context, executor database.Ex
 	return nil
 }
 
-func (r *DocumentRepository) FindOperation(ctx context.Context, executor database.Executor, operationID string) (domain.OperationAck, error) {
-	ack := domain.OperationAck{OperationID: operationID, Duplicate: true}
+func (r *DocumentRepository) LockOperation(ctx context.Context, executor database.Executor, operationID string) error {
+	if executor == nil || operationID == "" {
+		return errors.New("lock knowledge document operation: executor and operation ID are required")
+	}
+	if _, err := executor.ExecContext(ctx, `
+		SELECT pg_advisory_xact_lock(hashtextextended('knowledge.document_ops:' || $1, 0))`, operationID); err != nil {
+		return fmt.Errorf("lock knowledge document operation: %w", err)
+	}
+	return nil
+}
+
+func (r *DocumentRepository) FindOperation(ctx context.Context, executor database.Executor, operationID string) (repository.StoredOperation, error) {
+	stored := repository.StoredOperation{
+		Operation: domain.Operation{OperationID: operationID},
+		Ack:       domain.OperationAck{OperationID: operationID, Duplicate: true},
+	}
 	err := executor.QueryRowContext(ctx, `
-        SELECT document_id, document_version, block_version
-        FROM knowledge.document_ops WHERE op_id = $1`, operationID).Scan(&ack.DocumentID, &ack.DocumentVersion, &ack.BlockVersion)
+		SELECT document_id, actor_id, base_document_version, base_block_version, block_id, op_type,
+		       payload_json->>'position_key', payload_json->>'content_json', payload_json->>'text_content',
+		       document_version, block_version
+		FROM knowledge.document_ops WHERE op_id = $1`, operationID).Scan(
+		&stored.Operation.DocumentID,
+		&stored.Operation.ActorID,
+		&stored.Operation.BaseDocumentVersion,
+		&stored.Operation.BaseBlockVersion,
+		&stored.Operation.BlockID,
+		&stored.Type,
+		&stored.Operation.PositionKey,
+		&stored.Operation.ContentJSON,
+		&stored.Operation.TextContent,
+		&stored.Ack.DocumentVersion,
+		&stored.Ack.BlockVersion,
+	)
 	if errors.Is(err, sql.ErrNoRows) {
-		return domain.OperationAck{}, repository.ErrOperationNotFound
+		return repository.StoredOperation{}, repository.ErrOperationNotFound
 	}
 	if err != nil {
-		return domain.OperationAck{}, fmt.Errorf("find knowledge document operation: %w", err)
+		return repository.StoredOperation{}, fmt.Errorf("find knowledge document operation: %w", err)
 	}
-	return ack, nil
+	stored.Ack.DocumentID = stored.Operation.DocumentID
+	return stored, nil
 }
 
 func (r *DocumentRepository) SaveBlock(ctx context.Context, executor database.Executor, block *domain.Block) error {
@@ -264,12 +292,12 @@ func (r *DocumentRepository) SaveOperation(
 	payloadJSON []byte,
 ) error {
 	_, err := executor.ExecContext(ctx, `
-        INSERT INTO knowledge.document_ops (
-            op_id, document_id, actor_id, base_document_version, block_id, op_type,
-            payload_json, document_version, block_version
-        ) VALUES ($1, $2, $3, $4, $5, 'upsert_block', $6::jsonb, $7, $8)`,
+		INSERT INTO knowledge.document_ops (
+			op_id, document_id, actor_id, base_document_version, base_block_version, block_id, op_type,
+			payload_json, document_version, block_version
+		) VALUES ($1, $2, $3, $4, $5, $6, 'upsert_block', $7::jsonb, $8, $9)`,
 		operation.OperationID, operation.DocumentID, operation.ActorID, operation.BaseDocumentVersion,
-		operation.BlockID, payloadJSON, ack.DocumentVersion, ack.BlockVersion)
+		operation.BaseBlockVersion, operation.BlockID, payloadJSON, ack.DocumentVersion, ack.BlockVersion)
 	if err != nil {
 		return mapJSONError("save knowledge document operation", err)
 	}
@@ -282,19 +310,21 @@ func (r *DocumentRepository) SaveRevision(
 	document *domain.Document,
 	actorID int64,
 	contentJSON []byte,
-) error {
+) (int64, error) {
 	if executor == nil || document == nil {
-		return errors.New("save knowledge document revision: executor and document are required")
+		return 0, errors.New("save knowledge document revision: executor and document are required")
 	}
-	_, err := executor.ExecContext(ctx, `
-        INSERT INTO knowledge.document_revisions (document_id, version, title, summary, content_json, published_by)
-        VALUES ($1, $2, $3, $4, $5::jsonb, $6)
-        ON CONFLICT (document_id, version) DO NOTHING`,
-		document.ID, document.CurrentVersion, document.Title, document.Summary, contentJSON, actorID)
+	var revisionID int64
+	err := executor.QueryRowContext(ctx, `
+		INSERT INTO knowledge.document_revisions (document_id, version, title, summary, content_json, published_by)
+		VALUES ($1, $2, $3, $4, $5::jsonb, $6)
+		ON CONFLICT (document_id, version) DO UPDATE SET version = EXCLUDED.version
+		RETURNING id`,
+		document.ID, document.CurrentVersion, document.Title, document.Summary, contentJSON, actorID).Scan(&revisionID)
 	if err != nil {
-		return mapJSONError("save knowledge document revision", err)
+		return 0, mapJSONError("save knowledge document revision", err)
 	}
-	return nil
+	return revisionID, nil
 }
 
 type rowScanner interface {

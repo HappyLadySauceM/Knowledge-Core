@@ -49,6 +49,9 @@ func TestHertzServerMiddlewareExtractsTraceContextWithoutRecordingURL(t *testing
 	if response.Code != 200 || handlerSpan.TraceID().String() != traceID {
 		t.Fatalf("response = %d, handler span = %s", response.Code, handlerSpan.TraceID())
 	}
+	if responseTraceID := string(response.Header().Peek("X-Trace-ID")); responseTraceID != traceID {
+		t.Fatalf("X-Trace-ID = %q, want %q", responseTraceID, traceID)
+	}
 
 	spans := recorder.Ended()
 	if len(spans) != 1 {
@@ -118,6 +121,26 @@ func TestKitexMiddlewaresPreserveTraceParentAcrossTransportContext(t *testing.T)
 	}
 	if serverParent.SpanID() != clientSpanContext.SpanID() || !serverParent.IsRemote() {
 		t.Fatalf("server parent = %s (remote %t), want client %s", serverParent.SpanID(), serverParent.IsRemote(), clientSpanContext.SpanID())
+	}
+}
+
+func TestRuntimeCreatesTraceIDWithoutExporter(t *testing.T) {
+	runtime, err := New(context.Background(), Config{
+		Service: "gateway", Environment: "test", Level: "info", Output: io.Discard, SampleRatio: 1,
+	})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	t.Cleanup(func() {
+		if err := runtime.Shutdown(context.Background()); err != nil {
+			t.Errorf("Shutdown() error = %v", err)
+		}
+	})
+
+	ctx, span := runtime.Tracer("test").Start(context.Background(), "root")
+	defer span.End()
+	if traceID := TraceID(ctx); traceID == "" {
+		t.Fatal("runtime without exporter created an invalid trace ID")
 	}
 }
 

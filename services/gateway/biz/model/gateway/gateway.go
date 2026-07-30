@@ -179,6 +179,7 @@ type ErrorResponse struct {
 	Message   string     `thrift:"message,2,required" form:"message,required" json:"message,required"`
 	Data      *EmptyData `thrift:"data,3,required" form:"data,required" json:"data,required"`
 	RequestID string     `thrift:"request_id,4,required" form:"request_id,required" json:"request_id,required"`
+	TraceID   *string    `thrift:"trace_id,5,optional" form:"trace_id" json:"trace_id,omitempty"`
 }
 
 func NewErrorResponse() *ErrorResponse {
@@ -209,15 +210,29 @@ func (p *ErrorResponse) GetRequestID() (v string) {
 	return p.RequestID
 }
 
+var ErrorResponse_TraceID_DEFAULT string
+
+func (p *ErrorResponse) GetTraceID() (v string) {
+	if !p.IsSetTraceID() {
+		return ErrorResponse_TraceID_DEFAULT
+	}
+	return *p.TraceID
+}
+
 var fieldIDToName_ErrorResponse = map[int16]string{
 	1: "code",
 	2: "message",
 	3: "data",
 	4: "request_id",
+	5: "trace_id",
 }
 
 func (p *ErrorResponse) IsSetData() bool {
 	return p.Data != nil
+}
+
+func (p *ErrorResponse) IsSetTraceID() bool {
+	return p.TraceID != nil
 }
 
 func (p *ErrorResponse) Read(iprot thrift.TProtocol) (err error) {
@@ -276,6 +291,14 @@ func (p *ErrorResponse) Read(iprot thrift.TProtocol) (err error) {
 					goto ReadFieldError
 				}
 				issetRequestID = true
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		case 5:
+			if fieldTypeId == thrift.STRING {
+				if err = p.ReadField5(iprot); err != nil {
+					goto ReadFieldError
+				}
 			} else if err = iprot.Skip(fieldTypeId); err != nil {
 				goto SkipFieldError
 			}
@@ -370,6 +393,17 @@ func (p *ErrorResponse) ReadField4(iprot thrift.TProtocol) error {
 	p.RequestID = _field
 	return nil
 }
+func (p *ErrorResponse) ReadField5(iprot thrift.TProtocol) error {
+
+	var _field *string
+	if v, err := iprot.ReadString(); err != nil {
+		return err
+	} else {
+		_field = &v
+	}
+	p.TraceID = _field
+	return nil
+}
 
 func (p *ErrorResponse) Write(oprot thrift.TProtocol) (err error) {
 	var fieldId int16
@@ -391,6 +425,10 @@ func (p *ErrorResponse) Write(oprot thrift.TProtocol) (err error) {
 		}
 		if err = p.writeField4(oprot); err != nil {
 			fieldId = 4
+			goto WriteFieldError
+		}
+		if err = p.writeField5(oprot); err != nil {
+			fieldId = 5
 			goto WriteFieldError
 		}
 	}
@@ -477,6 +515,25 @@ WriteFieldBeginError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 4 begin error: ", p), err)
 WriteFieldEndError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 4 end error: ", p), err)
+}
+
+func (p *ErrorResponse) writeField5(oprot thrift.TProtocol) (err error) {
+	if p.IsSetTraceID() {
+		if err = oprot.WriteFieldBegin("trace_id", thrift.STRING, 5); err != nil {
+			goto WriteFieldBeginError
+		}
+		if err := oprot.WriteString(*p.TraceID); err != nil {
+			return err
+		}
+		if err = oprot.WriteFieldEnd(); err != nil {
+			goto WriteFieldEndError
+		}
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 5 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 5 end error: ", p), err)
 }
 
 func (p *ErrorResponse) String() string {
@@ -693,6 +750,7 @@ type HealthResponse struct {
 	Message   string      `thrift:"message,2,required" form:"message,required" json:"message,required"`
 	Data      *HealthData `thrift:"data,3,required" form:"data,required" json:"data,required"`
 	RequestID string      `thrift:"request_id,4,required" form:"request_id,required" json:"request_id,required"`
+	TraceID   *string     `thrift:"trace_id,5,optional" form:"trace_id" json:"trace_id,omitempty"`
 }
 
 func NewHealthResponse() *HealthResponse {
@@ -723,15 +781,29 @@ func (p *HealthResponse) GetRequestID() (v string) {
 	return p.RequestID
 }
 
+var HealthResponse_TraceID_DEFAULT string
+
+func (p *HealthResponse) GetTraceID() (v string) {
+	if !p.IsSetTraceID() {
+		return HealthResponse_TraceID_DEFAULT
+	}
+	return *p.TraceID
+}
+
 var fieldIDToName_HealthResponse = map[int16]string{
 	1: "code",
 	2: "message",
 	3: "data",
 	4: "request_id",
+	5: "trace_id",
 }
 
 func (p *HealthResponse) IsSetData() bool {
 	return p.Data != nil
+}
+
+func (p *HealthResponse) IsSetTraceID() bool {
+	return p.TraceID != nil
 }
 
 func (p *HealthResponse) Read(iprot thrift.TProtocol) (err error) {
@@ -790,6 +862,14 @@ func (p *HealthResponse) Read(iprot thrift.TProtocol) (err error) {
 					goto ReadFieldError
 				}
 				issetRequestID = true
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		case 5:
+			if fieldTypeId == thrift.STRING {
+				if err = p.ReadField5(iprot); err != nil {
+					goto ReadFieldError
+				}
 			} else if err = iprot.Skip(fieldTypeId); err != nil {
 				goto SkipFieldError
 			}
@@ -884,6 +964,17 @@ func (p *HealthResponse) ReadField4(iprot thrift.TProtocol) error {
 	p.RequestID = _field
 	return nil
 }
+func (p *HealthResponse) ReadField5(iprot thrift.TProtocol) error {
+
+	var _field *string
+	if v, err := iprot.ReadString(); err != nil {
+		return err
+	} else {
+		_field = &v
+	}
+	p.TraceID = _field
+	return nil
+}
 
 func (p *HealthResponse) Write(oprot thrift.TProtocol) (err error) {
 	var fieldId int16
@@ -905,6 +996,10 @@ func (p *HealthResponse) Write(oprot thrift.TProtocol) (err error) {
 		}
 		if err = p.writeField4(oprot); err != nil {
 			fieldId = 4
+			goto WriteFieldError
+		}
+		if err = p.writeField5(oprot); err != nil {
+			fieldId = 5
 			goto WriteFieldError
 		}
 	}
@@ -991,6 +1086,25 @@ WriteFieldBeginError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 4 begin error: ", p), err)
 WriteFieldEndError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 4 end error: ", p), err)
+}
+
+func (p *HealthResponse) writeField5(oprot thrift.TProtocol) (err error) {
+	if p.IsSetTraceID() {
+		if err = oprot.WriteFieldBegin("trace_id", thrift.STRING, 5); err != nil {
+			goto WriteFieldBeginError
+		}
+		if err := oprot.WriteString(*p.TraceID); err != nil {
+			return err
+		}
+		if err = oprot.WriteFieldEnd(); err != nil {
+			goto WriteFieldEndError
+		}
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 5 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 5 end error: ", p), err)
 }
 
 func (p *HealthResponse) String() string {
@@ -1832,6 +1946,7 @@ type RegisterResponse struct {
 	Message   string    `thrift:"message,2,required" form:"message,required" json:"message,required"`
 	Data      *UserData `thrift:"data,3,required" form:"data,required" json:"data,required"`
 	RequestID string    `thrift:"request_id,4,required" form:"request_id,required" json:"request_id,required"`
+	TraceID   *string   `thrift:"trace_id,5,optional" form:"trace_id" json:"trace_id,omitempty"`
 }
 
 func NewRegisterResponse() *RegisterResponse {
@@ -1862,15 +1977,29 @@ func (p *RegisterResponse) GetRequestID() (v string) {
 	return p.RequestID
 }
 
+var RegisterResponse_TraceID_DEFAULT string
+
+func (p *RegisterResponse) GetTraceID() (v string) {
+	if !p.IsSetTraceID() {
+		return RegisterResponse_TraceID_DEFAULT
+	}
+	return *p.TraceID
+}
+
 var fieldIDToName_RegisterResponse = map[int16]string{
 	1: "code",
 	2: "message",
 	3: "data",
 	4: "request_id",
+	5: "trace_id",
 }
 
 func (p *RegisterResponse) IsSetData() bool {
 	return p.Data != nil
+}
+
+func (p *RegisterResponse) IsSetTraceID() bool {
+	return p.TraceID != nil
 }
 
 func (p *RegisterResponse) Read(iprot thrift.TProtocol) (err error) {
@@ -1929,6 +2058,14 @@ func (p *RegisterResponse) Read(iprot thrift.TProtocol) (err error) {
 					goto ReadFieldError
 				}
 				issetRequestID = true
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		case 5:
+			if fieldTypeId == thrift.STRING {
+				if err = p.ReadField5(iprot); err != nil {
+					goto ReadFieldError
+				}
 			} else if err = iprot.Skip(fieldTypeId); err != nil {
 				goto SkipFieldError
 			}
@@ -2023,6 +2160,17 @@ func (p *RegisterResponse) ReadField4(iprot thrift.TProtocol) error {
 	p.RequestID = _field
 	return nil
 }
+func (p *RegisterResponse) ReadField5(iprot thrift.TProtocol) error {
+
+	var _field *string
+	if v, err := iprot.ReadString(); err != nil {
+		return err
+	} else {
+		_field = &v
+	}
+	p.TraceID = _field
+	return nil
+}
 
 func (p *RegisterResponse) Write(oprot thrift.TProtocol) (err error) {
 	var fieldId int16
@@ -2044,6 +2192,10 @@ func (p *RegisterResponse) Write(oprot thrift.TProtocol) (err error) {
 		}
 		if err = p.writeField4(oprot); err != nil {
 			fieldId = 4
+			goto WriteFieldError
+		}
+		if err = p.writeField5(oprot); err != nil {
+			fieldId = 5
 			goto WriteFieldError
 		}
 	}
@@ -2130,6 +2282,25 @@ WriteFieldBeginError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 4 begin error: ", p), err)
 WriteFieldEndError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 4 end error: ", p), err)
+}
+
+func (p *RegisterResponse) writeField5(oprot thrift.TProtocol) (err error) {
+	if p.IsSetTraceID() {
+		if err = oprot.WriteFieldBegin("trace_id", thrift.STRING, 5); err != nil {
+			goto WriteFieldBeginError
+		}
+		if err := oprot.WriteString(*p.TraceID); err != nil {
+			return err
+		}
+		if err = oprot.WriteFieldEnd(); err != nil {
+			goto WriteFieldEndError
+		}
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 5 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 5 end error: ", p), err)
 }
 
 func (p *RegisterResponse) String() string {
@@ -2659,6 +2830,7 @@ type LoginResponse struct {
 	Message   string     `thrift:"message,2,required" form:"message,required" json:"message,required"`
 	Data      *LoginData `thrift:"data,3,required" form:"data,required" json:"data,required"`
 	RequestID string     `thrift:"request_id,4,required" form:"request_id,required" json:"request_id,required"`
+	TraceID   *string    `thrift:"trace_id,5,optional" form:"trace_id" json:"trace_id,omitempty"`
 }
 
 func NewLoginResponse() *LoginResponse {
@@ -2689,15 +2861,29 @@ func (p *LoginResponse) GetRequestID() (v string) {
 	return p.RequestID
 }
 
+var LoginResponse_TraceID_DEFAULT string
+
+func (p *LoginResponse) GetTraceID() (v string) {
+	if !p.IsSetTraceID() {
+		return LoginResponse_TraceID_DEFAULT
+	}
+	return *p.TraceID
+}
+
 var fieldIDToName_LoginResponse = map[int16]string{
 	1: "code",
 	2: "message",
 	3: "data",
 	4: "request_id",
+	5: "trace_id",
 }
 
 func (p *LoginResponse) IsSetData() bool {
 	return p.Data != nil
+}
+
+func (p *LoginResponse) IsSetTraceID() bool {
+	return p.TraceID != nil
 }
 
 func (p *LoginResponse) Read(iprot thrift.TProtocol) (err error) {
@@ -2756,6 +2942,14 @@ func (p *LoginResponse) Read(iprot thrift.TProtocol) (err error) {
 					goto ReadFieldError
 				}
 				issetRequestID = true
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		case 5:
+			if fieldTypeId == thrift.STRING {
+				if err = p.ReadField5(iprot); err != nil {
+					goto ReadFieldError
+				}
 			} else if err = iprot.Skip(fieldTypeId); err != nil {
 				goto SkipFieldError
 			}
@@ -2850,6 +3044,17 @@ func (p *LoginResponse) ReadField4(iprot thrift.TProtocol) error {
 	p.RequestID = _field
 	return nil
 }
+func (p *LoginResponse) ReadField5(iprot thrift.TProtocol) error {
+
+	var _field *string
+	if v, err := iprot.ReadString(); err != nil {
+		return err
+	} else {
+		_field = &v
+	}
+	p.TraceID = _field
+	return nil
+}
 
 func (p *LoginResponse) Write(oprot thrift.TProtocol) (err error) {
 	var fieldId int16
@@ -2871,6 +3076,10 @@ func (p *LoginResponse) Write(oprot thrift.TProtocol) (err error) {
 		}
 		if err = p.writeField4(oprot); err != nil {
 			fieldId = 4
+			goto WriteFieldError
+		}
+		if err = p.writeField5(oprot); err != nil {
+			fieldId = 5
 			goto WriteFieldError
 		}
 	}
@@ -2957,6 +3166,25 @@ WriteFieldBeginError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 4 begin error: ", p), err)
 WriteFieldEndError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 4 end error: ", p), err)
+}
+
+func (p *LoginResponse) writeField5(oprot thrift.TProtocol) (err error) {
+	if p.IsSetTraceID() {
+		if err = oprot.WriteFieldBegin("trace_id", thrift.STRING, 5); err != nil {
+			goto WriteFieldBeginError
+		}
+		if err := oprot.WriteString(*p.TraceID); err != nil {
+			return err
+		}
+		if err = oprot.WriteFieldEnd(); err != nil {
+			goto WriteFieldEndError
+		}
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 5 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 5 end error: ", p), err)
 }
 
 func (p *LoginResponse) String() string {
@@ -3055,6 +3283,7 @@ type CurrentUserResponse struct {
 	Message   string    `thrift:"message,2,required" form:"message,required" json:"message,required"`
 	Data      *UserData `thrift:"data,3,required" form:"data,required" json:"data,required"`
 	RequestID string    `thrift:"request_id,4,required" form:"request_id,required" json:"request_id,required"`
+	TraceID   *string   `thrift:"trace_id,5,optional" form:"trace_id" json:"trace_id,omitempty"`
 }
 
 func NewCurrentUserResponse() *CurrentUserResponse {
@@ -3085,15 +3314,29 @@ func (p *CurrentUserResponse) GetRequestID() (v string) {
 	return p.RequestID
 }
 
+var CurrentUserResponse_TraceID_DEFAULT string
+
+func (p *CurrentUserResponse) GetTraceID() (v string) {
+	if !p.IsSetTraceID() {
+		return CurrentUserResponse_TraceID_DEFAULT
+	}
+	return *p.TraceID
+}
+
 var fieldIDToName_CurrentUserResponse = map[int16]string{
 	1: "code",
 	2: "message",
 	3: "data",
 	4: "request_id",
+	5: "trace_id",
 }
 
 func (p *CurrentUserResponse) IsSetData() bool {
 	return p.Data != nil
+}
+
+func (p *CurrentUserResponse) IsSetTraceID() bool {
+	return p.TraceID != nil
 }
 
 func (p *CurrentUserResponse) Read(iprot thrift.TProtocol) (err error) {
@@ -3152,6 +3395,14 @@ func (p *CurrentUserResponse) Read(iprot thrift.TProtocol) (err error) {
 					goto ReadFieldError
 				}
 				issetRequestID = true
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		case 5:
+			if fieldTypeId == thrift.STRING {
+				if err = p.ReadField5(iprot); err != nil {
+					goto ReadFieldError
+				}
 			} else if err = iprot.Skip(fieldTypeId); err != nil {
 				goto SkipFieldError
 			}
@@ -3246,6 +3497,17 @@ func (p *CurrentUserResponse) ReadField4(iprot thrift.TProtocol) error {
 	p.RequestID = _field
 	return nil
 }
+func (p *CurrentUserResponse) ReadField5(iprot thrift.TProtocol) error {
+
+	var _field *string
+	if v, err := iprot.ReadString(); err != nil {
+		return err
+	} else {
+		_field = &v
+	}
+	p.TraceID = _field
+	return nil
+}
 
 func (p *CurrentUserResponse) Write(oprot thrift.TProtocol) (err error) {
 	var fieldId int16
@@ -3267,6 +3529,10 @@ func (p *CurrentUserResponse) Write(oprot thrift.TProtocol) (err error) {
 		}
 		if err = p.writeField4(oprot); err != nil {
 			fieldId = 4
+			goto WriteFieldError
+		}
+		if err = p.writeField5(oprot); err != nil {
+			fieldId = 5
 			goto WriteFieldError
 		}
 	}
@@ -3353,6 +3619,25 @@ WriteFieldBeginError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 4 begin error: ", p), err)
 WriteFieldEndError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 4 end error: ", p), err)
+}
+
+func (p *CurrentUserResponse) writeField5(oprot thrift.TProtocol) (err error) {
+	if p.IsSetTraceID() {
+		if err = oprot.WriteFieldBegin("trace_id", thrift.STRING, 5); err != nil {
+			goto WriteFieldBeginError
+		}
+		if err := oprot.WriteString(*p.TraceID); err != nil {
+			return err
+		}
+		if err = oprot.WriteFieldEnd(); err != nil {
+			goto WriteFieldEndError
+		}
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 5 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 5 end error: ", p), err)
 }
 
 func (p *CurrentUserResponse) String() string {
@@ -7075,6 +7360,7 @@ type DocumentResponse struct {
 	Message   string        `thrift:"message,2,required" form:"message,required" json:"message,required"`
 	Data      *DocumentData `thrift:"data,3,required" form:"data,required" json:"data,required"`
 	RequestID string        `thrift:"request_id,4,required" form:"request_id,required" json:"request_id,required"`
+	TraceID   *string       `thrift:"trace_id,5,optional" form:"trace_id" json:"trace_id,omitempty"`
 }
 
 func NewDocumentResponse() *DocumentResponse {
@@ -7105,15 +7391,29 @@ func (p *DocumentResponse) GetRequestID() (v string) {
 	return p.RequestID
 }
 
+var DocumentResponse_TraceID_DEFAULT string
+
+func (p *DocumentResponse) GetTraceID() (v string) {
+	if !p.IsSetTraceID() {
+		return DocumentResponse_TraceID_DEFAULT
+	}
+	return *p.TraceID
+}
+
 var fieldIDToName_DocumentResponse = map[int16]string{
 	1: "code",
 	2: "message",
 	3: "data",
 	4: "request_id",
+	5: "trace_id",
 }
 
 func (p *DocumentResponse) IsSetData() bool {
 	return p.Data != nil
+}
+
+func (p *DocumentResponse) IsSetTraceID() bool {
+	return p.TraceID != nil
 }
 
 func (p *DocumentResponse) Read(iprot thrift.TProtocol) (err error) {
@@ -7172,6 +7472,14 @@ func (p *DocumentResponse) Read(iprot thrift.TProtocol) (err error) {
 					goto ReadFieldError
 				}
 				issetRequestID = true
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		case 5:
+			if fieldTypeId == thrift.STRING {
+				if err = p.ReadField5(iprot); err != nil {
+					goto ReadFieldError
+				}
 			} else if err = iprot.Skip(fieldTypeId); err != nil {
 				goto SkipFieldError
 			}
@@ -7266,6 +7574,17 @@ func (p *DocumentResponse) ReadField4(iprot thrift.TProtocol) error {
 	p.RequestID = _field
 	return nil
 }
+func (p *DocumentResponse) ReadField5(iprot thrift.TProtocol) error {
+
+	var _field *string
+	if v, err := iprot.ReadString(); err != nil {
+		return err
+	} else {
+		_field = &v
+	}
+	p.TraceID = _field
+	return nil
+}
 
 func (p *DocumentResponse) Write(oprot thrift.TProtocol) (err error) {
 	var fieldId int16
@@ -7287,6 +7606,10 @@ func (p *DocumentResponse) Write(oprot thrift.TProtocol) (err error) {
 		}
 		if err = p.writeField4(oprot); err != nil {
 			fieldId = 4
+			goto WriteFieldError
+		}
+		if err = p.writeField5(oprot); err != nil {
+			fieldId = 5
 			goto WriteFieldError
 		}
 	}
@@ -7375,6 +7698,25 @@ WriteFieldEndError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 4 end error: ", p), err)
 }
 
+func (p *DocumentResponse) writeField5(oprot thrift.TProtocol) (err error) {
+	if p.IsSetTraceID() {
+		if err = oprot.WriteFieldBegin("trace_id", thrift.STRING, 5); err != nil {
+			goto WriteFieldBeginError
+		}
+		if err := oprot.WriteString(*p.TraceID); err != nil {
+			return err
+		}
+		if err = oprot.WriteFieldEnd(); err != nil {
+			goto WriteFieldEndError
+		}
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 5 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 5 end error: ", p), err)
+}
+
 func (p *DocumentResponse) String() string {
 	if p == nil {
 		return "<nil>"
@@ -7388,6 +7730,7 @@ type DocumentDetailResponse struct {
 	Message   string              `thrift:"message,2,required" form:"message,required" json:"message,required"`
 	Data      *DocumentDetailData `thrift:"data,3,required" form:"data,required" json:"data,required"`
 	RequestID string              `thrift:"request_id,4,required" form:"request_id,required" json:"request_id,required"`
+	TraceID   *string             `thrift:"trace_id,5,optional" form:"trace_id" json:"trace_id,omitempty"`
 }
 
 func NewDocumentDetailResponse() *DocumentDetailResponse {
@@ -7418,15 +7761,29 @@ func (p *DocumentDetailResponse) GetRequestID() (v string) {
 	return p.RequestID
 }
 
+var DocumentDetailResponse_TraceID_DEFAULT string
+
+func (p *DocumentDetailResponse) GetTraceID() (v string) {
+	if !p.IsSetTraceID() {
+		return DocumentDetailResponse_TraceID_DEFAULT
+	}
+	return *p.TraceID
+}
+
 var fieldIDToName_DocumentDetailResponse = map[int16]string{
 	1: "code",
 	2: "message",
 	3: "data",
 	4: "request_id",
+	5: "trace_id",
 }
 
 func (p *DocumentDetailResponse) IsSetData() bool {
 	return p.Data != nil
+}
+
+func (p *DocumentDetailResponse) IsSetTraceID() bool {
+	return p.TraceID != nil
 }
 
 func (p *DocumentDetailResponse) Read(iprot thrift.TProtocol) (err error) {
@@ -7485,6 +7842,14 @@ func (p *DocumentDetailResponse) Read(iprot thrift.TProtocol) (err error) {
 					goto ReadFieldError
 				}
 				issetRequestID = true
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		case 5:
+			if fieldTypeId == thrift.STRING {
+				if err = p.ReadField5(iprot); err != nil {
+					goto ReadFieldError
+				}
 			} else if err = iprot.Skip(fieldTypeId); err != nil {
 				goto SkipFieldError
 			}
@@ -7579,6 +7944,17 @@ func (p *DocumentDetailResponse) ReadField4(iprot thrift.TProtocol) error {
 	p.RequestID = _field
 	return nil
 }
+func (p *DocumentDetailResponse) ReadField5(iprot thrift.TProtocol) error {
+
+	var _field *string
+	if v, err := iprot.ReadString(); err != nil {
+		return err
+	} else {
+		_field = &v
+	}
+	p.TraceID = _field
+	return nil
+}
 
 func (p *DocumentDetailResponse) Write(oprot thrift.TProtocol) (err error) {
 	var fieldId int16
@@ -7600,6 +7976,10 @@ func (p *DocumentDetailResponse) Write(oprot thrift.TProtocol) (err error) {
 		}
 		if err = p.writeField4(oprot); err != nil {
 			fieldId = 4
+			goto WriteFieldError
+		}
+		if err = p.writeField5(oprot); err != nil {
+			fieldId = 5
 			goto WriteFieldError
 		}
 	}
@@ -7688,6 +8068,25 @@ WriteFieldEndError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 4 end error: ", p), err)
 }
 
+func (p *DocumentDetailResponse) writeField5(oprot thrift.TProtocol) (err error) {
+	if p.IsSetTraceID() {
+		if err = oprot.WriteFieldBegin("trace_id", thrift.STRING, 5); err != nil {
+			goto WriteFieldBeginError
+		}
+		if err := oprot.WriteString(*p.TraceID); err != nil {
+			return err
+		}
+		if err = oprot.WriteFieldEnd(); err != nil {
+			goto WriteFieldEndError
+		}
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 5 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 5 end error: ", p), err)
+}
+
 func (p *DocumentDetailResponse) String() string {
 	if p == nil {
 		return "<nil>"
@@ -7701,6 +8100,7 @@ type DocumentListResponse struct {
 	Message   string            `thrift:"message,2,required" form:"message,required" json:"message,required"`
 	Data      *DocumentListData `thrift:"data,3,required" form:"data,required" json:"data,required"`
 	RequestID string            `thrift:"request_id,4,required" form:"request_id,required" json:"request_id,required"`
+	TraceID   *string           `thrift:"trace_id,5,optional" form:"trace_id" json:"trace_id,omitempty"`
 }
 
 func NewDocumentListResponse() *DocumentListResponse {
@@ -7731,15 +8131,29 @@ func (p *DocumentListResponse) GetRequestID() (v string) {
 	return p.RequestID
 }
 
+var DocumentListResponse_TraceID_DEFAULT string
+
+func (p *DocumentListResponse) GetTraceID() (v string) {
+	if !p.IsSetTraceID() {
+		return DocumentListResponse_TraceID_DEFAULT
+	}
+	return *p.TraceID
+}
+
 var fieldIDToName_DocumentListResponse = map[int16]string{
 	1: "code",
 	2: "message",
 	3: "data",
 	4: "request_id",
+	5: "trace_id",
 }
 
 func (p *DocumentListResponse) IsSetData() bool {
 	return p.Data != nil
+}
+
+func (p *DocumentListResponse) IsSetTraceID() bool {
+	return p.TraceID != nil
 }
 
 func (p *DocumentListResponse) Read(iprot thrift.TProtocol) (err error) {
@@ -7798,6 +8212,14 @@ func (p *DocumentListResponse) Read(iprot thrift.TProtocol) (err error) {
 					goto ReadFieldError
 				}
 				issetRequestID = true
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		case 5:
+			if fieldTypeId == thrift.STRING {
+				if err = p.ReadField5(iprot); err != nil {
+					goto ReadFieldError
+				}
 			} else if err = iprot.Skip(fieldTypeId); err != nil {
 				goto SkipFieldError
 			}
@@ -7892,6 +8314,17 @@ func (p *DocumentListResponse) ReadField4(iprot thrift.TProtocol) error {
 	p.RequestID = _field
 	return nil
 }
+func (p *DocumentListResponse) ReadField5(iprot thrift.TProtocol) error {
+
+	var _field *string
+	if v, err := iprot.ReadString(); err != nil {
+		return err
+	} else {
+		_field = &v
+	}
+	p.TraceID = _field
+	return nil
+}
 
 func (p *DocumentListResponse) Write(oprot thrift.TProtocol) (err error) {
 	var fieldId int16
@@ -7913,6 +8346,10 @@ func (p *DocumentListResponse) Write(oprot thrift.TProtocol) (err error) {
 		}
 		if err = p.writeField4(oprot); err != nil {
 			fieldId = 4
+			goto WriteFieldError
+		}
+		if err = p.writeField5(oprot); err != nil {
+			fieldId = 5
 			goto WriteFieldError
 		}
 	}
@@ -8001,6 +8438,25 @@ WriteFieldEndError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 4 end error: ", p), err)
 }
 
+func (p *DocumentListResponse) writeField5(oprot thrift.TProtocol) (err error) {
+	if p.IsSetTraceID() {
+		if err = oprot.WriteFieldBegin("trace_id", thrift.STRING, 5); err != nil {
+			goto WriteFieldBeginError
+		}
+		if err := oprot.WriteString(*p.TraceID); err != nil {
+			return err
+		}
+		if err = oprot.WriteFieldEnd(); err != nil {
+			goto WriteFieldEndError
+		}
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 5 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 5 end error: ", p), err)
+}
+
 func (p *DocumentListResponse) String() string {
 	if p == nil {
 		return "<nil>"
@@ -8014,6 +8470,7 @@ type DocumentOperationAckResponse struct {
 	Message   string                    `thrift:"message,2,required" form:"message,required" json:"message,required"`
 	Data      *DocumentOperationAckData `thrift:"data,3,required" form:"data,required" json:"data,required"`
 	RequestID string                    `thrift:"request_id,4,required" form:"request_id,required" json:"request_id,required"`
+	TraceID   *string                   `thrift:"trace_id,5,optional" form:"trace_id" json:"trace_id,omitempty"`
 }
 
 func NewDocumentOperationAckResponse() *DocumentOperationAckResponse {
@@ -8044,15 +8501,29 @@ func (p *DocumentOperationAckResponse) GetRequestID() (v string) {
 	return p.RequestID
 }
 
+var DocumentOperationAckResponse_TraceID_DEFAULT string
+
+func (p *DocumentOperationAckResponse) GetTraceID() (v string) {
+	if !p.IsSetTraceID() {
+		return DocumentOperationAckResponse_TraceID_DEFAULT
+	}
+	return *p.TraceID
+}
+
 var fieldIDToName_DocumentOperationAckResponse = map[int16]string{
 	1: "code",
 	2: "message",
 	3: "data",
 	4: "request_id",
+	5: "trace_id",
 }
 
 func (p *DocumentOperationAckResponse) IsSetData() bool {
 	return p.Data != nil
+}
+
+func (p *DocumentOperationAckResponse) IsSetTraceID() bool {
+	return p.TraceID != nil
 }
 
 func (p *DocumentOperationAckResponse) Read(iprot thrift.TProtocol) (err error) {
@@ -8111,6 +8582,14 @@ func (p *DocumentOperationAckResponse) Read(iprot thrift.TProtocol) (err error) 
 					goto ReadFieldError
 				}
 				issetRequestID = true
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		case 5:
+			if fieldTypeId == thrift.STRING {
+				if err = p.ReadField5(iprot); err != nil {
+					goto ReadFieldError
+				}
 			} else if err = iprot.Skip(fieldTypeId); err != nil {
 				goto SkipFieldError
 			}
@@ -8205,6 +8684,17 @@ func (p *DocumentOperationAckResponse) ReadField4(iprot thrift.TProtocol) error 
 	p.RequestID = _field
 	return nil
 }
+func (p *DocumentOperationAckResponse) ReadField5(iprot thrift.TProtocol) error {
+
+	var _field *string
+	if v, err := iprot.ReadString(); err != nil {
+		return err
+	} else {
+		_field = &v
+	}
+	p.TraceID = _field
+	return nil
+}
 
 func (p *DocumentOperationAckResponse) Write(oprot thrift.TProtocol) (err error) {
 	var fieldId int16
@@ -8226,6 +8716,10 @@ func (p *DocumentOperationAckResponse) Write(oprot thrift.TProtocol) (err error)
 		}
 		if err = p.writeField4(oprot); err != nil {
 			fieldId = 4
+			goto WriteFieldError
+		}
+		if err = p.writeField5(oprot); err != nil {
+			fieldId = 5
 			goto WriteFieldError
 		}
 	}
@@ -8312,6 +8806,25 @@ WriteFieldBeginError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 4 begin error: ", p), err)
 WriteFieldEndError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 4 end error: ", p), err)
+}
+
+func (p *DocumentOperationAckResponse) writeField5(oprot thrift.TProtocol) (err error) {
+	if p.IsSetTraceID() {
+		if err = oprot.WriteFieldBegin("trace_id", thrift.STRING, 5); err != nil {
+			goto WriteFieldBeginError
+		}
+		if err := oprot.WriteString(*p.TraceID); err != nil {
+			return err
+		}
+		if err = oprot.WriteFieldEnd(); err != nil {
+			goto WriteFieldEndError
+		}
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 5 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 5 end error: ", p), err)
 }
 
 func (p *DocumentOperationAckResponse) String() string {
