@@ -11,9 +11,9 @@ import (
 	identityv1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/identity"
 	apperror "github.com/HappyLadySauce/Knowledge-Core/pkg/error"
 	"github.com/HappyLadySauce/Knowledge-Core/pkg/metadata"
-	identityapp "github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/app"
 	"github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/domain"
 	identityerrors "github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/errors"
+	identitylogic "github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/logic"
 	"github.com/jackc/pgx/v5/pgconn"
 	"go.opentelemetry.io/otel/attribute"
 	oteltrace "go.opentelemetry.io/otel/trace"
@@ -22,7 +22,7 @@ import (
 const serviceName = "identity"
 
 type Service interface {
-	Register(context.Context, identityapp.RegisterInput) (*domain.User, error)
+	Register(context.Context, identitylogic.RegisterInput) (*domain.User, error)
 }
 
 type Readiness interface {
@@ -67,7 +67,7 @@ func (h *Handler) Register(ctx context.Context, request *identityv1.RegisterRequ
 		return nil, apperror.ToKitexBizStatus(ctx, identityerrors.InvalidInput.New())
 	}
 
-	user, err := h.service.Register(ctx, identityapp.RegisterInput{
+	user, err := h.service.Register(ctx, identitylogic.RegisterInput{
 		Username: request.Username,
 		Email:    request.Email,
 		Password: request.Password,
@@ -143,14 +143,13 @@ func (h *Handler) GetUser(ctx context.Context, _ *identityv1.GetUserRequest) (*i
 }
 
 func mapServiceError(err error) error {
+	if _, ok := apperror.Details(err); ok {
+		return err
+	}
 	var validationError *domain.ValidationError
 	switch {
 	case errors.As(err, &validationError):
 		return identityerrors.InvalidInput.Wrap(err)
-	case errors.Is(err, identityapp.ErrUsernameConflict):
-		return identityerrors.UsernameConflict.Wrap(err)
-	case errors.Is(err, identityapp.ErrEmailConflict):
-		return identityerrors.EmailConflict.Wrap(err)
 	default:
 		return identityerrors.Internal.Wrap(err)
 	}

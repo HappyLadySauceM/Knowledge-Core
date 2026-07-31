@@ -14,16 +14,16 @@ import (
 	identityv1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/identity"
 	apperror "github.com/HappyLadySauce/Knowledge-Core/pkg/error"
 	"github.com/HappyLadySauce/Knowledge-Core/pkg/metadata"
-	identityapp "github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/app"
 	"github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/domain"
+	identitylogic "github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/logic"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 )
 
 type serviceStub struct {
-	register func(context.Context, identityapp.RegisterInput) (*domain.User, error)
+	register func(context.Context, identitylogic.RegisterInput) (*domain.User, error)
 }
 
-func (s serviceStub) Register(ctx context.Context, input identityapp.RegisterInput) (*domain.User, error) {
+func (s serviceStub) Register(ctx context.Context, input identitylogic.RegisterInput) (*domain.User, error) {
 	return s.register(ctx, input)
 }
 
@@ -53,7 +53,7 @@ func TestHandlerPingReportsReadiness(t *testing.T) {
 func TestHandlerRegisterMapsUserAndErrors(t *testing.T) {
 	createdAt := time.Unix(100, 0)
 	updatedAt := time.Unix(200, 0)
-	handler := newTestHandler(t, serviceStub{register: func(_ context.Context, input identityapp.RegisterInput) (*domain.User, error) {
+	handler := newTestHandler(t, serviceStub{register: func(_ context.Context, input identitylogic.RegisterInput) (*domain.User, error) {
 		if input.Password != "safe-password" {
 			t.Fatalf("Register input = %#v", input)
 		}
@@ -98,7 +98,7 @@ func TestHandlerUnimplementedMethodsUseStableCode(t *testing.T) {
 }
 
 func TestHandlerRejectsNilServiceResult(t *testing.T) {
-	handler := newTestHandler(t, serviceStub{register: func(context.Context, identityapp.RegisterInput) (*domain.User, error) {
+	handler := newTestHandler(t, serviceStub{register: func(context.Context, identitylogic.RegisterInput) (*domain.User, error) {
 		return nil, nil
 	}}, readinessStub{})
 	_, err := handler.Register(context.Background(), &identityv1.RegisterRequest{})
@@ -111,7 +111,7 @@ func TestHandlerRejectsNilServiceResult(t *testing.T) {
 func TestHandlerLogsInternalCauseWithoutExposingItToClient(t *testing.T) {
 	var output bytes.Buffer
 	cause := errors.New("database exploded")
-	handler, err := NewHandler(serviceStub{register: func(context.Context, identityapp.RegisterInput) (*domain.User, error) {
+	handler, err := NewHandler(serviceStub{register: func(context.Context, identitylogic.RegisterInput) (*domain.User, error) {
 		return nil, cause
 	}}, readinessStub{}, slog.New(slog.NewTextHandler(&output, nil)))
 	if err != nil {
@@ -143,9 +143,9 @@ func newTestHandler(t *testing.T, service Service, readiness Readiness) *Handler
 	return handler
 }
 
-func unexpectedRegister(t *testing.T) func(context.Context, identityapp.RegisterInput) (*domain.User, error) {
+func unexpectedRegister(t *testing.T) func(context.Context, identitylogic.RegisterInput) (*domain.User, error) {
 	t.Helper()
-	return func(context.Context, identityapp.RegisterInput) (*domain.User, error) {
+	return func(context.Context, identitylogic.RegisterInput) (*domain.User, error) {
 		t.Fatal("unexpected Register call")
 		return nil, nil
 	}

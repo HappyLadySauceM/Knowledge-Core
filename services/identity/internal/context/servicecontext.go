@@ -13,8 +13,8 @@ import (
 	"github.com/HappyLadySauce/Knowledge-Core/pkg/health"
 	"github.com/HappyLadySauce/Knowledge-Core/pkg/postgres"
 	redisresource "github.com/HappyLadySauce/Knowledge-Core/pkg/redis"
-	identityapp "github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/app"
 	"github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/config"
+	identitylogic "github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/logic"
 	"github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/migration"
 	identityrepository "github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/repository"
 	"github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/security"
@@ -28,7 +28,7 @@ type ServiceContext struct {
 	Database   *gorm.DB
 	Redis      *redisresource.Resource
 	Etcd       *etcdresource.Resources
-	Identity   *identityapp.Service
+	Register   *identitylogic.RegisterLogic
 	RPCHandler *identityrpc.Handler
 	RPCServer  *identityrpc.RPCServer
 	Admin      *adminhttp.Server
@@ -88,11 +88,11 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 	if err != nil {
 		return nil, err
 	}
-	identity, err := identityapp.NewService(users, hasher)
+	register, err := identitylogic.NewRegisterLogic(users, hasher)
 	if err != nil {
 		return nil, err
 	}
-	handler, err := identityrpc.NewHandler(identity, runtime.Health, runtime.Logger)
+	handler, err := identityrpc.NewHandler(register, runtime.Health, runtime.Logger)
 	if err != nil {
 		return nil, err
 	}
@@ -152,7 +152,7 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 		Database:   db,
 		Redis:      cache,
 		Etcd:       registry,
-		Identity:   identity,
+		Register:   register,
 		RPCHandler: handler,
 		RPCServer:  rpcServer,
 		Admin:      admin,

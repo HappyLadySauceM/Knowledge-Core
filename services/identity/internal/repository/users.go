@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 
-	identityapp "github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/app"
 	"github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/domain"
 	"github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/model"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -17,18 +16,27 @@ const (
 	emailConstraint    = "users_email_lower_uidx"
 )
 
-type UserRepository struct {
+var (
+	ErrUsernameConflict = errors.New("identity repository: username already exists")
+	ErrEmailConflict    = errors.New("identity repository: email already exists")
+)
+
+type UserRepository interface {
+	Create(context.Context, *domain.User) error
+}
+
+type postgresUserRepository struct {
 	db *gorm.DB
 }
 
-func NewUserRepository(db *gorm.DB) (*UserRepository, error) {
+func NewUserRepository(db *gorm.DB) (UserRepository, error) {
 	if db == nil {
 		return nil, errors.New("create postgres user repository: database is required")
 	}
-	return &UserRepository{db: db}, nil
+	return &postgresUserRepository{db: db}, nil
 }
 
-func (r *UserRepository) Create(ctx context.Context, user *domain.User) error {
+func (r *postgresUserRepository) Create(ctx context.Context, user *domain.User) error {
 	if user == nil {
 		return errors.New("create postgres user: user is required")
 	}
@@ -45,9 +53,9 @@ func mapCreateError(err error) error {
 	if errors.As(err, &postgresError) && postgresError.Code == "23505" {
 		switch postgresError.ConstraintName {
 		case usernameConstraint:
-			return identityapp.ErrUsernameConflict
+			return ErrUsernameConflict
 		case emailConstraint:
-			return identityapp.ErrEmailConflict
+			return ErrEmailConflict
 		}
 	}
 	return fmt.Errorf("insert identity user: %w", err)
@@ -77,4 +85,4 @@ func applyModel(user *domain.User, record *model.User) {
 	user.UpdatedAt = record.UpdatedAt
 }
 
-var _ identityapp.UserRepository = (*UserRepository)(nil)
+var _ UserRepository = (*postgresUserRepository)(nil)

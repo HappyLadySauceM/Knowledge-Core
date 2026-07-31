@@ -6,7 +6,7 @@
 
 Knowledge Core 使用单 Go module Monorepo。外部 HTTP 服务使用 Hertz，内部同步 RPC 使用 Kitex + Thrift，JSON 编解码统一使用 Sonic，关系数据库访问统一使用 GORM。
 
-框架的职责是提供可复用的配置、日志、追踪、错误、健康、指标、资源连接和进程生命周期，不把业务概念放入公共包。每个服务仍拥有自己的配置扩展、领域模型、repository、应用服务和传输适配。
+框架的职责是提供可复用的配置、日志、追踪、错误、健康、指标、资源连接和进程生命周期，不把业务概念放入公共包。每个服务仍拥有自己的配置扩展、领域模型、repository、logic 和传输适配。
 
 首期明确不做以下工作：
 
@@ -39,8 +39,8 @@ services/identity/
   internal/config/        公共 option 组合与 Identity 私有 option
   internal/context/       ServiceContext，显式持有服务依赖
   internal/domain/        领域对象与校验
-  internal/repository/    固定的 GORM/PostgreSQL 实现
-  internal/app/           注册用例及其最小 repository port
+  internal/logic/         按用例组织的具体业务逻辑
+  internal/repository/    持久化契约及 PostgreSQL/GORM 实现
   internal/migration/     Identity schema 的启动迁移和校验
   internal/transport/     Kitex 与 Hertz admin 边界
 ```
@@ -77,7 +77,7 @@ Config
   -> PostgreSQL(GORM) -> migration -> UserRepository
   -> Redis
   -> Etcd registry
-  -> Identity application service
+  -> Identity register logic
   -> Kitex RPC + Hertz admin components
 ```
 
@@ -182,7 +182,7 @@ AutoMigrate 只用于首期已选定的增量策略，不删除废弃列，也�
 3. 打开 PostgreSQL/GORM，Ping 并执行 Identity migration。
 4. 打开并 Ping Redis。
 5. 创建 Etcd client 与 Kitex registry。
-6. 构建 ServiceContext、repository、应用服务和 transport。
+6. 构建 ServiceContext、repository、logic 和 transport。
 7. 在 ServiceContext 装配阶段使用标准 transporter 预绑定 Hertz listener，并预绑定 Kitex listener；Runtime 启动组件后等待 Hertz 进入 running 状态以及 Kitex 的 Etcd 注册成功屏障，所有组件都确认 ready 后才发布进程 ready。组件 `Serve`/`Ready`/`Shutdown` panic 都在生命周期边界转换为带 stack 的错误并进入统一回滚。
 
 退出或任一 component 意外结束时：
