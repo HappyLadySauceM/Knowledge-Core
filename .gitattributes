@@ -1,0 +1,5 @@
+# Keep repository text stable across Windows, Linux, and CI checkouts.
+* text=auto eol=lf
+
+*.bat text eol=crlf
+*.cmd text eol=crlf
