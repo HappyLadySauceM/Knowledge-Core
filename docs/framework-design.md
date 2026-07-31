@@ -27,7 +27,7 @@ pkg/
   trace/      OpenTelemetry provider、W3C 传播和传输层 instrumentation
   metadata/   request_id、trace_id 等上下文字段
   health/     liveness/readiness 注册表
-  metrics/    独立 Prometheus registry
+  metrics/    独立 Prometheus registry、应用状态与传输指标中间件
   transport/  Kitex 等框架的可复用安全传输策略
   postgres/   GORM/PostgreSQL 连接与生命周期
   redis/      go-redis 连接、观测与生命周期
@@ -145,6 +145,20 @@ go run ./services/identity --config services/identity/etc/config.yaml
 
 Identity 错误码域为 `2xxxx`。`CodeUnimplemented = 20009` 对应稳定 key `identity.unimplemented`；`Authenticate` 与 `GetUser` 首期始终使用该错误，不伪造空成功响应。
 
+### 5.4 Prometheus 指标
+
+每个服务进程持有独立的 Prometheus registry，并在自己的 Hertz 管理端口固定暴露 `/metrics`。Identity 默认地址为 `http://127.0.0.1:8081/metrics`。该端点与 `/livez`、`/readyz` 共用管理 listener，但不得通过公网 ingress 暴露；生产环境由集群网络策略、防火墙或独立管理网络限制访问。
+
+公共 registry 默认提供：
+
+- `knowledge_core_app_info` 与 `knowledge_core_app_ready`；
+- Go runtime、process 和 `database/sql` 连接池指标；
+- Hertz 请求数量、耗时和并发数；
+- Kitex 请求数量、耗时、并发数、结果类别和稳定业务码；
+- Redis 连接池使用量、等待、命中、超时和连接回收指标。
+
+指标标签只能使用服务名、环境、版本、路由模板、RPC 方法、状态码和稳定依赖名等有界值。request ID、trace ID、用户 ID、原始 URL、错误文本、数据库地址、Redis key 和消息正文禁止作为标签。`/metrics` 自身不创建 trace、不进入普通 HTTP 指标，也不写 access log；抓取状态由 `promhttp_metric_handler_*` 指标单独记录。Prometheus 不可用不会影响应用启动、readiness 或业务请求。
+
 ## 6. 传输与序列化
 
 业务 RPC IDL 位于 `idl/rpc/v1`，生成代码统一提交到 `kitex_gen/`。Kitex 服务使用 TTHeader，以便传播 persistent metadata、BizStatusError、deadline 和 OTel context。非幂等 RPC 默认不自动重试。启用客户端 TLS/mTLS 时通过 `pkg/transport/kitex.ClientOptions` 同时安装 TLS dialer 与标准 Go transport，避免 Linux netpoll 直接处理 `tls.Conn` 的不兼容组合。
@@ -159,7 +173,7 @@ HTTP JSON 必须经 Sonic 统一 codec。严格入口解码拒绝未知字段、
 
 ## 7. 数据库与启动迁移
 
-PostgreSQL 通过 GORM 打开，注册官方 OpenTelemetry tracing plugin，并取得底层 `sql.DB` 配置最大连接数、空闲连接数、连接最大生命周期和空闲时间。`pkg/metrics.RegisterDBStats` 将连接池饱和度、等待和连接 churn 注册到服务独立的 Prometheus registry。每次 repository 查询都使用 `db.WithContext(ctx)`，使 deadline、取消和数据库 span 与请求链路一致。GORM 日志保持参数化，tracing plugin 使用 `WithoutQueryVariables()`，不得把 SQL 参数写入日志或 span。Redis 使用 redisotel tracing 和 metrics，命令 span 关闭 statement 采集，其 metrics 生命周期随 Redis resource 一同关闭。
+PostgreSQL 通过 GORM 打开，注册官方 OpenTelemetry tracing plugin，并取得底层 `sql.DB` 配置最大连接数、空闲连接数、连接最大生命周期和空闲时间。`pkg/metrics.RegisterDBStats` 将连接池饱和度、等待和连接 churn 注册到服务独立的 Prometheus registry。每次 repository 查询都使用 `db.WithContext(ctx)`，使 deadline、取消和数据库 span 与请求链路一致。GORM 日志保持参数化，tracing plugin 使用 `WithoutQueryVariables()`，不得把 SQL 参数写入日志或 span。Redis 使用 redisotel tracing 且关闭 command statement 采集；连接池 collector 直接注册到当前服务的 Prometheus registry，并随 Redis resource 注销。
 
 Identity 在网络 listener 启动前执行 `AutoMigrate`：
 
@@ -244,3 +258,14 @@ Identity Dockerfile 使用多阶段构建、`CGO_ENABLED=0`、`-trimpath` 和无
 数据库、Redis、Etcd 和 OTLP 认证材料必须通过环境变量或 Secret manager 注入，不写入 YAML、示例文件或镜像层。TLS/mTLS 配置一旦声明就必须完整校验，证书加载失败时启动失败，禁止静默降级到明文。
 
 日志、metric label 和 span attribute 不得包含用户 ID、trace ID 以外的无界高基数字段，不得包含 password、hash、Token、DSN、SQL 参数或消息正文。
+
+本地 Prometheus 由 infrastructure Compose 启动：
+
+```powershell
+$env:KC_POSTGRES_PASSWORD = "local-development-password"
+docker compose -f docker/infrastructure/docker-compose.yml up -d
+$env:IDENTITY_POSTGRES_PASSWORD = $env:KC_POSTGRES_PASSWORD
+go run ./services/identity --config services/identity/etc/config.yaml
+```
+
+Prometheus 通过 `host.docker.internal:8081` 抓取宿主机上的 Identity；Compose 显式配置 `host-gateway` 以兼容 Linux Docker。启动 Identity 后，可在 `http://127.0.0.1:9090/targets` 确认 `knowledge-core-identity` 为 `UP`。本地 TSDB 默认保留 15 天；删除 named volume 才会清除历史指标。

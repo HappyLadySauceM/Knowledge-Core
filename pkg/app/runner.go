@@ -76,12 +76,12 @@ type Runtime struct {
 	isClosed   bool
 }
 
-func newRuntime(logger *slog.Logger, telemetry *trace.Runtime, shutdown time.Duration) *Runtime {
+func newRuntime(logger *slog.Logger, telemetry *trace.Runtime, metricRegistry *metrics.Registry, shutdown time.Duration) *Runtime {
 	return &Runtime{
 		Logger:   logger,
 		Trace:    telemetry,
 		Health:   health.NewRegistry(),
-		Metrics:  metrics.NewRegistry(),
+		Metrics:  metricRegistry,
 		shutdown: shutdown,
 	}
 }
@@ -224,6 +224,7 @@ func (r *Runtime) run(ctx, startupCtx context.Context) error {
 
 	if !startupFailed {
 		r.Health.SetServing(true)
+		r.Metrics.SetReady(true)
 		r.Logger.InfoContext(ctx, "application ready",
 			slog.String("component", "app"),
 			slog.String("event", "lifecycle"),
@@ -243,6 +244,7 @@ func (r *Runtime) run(ctx, startupCtx context.Context) error {
 	}
 
 	r.Health.SetServing(false)
+	r.Metrics.SetReady(false)
 	r.Logger.InfoContext(context.Background(), "application draining",
 		slog.String("component", "app"),
 		slog.String("event", "lifecycle"),

@@ -60,7 +60,7 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 		return nil, err
 	}
 
-	cache, err := redisresource.Open(ctx, *cfg.Redis, runtime.Logger)
+	cache, err := redisresource.Open(ctx, *cfg.Redis, "cache", runtime.Metrics, runtime.Logger)
 	if err != nil {
 		return nil, err
 	}
@@ -130,6 +130,7 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 		handler,
 		registry.Registry,
 		runtime.Trace,
+		runtime.Metrics,
 		runtime.Logger,
 		map[string]string{
 			"environment": cfg.App.Environment,

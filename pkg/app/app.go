@@ -12,6 +12,7 @@ import (
 	"time"
 
 	corelog "github.com/HappyLadySauce/Knowledge-Core/pkg/log"
+	"github.com/HappyLadySauce/Knowledge-Core/pkg/metrics"
 	"github.com/HappyLadySauce/Knowledge-Core/pkg/option"
 	"github.com/HappyLadySauce/Knowledge-Core/pkg/trace"
 	"github.com/spf13/cobra"
@@ -30,6 +31,7 @@ type ConfigLoader[C any] interface {
 type RuntimeOptions struct {
 	Service         string
 	Environment     string
+	Version         string
 	LogLevel        string
 	LogAddSource    bool
 	OTLPEndpoint    string
@@ -66,6 +68,7 @@ func RuntimeOptionsFrom(
 	runtimeOptions := RuntimeOptions{
 		Service:         appOptions.Name,
 		Environment:     appOptions.Environment,
+		Version:         appOptions.Version,
 		LogLevel:        logOptions.Level,
 		LogAddSource:    logOptions.AddSource,
 		TraceBatch:      traceOptions.BatchTimeout,
@@ -191,7 +194,16 @@ func execute[C any](ctx context.Context, cfg C, spec Spec[C]) (runErr error) {
 		return fmt.Errorf("initialize application tracing: %w", err)
 	}
 
-	runtime := newRuntime(logger, telemetry, opts.ShutdownTimeout)
+	metricsRegistry, err := metrics.NewRegistry(metrics.Config{
+		Service:     opts.Service,
+		Environment: opts.Environment,
+		Version:     opts.Version,
+	})
+	if err != nil {
+		return errors.Join(fmt.Errorf("initialize application metrics: %w", err), telemetry.Shutdown(context.Background()))
+	}
+
+	runtime := newRuntime(logger, telemetry, metricsRegistry, opts.ShutdownTimeout)
 	if err := runtime.AddCleanup("telemetry", telemetry.Shutdown); err != nil {
 		return errors.Join(err, telemetry.Shutdown(context.Background()))
 	}

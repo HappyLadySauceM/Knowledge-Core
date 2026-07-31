@@ -12,6 +12,7 @@ import (
 
 	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/identity"
 	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/identity/identityservice"
+	"github.com/HappyLadySauce/Knowledge-Core/pkg/metrics"
 	"github.com/HappyLadySauce/Knowledge-Core/pkg/option"
 	coretrace "github.com/HappyLadySauce/Knowledge-Core/pkg/trace"
 	"github.com/cloudwego/kitex/pkg/endpoint"
@@ -41,11 +42,12 @@ func NewRPCServer(
 	service identity.IdentityService,
 	serviceRegistry registry.Registry,
 	telemetry *coretrace.Runtime,
+	metricsRegistry *metrics.Registry,
 	logger *slog.Logger,
 	tags map[string]string,
 ) (*RPCServer, error) {
-	if ctx == nil || service == nil || serviceRegistry == nil || telemetry == nil || logger == nil {
-		return nil, errors.New("create identity RPC server: context, service, registry, tracing, and logger are required")
+	if ctx == nil || service == nil || serviceRegistry == nil || telemetry == nil || metricsRegistry == nil || logger == nil {
+		return nil, errors.New("create identity RPC server: context, service, registry, tracing, metrics, and logger are required")
 	}
 	if err := options.Validate(); err != nil {
 		return nil, fmt.Errorf("create identity RPC server: invalid options: %w", err)
@@ -78,6 +80,7 @@ func NewRPCServer(
 		kitexserver.WithCompatibleMiddlewareForUnary(),
 	}
 	serverOptions = append(serverOptions, coretrace.KitexServerOptions(telemetry)...)
+	serverOptions = append(serverOptions, kitexserver.WithMiddleware(metrics.KitexServerMiddleware(metricsRegistry)))
 	serverOptions = append(serverOptions, kitexserver.WithMiddleware(accessLogMiddleware(logger)))
 	if tlsConfig != nil {
 		// Kitex's Linux default netpoll transport cannot consume a tls.Listener.

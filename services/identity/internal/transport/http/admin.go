@@ -70,10 +70,9 @@ func NewServer(
 
 	h := server.New(hertzOptions...)
 	h.Use(
-		coretrace.HertzServerMiddleware(telemetry, func(_ context.Context, request *app.RequestContext) bool {
-			return string(request.Request.URI().Path()) == "/metrics"
-		}),
-		accessLogMiddleware(logger),
+		coretrace.HertzServerMiddleware(telemetry, isMetricsRequest),
+		metrics.HertzServerMiddleware(metricsRegistry, isMetricsRequest),
+		accessLogMiddleware(logger, isMetricsRequest),
 		recoveryMiddleware(logger),
 	)
 	h.GET("/livez", healthHandler(healthRegistry.Live))
@@ -151,10 +150,13 @@ func writeStatus(ctx context.Context, request *app.RequestContext, code int, sta
 	request.Data(code, consts.MIMEApplicationJSONUTF8, payload)
 }
 
-func accessLogMiddleware(logger *slog.Logger) app.HandlerFunc {
+func accessLogMiddleware(logger *slog.Logger, ignore func(context.Context, *app.RequestContext) bool) app.HandlerFunc {
 	return func(ctx context.Context, request *app.RequestContext) {
 		started := time.Now()
 		request.Next(ctx)
+		if ignore != nil && ignore(ctx, request) {
+			return
+		}
 		logger.InfoContext(ctx, "HTTP request completed",
 			slog.String("component", "identity.admin"),
 			slog.String("event", "request"),
@@ -164,6 +166,10 @@ func accessLogMiddleware(logger *slog.Logger) app.HandlerFunc {
 			slog.Duration("duration", time.Since(started)),
 		)
 	}
+}
+
+func isMetricsRequest(_ context.Context, request *app.RequestContext) bool {
+	return string(request.Request.URI().Path()) == "/metrics"
 }
 
 func recoveryMiddleware(logger *slog.Logger) app.HandlerFunc {

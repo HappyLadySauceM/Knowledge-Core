@@ -10,10 +10,12 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/HappyLadySauce/Knowledge-Core/pkg/metrics"
 )
 
 func TestCloseRollsBackComponentsAndResourcesInReverseOrder(t *testing.T) {
-	runtime := newRuntime(slog.New(slog.NewTextHandler(io.Discard, nil)), nil, time.Second)
+	runtime := newTestRuntime(t, time.Second)
 	var mu sync.Mutex
 	var order []string
 	record := func(value string) {
@@ -59,7 +61,7 @@ func TestCloseRollsBackComponentsAndResourcesInReverseOrder(t *testing.T) {
 
 func TestRunGivesResourcesAnIndependentShutdownDeadline(t *testing.T) {
 	const timeout = 100 * time.Millisecond
-	runtime := newRuntime(slog.New(slog.NewTextHandler(io.Discard, nil)), nil, timeout)
+	runtime := newTestRuntime(t, timeout)
 	serveDone := make(chan struct{})
 	if err := runtime.AddComponent(ComponentFuncs{
 		ComponentName: "slow-component",
@@ -103,7 +105,7 @@ func TestRunGivesResourcesAnIndependentShutdownDeadline(t *testing.T) {
 }
 
 func TestRunWaitsForComponentReadiness(t *testing.T) {
-	runtime := newRuntime(slog.New(slog.NewTextHandler(io.Discard, nil)), nil, time.Second)
+	runtime := newTestRuntime(t, time.Second)
 	readyCalled := make(chan struct{})
 	readyGate := make(chan struct{})
 	serveDone := make(chan struct{})
@@ -139,14 +141,20 @@ func TestRunWaitsForComponentReadiness(t *testing.T) {
 	}
 	close(readyGate)
 	waitUntilReady(t, runtime)
+	if got := metricGaugeValue(t, runtime.Metrics, "knowledge_core_app_ready"); got != 1 {
+		t.Fatalf("ready metric = %v, want 1", got)
+	}
 	cancel()
 	if err := <-result; err != nil {
 		t.Fatalf("run() error = %v", err)
 	}
+	if got := metricGaugeValue(t, runtime.Metrics, "knowledge_core_app_ready"); got != 0 {
+		t.Fatalf("ready metric after shutdown = %v, want 0", got)
+	}
 }
 
 func TestRunRecoversServePanicAndRollsBackResources(t *testing.T) {
-	runtime := newRuntime(slog.New(slog.NewTextHandler(io.Discard, nil)), nil, time.Second)
+	runtime := newTestRuntime(t, time.Second)
 	var cleaned atomic.Bool
 	if err := runtime.AddComponent(ComponentFuncs{
 		ComponentName: "panic",
@@ -174,7 +182,7 @@ func TestRunRecoversServePanicAndRollsBackResources(t *testing.T) {
 
 func TestRunLeavesResourcesOpenWhenComponentDoesNotExit(t *testing.T) {
 	const timeout = 30 * time.Millisecond
-	runtime := newRuntime(slog.New(slog.NewTextHandler(io.Discard, nil)), nil, timeout)
+	runtime := newTestRuntime(t, timeout)
 	serveDone := make(chan struct{})
 	var cleaned atomic.Bool
 	if err := runtime.AddComponent(ComponentFuncs{
@@ -219,4 +227,32 @@ func waitUntilReady(t *testing.T, runtime *Runtime) {
 		time.Sleep(time.Millisecond)
 	}
 	t.Fatal("runtime did not become ready")
+}
+
+func newTestRuntime(t *testing.T, timeout time.Duration) *Runtime {
+	t.Helper()
+	registry, err := metrics.NewRegistry(metrics.Config{
+		Service:     "test",
+		Environment: "testing",
+		Version:     "test",
+	})
+	if err != nil {
+		t.Fatalf("metrics.NewRegistry() error = %v", err)
+	}
+	return newRuntime(slog.New(slog.NewTextHandler(io.Discard, nil)), nil, registry, timeout)
+}
+
+func metricGaugeValue(t *testing.T, registry *metrics.Registry, name string) float64 {
+	t.Helper()
+	families, err := registry.Gather()
+	if err != nil {
+		t.Fatalf("Gather() error = %v", err)
+	}
+	for _, family := range families {
+		if family.GetName() == name && len(family.Metric) > 0 {
+			return family.Metric[0].GetGauge().GetValue()
+		}
+	}
+	t.Fatalf("metric %q was not gathered", name)
+	return 0
 }

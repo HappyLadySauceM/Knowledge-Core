@@ -63,8 +63,29 @@ services:
     volumes:
       - knowledge-core-etcd-data:/etcd-data
 
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    container_name: knowledge-core-prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+    ports:
+      - "9090:9090"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:9090/-/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - knowledge-core-prometheus-data:/prometheus
+
 volumes:
   knowledge-core-postgres-data:
   knowledge-core-redis-data:
   knowledge-core-nats-data:
   knowledge-core-etcd-data:
+  knowledge-core-prometheus-data:

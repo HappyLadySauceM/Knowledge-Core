@@ -43,7 +43,7 @@ func TestRecoveryPreservesAccessLogAndRecordsStack(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(&output, nil))
 	request := app.NewContext(0)
 	request.SetHandlers(app.HandlersChain{
-		accessLogMiddleware(logger),
+		accessLogMiddleware(logger, nil),
 		recoveryMiddleware(logger),
 		func(context.Context, *app.RequestContext) { panic("boom") },
 	})
@@ -57,5 +57,23 @@ func TestRecoveryPreservesAccessLogAndRecordsStack(t *testing.T) {
 		if !strings.Contains(logs, expected) {
 			t.Fatalf("logs do not contain %q: %s", expected, logs)
 		}
+	}
+}
+
+func TestMetricsRequestDoesNotWriteAccessLog(t *testing.T) {
+	var output bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&output, nil))
+	request := app.NewContext(0)
+	request.Request.SetRequestURI("/metrics")
+	request.SetHandlers(app.HandlersChain{
+		accessLogMiddleware(logger, isMetricsRequest),
+		func(_ context.Context, request *app.RequestContext) {
+			request.String(consts.StatusOK, "metrics")
+		},
+	})
+
+	request.Next(context.Background())
+	if output.Len() != 0 {
+		t.Fatalf("metrics request wrote access log: %s", output.String())
 	}
 }

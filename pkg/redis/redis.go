@@ -6,9 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 
+	"github.com/HappyLadySauce/Knowledge-Core/pkg/metrics"
 	"github.com/HappyLadySauce/Knowledge-Core/pkg/option"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/redis/go-redis/extra/redisotel/v9"
 	redisclient "github.com/redis/go-redis/v9"
 )
@@ -16,18 +19,29 @@ import (
 // Resource owns an instrumented go-redis client. Client is exposed for direct
 // Redis operations; Resource retains ownership of its lifecycle.
 type Resource struct {
-	Client      *redisclient.Client
-	metricsDone chan struct{}
-	closeOnce   sync.Once
-	closeErr    error
+	Client           *redisclient.Client
+	metricsRegistry  *metrics.Registry
+	metricsCollector prometheus.Collector
+	closeOnce        sync.Once
+	closeErr         error
 }
 
-func Open(ctx context.Context, opts option.RedisOptions, logger *slog.Logger) (*Resource, error) {
+func Open(
+	ctx context.Context,
+	opts option.RedisOptions,
+	dependency string,
+	metricsRegistry *metrics.Registry,
+	logger *slog.Logger,
+) (*Resource, error) {
 	if err := opts.Validate(); err != nil {
 		return nil, fmt.Errorf("open redis: invalid options: %w", err)
 	}
 	if ctx == nil {
 		return nil, errors.New("open redis: context is required")
+	}
+	dependency = strings.TrimSpace(dependency)
+	if dependency == "" || metricsRegistry == nil {
+		return nil, errors.New("open redis: dependency name and metrics registry are required")
 	}
 	tlsConfig, err := opts.TLS.ClientTLSConfig()
 	if err != nil {
@@ -47,17 +61,20 @@ func Open(ctx context.Context, opts option.RedisOptions, logger *slog.Logger) (*
 		MaxRetries:            opts.MaxRetries,
 		TLSConfig:             tlsConfig,
 	})
-	metricsDone := make(chan struct{})
 	if err := redisotel.InstrumentTracing(client, redisotel.WithDBStatement(false)); err != nil {
 		_ = client.Close()
 		return nil, fmt.Errorf("instrument redis tracing: %w", err)
 	}
-	if err := redisotel.InstrumentMetrics(client, redisotel.WithCloseChan(metricsDone)); err != nil {
-		close(metricsDone)
+	metricsCollector := newPoolCollector(dependency, client)
+	if err := metricsRegistry.Register(metricsCollector); err != nil {
 		_ = client.Close()
-		return nil, fmt.Errorf("instrument redis metrics: %w", err)
+		return nil, fmt.Errorf("register redis metrics: %w", err)
 	}
-	resource := &Resource{Client: client, metricsDone: metricsDone}
+	resource := &Resource{
+		Client:           client,
+		metricsRegistry:  metricsRegistry,
+		metricsCollector: metricsCollector,
+	}
 	if err := resource.Ping(ctx); err != nil {
 		_ = resource.Close()
 		return nil, err
@@ -86,8 +103,8 @@ func (r *Resource) Close() error {
 		return nil
 	}
 	r.closeOnce.Do(func() {
-		if r.metricsDone != nil {
-			close(r.metricsDone)
+		if r.metricsRegistry != nil && r.metricsCollector != nil {
+			r.metricsRegistry.Unregister(r.metricsCollector)
 		}
 		if err := r.Client.Close(); err != nil {
 			r.closeErr = fmt.Errorf("close redis: %w", err)
