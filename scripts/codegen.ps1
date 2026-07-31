@@ -51,7 +51,18 @@ function Assert-ToolVersion {
 function Get-SHA256 {
     param([Parameter(Mandatory = $true)][string]$Path)
 
-    return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash
+    $stream = [System.IO.File]::OpenRead($Path)
+    try {
+        $sha256 = [System.Security.Cryptography.SHA256]::Create()
+        try {
+            $hash = $sha256.ComputeHash($stream)
+            return ([System.BitConverter]::ToString($hash)).Replace("-", "")
+        } finally {
+            $sha256.Dispose()
+        }
+    } finally {
+        $stream.Dispose()
+    }
 }
 
 function Get-OwnedFiles {
