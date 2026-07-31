@@ -1,0 +1,80 @@
+app:
+  name: identity
+  environment: development
+  version: dev
+  startup_timeout: 30s
+  shutdown_timeout: 30s
+
+log:
+  level: info
+  add_source: false
+
+trace:
+  enabled: false
+  endpoint: 127.0.0.1:4317
+  sample_ratio: 0.1
+  insecure: true
+  batch_timeout: 5s
+  export_timeout: 10s
+  tls:
+    enabled: false
+
+rpc:
+  address: :8881
+  service_name: knowledge-core.identity
+  read_write_timeout: 30s
+  exit_wait_timeout: 10s
+  max_connections: 0
+  tls:
+    enabled: false
+
+http:
+  address: :8081
+  read_timeout: 10s
+  write_timeout: 30s
+  idle_timeout: 2m
+  shutdown_timeout: 15s
+  max_request_body_size: 4194304
+  tls:
+    enabled: false
+
+postgres:
+  host: 127.0.0.1
+  port: 5432
+  user: knowledge_core
+  database: knowledge_core
+  ssl_mode: disable
+  time_zone: UTC
+  max_idle_conns: 10
+  max_open_conns: 100
+  conn_max_lifetime: 1h
+  conn_max_idle_time: 30m
+  connect_timeout: 5s
+  slow_threshold: 200ms
+  prepare_stmt: false
+  tls:
+    enabled: false
+
+redis:
+  address: 127.0.0.1:6379
+  db: 0
+  dial_timeout: 5s
+  read_timeout: 3s
+  write_timeout: 3s
+  pool_size: 20
+  min_idle_conns: 2
+  max_retries: 3
+  tls:
+    enabled: false
+
+etcd:
+  endpoints:
+    - 127.0.0.1:2379
+  prefix: /knowledge-core/development/registry
+  dial_timeout: 5s
+  request_timeout: 3s
+  tls:
+    enabled: false
+
+bcrypt:
+  cost: 12

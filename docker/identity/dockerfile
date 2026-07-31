@@ -1,0 +1,37 @@
+# syntax=docker/dockerfile:1.7
+
+ARG GO_VERSION=1.26.2
+
+FROM --platform=$BUILDPLATFORM golang:${GO_VERSION}-alpine AS build
+
+RUN apk add --no-cache ca-certificates git
+WORKDIR /src
+
+COPY go.mod go.sum ./
+RUN --mount=type=cache,target=/go/pkg/mod go mod download
+
+COPY pkg ./pkg
+COPY kitex_gen/common ./kitex_gen/common
+COPY kitex_gen/identity ./kitex_gen/identity
+COPY services/identity ./services/identity
+
+ARG TARGETOS=linux
+ARG TARGETARCH
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
+    go build -mod=readonly -trimpath -buildvcs=false -ldflags="-s -w" \
+    -o /out/identity ./services/identity
+
+FROM gcr.io/distroless/static-debian12:nonroot AS runtime
+
+WORKDIR /app
+COPY --from=build --chown=nonroot:nonroot /out/identity /app/identity
+COPY --from=build --chown=nonroot:nonroot \
+    /src/services/identity/etc/config.yaml \
+    /etc/knowledge-core/identity/config.yaml
+
+EXPOSE 8881 8081
+USER nonroot:nonroot
+ENTRYPOINT ["/app/identity"]
+CMD ["--config=/etc/knowledge-core/identity/config.yaml"]
