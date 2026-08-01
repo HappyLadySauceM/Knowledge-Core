@@ -27,22 +27,26 @@ jobs:
     env:
       GOPROXY: https://goproxy.cn,direct
     steps:
-      - name: Check runner prerequisites
-        shell: bash
-        run: |
-          set -euo pipefail
-          for command_name in bash git make gcc; do
-            if ! command -v "$command_name" >/dev/null 2>&1; then
-              echo "::error title=Missing runner prerequisite::${command_name} is required on runner ${RUNNER_NAME}."
-              exit 1
-            fi
-          done
-
       - name: Check out dev
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           clean: true
           persist-credentials: false
+
+      - name: Check runner prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=()
+          for command_name in bash git make gcc; do
+            if ! command -v "$command_name" >/dev/null 2>&1; then
+              missing+=("$command_name")
+            fi
+          done
+          if (( ${#missing[@]} > 0 )); then
+            echo "::error title=Missing runner prerequisites::Install on runner ${RUNNER_NAME}: ${missing[*]}."
+            exit 1
+          fi
 
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -83,6 +87,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          if [[ ! -d "$GITHUB_WORKSPACE/.git" ]]; then
+            echo "Workspace was not checked out; nothing to clean."
+            exit 0
+          fi
+          cd "$GITHUB_WORKSPACE"
           workspace="$(pwd -P)"
           repository_root="$(cd "$(git rev-parse --show-toplevel)" && pwd -P)"
           if [[ "$workspace" != "$repository_root" || "$workspace" != "$(cd "$GITHUB_WORKSPACE" && pwd -P)" ]]; then
