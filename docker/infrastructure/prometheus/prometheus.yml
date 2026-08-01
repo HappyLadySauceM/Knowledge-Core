@@ -4,6 +4,13 @@ global:
   evaluation_interval: 15s
 
 scrape_configs:
+  - job_name: knowledge-core-gateway
+    metrics_path: /metrics
+    scheme: http
+    static_configs:
+      - targets:
+          - host.docker.internal:8082
+
   - job_name: knowledge-core-identity
     metrics_path: /metrics
     scheme: http

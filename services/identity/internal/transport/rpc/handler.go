@@ -9,6 +9,7 @@ import (
 
 	commonv1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/common"
 	identityv1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/identity"
+	coreauth "github.com/HappyLadySauce/Knowledge-Core/pkg/auth"
 	apperror "github.com/HappyLadySauce/Knowledge-Core/pkg/error"
 	"github.com/HappyLadySauce/Knowledge-Core/pkg/metadata"
 	"github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/domain"
@@ -21,8 +22,20 @@ import (
 
 const serviceName = "identity"
 
-type Service interface {
+type RegisterService interface {
 	Register(context.Context, identitylogic.RegisterInput) (*domain.User, error)
+}
+
+type AuthenticateService interface {
+	Authenticate(context.Context, identitylogic.AuthenticateInput) (*identitylogic.Authentication, error)
+}
+
+type GetUserService interface {
+	GetUser(context.Context, int64) (*domain.User, error)
+}
+
+type TokenVerifier interface {
+	Verify(string) (coreauth.Principal, error)
 }
 
 type Readiness interface {
@@ -30,18 +43,28 @@ type Readiness interface {
 }
 
 type Handler struct {
-	service   Service
-	readiness Readiness
-	logger    *slog.Logger
-	now       func() time.Time
+	register     RegisterService
+	authenticate AuthenticateService
+	users        GetUserService
+	verifier     TokenVerifier
+	readiness    Readiness
+	logger       *slog.Logger
+	now          func() time.Time
 }
 
-func NewHandler(service Service, readiness Readiness, logger *slog.Logger) (*Handler, error) {
-	if service == nil || readiness == nil || logger == nil {
-		return nil, errors.New("create identity RPC handler: service, readiness, and logger are required")
+func NewHandler(
+	register RegisterService,
+	authenticate AuthenticateService,
+	users GetUserService,
+	verifier TokenVerifier,
+	readiness Readiness,
+	logger *slog.Logger,
+) (*Handler, error) {
+	if register == nil || authenticate == nil || users == nil || verifier == nil || readiness == nil || logger == nil {
+		return nil, errors.New("create identity RPC handler: use cases, verifier, readiness, and logger are required")
 	}
 	return &Handler{
-		service:   service,
+		register: register, authenticate: authenticate, users: users, verifier: verifier,
 		readiness: readiness,
 		logger:    logger,
 		now:       time.Now,
@@ -67,7 +90,7 @@ func (h *Handler) Register(ctx context.Context, request *identityv1.RegisterRequ
 		return nil, apperror.ToKitexBizStatus(ctx, identityerrors.InvalidInput.New())
 	}
 
-	user, err := h.service.Register(ctx, identitylogic.RegisterInput{
+	user, err := h.register.Register(ctx, identitylogic.RegisterInput{
 		Username: request.Username,
 		Email:    request.Email,
 		Password: request.Password,
@@ -132,14 +155,68 @@ func recordErrorDiagnostics(ctx context.Context, err error) {
 	span.SetAttributes(attributes...)
 }
 
-func (h *Handler) Authenticate(ctx context.Context, _ *identityv1.AuthenticateRequest) (*identityv1.Authentication, error) {
+func (h *Handler) Authenticate(ctx context.Context, request *identityv1.AuthenticateRequest) (*identityv1.Authentication, error) {
 	ctx = metadata.EnsureRequestID(ctx)
-	return nil, apperror.ToKitexBizStatus(ctx, identityerrors.Unimplemented.New())
+	if request == nil {
+		return nil, apperror.ToKitexBizStatus(ctx, identityerrors.InvalidInput.New())
+	}
+	authentication, err := h.authenticate.Authenticate(ctx, identitylogic.AuthenticateInput{
+		Identifier: request.Identifier,
+		Password:   request.Password,
+	})
+	if err != nil {
+		return nil, h.transportError(ctx, "authenticate_failed", err)
+	}
+	if authentication == nil || authentication.User == nil || authentication.AccessToken.Value == "" || authentication.AccessToken.ExpiresAt.IsZero() {
+		return nil, h.transportError(ctx, "authenticate_failed", errors.New("identity authentication returned an incomplete result"))
+	}
+	return &identityv1.Authentication{
+		User:          toTransportUser(authentication.User),
+		AccessToken:   authentication.AccessToken.Value,
+		ExpiresAtUnix: authentication.AccessToken.ExpiresAt.UTC().Unix(),
+	}, nil
 }
 
-func (h *Handler) GetUser(ctx context.Context, _ *identityv1.GetUserRequest) (*identityv1.User, error) {
+func (h *Handler) GetUser(ctx context.Context, request *identityv1.GetUserRequest) (*identityv1.User, error) {
 	ctx = metadata.EnsureRequestID(ctx)
-	return nil, apperror.ToKitexBizStatus(ctx, identityerrors.Unimplemented.New())
+	if request == nil || request.UserId <= 0 {
+		return nil, apperror.ToKitexBizStatus(ctx, identityerrors.InvalidInput.New())
+	}
+	principal, err := h.verifier.Verify(coreauth.AccessToken(ctx))
+	if err != nil {
+		return nil, apperror.ToKitexBizStatus(ctx, identityerrors.Unauthenticated.Wrap(err))
+	}
+	if principal.UserID != request.UserId {
+		return nil, apperror.ToKitexBizStatus(ctx, identityerrors.Forbidden.New())
+	}
+	user, err := h.users.GetUser(ctx, request.UserId)
+	if err != nil {
+		if apperror.KindOf(err) == apperror.KindNotFound {
+			err = identityerrors.Unauthenticated.Wrap(err)
+		}
+		return nil, h.transportError(ctx, "get_user_failed", err)
+	}
+	if user == nil || user.Status != domain.StatusActive || user.TokenVersion != principal.TokenVersion {
+		return nil, apperror.ToKitexBizStatus(ctx, identityerrors.Unauthenticated.New())
+	}
+	return toTransportUser(user), nil
+}
+
+func (h *Handler) transportError(ctx context.Context, event string, err error) error {
+	mapped := mapServiceError(err)
+	attributes := []any{
+		slog.String("component", "identity.rpc"),
+		slog.String("event", event),
+		slog.String("error_key", apperror.Key(mapped)),
+		errorDiagnostic(err),
+	}
+	recordErrorDiagnostics(ctx, err)
+	if apperror.KindOf(mapped) == apperror.KindInternal {
+		h.logger.ErrorContext(ctx, "identity RPC operation failed", attributes...)
+	} else {
+		h.logger.WarnContext(ctx, "identity RPC operation failed", attributes...)
+	}
+	return apperror.ToKitexBizStatus(ctx, mapped)
 }
 
 func mapServiceError(err error) error {

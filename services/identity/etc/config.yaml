@@ -78,3 +78,8 @@ etcd:
 
 bcrypt:
   cost: 12
+
+auth:
+  access_token_ttl: 15m
+  failure_threshold: 5
+  lock_duration: 15m

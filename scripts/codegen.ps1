@@ -68,14 +68,23 @@ function Get-SHA256 {
 function Get-OwnedFiles {
     param([Parameter(Mandatory = $true)][string]$Root)
 
+    $owned = @()
     $kitexRoot = Join-Path $Root "kitex_gen"
-    if (-not (Test-Path -LiteralPath $kitexRoot)) {
-        return @()
+    if (Test-Path -LiteralPath $kitexRoot) {
+        $prefix = $Root.TrimEnd("\", "/") + [System.IO.Path]::DirectorySeparatorChar
+        $owned += @(Get-ChildItem -LiteralPath $kitexRoot -Recurse -File |
+            ForEach-Object { $_.FullName.Substring($prefix.Length).Replace("\", "/") })
     }
-    $prefix = $Root.TrimEnd("\", "/") + [System.IO.Path]::DirectorySeparatorChar
-    return @(Get-ChildItem -LiteralPath $kitexRoot -Recurse -File |
-        ForEach-Object { $_.FullName.Substring($prefix.Length).Replace("\", "/") } |
-        Sort-Object -Unique)
+    foreach ($relative in @(
+        "services/gateway/biz/model/gateway/gateway.go",
+        "services/gateway/biz/router/gateway/gateway.go",
+        "services/gateway/biz/router/register.go"
+    )) {
+        if (Test-Path -LiteralPath (Join-Path $Root $relative)) {
+            $owned += $relative
+        }
+    }
+    return @($owned | Sort-Object -Unique)
 }
 
 function Assert-OwnedManifest {
@@ -124,7 +133,7 @@ function Assert-SnapshotsEqual {
     )
     if ($changed.Count -ne 0) {
         $changed | ForEach-Object { Write-Error "generated file changed: $_" }
-        throw "generated RPC code is not up to date"
+        throw "generated code is not up to date"
     }
 }
 
@@ -189,19 +198,10 @@ function Invoke-HertzGeneration {
     }
 }
 
-if ($Check -and $IncludeHertz) {
-    throw "-Check currently covers the committed Kitex contract only; Hertz ownership begins when the Gateway scaffold lands"
-}
-
 if (-not $Check) {
-    if ($IncludeHertz -and -not (Test-Path -LiteralPath (Join-Path $repositoryRoot "services/gateway/biz/router/register.go"))) {
-        throw "Hertz scaffold is not present. Refusing 'hz new' because it would own service source; land the Gateway transport first, then rerun with -IncludeHertz."
-    }
     Invoke-RPCGeneration -Root $repositoryRoot
+    Invoke-HertzGeneration -Root $repositoryRoot
     Assert-OwnedManifest -Root $repositoryRoot
-    if ($IncludeHertz) {
-        Invoke-HertzGeneration -Root $repositoryRoot
-    }
     exit 0
 }
 
@@ -217,8 +217,14 @@ try {
     }
     Copy-Item -LiteralPath (Join-Path $repositoryRoot "idl") -Destination (Join-Path $temporaryRoot "idl") -Recurse
     Copy-Item -LiteralPath (Join-Path $repositoryRoot "scripts") -Destination (Join-Path $temporaryRoot "scripts") -Recurse
+    [System.IO.Directory]::CreateDirectory((Join-Path $temporaryRoot "services/gateway")) | Out-Null
+    Copy-Item -LiteralPath (Join-Path $repositoryRoot "services/gateway/biz") -Destination (Join-Path $temporaryRoot "services/gateway/biz") -Recurse
+    if (Test-Path -LiteralPath (Join-Path $repositoryRoot ".hz")) {
+        Copy-Item -LiteralPath (Join-Path $repositoryRoot ".hz") -Destination (Join-Path $temporaryRoot ".hz")
+    }
 
     Invoke-RPCGeneration -Root $temporaryRoot
+    Invoke-HertzGeneration -Root $temporaryRoot
     Assert-OwnedManifest -Root $temporaryRoot
     Assert-SnapshotsEqual -Expected (Get-GeneratedSnapshot -Root $repositoryRoot) -Actual (Get-GeneratedSnapshot -Root $temporaryRoot)
 } finally {

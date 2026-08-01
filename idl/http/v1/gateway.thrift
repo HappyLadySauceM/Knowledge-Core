@@ -1,5 +1,18 @@
 namespace go gateway
 
+const i32 CodeNotReady = 10001
+const i32 CodeInvalidRequest = 10002
+const i32 CodeAuthenticationRequired = 10003
+const i32 CodePermissionDenied = 10005
+const i32 CodeDependencyUnavailable = 10007
+const i32 CodeRouteNotFound = 10008
+const i32 CodeMethodNotAllowed = 10009
+const i32 CodeRateLimited = 10010
+const i32 CodeUpstreamTimeout = 10011
+const i32 CodeInvalidUpstreamResponse = 10012
+const i32 CodeUnimplemented = 10013
+const i32 CodeInternal = 10999
+
 struct HealthRequest {}
 
 struct EmptyData {}

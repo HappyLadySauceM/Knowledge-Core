@@ -11,6 +11,14 @@ import (
 )
 
 func KitexServerMiddleware(registry *Registry) endpoint.Middleware {
+	return kitexMiddleware(registry, false)
+}
+
+func KitexClientMiddleware(registry *Registry) endpoint.Middleware {
+	return kitexMiddleware(registry, true)
+}
+
+func kitexMiddleware(registry *Registry, client bool) endpoint.Middleware {
 	return func(next endpoint.Endpoint) endpoint.Endpoint {
 		return func(ctx context.Context, request, response any) error {
 			if registry == nil {
@@ -19,14 +27,22 @@ func KitexServerMiddleware(registry *Registry) endpoint.Middleware {
 
 			service, method := kitexRPCDetails(ctx)
 			inFlight := registry.rpcInFlight.WithLabelValues(service, method)
+			if client {
+				inFlight = registry.rpcClientInFlight.WithLabelValues(service, method)
+			}
 			inFlight.Inc()
 			started := time.Now()
 			defer inFlight.Dec()
 
 			err := next(ctx, request, response)
 			outcome, businessCode := kitexRPCOutcome(ctx, err)
-			registry.rpcRequests.WithLabelValues(service, method, outcome, businessCode).Inc()
-			registry.rpcDuration.WithLabelValues(service, method, outcome).Observe(time.Since(started).Seconds())
+			if client {
+				registry.rpcClientRequests.WithLabelValues(service, method, outcome, businessCode).Inc()
+				registry.rpcClientDuration.WithLabelValues(service, method, outcome).Observe(time.Since(started).Seconds())
+			} else {
+				registry.rpcRequests.WithLabelValues(service, method, outcome, businessCode).Inc()
+				registry.rpcDuration.WithLabelValues(service, method, outcome).Observe(time.Since(started).Seconds())
+			}
 			return err
 		}
 	}

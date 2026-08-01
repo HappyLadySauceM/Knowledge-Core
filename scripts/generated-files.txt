@@ -1,4 +1,4 @@
-# Generator-owned Kitex RPC files. Hertz ownership is added with its scaffold.
+# Generator-owned Kitex RPC and Hertz model/router files.
 kitex_gen/common/common.go
 kitex_gen/common/k-common.go
 kitex_gen/common/k-consts.go
@@ -20,3 +20,6 @@ kitex_gen/platform/platform.go
 kitex_gen/platform/platformservice/client.go
 kitex_gen/platform/platformservice/platformservice.go
 kitex_gen/platform/platformservice/server.go
+services/gateway/biz/model/gateway/gateway.go
+services/gateway/biz/router/gateway/gateway.go
+services/gateway/biz/router/register.go

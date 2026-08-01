@@ -1,4 +1,5 @@
-package http
+// Package hertz contains reusable Hertz transport components.
+package hertz
 
 import (
 	"context"
@@ -8,6 +9,7 @@ import (
 	"log/slog"
 	"net"
 	"runtime/debug"
+	"strings"
 	"time"
 
 	jsoncodec "github.com/HappyLadySauce/Knowledge-Core/pkg/codec/json"
@@ -24,75 +26,92 @@ import (
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 )
 
-const componentName = "identity-admin-http"
-
-type Server struct {
-	server   *server.Hertz
-	listener net.Listener
+type AdminServerConfig struct {
+	ComponentName string
+	LogComponent  string
+	Options       option.HertzServerOptions
+	TLSConfig     *tls.Config
 }
 
-func NewServer(
+type AdminServer struct {
+	name         string
+	logComponent string
+	server       *server.Hertz
+	listener     net.Listener
+}
+
+func NewAdminServer(
 	ctx context.Context,
-	options option.HertzServerOptions,
-	tlsConfig *tls.Config,
+	cfg AdminServerConfig,
 	healthRegistry *health.Registry,
 	metricsRegistry *metrics.Registry,
 	telemetry *coretrace.Runtime,
 	logger *slog.Logger,
-) (*Server, error) {
-	if ctx == nil || healthRegistry == nil || metricsRegistry == nil || telemetry == nil || logger == nil {
-		return nil, errors.New("create identity admin server: context, health, metrics, tracing, and logger are required")
+) (*AdminServer, error) {
+	cfg.ComponentName = strings.TrimSpace(cfg.ComponentName)
+	cfg.LogComponent = strings.TrimSpace(cfg.LogComponent)
+	if ctx == nil || cfg.ComponentName == "" || cfg.LogComponent == "" || healthRegistry == nil || metricsRegistry == nil || telemetry == nil || logger == nil {
+		return nil, errors.New("create admin server: context, names, health, metrics, tracing, and logger are required")
 	}
-	if err := options.Validate(); err != nil {
-		return nil, fmt.Errorf("create identity admin server: invalid options: %w", err)
+	if err := cfg.Options.Validate(); err != nil {
+		return nil, fmt.Errorf("create admin server: invalid options: %w", err)
 	}
-	if options.TLS.Enabled != (tlsConfig != nil) {
-		return nil, errors.New("create identity admin server: TLS configuration does not match enabled setting")
+	if cfg.Options.TLS.Enabled != (cfg.TLSConfig != nil) {
+		return nil, errors.New("create admin server: TLS configuration does not match enabled setting")
 	}
 
-	listener, err := (&net.ListenConfig{}).Listen(ctx, "tcp", options.Address)
+	listener, err := (&net.ListenConfig{}).Listen(ctx, "tcp", cfg.Options.Address)
 	if err != nil {
-		return nil, fmt.Errorf("listen for identity admin HTTP: %w", err)
+		return nil, fmt.Errorf("listen for admin HTTP: %w", err)
 	}
 	hertzOptions := []config.Option{
 		server.WithListener(listener),
 		server.WithTransport(standard.NewTransporter),
-		server.WithReadTimeout(options.ReadTimeout),
-		server.WithWriteTimeout(options.WriteTimeout),
-		server.WithIdleTimeout(options.IdleTimeout),
-		server.WithExitWaitTime(options.ShutdownTimeout),
-		server.WithMaxRequestBodySize(options.MaxRequestBodySize),
+		server.WithReadTimeout(cfg.Options.ReadTimeout),
+		server.WithWriteTimeout(cfg.Options.WriteTimeout),
+		server.WithIdleTimeout(cfg.Options.IdleTimeout),
+		server.WithExitWaitTime(cfg.Options.ShutdownTimeout),
+		server.WithMaxRequestBodySize(cfg.Options.MaxRequestBodySize),
 		server.WithDisablePrintRoute(true),
 	}
-	if tlsConfig != nil {
-		hertzOptions = append(hertzOptions, server.WithTLS(tlsConfig))
+	if cfg.TLSConfig != nil {
+		hertzOptions = append(hertzOptions, server.WithTLS(cfg.TLSConfig))
 	}
 
 	h := server.New(hertzOptions...)
+	result := &AdminServer{
+		name: cfg.ComponentName, logComponent: cfg.LogComponent,
+		server: h, listener: listener,
+	}
 	h.Use(
 		coretrace.HertzServerMiddleware(telemetry, isMetricsRequest),
 		metrics.HertzServerMiddleware(metricsRegistry, isMetricsRequest),
-		accessLogMiddleware(logger, isMetricsRequest),
-		recoveryMiddleware(logger),
+		result.accessLogMiddleware(logger),
+		result.recoveryMiddleware(logger),
 	)
 	h.GET("/livez", healthHandler(healthRegistry.Live))
 	h.GET("/readyz", healthHandler(healthRegistry.Ready))
 	h.GET("/metrics", adaptor.HertzHandler(metricsRegistry.Handler()))
-	return &Server{server: h, listener: listener}, nil
+	return result, nil
 }
 
-func (s *Server) Name() string { return componentName }
+func (s *AdminServer) Name() string {
+	if s == nil {
+		return ""
+	}
+	return s.name
+}
 
-func (s *Server) Serve() error {
+func (s *AdminServer) Serve() error {
 	if s == nil || s.server == nil {
-		return errors.New("serve identity admin server: server is nil")
+		return errors.New("serve admin server: server is nil")
 	}
 	return s.server.Run()
 }
 
-func (s *Server) Ready(ctx context.Context) error {
+func (s *AdminServer) Ready(ctx context.Context) error {
 	if s == nil || s.server == nil {
-		return errors.New("wait for identity admin readiness: server is nil")
+		return errors.New("wait for admin readiness: server is nil")
 	}
 	if ctx == nil {
 		ctx = context.Background()
@@ -105,13 +124,13 @@ func (s *Server) Ready(ctx context.Context) error {
 		}
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("wait for identity admin readiness: %w", ctx.Err())
+			return fmt.Errorf("wait for admin readiness: %w", ctx.Err())
 		case <-ticker.C:
 		}
 	}
 }
 
-func (s *Server) Shutdown(ctx context.Context) error {
+func (s *AdminServer) Shutdown(ctx context.Context) error {
 	if s == nil || s.server == nil {
 		return nil
 	}
@@ -139,9 +158,7 @@ func healthHandler(check health.Check) app.HandlerFunc {
 
 func writeStatus(ctx context.Context, request *app.RequestContext, code int, status string) {
 	payload, err := jsoncodec.Marshal(statusResponse{
-		Status:    status,
-		RequestID: metadata.RequestID(ctx),
-		TraceID:   coretrace.TraceID(ctx),
+		Status: status, RequestID: metadata.RequestID(ctx), TraceID: coretrace.TraceID(ctx),
 	})
 	if err != nil {
 		request.Data(consts.StatusInternalServerError, consts.MIMEApplicationJSONUTF8, []byte(`{"status":"error"}`))
@@ -150,15 +167,15 @@ func writeStatus(ctx context.Context, request *app.RequestContext, code int, sta
 	request.Data(code, consts.MIMEApplicationJSONUTF8, payload)
 }
 
-func accessLogMiddleware(logger *slog.Logger, ignore func(context.Context, *app.RequestContext) bool) app.HandlerFunc {
+func (s *AdminServer) accessLogMiddleware(logger *slog.Logger) app.HandlerFunc {
 	return func(ctx context.Context, request *app.RequestContext) {
 		started := time.Now()
 		request.Next(ctx)
-		if ignore != nil && ignore(ctx, request) {
+		if isMetricsRequest(ctx, request) {
 			return
 		}
 		logger.InfoContext(ctx, "HTTP request completed",
-			slog.String("component", "identity.admin"),
+			slog.String("component", s.logComponent),
 			slog.String("event", "request"),
 			slog.String("http.method", string(request.Method())),
 			slog.String("http.route", request.FullPath()),
@@ -168,16 +185,12 @@ func accessLogMiddleware(logger *slog.Logger, ignore func(context.Context, *app.
 	}
 }
 
-func isMetricsRequest(_ context.Context, request *app.RequestContext) bool {
-	return string(request.Request.URI().Path()) == "/metrics"
-}
-
-func recoveryMiddleware(logger *slog.Logger) app.HandlerFunc {
+func (s *AdminServer) recoveryMiddleware(logger *slog.Logger) app.HandlerFunc {
 	return func(ctx context.Context, request *app.RequestContext) {
 		defer func() {
 			if recovered := recover(); recovered != nil {
 				logger.ErrorContext(ctx, "HTTP handler panic recovered",
-					slog.String("component", "identity.admin"),
+					slog.String("component", s.logComponent),
 					slog.String("event", "panic"),
 					slog.Any("panic", recovered),
 					slog.String("stack", string(debug.Stack())),
@@ -187,6 +200,10 @@ func recoveryMiddleware(logger *slog.Logger) app.HandlerFunc {
 		}()
 		request.Next(ctx)
 	}
+}
+
+func isMetricsRequest(_ context.Context, request *app.RequestContext) bool {
+	return string(request.Request.URI().Path()) == "/metrics"
 }
 
 func closeListener(listener net.Listener) error {

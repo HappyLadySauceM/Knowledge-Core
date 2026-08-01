@@ -18,14 +18,17 @@ import (
 // prometheus.Registerer and prometheus.Gatherer.
 type Registry struct {
 	*prometheus.Registry
-	ready        prometheus.Gauge
-	httpRequests *prometheus.CounterVec
-	httpDuration *prometheus.HistogramVec
-	httpInFlight prometheus.Gauge
-	rpcRequests  *prometheus.CounterVec
-	rpcDuration  *prometheus.HistogramVec
-	rpcInFlight  *prometheus.GaugeVec
-	handler      http.Handler
+	ready             prometheus.Gauge
+	httpRequests      *prometheus.CounterVec
+	httpDuration      *prometheus.HistogramVec
+	httpInFlight      prometheus.Gauge
+	rpcRequests       *prometheus.CounterVec
+	rpcDuration       *prometheus.HistogramVec
+	rpcInFlight       *prometheus.GaugeVec
+	rpcClientRequests *prometheus.CounterVec
+	rpcClientDuration *prometheus.HistogramVec
+	rpcClientInFlight *prometheus.GaugeVec
+	handler           http.Handler
 }
 
 type Config struct {
@@ -96,6 +99,25 @@ func NewRegistry(config Config) (*Registry, error) {
 		Name:      "requests_in_flight",
 		Help:      "Current number of RPC requests being handled.",
 	}, []string{"rpc_service", "rpc_method"})
+	rpcClientRequests := prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "knowledge_core",
+		Subsystem: "rpc_client",
+		Name:      "requests_total",
+		Help:      "Total number of outbound RPC requests.",
+	}, []string{"rpc_service", "rpc_method", "outcome", "business_code"})
+	rpcClientDuration := prometheus.NewHistogramVec(prometheus.HistogramOpts{
+		Namespace: "knowledge_core",
+		Subsystem: "rpc_client",
+		Name:      "request_duration_seconds",
+		Help:      "Duration of outbound RPC requests.",
+		Buckets:   prometheus.DefBuckets,
+	}, []string{"rpc_service", "rpc_method", "outcome"})
+	rpcClientInFlight := prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "knowledge_core",
+		Subsystem: "rpc_client",
+		Name:      "requests_in_flight",
+		Help:      "Current number of outbound RPC requests.",
+	}, []string{"rpc_service", "rpc_method"})
 
 	registeredCollectors := []prometheus.Collector{
 		collectors.NewGoCollector(),
@@ -108,6 +130,9 @@ func NewRegistry(config Config) (*Registry, error) {
 		rpcRequests,
 		rpcDuration,
 		rpcInFlight,
+		rpcClientRequests,
+		rpcClientDuration,
+		rpcClientInFlight,
 	}
 	for _, collector := range registeredCollectors {
 		if err := registry.Register(collector); err != nil {
@@ -117,14 +142,17 @@ func NewRegistry(config Config) (*Registry, error) {
 	appInfo.WithLabelValues(config.Service, config.Environment, config.Version).Set(1)
 
 	result := &Registry{
-		Registry:     registry,
-		ready:        ready,
-		httpRequests: httpRequests,
-		httpDuration: httpDuration,
-		httpInFlight: httpInFlight,
-		rpcRequests:  rpcRequests,
-		rpcDuration:  rpcDuration,
-		rpcInFlight:  rpcInFlight,
+		Registry:          registry,
+		ready:             ready,
+		httpRequests:      httpRequests,
+		httpDuration:      httpDuration,
+		httpInFlight:      httpInFlight,
+		rpcRequests:       rpcRequests,
+		rpcDuration:       rpcDuration,
+		rpcInFlight:       rpcInFlight,
+		rpcClientRequests: rpcClientRequests,
+		rpcClientDuration: rpcClientDuration,
+		rpcClientInFlight: rpcClientInFlight,
 	}
 	result.handler = promhttp.InstrumentMetricHandler(
 		result.Registerer(),

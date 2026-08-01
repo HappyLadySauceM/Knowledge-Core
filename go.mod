@@ -2,7 +2,11 @@ module github.com/HappyLadySauce/Knowledge-Core
 
 go 1.26.1
 
+// Hertz's Thrift model generator still emits the pre-context Apache Thrift API.
+replace github.com/apache/thrift => github.com/apache/thrift v0.13.0
+
 require (
+	github.com/apache/thrift v0.16.0
 	github.com/bytedance/gopkg v0.1.4
 	github.com/bytedance/sonic v1.15.1
 	github.com/cloudwego/gopkg v0.2.0
@@ -10,6 +14,7 @@ require (
 	github.com/cloudwego/kitex v0.16.2
 	github.com/cloudwego/thriftgo v0.4.5
 	github.com/go-viper/mapstructure/v2 v2.4.0
+	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/nats-io/nats.go v1.52.0
 	github.com/prometheus/client_golang v1.23.2
@@ -19,6 +24,7 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	github.com/spf13/viper v1.21.0
+	go.etcd.io/etcd/api/v3 v3.6.10
 	go.etcd.io/etcd/client/v3 v3.6.10
 	go.opentelemetry.io/otel v1.43.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.43.0
@@ -99,7 +105,6 @@ require (
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.0 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
-	go.etcd.io/etcd/api/v3 v3.6.10 // indirect
 	go.etcd.io/etcd/client/pkg/v3 v3.6.10 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.43.0 // indirect

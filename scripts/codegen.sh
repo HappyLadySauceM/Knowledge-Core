@@ -44,8 +44,17 @@ assert_tool_version() {
 
 owned_files() {
   local root="$1"
-  [[ -d "$root/kitex_gen" ]] || return 0
-  (cd "$root" && find kitex_gen -type f -print) | LC_ALL=C sort -u
+  {
+    if [[ -d "$root/kitex_gen" ]]; then
+      (cd "$root" && find kitex_gen -type f -print)
+    fi
+    for relative in \
+      services/gateway/biz/model/gateway/gateway.go \
+      services/gateway/biz/router/gateway/gateway.go \
+      services/gateway/biz/router/register.go; do
+      [[ ! -f "$root/$relative" ]] || printf '%s\n' "$relative"
+    done
+  } | LC_ALL=C sort -u
 }
 
 validate_manifest() {
@@ -126,21 +135,10 @@ generate_hertz() {
   gofmt -w services/gateway/biz
 }
 
-if $check && $include_hertz; then
-  echo "--check currently covers the committed Kitex contract only; Hertz ownership begins when the Gateway scaffold lands" >&2
-  exit 2
-fi
-
 if ! $check; then
-  if $include_hertz && [[ ! -f "$repository_root/services/gateway/biz/router/register.go" ]]; then
-    echo "Hertz scaffold is not present. Refusing 'hz new' because it would own service source; land the Gateway transport first, then rerun with --hertz." >&2
-    exit 1
-  fi
   generate_rpc "$repository_root"
+  generate_hertz "$repository_root"
   validate_manifest "$repository_root"
-  if $include_hertz; then
-    generate_hertz "$repository_root"
-  fi
   exit 0
 fi
 
@@ -160,8 +158,12 @@ for file in go.mod go.sum; do
 done
 cp -a "$repository_root/idl" "$temporary_root/idl"
 cp -a "$repository_root/scripts" "$temporary_root/scripts"
+mkdir -p "$temporary_root/services/gateway"
+cp -a "$repository_root/services/gateway/biz" "$temporary_root/services/gateway/biz"
+[[ ! -f "$repository_root/.hz" ]] || cp -a "$repository_root/.hz" "$temporary_root/.hz"
 
 generate_rpc "$temporary_root"
+generate_hertz "$temporary_root"
 validate_manifest "$temporary_root"
 
 expected_snapshot="$(mktemp)"
@@ -171,7 +173,7 @@ snapshot "$temporary_root" >"$actual_snapshot"
 if ! cmp -s "$expected_snapshot" "$actual_snapshot"; then
   diff -u "$expected_snapshot" "$actual_snapshot" || true
   rm -f -- "$expected_snapshot" "$actual_snapshot"
-  echo "generated RPC code is not up to date" >&2
+  echo "generated code is not up to date" >&2
   exit 1
 fi
 rm -f -- "$expected_snapshot" "$actual_snapshot"

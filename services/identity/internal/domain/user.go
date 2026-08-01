@@ -90,3 +90,7 @@ func ValidatePassword(password string) error {
 	}
 	return nil
 }
+
+func (u *User) IsLocked(now time.Time) bool {
+	return u != nil && u.LockedUntil != nil && u.LockedUntil.After(now.UTC())
+}

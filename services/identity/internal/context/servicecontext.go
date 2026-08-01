@@ -9,29 +9,32 @@ import (
 	"time"
 
 	coreapp "github.com/HappyLadySauce/Knowledge-Core/pkg/app"
+	coreauth "github.com/HappyLadySauce/Knowledge-Core/pkg/auth"
 	etcdresource "github.com/HappyLadySauce/Knowledge-Core/pkg/etcd"
 	"github.com/HappyLadySauce/Knowledge-Core/pkg/health"
 	"github.com/HappyLadySauce/Knowledge-Core/pkg/postgres"
 	redisresource "github.com/HappyLadySauce/Knowledge-Core/pkg/redis"
+	hertztransport "github.com/HappyLadySauce/Knowledge-Core/pkg/transport/hertz"
 	"github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/config"
 	identitylogic "github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/logic"
 	"github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/migration"
 	identityrepository "github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/repository"
 	"github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/security"
-	adminhttp "github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/transport/http"
 	identityrpc "github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/transport/rpc"
 	"gorm.io/gorm"
 )
 
 type ServiceContext struct {
-	Config     config.Config
-	Database   *gorm.DB
-	Redis      *redisresource.Resource
-	Etcd       *etcdresource.Resources
-	Register   *identitylogic.RegisterLogic
-	RPCHandler *identityrpc.Handler
-	RPCServer  *identityrpc.RPCServer
-	Admin      *adminhttp.Server
+	Config       config.Config
+	Database     *gorm.DB
+	Redis        *redisresource.Resource
+	Etcd         *etcdresource.Resources
+	Register     *identitylogic.RegisterLogic
+	Authenticate *identitylogic.AuthenticateLogic
+	GetUser      *identitylogic.GetUserLogic
+	RPCHandler   *identityrpc.Handler
+	RPCServer    *identityrpc.RPCServer
+	Admin        *hertztransport.AdminServer
 }
 
 func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *coreapp.Runtime) (*ServiceContext, error) {
@@ -92,7 +95,25 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 	if err != nil {
 		return nil, err
 	}
-	handler, err := identityrpc.NewHandler(register, runtime.Health, runtime.Logger)
+	issuer, err := coreauth.NewIssuer(cfg.Auth.PrivateKey, cfg.Auth.AccessTokenTTL)
+	if err != nil {
+		return nil, fmt.Errorf("create identity access-token issuer: %w", err)
+	}
+	verifier, err := coreauth.NewVerifier(cfg.Auth.PublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("create identity access-token verifier: %w", err)
+	}
+	authenticate, err := identitylogic.NewAuthenticateLogic(
+		users, hasher, issuer, cfg.Auth.FailureThreshold, cfg.Auth.LockDuration,
+	)
+	if err != nil {
+		return nil, err
+	}
+	getUser, err := identitylogic.NewGetUserLogic(users)
+	if err != nil {
+		return nil, err
+	}
+	handler, err := identityrpc.NewHandler(register, authenticate, getUser, verifier, runtime.Health, runtime.Logger)
 	if err != nil {
 		return nil, err
 	}
@@ -101,10 +122,14 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 	if err != nil {
 		return nil, fmt.Errorf("load identity admin TLS configuration: %w", err)
 	}
-	admin, err := adminhttp.NewServer(
+	admin, err := hertztransport.NewAdminServer(
 		ctx,
-		*cfg.HTTP,
-		httpTLS,
+		hertztransport.AdminServerConfig{
+			ComponentName: "identity-admin-http",
+			LogComponent:  "identity.admin",
+			Options:       *cfg.HTTP,
+			TLSConfig:     httpTLS,
+		},
 		runtime.Health,
 		runtime.Metrics,
 		runtime.Trace,
@@ -149,14 +174,16 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 		slog.String("event", "dependencies_ready"),
 	)
 	return &ServiceContext{
-		Config:     cfg,
-		Database:   db,
-		Redis:      cache,
-		Etcd:       registry,
-		Register:   register,
-		RPCHandler: handler,
-		RPCServer:  rpcServer,
-		Admin:      admin,
+		Config:       cfg,
+		Database:     db,
+		Redis:        cache,
+		Etcd:         registry,
+		Register:     register,
+		Authenticate: authenticate,
+		GetUser:      getUser,
+		RPCHandler:   handler,
+		RPCServer:    rpcServer,
+		Admin:        admin,
 	}, nil
 }
 

@@ -22,6 +22,7 @@ type Config struct {
 	Redis      *option.RedisOptions       `mapstructure:"redis" json:"redis" yaml:"redis"`
 	Etcd       *option.EtcdOptions        `mapstructure:"etcd" json:"etcd" yaml:"etcd"`
 	Bcrypt     *BcryptOptions             `mapstructure:"bcrypt" json:"bcrypt" yaml:"bcrypt"`
+	Auth       *AuthOptions               `mapstructure:"auth" json:"auth" yaml:"auth"`
 }
 
 func New() Config {
@@ -38,6 +39,7 @@ func New() Config {
 		Redis:      option.NewRedisOptions(),
 		Etcd:       option.NewEtcdOptions(),
 		Bcrypt:     NewBcryptOptions(),
+		Auth:       NewAuthOptions(),
 	}
 }
 
@@ -55,6 +57,7 @@ func (c Config) Validate() error {
 		wrapValidation("redis", c.Redis.Validate()),
 		wrapValidation("etcd", c.Etcd.Validate()),
 		wrapValidation("bcrypt", c.Bcrypt.Validate()),
+		wrapValidation("auth", c.Auth.Validate()),
 		validateLifecycleBudgets(c),
 	)
 }
@@ -85,6 +88,7 @@ func (c Config) requireSections() error {
 		"app": c.App, "log": c.Log, "trace": c.Trace, "rpc": c.RPC,
 		"http": c.HTTP, "postgres": c.PostgreSQL, "redis": c.Redis,
 		"etcd": c.Etcd, "bcrypt": c.Bcrypt,
+		"auth": c.Auth,
 	}
 	var joined error
 	for name, section := range sections {

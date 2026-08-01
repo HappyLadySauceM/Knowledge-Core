@@ -26,3 +26,14 @@ func (h *BcryptHasher) Hash(password string) (string, error) {
 	}
 	return string(value), nil
 }
+
+func (h *BcryptHasher) Compare(hash, password string) (bool, error) {
+	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+	if err == nil {
+		return true, nil
+	}
+	if err == bcrypt.ErrMismatchedHashAndPassword {
+		return false, nil
+	}
+	return false, fmt.Errorf("compare password: %w", err)
+}

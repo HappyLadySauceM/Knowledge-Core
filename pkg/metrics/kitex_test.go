@@ -33,6 +33,9 @@ func TestKitexMiddlewareClassifiesOutcomes(t *testing.T) {
 		if err := metrics.KitexServerMiddleware(registry)(next)(ctx, nil, nil); !errors.Is(err, test.err) {
 			t.Fatalf("%s middleware error = %v, want %v", test.name, err, test.err)
 		}
+		if err := metrics.KitexClientMiddleware(registry)(next)(ctx, nil, nil); !errors.Is(err, test.err) {
+			t.Fatalf("%s client middleware error = %v, want %v", test.name, err, test.err)
+		}
 	}
 
 	family := gatherFamily(t, registry, "knowledge_core_rpc_server_requests_total")
@@ -44,6 +47,18 @@ func TestKitexMiddlewareClassifiesOutcomes(t *testing.T) {
 			"business_code": test.businessCode,
 		}); got != 1 {
 			t.Fatalf("%s RPC request counter = %v, want 1", test.name, got)
+		}
+	}
+
+	clientFamily := gatherFamily(t, registry, "knowledge_core_rpc_client_requests_total")
+	for _, test := range tests {
+		if got := counterValue(clientFamily, map[string]string{
+			"rpc_service":   "identity.IdentityService",
+			"rpc_method":    "Register",
+			"outcome":       test.outcome,
+			"business_code": test.businessCode,
+		}); got != 1 {
+			t.Fatalf("%s RPC client request counter = %v, want 1", test.name, got)
 		}
 	}
 }
