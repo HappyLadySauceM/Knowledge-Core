@@ -18,34 +18,79 @@ jobs:
   verify:
     name: verify
     if: github.ref == 'refs/heads/dev'
-    runs-on: ubuntu-latest
+    runs-on:
+      group: Knowledge-Core CI
+      labels: [self-hosted, Linux, X64]
     timeout-minutes: 45
     permissions:
       contents: read
+    env:
+      GOPROXY: https://goproxy.cn,direct
     steps:
+      - name: Check runner prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          for command_name in bash git make gcc; do
+            if ! command -v "$command_name" >/dev/null 2>&1; then
+              echo "::error title=Missing runner prerequisite::${command_name} is required on runner ${RUNNER_NAME}."
+              exit 1
+            fi
+          done
+
       - name: Check out dev
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          clean: true
+          persist-credentials: false
 
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-          cache: true
+          cache: false
 
-      - name: Install pinned code generators
+      - name: Prepare pinned Go tools
         shell: bash
+        env:
+          GOLANGCI_LINT: ${{ runner.tool_cache }}/knowledge-core/golangci-lint/v2.12.2/golangci-lint
+          CODEGEN_BIN: ${{ runner.tool_cache }}/knowledge-core/codegen/kitex-v0.16.2_hz-v0.9.7_thriftgo-v0.4.5/bin
         run: |
           set -euo pipefail
-          go install github.com/cloudwego/kitex/tool/cmd/kitex@v0.16.2
-          go install github.com/cloudwego/hertz/cmd/hz@v0.9.7
-          go install github.com/cloudwego/thriftgo@v0.4.5
-          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+          mkdir -p "$(dirname "$GOLANGCI_LINT")" "$CODEGEN_BIN"
+          if [[ ! -x "$GOLANGCI_LINT" ]]; then
+            GOBIN="$(dirname "$GOLANGCI_LINT")" \
+              go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2
+          fi
+          if [[ ! -x "$CODEGEN_BIN/kitex" || ! -x "$CODEGEN_BIN/hz" || ! -x "$CODEGEN_BIN/thriftgo" ]]; then
+            GOBIN="$CODEGEN_BIN" go install github.com/cloudwego/kitex/tool/cmd/kitex@v0.16.2
+            GOBIN="$CODEGEN_BIN" go install github.com/cloudwego/hertz/cmd/hz@v0.9.7
+            GOBIN="$CODEGEN_BIN" go install github.com/cloudwego/thriftgo@v0.4.5
+          fi
+          echo "$CODEGEN_BIN" >> "$GITHUB_PATH"
 
       - name: Run CI checks
+        env:
+          GOLANGCI_LINT: ${{ runner.tool_cache }}/knowledge-core/golangci-lint/v2.12.2/golangci-lint
         run: make ci
 
       - name: Run race detector
         run: make race
+
+      - name: Clean persistent workspace
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          workspace="$(pwd -P)"
+          repository_root="$(cd "$(git rev-parse --show-toplevel)" && pwd -P)"
+          if [[ "$workspace" != "$repository_root" || "$workspace" != "$(cd "$GITHUB_WORKSPACE" && pwd -P)" ]]; then
+            echo "::error title=Unsafe cleanup target::Refusing to clean outside GITHUB_WORKSPACE."
+            exit 1
+          fi
+          git reset --hard HEAD
+          git clean -ffdx
 
   promote:
     name: Promote dev to main

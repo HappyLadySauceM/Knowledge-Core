@@ -289,6 +289,16 @@ $mergeBase = git merge-base origin/main HEAD
 go run ./scripts/idlguard compat-git $mergeBase idl
 ```
 
+### 自托管 CI Runner
+
+`dev` 的 `verify` job 运行在组织自托管 Linux runner `home` 上，并使用专用的 `Knowledge-Core CI` runner group。该组只授权本仓库；具有仓库写权限的自动 PR、合并和分支同步 job 仍运行在 GitHub 托管 runner 上。
+
+在 GitHub 组织的 **Settings -> Actions -> Runners** 中确认 `home` 显示 `Online` 且标签包含 `self-hosted`、`Linux`、`X64`、`home`。Runner 主机需要提供 `bash`、`git`、GNU Make 和 `gcc`；Go 版本由 workflow 根据 `go.mod` 自动准备。`gcc` 是执行 `make race` 的必要依赖。
+
+自托管 runner 会保留 Go module、build cache 和固定版本的代码生成工具，避免每次运行上传或下载大型 GitHub Actions cache。Go module 和工具下载统一使用 `GOPROXY=https://goproxy.cn,direct`，依赖完整性仍由 Go module checksum 校验。checkout 前后都会清理仓库 workspace，但不会清理 runner 的 Go/tool cache。`home` 离线或正在执行其他任务时，`verify` 会在队列中等待，不会自动回退到未授权的机器。
+
+仓库是 public，但 workflow 不处理 fork pull request，只响应受保护的 `dev`/`main` push 和手动触发。所有能 push `dev` 的成员都能让提交中的代码在 `home` 上执行，因此 runner 必须使用无特权的独立系统账号，不得保存生产 Secret、个人 SSH key，或开放 sudo 与生产网络访问。
+
 ## 代码生成
 
 IDL 是 HTTP 与 RPC 契约源。先安装仓库固定的生成器版本：
