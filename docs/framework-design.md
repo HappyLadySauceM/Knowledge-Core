@@ -1,6 +1,8 @@
 # Knowledge Core 框架设计
 
 > 状态：当前实现基线，更新于 2026-08-02。本文只描述仓库中已经实现的行为。系统由 Gateway、Identity、Knowledge 和 Collaboration 四个服务组成；Identity 与 Knowledge 的真实 PostgreSQL 集成测试仍未纳入当前门禁。
+>
+> 规划提案（尚未实现）：[`Rust Collaboration 重写设计提案`](rust-collaboration-design.md)。该提案不属于本文描述的当前运行时能力。
 
 ## 1. 系统目标与边界
 
