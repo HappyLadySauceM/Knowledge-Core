@@ -306,14 +306,20 @@ func registrationAddress(address net.Addr) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("parse registry info address: %w", err)
 	}
-	if host == "" || host == "::" {
+	if configuredHost, ok := os.LookupEnv(ipEnvironment); ok && configuredHost != "" {
+		parsedHost := net.ParseIP(configuredHost)
+		if parsedHost == nil {
+			return "", fmt.Errorf("parse registry info advertised IP %q from %s: invalid IP address", configuredHost, ipEnvironment)
+		}
+		if parsedHost.IsUnspecified() {
+			return "", fmt.Errorf("parse registry info advertised IP %q from %s: unspecified IP address is not advertisable", configuredHost, ipEnvironment)
+		}
+		host = parsedHost.String()
+	} else if parsedHost := net.ParseIP(host); host == "" || (parsedHost != nil && parsedHost.IsUnspecified()) {
 		host, err = localIPv4Host()
 		if err != nil {
 			return "", fmt.Errorf("parse registry info address: %w", err)
 		}
-	}
-	if configuredHost, ok := os.LookupEnv(ipEnvironment); ok && configuredHost != "" {
-		host = configuredHost
 	}
 	if configuredPort, ok := os.LookupEnv(portEnvironment); ok && configuredPort != "" {
 		port = configuredPort
@@ -322,7 +328,10 @@ func registrationAddress(address net.Addr) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("parse registry info port: %w", err)
 	}
-	return fmt.Sprintf("%s:%d", host, parsedPort), nil
+	if parsedPort < 1 || parsedPort > 65535 {
+		return "", fmt.Errorf("parse registry info port %d: must be between 1 and 65535", parsedPort)
+	}
+	return net.JoinHostPort(host, strconv.Itoa(parsedPort)), nil
 }
 
 func localIPv4Host() (string, error) {
