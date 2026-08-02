@@ -19,6 +19,10 @@ func (s getUserRepositoryStub) FindByID(context.Context, int64) (*domain.User, e
 	return s.user, s.err
 }
 
+func (s getUserRepositoryStub) FindByUsername(context.Context, string) (*domain.User, error) {
+	return s.user, s.err
+}
+
 func TestGetUserMapsNotFound(t *testing.T) {
 	logic, err := NewGetUserLogic(getUserRepositoryStub{err: repository.ErrUserNotFound})
 	if err != nil {
@@ -26,6 +30,16 @@ func TestGetUserMapsNotFound(t *testing.T) {
 	}
 	if _, err := logic.GetUser(context.Background(), 1); !errors.Is(err, identityerrors.UserNotFound) {
 		t.Fatalf("GetUser() error = %v", err)
+	}
+}
+
+func TestResolveUserMapsNotFound(t *testing.T) {
+	logic, err := NewGetUserLogic(getUserRepositoryStub{err: repository.ErrUserNotFound})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := logic.ResolveUser(context.Background(), "alice"); !errors.Is(err, identityerrors.UserNotFound) {
+		t.Fatalf("ResolveUser() error = %v", err)
 	}
 }
 

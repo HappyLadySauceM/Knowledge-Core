@@ -5,6 +5,7 @@ readonly default_goproxy="https://goproxy.cn,direct"
 readonly ci_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 readonly repository_root="$(cd "${ci_root}/../.." && pwd -P)"
 readonly dockerfile="${ci_root}/Dockerfile"
+readonly node_image="node:24.18.1-bookworm-slim"
 readonly goproxy="${GOPROXY:-$default_goproxy}"
 readonly container_proxy="${KC_CONTAINER_PROXY:-}"
 readonly cache_root="${KC_CI_CACHE_ROOT:-${XDG_CACHE_HOME:-$HOME/.cache}/knowledge-core-ci}"
@@ -63,6 +64,37 @@ if ! docker image inspect "$image" >/dev/null 2>&1; then
 fi
 
 mkdir -p "$cache_root/go-build" "$cache_root/go-mod" "$cache_root/gopath"
+mkdir -p "$cache_root/npm"
+
+node_container_env=(
+    --env "HOME=/tmp/knowledge-core-node-ci"
+    --env "npm_config_cache=/cache/npm"
+)
+if [[ -n "$container_proxy" ]]; then
+    node_container_env+=(
+        --env "http_proxy=${container_proxy}"
+        --env "https_proxy=${container_proxy}"
+        --env "HTTP_PROXY=${container_proxy}"
+        --env "HTTPS_PROXY=${container_proxy}"
+        --env "no_proxy=127.0.0.1,localhost,::1"
+        --env "NO_PROXY=127.0.0.1,localhost,::1"
+    )
+fi
+
+docker run --rm \
+    --cap-drop ALL \
+    --security-opt no-new-privileges:true \
+    --pids-limit 2048 \
+    --read-only \
+    --tmpfs /tmp:rw,exec,nosuid,nodev,mode=1777,size=1073741824 \
+    --network bridge \
+    "${node_container_env[@]}" \
+    --volume "${repository_root}:/workspace:rw" \
+    --volume "${cache_root}/npm:/cache/npm:rw" \
+    --tmpfs /workspace/services/collaboration/node_modules:rw,exec,nosuid,nodev,mode=1777,size=1073741824 \
+    --workdir /workspace/services/collaboration \
+    "$node_image" \
+    sh -eu -c 'mkdir -p "$HOME"; npm ci; npm run ci'
 
 docker run --rm \
     --cap-drop ALL \

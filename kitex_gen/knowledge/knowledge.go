@@ -17,20 +17,503 @@ const (
 
 	CodeForbidden = 30004
 
+	CodeUnauthenticated = 30005
+
+	CodeUnavailable = 30006
+
+	CodePreconditionFailed = 30007
+
+	CodeGone = 30008
+
+	CodeQuotaExceeded = 30009
+
 	CodeInternal = 30999
 )
 
+type PublicUser struct {
+	Id       int64  `thrift:"id,1,required" frugal:"1,required,i64" json:"id"`
+	Username string `thrift:"username,2,required" frugal:"2,required,string" json:"username"`
+	Avatar   string `thrift:"avatar,3,required" frugal:"3,required,string" json:"avatar"`
+}
+
+func NewPublicUser() *PublicUser {
+	return &PublicUser{}
+}
+
+func (p *PublicUser) InitDefault() {
+}
+
+func (p *PublicUser) GetId() (v int64) {
+	return p.Id
+}
+
+func (p *PublicUser) GetUsername() (v string) {
+	return p.Username
+}
+
+func (p *PublicUser) GetAvatar() (v string) {
+	return p.Avatar
+}
+func (p *PublicUser) SetId(val int64) {
+	p.Id = val
+}
+func (p *PublicUser) SetUsername(val string) {
+	p.Username = val
+}
+func (p *PublicUser) SetAvatar(val string) {
+	p.Avatar = val
+}
+
+func (p *PublicUser) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("PublicUser(%+v)", *p)
+}
+
+var fieldIDToName_PublicUser = map[int16]string{
+	1: "id",
+	2: "username",
+	3: "avatar",
+}
+
+type RichTextAttrs struct {
+	Level        *int32  `thrift:"level,1,optional" frugal:"1,optional,i32" json:"level,omitempty"`
+	Start        *int32  `thrift:"start,2,optional" frugal:"2,optional,i32" json:"start,omitempty"`
+	Checked      *bool   `thrift:"checked,3,optional" frugal:"3,optional,bool" json:"checked,omitempty"`
+	Language     *string `thrift:"language,4,optional" frugal:"4,optional,string" json:"language,omitempty"`
+	Href         *string `thrift:"href,5,optional" frugal:"5,optional,string" json:"href,omitempty"`
+	AttachmentId *string `thrift:"attachment_id,6,optional" frugal:"6,optional,string" json:"attachment_id,omitempty"`
+	Alt          *string `thrift:"alt,7,optional" frugal:"7,optional,string" json:"alt,omitempty"`
+	Title        *string `thrift:"title,8,optional" frugal:"8,optional,string" json:"title,omitempty"`
+	TextAlign    *string `thrift:"text_align,9,optional" frugal:"9,optional,string" json:"text_align,omitempty"`
+	Colspan      *int32  `thrift:"colspan,10,optional" frugal:"10,optional,i32" json:"colspan,omitempty"`
+	Rowspan      *int32  `thrift:"rowspan,11,optional" frugal:"11,optional,i32" json:"rowspan,omitempty"`
+	Colwidth     []int32 `thrift:"colwidth,12,optional" frugal:"12,optional,list<i32>" json:"colwidth,omitempty"`
+}
+
+func NewRichTextAttrs() *RichTextAttrs {
+	return &RichTextAttrs{}
+}
+
+func (p *RichTextAttrs) InitDefault() {
+}
+
+var RichTextAttrs_Level_DEFAULT int32
+
+func (p *RichTextAttrs) GetLevel() (v int32) {
+	if !p.IsSetLevel() {
+		return RichTextAttrs_Level_DEFAULT
+	}
+	return *p.Level
+}
+
+var RichTextAttrs_Start_DEFAULT int32
+
+func (p *RichTextAttrs) GetStart() (v int32) {
+	if !p.IsSetStart() {
+		return RichTextAttrs_Start_DEFAULT
+	}
+	return *p.Start
+}
+
+var RichTextAttrs_Checked_DEFAULT bool
+
+func (p *RichTextAttrs) GetChecked() (v bool) {
+	if !p.IsSetChecked() {
+		return RichTextAttrs_Checked_DEFAULT
+	}
+	return *p.Checked
+}
+
+var RichTextAttrs_Language_DEFAULT string
+
+func (p *RichTextAttrs) GetLanguage() (v string) {
+	if !p.IsSetLanguage() {
+		return RichTextAttrs_Language_DEFAULT
+	}
+	return *p.Language
+}
+
+var RichTextAttrs_Href_DEFAULT string
+
+func (p *RichTextAttrs) GetHref() (v string) {
+	if !p.IsSetHref() {
+		return RichTextAttrs_Href_DEFAULT
+	}
+	return *p.Href
+}
+
+var RichTextAttrs_AttachmentId_DEFAULT string
+
+func (p *RichTextAttrs) GetAttachmentId() (v string) {
+	if !p.IsSetAttachmentId() {
+		return RichTextAttrs_AttachmentId_DEFAULT
+	}
+	return *p.AttachmentId
+}
+
+var RichTextAttrs_Alt_DEFAULT string
+
+func (p *RichTextAttrs) GetAlt() (v string) {
+	if !p.IsSetAlt() {
+		return RichTextAttrs_Alt_DEFAULT
+	}
+	return *p.Alt
+}
+
+var RichTextAttrs_Title_DEFAULT string
+
+func (p *RichTextAttrs) GetTitle() (v string) {
+	if !p.IsSetTitle() {
+		return RichTextAttrs_Title_DEFAULT
+	}
+	return *p.Title
+}
+
+var RichTextAttrs_TextAlign_DEFAULT string
+
+func (p *RichTextAttrs) GetTextAlign() (v string) {
+	if !p.IsSetTextAlign() {
+		return RichTextAttrs_TextAlign_DEFAULT
+	}
+	return *p.TextAlign
+}
+
+var RichTextAttrs_Colspan_DEFAULT int32
+
+func (p *RichTextAttrs) GetColspan() (v int32) {
+	if !p.IsSetColspan() {
+		return RichTextAttrs_Colspan_DEFAULT
+	}
+	return *p.Colspan
+}
+
+var RichTextAttrs_Rowspan_DEFAULT int32
+
+func (p *RichTextAttrs) GetRowspan() (v int32) {
+	if !p.IsSetRowspan() {
+		return RichTextAttrs_Rowspan_DEFAULT
+	}
+	return *p.Rowspan
+}
+
+var RichTextAttrs_Colwidth_DEFAULT []int32
+
+func (p *RichTextAttrs) GetColwidth() (v []int32) {
+	if !p.IsSetColwidth() {
+		return RichTextAttrs_Colwidth_DEFAULT
+	}
+	return p.Colwidth
+}
+func (p *RichTextAttrs) SetLevel(val *int32) {
+	p.Level = val
+}
+func (p *RichTextAttrs) SetStart(val *int32) {
+	p.Start = val
+}
+func (p *RichTextAttrs) SetChecked(val *bool) {
+	p.Checked = val
+}
+func (p *RichTextAttrs) SetLanguage(val *string) {
+	p.Language = val
+}
+func (p *RichTextAttrs) SetHref(val *string) {
+	p.Href = val
+}
+func (p *RichTextAttrs) SetAttachmentId(val *string) {
+	p.AttachmentId = val
+}
+func (p *RichTextAttrs) SetAlt(val *string) {
+	p.Alt = val
+}
+func (p *RichTextAttrs) SetTitle(val *string) {
+	p.Title = val
+}
+func (p *RichTextAttrs) SetTextAlign(val *string) {
+	p.TextAlign = val
+}
+func (p *RichTextAttrs) SetColspan(val *int32) {
+	p.Colspan = val
+}
+func (p *RichTextAttrs) SetRowspan(val *int32) {
+	p.Rowspan = val
+}
+func (p *RichTextAttrs) SetColwidth(val []int32) {
+	p.Colwidth = val
+}
+
+func (p *RichTextAttrs) IsSetLevel() bool {
+	return p.Level != nil
+}
+
+func (p *RichTextAttrs) IsSetStart() bool {
+	return p.Start != nil
+}
+
+func (p *RichTextAttrs) IsSetChecked() bool {
+	return p.Checked != nil
+}
+
+func (p *RichTextAttrs) IsSetLanguage() bool {
+	return p.Language != nil
+}
+
+func (p *RichTextAttrs) IsSetHref() bool {
+	return p.Href != nil
+}
+
+func (p *RichTextAttrs) IsSetAttachmentId() bool {
+	return p.AttachmentId != nil
+}
+
+func (p *RichTextAttrs) IsSetAlt() bool {
+	return p.Alt != nil
+}
+
+func (p *RichTextAttrs) IsSetTitle() bool {
+	return p.Title != nil
+}
+
+func (p *RichTextAttrs) IsSetTextAlign() bool {
+	return p.TextAlign != nil
+}
+
+func (p *RichTextAttrs) IsSetColspan() bool {
+	return p.Colspan != nil
+}
+
+func (p *RichTextAttrs) IsSetRowspan() bool {
+	return p.Rowspan != nil
+}
+
+func (p *RichTextAttrs) IsSetColwidth() bool {
+	return p.Colwidth != nil
+}
+
+func (p *RichTextAttrs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("RichTextAttrs(%+v)", *p)
+}
+
+var fieldIDToName_RichTextAttrs = map[int16]string{
+	1:  "level",
+	2:  "start",
+	3:  "checked",
+	4:  "language",
+	5:  "href",
+	6:  "attachment_id",
+	7:  "alt",
+	8:  "title",
+	9:  "text_align",
+	10: "colspan",
+	11: "rowspan",
+	12: "colwidth",
+}
+
+type RichTextMark struct {
+	Type  string         `thrift:"type,1,required" frugal:"1,required,string" json:"type"`
+	Attrs *RichTextAttrs `thrift:"attrs,2,optional" frugal:"2,optional,RichTextAttrs" json:"attrs,omitempty"`
+}
+
+func NewRichTextMark() *RichTextMark {
+	return &RichTextMark{}
+}
+
+func (p *RichTextMark) InitDefault() {
+}
+
+func (p *RichTextMark) GetType() (v string) {
+	return p.Type
+}
+
+var RichTextMark_Attrs_DEFAULT *RichTextAttrs
+
+func (p *RichTextMark) GetAttrs() (v *RichTextAttrs) {
+	if !p.IsSetAttrs() {
+		return RichTextMark_Attrs_DEFAULT
+	}
+	return p.Attrs
+}
+func (p *RichTextMark) SetType(val string) {
+	p.Type = val
+}
+func (p *RichTextMark) SetAttrs(val *RichTextAttrs) {
+	p.Attrs = val
+}
+
+func (p *RichTextMark) IsSetAttrs() bool {
+	return p.Attrs != nil
+}
+
+func (p *RichTextMark) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("RichTextMark(%+v)", *p)
+}
+
+var fieldIDToName_RichTextMark = map[int16]string{
+	1: "type",
+	2: "attrs",
+}
+
+type RichTextNode struct {
+	Type    string          `thrift:"type,1,required" frugal:"1,required,string" json:"type"`
+	Attrs   *RichTextAttrs  `thrift:"attrs,2,optional" frugal:"2,optional,RichTextAttrs" json:"attrs,omitempty"`
+	Content []*RichTextNode `thrift:"content,3,optional" frugal:"3,optional,list<RichTextNode>" json:"content,omitempty"`
+	Text    *string         `thrift:"text,4,optional" frugal:"4,optional,string" json:"text,omitempty"`
+	Marks   []*RichTextMark `thrift:"marks,5,optional" frugal:"5,optional,list<RichTextMark>" json:"marks,omitempty"`
+}
+
+func NewRichTextNode() *RichTextNode {
+	return &RichTextNode{}
+}
+
+func (p *RichTextNode) InitDefault() {
+}
+
+func (p *RichTextNode) GetType() (v string) {
+	return p.Type
+}
+
+var RichTextNode_Attrs_DEFAULT *RichTextAttrs
+
+func (p *RichTextNode) GetAttrs() (v *RichTextAttrs) {
+	if !p.IsSetAttrs() {
+		return RichTextNode_Attrs_DEFAULT
+	}
+	return p.Attrs
+}
+
+var RichTextNode_Content_DEFAULT []*RichTextNode
+
+func (p *RichTextNode) GetContent() (v []*RichTextNode) {
+	if !p.IsSetContent() {
+		return RichTextNode_Content_DEFAULT
+	}
+	return p.Content
+}
+
+var RichTextNode_Text_DEFAULT string
+
+func (p *RichTextNode) GetText() (v string) {
+	if !p.IsSetText() {
+		return RichTextNode_Text_DEFAULT
+	}
+	return *p.Text
+}
+
+var RichTextNode_Marks_DEFAULT []*RichTextMark
+
+func (p *RichTextNode) GetMarks() (v []*RichTextMark) {
+	if !p.IsSetMarks() {
+		return RichTextNode_Marks_DEFAULT
+	}
+	return p.Marks
+}
+func (p *RichTextNode) SetType(val string) {
+	p.Type = val
+}
+func (p *RichTextNode) SetAttrs(val *RichTextAttrs) {
+	p.Attrs = val
+}
+func (p *RichTextNode) SetContent(val []*RichTextNode) {
+	p.Content = val
+}
+func (p *RichTextNode) SetText(val *string) {
+	p.Text = val
+}
+func (p *RichTextNode) SetMarks(val []*RichTextMark) {
+	p.Marks = val
+}
+
+func (p *RichTextNode) IsSetAttrs() bool {
+	return p.Attrs != nil
+}
+
+func (p *RichTextNode) IsSetContent() bool {
+	return p.Content != nil
+}
+
+func (p *RichTextNode) IsSetText() bool {
+	return p.Text != nil
+}
+
+func (p *RichTextNode) IsSetMarks() bool {
+	return p.Marks != nil
+}
+
+func (p *RichTextNode) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("RichTextNode(%+v)", *p)
+}
+
+var fieldIDToName_RichTextNode = map[int16]string{
+	1: "type",
+	2: "attrs",
+	3: "content",
+	4: "text",
+	5: "marks",
+}
+
+type RichTextDocument struct {
+	Type    string          `thrift:"type,1,required" frugal:"1,required,string" json:"type"`
+	Content []*RichTextNode `thrift:"content,2,required" frugal:"2,required,list<RichTextNode>" json:"content"`
+}
+
+func NewRichTextDocument() *RichTextDocument {
+	return &RichTextDocument{}
+}
+
+func (p *RichTextDocument) InitDefault() {
+}
+
+func (p *RichTextDocument) GetType() (v string) {
+	return p.Type
+}
+
+func (p *RichTextDocument) GetContent() (v []*RichTextNode) {
+	return p.Content
+}
+func (p *RichTextDocument) SetType(val string) {
+	p.Type = val
+}
+func (p *RichTextDocument) SetContent(val []*RichTextNode) {
+	p.Content = val
+}
+
+func (p *RichTextDocument) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("RichTextDocument(%+v)", *p)
+}
+
+var fieldIDToName_RichTextDocument = map[int16]string{
+	1: "type",
+	2: "content",
+}
+
 type Document struct {
-	Id              int64  `thrift:"id,1,required" frugal:"1,required,i64" json:"id"`
-	Title           string `thrift:"title,2,required" frugal:"2,required,string" json:"title"`
-	Summary         string `thrift:"summary,3,required" frugal:"3,required,string" json:"summary"`
-	Slug            string `thrift:"slug,4,required" frugal:"4,required,string" json:"slug"`
-	Status          string `thrift:"status,5,required" frugal:"5,required,string" json:"status"`
-	AuthorId        int64  `thrift:"author_id,6,required" frugal:"6,required,i64" json:"author_id"`
-	CurrentVersion  int64  `thrift:"current_version,7,required" frugal:"7,required,i64" json:"current_version"`
-	PublishedAtUnix *int64 `thrift:"published_at_unix,8,optional" frugal:"8,optional,i64" json:"published_at_unix,omitempty"`
-	CreatedAtUnix   int64  `thrift:"created_at_unix,9,required" frugal:"9,required,i64" json:"created_at_unix"`
-	UpdatedAtUnix   int64  `thrift:"updated_at_unix,10,required" frugal:"10,required,i64" json:"updated_at_unix"`
+	Id               string      `thrift:"id,1,required" frugal:"1,required,string" json:"id"`
+	Title            string      `thrift:"title,2,required" frugal:"2,required,string" json:"title"`
+	Summary          string      `thrift:"summary,3,required" frugal:"3,required,string" json:"summary"`
+	Slug             string      `thrift:"slug,4,required" frugal:"4,required,string" json:"slug"`
+	Owner            *PublicUser `thrift:"owner,5,required" frugal:"5,required,PublicUser" json:"owner"`
+	Access           string      `thrift:"access,6,required" frugal:"6,required,string" json:"access"`
+	Published        bool        `thrift:"published,7,required" frugal:"7,required,bool" json:"published"`
+	MetadataRevision int64       `thrift:"metadata_revision,8,required" frugal:"8,required,i64" json:"metadata_revision"`
+	ContentRevision  int64       `thrift:"content_revision,9,required" frugal:"9,required,i64" json:"content_revision"`
+	PublishedAt      *string     `thrift:"published_at,10,optional" frugal:"10,optional,string" json:"published_at,omitempty"`
+	DeletedAt        *string     `thrift:"deleted_at,11,optional" frugal:"11,optional,string" json:"deleted_at,omitempty"`
+	ProjectedAt      *string     `thrift:"projected_at,12,optional" frugal:"12,optional,string" json:"projected_at,omitempty"`
+	CreatedAt        string      `thrift:"created_at,13,required" frugal:"13,required,string" json:"created_at"`
+	UpdatedAt        string      `thrift:"updated_at,14,required" frugal:"14,required,string" json:"updated_at"`
 }
 
 func NewDocument() *Document {
@@ -40,7 +523,7 @@ func NewDocument() *Document {
 func (p *Document) InitDefault() {
 }
 
-func (p *Document) GetId() (v int64) {
+func (p *Document) GetId() (v string) {
 	return p.Id
 }
 
@@ -56,35 +539,66 @@ func (p *Document) GetSlug() (v string) {
 	return p.Slug
 }
 
-func (p *Document) GetStatus() (v string) {
-	return p.Status
-}
+var Document_Owner_DEFAULT *PublicUser
 
-func (p *Document) GetAuthorId() (v int64) {
-	return p.AuthorId
-}
-
-func (p *Document) GetCurrentVersion() (v int64) {
-	return p.CurrentVersion
-}
-
-var Document_PublishedAtUnix_DEFAULT int64
-
-func (p *Document) GetPublishedAtUnix() (v int64) {
-	if !p.IsSetPublishedAtUnix() {
-		return Document_PublishedAtUnix_DEFAULT
+func (p *Document) GetOwner() (v *PublicUser) {
+	if !p.IsSetOwner() {
+		return Document_Owner_DEFAULT
 	}
-	return *p.PublishedAtUnix
+	return p.Owner
 }
 
-func (p *Document) GetCreatedAtUnix() (v int64) {
-	return p.CreatedAtUnix
+func (p *Document) GetAccess() (v string) {
+	return p.Access
 }
 
-func (p *Document) GetUpdatedAtUnix() (v int64) {
-	return p.UpdatedAtUnix
+func (p *Document) GetPublished() (v bool) {
+	return p.Published
 }
-func (p *Document) SetId(val int64) {
+
+func (p *Document) GetMetadataRevision() (v int64) {
+	return p.MetadataRevision
+}
+
+func (p *Document) GetContentRevision() (v int64) {
+	return p.ContentRevision
+}
+
+var Document_PublishedAt_DEFAULT string
+
+func (p *Document) GetPublishedAt() (v string) {
+	if !p.IsSetPublishedAt() {
+		return Document_PublishedAt_DEFAULT
+	}
+	return *p.PublishedAt
+}
+
+var Document_DeletedAt_DEFAULT string
+
+func (p *Document) GetDeletedAt() (v string) {
+	if !p.IsSetDeletedAt() {
+		return Document_DeletedAt_DEFAULT
+	}
+	return *p.DeletedAt
+}
+
+var Document_ProjectedAt_DEFAULT string
+
+func (p *Document) GetProjectedAt() (v string) {
+	if !p.IsSetProjectedAt() {
+		return Document_ProjectedAt_DEFAULT
+	}
+	return *p.ProjectedAt
+}
+
+func (p *Document) GetCreatedAt() (v string) {
+	return p.CreatedAt
+}
+
+func (p *Document) GetUpdatedAt() (v string) {
+	return p.UpdatedAt
+}
+func (p *Document) SetId(val string) {
 	p.Id = val
 }
 func (p *Document) SetTitle(val string) {
@@ -96,27 +610,51 @@ func (p *Document) SetSummary(val string) {
 func (p *Document) SetSlug(val string) {
 	p.Slug = val
 }
-func (p *Document) SetStatus(val string) {
-	p.Status = val
+func (p *Document) SetOwner(val *PublicUser) {
+	p.Owner = val
 }
-func (p *Document) SetAuthorId(val int64) {
-	p.AuthorId = val
+func (p *Document) SetAccess(val string) {
+	p.Access = val
 }
-func (p *Document) SetCurrentVersion(val int64) {
-	p.CurrentVersion = val
+func (p *Document) SetPublished(val bool) {
+	p.Published = val
 }
-func (p *Document) SetPublishedAtUnix(val *int64) {
-	p.PublishedAtUnix = val
+func (p *Document) SetMetadataRevision(val int64) {
+	p.MetadataRevision = val
 }
-func (p *Document) SetCreatedAtUnix(val int64) {
-	p.CreatedAtUnix = val
+func (p *Document) SetContentRevision(val int64) {
+	p.ContentRevision = val
 }
-func (p *Document) SetUpdatedAtUnix(val int64) {
-	p.UpdatedAtUnix = val
+func (p *Document) SetPublishedAt(val *string) {
+	p.PublishedAt = val
+}
+func (p *Document) SetDeletedAt(val *string) {
+	p.DeletedAt = val
+}
+func (p *Document) SetProjectedAt(val *string) {
+	p.ProjectedAt = val
+}
+func (p *Document) SetCreatedAt(val string) {
+	p.CreatedAt = val
+}
+func (p *Document) SetUpdatedAt(val string) {
+	p.UpdatedAt = val
 }
 
-func (p *Document) IsSetPublishedAtUnix() bool {
-	return p.PublishedAtUnix != nil
+func (p *Document) IsSetOwner() bool {
+	return p.Owner != nil
+}
+
+func (p *Document) IsSetPublishedAt() bool {
+	return p.PublishedAt != nil
+}
+
+func (p *Document) IsSetDeletedAt() bool {
+	return p.DeletedAt != nil
+}
+
+func (p *Document) IsSetProjectedAt() bool {
+	return p.ProjectedAt != nil
 }
 
 func (p *Document) String() string {
@@ -131,118 +669,106 @@ var fieldIDToName_Document = map[int16]string{
 	2:  "title",
 	3:  "summary",
 	4:  "slug",
-	5:  "status",
-	6:  "author_id",
-	7:  "current_version",
-	8:  "published_at_unix",
-	9:  "created_at_unix",
-	10: "updated_at_unix",
+	5:  "owner",
+	6:  "access",
+	7:  "published",
+	8:  "metadata_revision",
+	9:  "content_revision",
+	10: "published_at",
+	11: "deleted_at",
+	12: "projected_at",
+	13: "created_at",
+	14: "updated_at",
 }
 
-type DocumentBlock struct {
-	BlockId       string `thrift:"block_id,1,required" frugal:"1,required,string" json:"block_id"`
-	DocumentId    int64  `thrift:"document_id,2,required" frugal:"2,required,i64" json:"document_id"`
-	PositionKey   string `thrift:"position_key,3,required" frugal:"3,required,string" json:"position_key"`
-	Type          string `thrift:"type,4,required" frugal:"4,required,string" json:"type"`
-	ContentJson   string `thrift:"content_json,5,required" frugal:"5,required,string" json:"content_json"`
-	TextContent   string `thrift:"text_content,6,required" frugal:"6,required,string" json:"text_content"`
-	Version       int64  `thrift:"version,7,required" frugal:"7,required,i64" json:"version"`
-	UpdatedBy     int64  `thrift:"updated_by,8,required" frugal:"8,required,i64" json:"updated_by"`
-	UpdatedAtUnix int64  `thrift:"updated_at_unix,9,required" frugal:"9,required,i64" json:"updated_at_unix"`
+type Attachment struct {
+	Id         string `thrift:"id,1,required" frugal:"1,required,string" json:"id"`
+	DocumentId string `thrift:"document_id,2,required" frugal:"2,required,string" json:"document_id"`
+	Filename   string `thrift:"filename,3,required" frugal:"3,required,string" json:"filename"`
+	MediaType  string `thrift:"media_type,4,required" frugal:"4,required,string" json:"media_type"`
+	SizeBytes  int64  `thrift:"size_bytes,5,required" frugal:"5,required,i64" json:"size_bytes"`
+	Status     string `thrift:"status,6,required" frugal:"6,required,string" json:"status"`
+	CreatedAt  string `thrift:"created_at,7,required" frugal:"7,required,string" json:"created_at"`
 }
 
-func NewDocumentBlock() *DocumentBlock {
-	return &DocumentBlock{}
+func NewAttachment() *Attachment {
+	return &Attachment{}
 }
 
-func (p *DocumentBlock) InitDefault() {
+func (p *Attachment) InitDefault() {
 }
 
-func (p *DocumentBlock) GetBlockId() (v string) {
-	return p.BlockId
+func (p *Attachment) GetId() (v string) {
+	return p.Id
 }
 
-func (p *DocumentBlock) GetDocumentId() (v int64) {
+func (p *Attachment) GetDocumentId() (v string) {
 	return p.DocumentId
 }
 
-func (p *DocumentBlock) GetPositionKey() (v string) {
-	return p.PositionKey
+func (p *Attachment) GetFilename() (v string) {
+	return p.Filename
 }
 
-func (p *DocumentBlock) GetType() (v string) {
-	return p.Type
+func (p *Attachment) GetMediaType() (v string) {
+	return p.MediaType
 }
 
-func (p *DocumentBlock) GetContentJson() (v string) {
-	return p.ContentJson
+func (p *Attachment) GetSizeBytes() (v int64) {
+	return p.SizeBytes
 }
 
-func (p *DocumentBlock) GetTextContent() (v string) {
-	return p.TextContent
+func (p *Attachment) GetStatus() (v string) {
+	return p.Status
 }
 
-func (p *DocumentBlock) GetVersion() (v int64) {
-	return p.Version
+func (p *Attachment) GetCreatedAt() (v string) {
+	return p.CreatedAt
 }
-
-func (p *DocumentBlock) GetUpdatedBy() (v int64) {
-	return p.UpdatedBy
+func (p *Attachment) SetId(val string) {
+	p.Id = val
 }
-
-func (p *DocumentBlock) GetUpdatedAtUnix() (v int64) {
-	return p.UpdatedAtUnix
-}
-func (p *DocumentBlock) SetBlockId(val string) {
-	p.BlockId = val
-}
-func (p *DocumentBlock) SetDocumentId(val int64) {
+func (p *Attachment) SetDocumentId(val string) {
 	p.DocumentId = val
 }
-func (p *DocumentBlock) SetPositionKey(val string) {
-	p.PositionKey = val
+func (p *Attachment) SetFilename(val string) {
+	p.Filename = val
 }
-func (p *DocumentBlock) SetType(val string) {
-	p.Type = val
+func (p *Attachment) SetMediaType(val string) {
+	p.MediaType = val
 }
-func (p *DocumentBlock) SetContentJson(val string) {
-	p.ContentJson = val
+func (p *Attachment) SetSizeBytes(val int64) {
+	p.SizeBytes = val
 }
-func (p *DocumentBlock) SetTextContent(val string) {
-	p.TextContent = val
+func (p *Attachment) SetStatus(val string) {
+	p.Status = val
 }
-func (p *DocumentBlock) SetVersion(val int64) {
-	p.Version = val
-}
-func (p *DocumentBlock) SetUpdatedBy(val int64) {
-	p.UpdatedBy = val
-}
-func (p *DocumentBlock) SetUpdatedAtUnix(val int64) {
-	p.UpdatedAtUnix = val
+func (p *Attachment) SetCreatedAt(val string) {
+	p.CreatedAt = val
 }
 
-func (p *DocumentBlock) String() string {
+func (p *Attachment) String() string {
 	if p == nil {
 		return "<nil>"
 	}
-	return fmt.Sprintf("DocumentBlock(%+v)", *p)
+	return fmt.Sprintf("Attachment(%+v)", *p)
 }
 
-var fieldIDToName_DocumentBlock = map[int16]string{
-	1: "block_id",
+var fieldIDToName_Attachment = map[int16]string{
+	1: "id",
 	2: "document_id",
-	3: "position_key",
-	4: "type",
-	5: "content_json",
-	6: "text_content",
-	7: "version",
-	8: "updated_by",
-	9: "updated_at_unix",
+	3: "filename",
+	4: "media_type",
+	5: "size_bytes",
+	6: "status",
+	7: "created_at",
 }
 
 type DocumentDetail struct {
-	Document *Document        `thrift:"document,1,required" frugal:"1,required,Document" json:"document"`
-	Blocks   []*DocumentBlock `thrift:"blocks,2,required" frugal:"2,required,list<DocumentBlock>" json:"blocks"`
+	Document    *Document         `thrift:"document,1,required" frugal:"1,required,Document" json:"document"`
+	Content     *RichTextDocument `thrift:"content,2,required" frugal:"2,required,RichTextDocument" json:"content"`
+	PlainText   string            `thrift:"plain_text,3,required" frugal:"3,required,string" json:"plain_text"`
+	Attachments []*Attachment     `thrift:"attachments,4,required" frugal:"4,required,list<Attachment>" json:"attachments"`
 }
 
 func NewDocumentDetail() *DocumentDetail {
@@ -261,18 +787,41 @@ func (p *DocumentDetail) GetDocument() (v *Document) {
 	return p.Document
 }
 
-func (p *DocumentDetail) GetBlocks() (v []*DocumentBlock) {
-	return p.Blocks
+var DocumentDetail_Content_DEFAULT *RichTextDocument
+
+func (p *DocumentDetail) GetContent() (v *RichTextDocument) {
+	if !p.IsSetContent() {
+		return DocumentDetail_Content_DEFAULT
+	}
+	return p.Content
+}
+
+func (p *DocumentDetail) GetPlainText() (v string) {
+	return p.PlainText
+}
+
+func (p *DocumentDetail) GetAttachments() (v []*Attachment) {
+	return p.Attachments
 }
 func (p *DocumentDetail) SetDocument(val *Document) {
 	p.Document = val
 }
-func (p *DocumentDetail) SetBlocks(val []*DocumentBlock) {
-	p.Blocks = val
+func (p *DocumentDetail) SetContent(val *RichTextDocument) {
+	p.Content = val
+}
+func (p *DocumentDetail) SetPlainText(val string) {
+	p.PlainText = val
+}
+func (p *DocumentDetail) SetAttachments(val []*Attachment) {
+	p.Attachments = val
 }
 
 func (p *DocumentDetail) IsSetDocument() bool {
 	return p.Document != nil
+}
+
+func (p *DocumentDetail) IsSetContent() bool {
+	return p.Content != nil
 }
 
 func (p *DocumentDetail) String() string {
@@ -284,141 +833,265 @@ func (p *DocumentDetail) String() string {
 
 var fieldIDToName_DocumentDetail = map[int16]string{
 	1: "document",
-	2: "blocks",
+	2: "content",
+	3: "plain_text",
+	4: "attachments",
 }
 
-type DocumentListRequest struct {
-	Query    *string `thrift:"query,1,optional" frugal:"1,optional,string" json:"query,omitempty"`
-	Page     *int32  `thrift:"page,2,optional" frugal:"2,optional,i32" json:"page,omitempty"`
-	PageSize *int32  `thrift:"page_size,3,optional" frugal:"3,optional,i32" json:"page_size,omitempty"`
+type PageInfo struct {
+	NextCursor *string `thrift:"next_cursor,1,optional" frugal:"1,optional,string" json:"next_cursor,omitempty"`
+	HasMore    bool    `thrift:"has_more,2,required" frugal:"2,required,bool" json:"has_more"`
 }
 
-func NewDocumentListRequest() *DocumentListRequest {
-	return &DocumentListRequest{}
+func NewPageInfo() *PageInfo {
+	return &PageInfo{}
 }
 
-func (p *DocumentListRequest) InitDefault() {
+func (p *PageInfo) InitDefault() {
 }
 
-var DocumentListRequest_Query_DEFAULT string
+var PageInfo_NextCursor_DEFAULT string
 
-func (p *DocumentListRequest) GetQuery() (v string) {
+func (p *PageInfo) GetNextCursor() (v string) {
+	if !p.IsSetNextCursor() {
+		return PageInfo_NextCursor_DEFAULT
+	}
+	return *p.NextCursor
+}
+
+func (p *PageInfo) GetHasMore() (v bool) {
+	return p.HasMore
+}
+func (p *PageInfo) SetNextCursor(val *string) {
+	p.NextCursor = val
+}
+func (p *PageInfo) SetHasMore(val bool) {
+	p.HasMore = val
+}
+
+func (p *PageInfo) IsSetNextCursor() bool {
+	return p.NextCursor != nil
+}
+
+func (p *PageInfo) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("PageInfo(%+v)", *p)
+}
+
+var fieldIDToName_PageInfo = map[int16]string{
+	1: "next_cursor",
+	2: "has_more",
+}
+
+type DocumentPage struct {
+	Items []*Document `thrift:"items,1,required" frugal:"1,required,list<Document>" json:"items"`
+	Page  *PageInfo   `thrift:"page,2,required" frugal:"2,required,PageInfo" json:"page"`
+}
+
+func NewDocumentPage() *DocumentPage {
+	return &DocumentPage{}
+}
+
+func (p *DocumentPage) InitDefault() {
+}
+
+func (p *DocumentPage) GetItems() (v []*Document) {
+	return p.Items
+}
+
+var DocumentPage_Page_DEFAULT *PageInfo
+
+func (p *DocumentPage) GetPage() (v *PageInfo) {
+	if !p.IsSetPage() {
+		return DocumentPage_Page_DEFAULT
+	}
+	return p.Page
+}
+func (p *DocumentPage) SetItems(val []*Document) {
+	p.Items = val
+}
+func (p *DocumentPage) SetPage(val *PageInfo) {
+	p.Page = val
+}
+
+func (p *DocumentPage) IsSetPage() bool {
+	return p.Page != nil
+}
+
+func (p *DocumentPage) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("DocumentPage(%+v)", *p)
+}
+
+var fieldIDToName_DocumentPage = map[int16]string{
+	1: "items",
+	2: "page",
+}
+
+type EmptyRequest struct {
+}
+
+func NewEmptyRequest() *EmptyRequest {
+	return &EmptyRequest{}
+}
+
+func (p *EmptyRequest) InitDefault() {
+}
+
+func (p *EmptyRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("EmptyRequest(%+v)", *p)
+}
+
+var fieldIDToName_EmptyRequest = map[int16]string{}
+
+type ListDocumentsRequest struct {
+	Query       *string `thrift:"query,1,optional" frugal:"1,optional,string" json:"query,omitempty"`
+	Cursor      *string `thrift:"cursor,2,optional" frugal:"2,optional,string" json:"cursor,omitempty"`
+	Limit       *int32  `thrift:"limit,3,optional" frugal:"3,optional,i32" json:"limit,omitempty"`
+	Access      *string `thrift:"access,4,optional" frugal:"4,optional,string" json:"access,omitempty"`
+	Publication *string `thrift:"publication,5,optional" frugal:"5,optional,string" json:"publication,omitempty"`
+}
+
+func NewListDocumentsRequest() *ListDocumentsRequest {
+	return &ListDocumentsRequest{}
+}
+
+func (p *ListDocumentsRequest) InitDefault() {
+}
+
+var ListDocumentsRequest_Query_DEFAULT string
+
+func (p *ListDocumentsRequest) GetQuery() (v string) {
 	if !p.IsSetQuery() {
-		return DocumentListRequest_Query_DEFAULT
+		return ListDocumentsRequest_Query_DEFAULT
 	}
 	return *p.Query
 }
 
-var DocumentListRequest_Page_DEFAULT int32
+var ListDocumentsRequest_Cursor_DEFAULT string
 
-func (p *DocumentListRequest) GetPage() (v int32) {
-	if !p.IsSetPage() {
-		return DocumentListRequest_Page_DEFAULT
+func (p *ListDocumentsRequest) GetCursor() (v string) {
+	if !p.IsSetCursor() {
+		return ListDocumentsRequest_Cursor_DEFAULT
 	}
-	return *p.Page
+	return *p.Cursor
 }
 
-var DocumentListRequest_PageSize_DEFAULT int32
+var ListDocumentsRequest_Limit_DEFAULT int32
 
-func (p *DocumentListRequest) GetPageSize() (v int32) {
-	if !p.IsSetPageSize() {
-		return DocumentListRequest_PageSize_DEFAULT
+func (p *ListDocumentsRequest) GetLimit() (v int32) {
+	if !p.IsSetLimit() {
+		return ListDocumentsRequest_Limit_DEFAULT
 	}
-	return *p.PageSize
+	return *p.Limit
 }
-func (p *DocumentListRequest) SetQuery(val *string) {
+
+var ListDocumentsRequest_Access_DEFAULT string
+
+func (p *ListDocumentsRequest) GetAccess() (v string) {
+	if !p.IsSetAccess() {
+		return ListDocumentsRequest_Access_DEFAULT
+	}
+	return *p.Access
+}
+
+var ListDocumentsRequest_Publication_DEFAULT string
+
+func (p *ListDocumentsRequest) GetPublication() (v string) {
+	if !p.IsSetPublication() {
+		return ListDocumentsRequest_Publication_DEFAULT
+	}
+	return *p.Publication
+}
+func (p *ListDocumentsRequest) SetQuery(val *string) {
 	p.Query = val
 }
-func (p *DocumentListRequest) SetPage(val *int32) {
-	p.Page = val
+func (p *ListDocumentsRequest) SetCursor(val *string) {
+	p.Cursor = val
 }
-func (p *DocumentListRequest) SetPageSize(val *int32) {
-	p.PageSize = val
+func (p *ListDocumentsRequest) SetLimit(val *int32) {
+	p.Limit = val
+}
+func (p *ListDocumentsRequest) SetAccess(val *string) {
+	p.Access = val
+}
+func (p *ListDocumentsRequest) SetPublication(val *string) {
+	p.Publication = val
 }
 
-func (p *DocumentListRequest) IsSetQuery() bool {
+func (p *ListDocumentsRequest) IsSetQuery() bool {
 	return p.Query != nil
 }
 
-func (p *DocumentListRequest) IsSetPage() bool {
-	return p.Page != nil
+func (p *ListDocumentsRequest) IsSetCursor() bool {
+	return p.Cursor != nil
 }
 
-func (p *DocumentListRequest) IsSetPageSize() bool {
-	return p.PageSize != nil
+func (p *ListDocumentsRequest) IsSetLimit() bool {
+	return p.Limit != nil
 }
 
-func (p *DocumentListRequest) String() string {
+func (p *ListDocumentsRequest) IsSetAccess() bool {
+	return p.Access != nil
+}
+
+func (p *ListDocumentsRequest) IsSetPublication() bool {
+	return p.Publication != nil
+}
+
+func (p *ListDocumentsRequest) String() string {
 	if p == nil {
 		return "<nil>"
 	}
-	return fmt.Sprintf("DocumentListRequest(%+v)", *p)
+	return fmt.Sprintf("ListDocumentsRequest(%+v)", *p)
 }
 
-var fieldIDToName_DocumentListRequest = map[int16]string{
+var fieldIDToName_ListDocumentsRequest = map[int16]string{
 	1: "query",
-	2: "page",
-	3: "page_size",
+	2: "cursor",
+	3: "limit",
+	4: "access",
+	5: "publication",
 }
 
-type DocumentList struct {
-	Items    []*Document `thrift:"items,1,required" frugal:"1,required,list<Document>" json:"items"`
-	Total    int64       `thrift:"total,2,required" frugal:"2,required,i64" json:"total"`
-	Page     int32       `thrift:"page,3,required" frugal:"3,required,i32" json:"page"`
-	PageSize int32       `thrift:"page_size,4,required" frugal:"4,required,i32" json:"page_size"`
+type GetPublishedDocumentRequest struct {
+	Slug string `thrift:"slug,1,required" frugal:"1,required,string" json:"slug"`
 }
 
-func NewDocumentList() *DocumentList {
-	return &DocumentList{}
+func NewGetPublishedDocumentRequest() *GetPublishedDocumentRequest {
+	return &GetPublishedDocumentRequest{}
 }
 
-func (p *DocumentList) InitDefault() {
+func (p *GetPublishedDocumentRequest) InitDefault() {
 }
 
-func (p *DocumentList) GetItems() (v []*Document) {
-	return p.Items
+func (p *GetPublishedDocumentRequest) GetSlug() (v string) {
+	return p.Slug
+}
+func (p *GetPublishedDocumentRequest) SetSlug(val string) {
+	p.Slug = val
 }
 
-func (p *DocumentList) GetTotal() (v int64) {
-	return p.Total
-}
-
-func (p *DocumentList) GetPage() (v int32) {
-	return p.Page
-}
-
-func (p *DocumentList) GetPageSize() (v int32) {
-	return p.PageSize
-}
-func (p *DocumentList) SetItems(val []*Document) {
-	p.Items = val
-}
-func (p *DocumentList) SetTotal(val int64) {
-	p.Total = val
-}
-func (p *DocumentList) SetPage(val int32) {
-	p.Page = val
-}
-func (p *DocumentList) SetPageSize(val int32) {
-	p.PageSize = val
-}
-
-func (p *DocumentList) String() string {
+func (p *GetPublishedDocumentRequest) String() string {
 	if p == nil {
 		return "<nil>"
 	}
-	return fmt.Sprintf("DocumentList(%+v)", *p)
+	return fmt.Sprintf("GetPublishedDocumentRequest(%+v)", *p)
 }
 
-var fieldIDToName_DocumentList = map[int16]string{
-	1: "items",
-	2: "total",
-	3: "page",
-	4: "page_size",
+var fieldIDToName_GetPublishedDocumentRequest = map[int16]string{
+	1: "slug",
 }
 
 type DocumentIDRequest struct {
-	DocumentId int64 `thrift:"document_id,1,required" frugal:"1,required,i64" json:"document_id"`
+	DocumentId string `thrift:"document_id,1,required" frugal:"1,required,string" json:"document_id"`
 }
 
 func NewDocumentIDRequest() *DocumentIDRequest {
@@ -428,10 +1101,10 @@ func NewDocumentIDRequest() *DocumentIDRequest {
 func (p *DocumentIDRequest) InitDefault() {
 }
 
-func (p *DocumentIDRequest) GetDocumentId() (v int64) {
+func (p *DocumentIDRequest) GetDocumentId() (v string) {
 	return p.DocumentId
 }
-func (p *DocumentIDRequest) SetDocumentId(val int64) {
+func (p *DocumentIDRequest) SetDocumentId(val string) {
 	p.DocumentId = val
 }
 
@@ -447,8 +1120,10 @@ var fieldIDToName_DocumentIDRequest = map[int16]string{
 }
 
 type CreateDocumentRequest struct {
-	Title   string  `thrift:"title,1,required" frugal:"1,required,string" json:"title"`
-	Summary *string `thrift:"summary,2,optional" frugal:"2,optional,string" json:"summary,omitempty"`
+	Title          string  `thrift:"title,1,required" frugal:"1,required,string" json:"title"`
+	Summary        *string `thrift:"summary,2,optional" frugal:"2,optional,string" json:"summary,omitempty"`
+	Slug           *string `thrift:"slug,3,optional" frugal:"3,optional,string" json:"slug,omitempty"`
+	IdempotencyKey *string `thrift:"idempotency_key,4,optional" frugal:"4,optional,string" json:"idempotency_key,omitempty"`
 }
 
 func NewCreateDocumentRequest() *CreateDocumentRequest {
@@ -470,15 +1145,47 @@ func (p *CreateDocumentRequest) GetSummary() (v string) {
 	}
 	return *p.Summary
 }
+
+var CreateDocumentRequest_Slug_DEFAULT string
+
+func (p *CreateDocumentRequest) GetSlug() (v string) {
+	if !p.IsSetSlug() {
+		return CreateDocumentRequest_Slug_DEFAULT
+	}
+	return *p.Slug
+}
+
+var CreateDocumentRequest_IdempotencyKey_DEFAULT string
+
+func (p *CreateDocumentRequest) GetIdempotencyKey() (v string) {
+	if !p.IsSetIdempotencyKey() {
+		return CreateDocumentRequest_IdempotencyKey_DEFAULT
+	}
+	return *p.IdempotencyKey
+}
 func (p *CreateDocumentRequest) SetTitle(val string) {
 	p.Title = val
 }
 func (p *CreateDocumentRequest) SetSummary(val *string) {
 	p.Summary = val
 }
+func (p *CreateDocumentRequest) SetSlug(val *string) {
+	p.Slug = val
+}
+func (p *CreateDocumentRequest) SetIdempotencyKey(val *string) {
+	p.IdempotencyKey = val
+}
 
 func (p *CreateDocumentRequest) IsSetSummary() bool {
 	return p.Summary != nil
+}
+
+func (p *CreateDocumentRequest) IsSetSlug() bool {
+	return p.Slug != nil
+}
+
+func (p *CreateDocumentRequest) IsSetIdempotencyKey() bool {
+	return p.IdempotencyKey != nil
 }
 
 func (p *CreateDocumentRequest) String() string {
@@ -491,12 +1198,16 @@ func (p *CreateDocumentRequest) String() string {
 var fieldIDToName_CreateDocumentRequest = map[int16]string{
 	1: "title",
 	2: "summary",
+	3: "slug",
+	4: "idempotency_key",
 }
 
 type UpdateDocumentRequest struct {
-	DocumentId int64  `thrift:"document_id,1,required" frugal:"1,required,i64" json:"document_id"`
-	Title      string `thrift:"title,2,required" frugal:"2,required,string" json:"title"`
-	Summary    string `thrift:"summary,3,required" frugal:"3,required,string" json:"summary"`
+	DocumentId       string  `thrift:"document_id,1,required" frugal:"1,required,string" json:"document_id"`
+	ExpectedRevision int64   `thrift:"expected_revision,2,required" frugal:"2,required,i64" json:"expected_revision"`
+	Title            *string `thrift:"title,3,optional" frugal:"3,optional,string" json:"title,omitempty"`
+	Summary          *string `thrift:"summary,4,optional" frugal:"4,optional,string" json:"summary,omitempty"`
+	Slug             *string `thrift:"slug,5,optional" frugal:"5,optional,string" json:"slug,omitempty"`
 }
 
 func NewUpdateDocumentRequest() *UpdateDocumentRequest {
@@ -506,25 +1217,66 @@ func NewUpdateDocumentRequest() *UpdateDocumentRequest {
 func (p *UpdateDocumentRequest) InitDefault() {
 }
 
-func (p *UpdateDocumentRequest) GetDocumentId() (v int64) {
+func (p *UpdateDocumentRequest) GetDocumentId() (v string) {
 	return p.DocumentId
 }
 
-func (p *UpdateDocumentRequest) GetTitle() (v string) {
-	return p.Title
+func (p *UpdateDocumentRequest) GetExpectedRevision() (v int64) {
+	return p.ExpectedRevision
 }
 
-func (p *UpdateDocumentRequest) GetSummary() (v string) {
-	return p.Summary
+var UpdateDocumentRequest_Title_DEFAULT string
+
+func (p *UpdateDocumentRequest) GetTitle() (v string) {
+	if !p.IsSetTitle() {
+		return UpdateDocumentRequest_Title_DEFAULT
+	}
+	return *p.Title
 }
-func (p *UpdateDocumentRequest) SetDocumentId(val int64) {
+
+var UpdateDocumentRequest_Summary_DEFAULT string
+
+func (p *UpdateDocumentRequest) GetSummary() (v string) {
+	if !p.IsSetSummary() {
+		return UpdateDocumentRequest_Summary_DEFAULT
+	}
+	return *p.Summary
+}
+
+var UpdateDocumentRequest_Slug_DEFAULT string
+
+func (p *UpdateDocumentRequest) GetSlug() (v string) {
+	if !p.IsSetSlug() {
+		return UpdateDocumentRequest_Slug_DEFAULT
+	}
+	return *p.Slug
+}
+func (p *UpdateDocumentRequest) SetDocumentId(val string) {
 	p.DocumentId = val
 }
-func (p *UpdateDocumentRequest) SetTitle(val string) {
+func (p *UpdateDocumentRequest) SetExpectedRevision(val int64) {
+	p.ExpectedRevision = val
+}
+func (p *UpdateDocumentRequest) SetTitle(val *string) {
 	p.Title = val
 }
-func (p *UpdateDocumentRequest) SetSummary(val string) {
+func (p *UpdateDocumentRequest) SetSummary(val *string) {
 	p.Summary = val
+}
+func (p *UpdateDocumentRequest) SetSlug(val *string) {
+	p.Slug = val
+}
+
+func (p *UpdateDocumentRequest) IsSetTitle() bool {
+	return p.Title != nil
+}
+
+func (p *UpdateDocumentRequest) IsSetSummary() bool {
+	return p.Summary != nil
+}
+
+func (p *UpdateDocumentRequest) IsSetSlug() bool {
+	return p.Slug != nil
 }
 
 func (p *UpdateDocumentRequest) String() string {
@@ -536,225 +1288,690 @@ func (p *UpdateDocumentRequest) String() string {
 
 var fieldIDToName_UpdateDocumentRequest = map[int16]string{
 	1: "document_id",
-	2: "title",
-	3: "summary",
+	2: "expected_revision",
+	3: "title",
+	4: "summary",
+	5: "slug",
 }
 
-type SetDocumentStatusRequest struct {
-	DocumentId int64  `thrift:"document_id,1,required" frugal:"1,required,i64" json:"document_id"`
-	Status     string `thrift:"status,2,required" frugal:"2,required,string" json:"status"`
+type SetPublicationRequest struct {
+	DocumentId       string `thrift:"document_id,1,required" frugal:"1,required,string" json:"document_id"`
+	ExpectedRevision int64  `thrift:"expected_revision,2,required" frugal:"2,required,i64" json:"expected_revision"`
+	Published        bool   `thrift:"published,3,required" frugal:"3,required,bool" json:"published"`
 }
 
-func NewSetDocumentStatusRequest() *SetDocumentStatusRequest {
-	return &SetDocumentStatusRequest{}
+func NewSetPublicationRequest() *SetPublicationRequest {
+	return &SetPublicationRequest{}
 }
 
-func (p *SetDocumentStatusRequest) InitDefault() {
+func (p *SetPublicationRequest) InitDefault() {
 }
 
-func (p *SetDocumentStatusRequest) GetDocumentId() (v int64) {
+func (p *SetPublicationRequest) GetDocumentId() (v string) {
 	return p.DocumentId
 }
 
-func (p *SetDocumentStatusRequest) GetStatus() (v string) {
-	return p.Status
-}
-func (p *SetDocumentStatusRequest) SetDocumentId(val int64) {
-	p.DocumentId = val
-}
-func (p *SetDocumentStatusRequest) SetStatus(val string) {
-	p.Status = val
+func (p *SetPublicationRequest) GetExpectedRevision() (v int64) {
+	return p.ExpectedRevision
 }
 
-func (p *SetDocumentStatusRequest) String() string {
+func (p *SetPublicationRequest) GetPublished() (v bool) {
+	return p.Published
+}
+func (p *SetPublicationRequest) SetDocumentId(val string) {
+	p.DocumentId = val
+}
+func (p *SetPublicationRequest) SetExpectedRevision(val int64) {
+	p.ExpectedRevision = val
+}
+func (p *SetPublicationRequest) SetPublished(val bool) {
+	p.Published = val
+}
+
+func (p *SetPublicationRequest) String() string {
 	if p == nil {
 		return "<nil>"
 	}
-	return fmt.Sprintf("SetDocumentStatusRequest(%+v)", *p)
+	return fmt.Sprintf("SetPublicationRequest(%+v)", *p)
 }
 
-var fieldIDToName_SetDocumentStatusRequest = map[int16]string{
+var fieldIDToName_SetPublicationRequest = map[int16]string{
 	1: "document_id",
-	2: "status",
+	2: "expected_revision",
+	3: "published",
 }
 
-type ApplyDocumentOperationRequest struct {
-	DocumentId          int64  `thrift:"document_id,1,required" frugal:"1,required,i64" json:"document_id"`
-	OpId                string `thrift:"op_id,2,required" frugal:"2,required,string" json:"op_id"`
-	BaseDocumentVersion int64  `thrift:"base_document_version,3,required" frugal:"3,required,i64" json:"base_document_version"`
-	BlockId             string `thrift:"block_id,4,required" frugal:"4,required,string" json:"block_id"`
-	BaseBlockVersion    int64  `thrift:"base_block_version,5,required" frugal:"5,required,i64" json:"base_block_version"`
-	PositionKey         string `thrift:"position_key,6,required" frugal:"6,required,string" json:"position_key"`
-	ContentJson         string `thrift:"content_json,7,required" frugal:"7,required,string" json:"content_json"`
-	TextContent         string `thrift:"text_content,8,required" frugal:"8,required,string" json:"text_content"`
+type DeleteDocumentRequest struct {
+	DocumentId       string `thrift:"document_id,1,required" frugal:"1,required,string" json:"document_id"`
+	ExpectedRevision int64  `thrift:"expected_revision,2,required" frugal:"2,required,i64" json:"expected_revision"`
 }
 
-func NewApplyDocumentOperationRequest() *ApplyDocumentOperationRequest {
-	return &ApplyDocumentOperationRequest{}
+func NewDeleteDocumentRequest() *DeleteDocumentRequest {
+	return &DeleteDocumentRequest{}
 }
 
-func (p *ApplyDocumentOperationRequest) InitDefault() {
+func (p *DeleteDocumentRequest) InitDefault() {
 }
 
-func (p *ApplyDocumentOperationRequest) GetDocumentId() (v int64) {
+func (p *DeleteDocumentRequest) GetDocumentId() (v string) {
 	return p.DocumentId
 }
 
-func (p *ApplyDocumentOperationRequest) GetOpId() (v string) {
-	return p.OpId
+func (p *DeleteDocumentRequest) GetExpectedRevision() (v int64) {
+	return p.ExpectedRevision
 }
-
-func (p *ApplyDocumentOperationRequest) GetBaseDocumentVersion() (v int64) {
-	return p.BaseDocumentVersion
-}
-
-func (p *ApplyDocumentOperationRequest) GetBlockId() (v string) {
-	return p.BlockId
-}
-
-func (p *ApplyDocumentOperationRequest) GetBaseBlockVersion() (v int64) {
-	return p.BaseBlockVersion
-}
-
-func (p *ApplyDocumentOperationRequest) GetPositionKey() (v string) {
-	return p.PositionKey
-}
-
-func (p *ApplyDocumentOperationRequest) GetContentJson() (v string) {
-	return p.ContentJson
-}
-
-func (p *ApplyDocumentOperationRequest) GetTextContent() (v string) {
-	return p.TextContent
-}
-func (p *ApplyDocumentOperationRequest) SetDocumentId(val int64) {
+func (p *DeleteDocumentRequest) SetDocumentId(val string) {
 	p.DocumentId = val
 }
-func (p *ApplyDocumentOperationRequest) SetOpId(val string) {
-	p.OpId = val
-}
-func (p *ApplyDocumentOperationRequest) SetBaseDocumentVersion(val int64) {
-	p.BaseDocumentVersion = val
-}
-func (p *ApplyDocumentOperationRequest) SetBlockId(val string) {
-	p.BlockId = val
-}
-func (p *ApplyDocumentOperationRequest) SetBaseBlockVersion(val int64) {
-	p.BaseBlockVersion = val
-}
-func (p *ApplyDocumentOperationRequest) SetPositionKey(val string) {
-	p.PositionKey = val
-}
-func (p *ApplyDocumentOperationRequest) SetContentJson(val string) {
-	p.ContentJson = val
-}
-func (p *ApplyDocumentOperationRequest) SetTextContent(val string) {
-	p.TextContent = val
+func (p *DeleteDocumentRequest) SetExpectedRevision(val int64) {
+	p.ExpectedRevision = val
 }
 
-func (p *ApplyDocumentOperationRequest) String() string {
+func (p *DeleteDocumentRequest) String() string {
 	if p == nil {
 		return "<nil>"
 	}
-	return fmt.Sprintf("ApplyDocumentOperationRequest(%+v)", *p)
+	return fmt.Sprintf("DeleteDocumentRequest(%+v)", *p)
 }
 
-var fieldIDToName_ApplyDocumentOperationRequest = map[int16]string{
+var fieldIDToName_DeleteDocumentRequest = map[int16]string{
 	1: "document_id",
-	2: "op_id",
-	3: "base_document_version",
-	4: "block_id",
-	5: "base_block_version",
-	6: "position_key",
-	7: "content_json",
-	8: "text_content",
+	2: "expected_revision",
 }
 
-type DocumentOperationAck struct {
-	DocumentId      int64  `thrift:"document_id,1,required" frugal:"1,required,i64" json:"document_id"`
-	OpId            string `thrift:"op_id,2,required" frugal:"2,required,string" json:"op_id"`
-	DocumentVersion int64  `thrift:"document_version,3,required" frugal:"3,required,i64" json:"document_version"`
-	BlockVersion    int64  `thrift:"block_version,4,required" frugal:"4,required,i64" json:"block_version"`
-	Duplicate       bool   `thrift:"duplicate,5,required" frugal:"5,required,bool" json:"duplicate"`
+type Member struct {
+	User      *PublicUser `thrift:"user,1,required" frugal:"1,required,PublicUser" json:"user"`
+	Role      string      `thrift:"role,2,required" frugal:"2,required,string" json:"role"`
+	Revision  int64       `thrift:"revision,3,required" frugal:"3,required,i64" json:"revision"`
+	CreatedAt string      `thrift:"created_at,4,required" frugal:"4,required,string" json:"created_at"`
+	UpdatedAt string      `thrift:"updated_at,5,required" frugal:"5,required,string" json:"updated_at"`
 }
 
-func NewDocumentOperationAck() *DocumentOperationAck {
-	return &DocumentOperationAck{}
+func NewMember() *Member {
+	return &Member{}
 }
 
-func (p *DocumentOperationAck) InitDefault() {
+func (p *Member) InitDefault() {
 }
 
-func (p *DocumentOperationAck) GetDocumentId() (v int64) {
+var Member_User_DEFAULT *PublicUser
+
+func (p *Member) GetUser() (v *PublicUser) {
+	if !p.IsSetUser() {
+		return Member_User_DEFAULT
+	}
+	return p.User
+}
+
+func (p *Member) GetRole() (v string) {
+	return p.Role
+}
+
+func (p *Member) GetRevision() (v int64) {
+	return p.Revision
+}
+
+func (p *Member) GetCreatedAt() (v string) {
+	return p.CreatedAt
+}
+
+func (p *Member) GetUpdatedAt() (v string) {
+	return p.UpdatedAt
+}
+func (p *Member) SetUser(val *PublicUser) {
+	p.User = val
+}
+func (p *Member) SetRole(val string) {
+	p.Role = val
+}
+func (p *Member) SetRevision(val int64) {
+	p.Revision = val
+}
+func (p *Member) SetCreatedAt(val string) {
+	p.CreatedAt = val
+}
+func (p *Member) SetUpdatedAt(val string) {
+	p.UpdatedAt = val
+}
+
+func (p *Member) IsSetUser() bool {
+	return p.User != nil
+}
+
+func (p *Member) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("Member(%+v)", *p)
+}
+
+var fieldIDToName_Member = map[int16]string{
+	1: "user",
+	2: "role",
+	3: "revision",
+	4: "created_at",
+	5: "updated_at",
+}
+
+type MemberList struct {
+	Items []*Member `thrift:"items,1,required" frugal:"1,required,list<Member>" json:"items"`
+}
+
+func NewMemberList() *MemberList {
+	return &MemberList{}
+}
+
+func (p *MemberList) InitDefault() {
+}
+
+func (p *MemberList) GetItems() (v []*Member) {
+	return p.Items
+}
+func (p *MemberList) SetItems(val []*Member) {
+	p.Items = val
+}
+
+func (p *MemberList) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("MemberList(%+v)", *p)
+}
+
+var fieldIDToName_MemberList = map[int16]string{
+	1: "items",
+}
+
+type AddMemberRequest struct {
+	DocumentId     string  `thrift:"document_id,1,required" frugal:"1,required,string" json:"document_id"`
+	Username       string  `thrift:"username,2,required" frugal:"2,required,string" json:"username"`
+	Role           string  `thrift:"role,3,required" frugal:"3,required,string" json:"role"`
+	IdempotencyKey *string `thrift:"idempotency_key,4,optional" frugal:"4,optional,string" json:"idempotency_key,omitempty"`
+}
+
+func NewAddMemberRequest() *AddMemberRequest {
+	return &AddMemberRequest{}
+}
+
+func (p *AddMemberRequest) InitDefault() {
+}
+
+func (p *AddMemberRequest) GetDocumentId() (v string) {
 	return p.DocumentId
 }
 
-func (p *DocumentOperationAck) GetOpId() (v string) {
-	return p.OpId
+func (p *AddMemberRequest) GetUsername() (v string) {
+	return p.Username
 }
 
-func (p *DocumentOperationAck) GetDocumentVersion() (v int64) {
-	return p.DocumentVersion
+func (p *AddMemberRequest) GetRole() (v string) {
+	return p.Role
 }
 
-func (p *DocumentOperationAck) GetBlockVersion() (v int64) {
-	return p.BlockVersion
-}
+var AddMemberRequest_IdempotencyKey_DEFAULT string
 
-func (p *DocumentOperationAck) GetDuplicate() (v bool) {
-	return p.Duplicate
+func (p *AddMemberRequest) GetIdempotencyKey() (v string) {
+	if !p.IsSetIdempotencyKey() {
+		return AddMemberRequest_IdempotencyKey_DEFAULT
+	}
+	return *p.IdempotencyKey
 }
-func (p *DocumentOperationAck) SetDocumentId(val int64) {
+func (p *AddMemberRequest) SetDocumentId(val string) {
 	p.DocumentId = val
 }
-func (p *DocumentOperationAck) SetOpId(val string) {
-	p.OpId = val
+func (p *AddMemberRequest) SetUsername(val string) {
+	p.Username = val
 }
-func (p *DocumentOperationAck) SetDocumentVersion(val int64) {
-	p.DocumentVersion = val
+func (p *AddMemberRequest) SetRole(val string) {
+	p.Role = val
 }
-func (p *DocumentOperationAck) SetBlockVersion(val int64) {
-	p.BlockVersion = val
-}
-func (p *DocumentOperationAck) SetDuplicate(val bool) {
-	p.Duplicate = val
+func (p *AddMemberRequest) SetIdempotencyKey(val *string) {
+	p.IdempotencyKey = val
 }
 
-func (p *DocumentOperationAck) String() string {
+func (p *AddMemberRequest) IsSetIdempotencyKey() bool {
+	return p.IdempotencyKey != nil
+}
+
+func (p *AddMemberRequest) String() string {
 	if p == nil {
 		return "<nil>"
 	}
-	return fmt.Sprintf("DocumentOperationAck(%+v)", *p)
+	return fmt.Sprintf("AddMemberRequest(%+v)", *p)
 }
 
-var fieldIDToName_DocumentOperationAck = map[int16]string{
+var fieldIDToName_AddMemberRequest = map[int16]string{
 	1: "document_id",
-	2: "op_id",
-	3: "document_version",
-	4: "block_version",
-	5: "duplicate",
+	2: "username",
+	3: "role",
+	4: "idempotency_key",
+}
+
+type UpdateMemberRequest struct {
+	DocumentId       string `thrift:"document_id,1,required" frugal:"1,required,string" json:"document_id"`
+	UserId           int64  `thrift:"user_id,2,required" frugal:"2,required,i64" json:"user_id"`
+	ExpectedRevision int64  `thrift:"expected_revision,3,required" frugal:"3,required,i64" json:"expected_revision"`
+	Role             string `thrift:"role,4,required" frugal:"4,required,string" json:"role"`
+}
+
+func NewUpdateMemberRequest() *UpdateMemberRequest {
+	return &UpdateMemberRequest{}
+}
+
+func (p *UpdateMemberRequest) InitDefault() {
+}
+
+func (p *UpdateMemberRequest) GetDocumentId() (v string) {
+	return p.DocumentId
+}
+
+func (p *UpdateMemberRequest) GetUserId() (v int64) {
+	return p.UserId
+}
+
+func (p *UpdateMemberRequest) GetExpectedRevision() (v int64) {
+	return p.ExpectedRevision
+}
+
+func (p *UpdateMemberRequest) GetRole() (v string) {
+	return p.Role
+}
+func (p *UpdateMemberRequest) SetDocumentId(val string) {
+	p.DocumentId = val
+}
+func (p *UpdateMemberRequest) SetUserId(val int64) {
+	p.UserId = val
+}
+func (p *UpdateMemberRequest) SetExpectedRevision(val int64) {
+	p.ExpectedRevision = val
+}
+func (p *UpdateMemberRequest) SetRole(val string) {
+	p.Role = val
+}
+
+func (p *UpdateMemberRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("UpdateMemberRequest(%+v)", *p)
+}
+
+var fieldIDToName_UpdateMemberRequest = map[int16]string{
+	1: "document_id",
+	2: "user_id",
+	3: "expected_revision",
+	4: "role",
+}
+
+type DeleteMemberRequest struct {
+	DocumentId       string `thrift:"document_id,1,required" frugal:"1,required,string" json:"document_id"`
+	UserId           int64  `thrift:"user_id,2,required" frugal:"2,required,i64" json:"user_id"`
+	ExpectedRevision int64  `thrift:"expected_revision,3,required" frugal:"3,required,i64" json:"expected_revision"`
+}
+
+func NewDeleteMemberRequest() *DeleteMemberRequest {
+	return &DeleteMemberRequest{}
+}
+
+func (p *DeleteMemberRequest) InitDefault() {
+}
+
+func (p *DeleteMemberRequest) GetDocumentId() (v string) {
+	return p.DocumentId
+}
+
+func (p *DeleteMemberRequest) GetUserId() (v int64) {
+	return p.UserId
+}
+
+func (p *DeleteMemberRequest) GetExpectedRevision() (v int64) {
+	return p.ExpectedRevision
+}
+func (p *DeleteMemberRequest) SetDocumentId(val string) {
+	p.DocumentId = val
+}
+func (p *DeleteMemberRequest) SetUserId(val int64) {
+	p.UserId = val
+}
+func (p *DeleteMemberRequest) SetExpectedRevision(val int64) {
+	p.ExpectedRevision = val
+}
+
+func (p *DeleteMemberRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("DeleteMemberRequest(%+v)", *p)
+}
+
+var fieldIDToName_DeleteMemberRequest = map[int16]string{
+	1: "document_id",
+	2: "user_id",
+	3: "expected_revision",
+}
+
+type CreateAttachmentRequest struct {
+	DocumentId     string  `thrift:"document_id,1,required" frugal:"1,required,string" json:"document_id"`
+	Filename       string  `thrift:"filename,2,required" frugal:"2,required,string" json:"filename"`
+	MediaType      string  `thrift:"media_type,3,required" frugal:"3,required,string" json:"media_type"`
+	SizeBytes      int64   `thrift:"size_bytes,4,required" frugal:"4,required,i64" json:"size_bytes"`
+	Sha256         string  `thrift:"sha256,5,required" frugal:"5,required,string" json:"sha256"`
+	IdempotencyKey *string `thrift:"idempotency_key,6,optional" frugal:"6,optional,string" json:"idempotency_key,omitempty"`
+}
+
+func NewCreateAttachmentRequest() *CreateAttachmentRequest {
+	return &CreateAttachmentRequest{}
+}
+
+func (p *CreateAttachmentRequest) InitDefault() {
+}
+
+func (p *CreateAttachmentRequest) GetDocumentId() (v string) {
+	return p.DocumentId
+}
+
+func (p *CreateAttachmentRequest) GetFilename() (v string) {
+	return p.Filename
+}
+
+func (p *CreateAttachmentRequest) GetMediaType() (v string) {
+	return p.MediaType
+}
+
+func (p *CreateAttachmentRequest) GetSizeBytes() (v int64) {
+	return p.SizeBytes
+}
+
+func (p *CreateAttachmentRequest) GetSha256() (v string) {
+	return p.Sha256
+}
+
+var CreateAttachmentRequest_IdempotencyKey_DEFAULT string
+
+func (p *CreateAttachmentRequest) GetIdempotencyKey() (v string) {
+	if !p.IsSetIdempotencyKey() {
+		return CreateAttachmentRequest_IdempotencyKey_DEFAULT
+	}
+	return *p.IdempotencyKey
+}
+func (p *CreateAttachmentRequest) SetDocumentId(val string) {
+	p.DocumentId = val
+}
+func (p *CreateAttachmentRequest) SetFilename(val string) {
+	p.Filename = val
+}
+func (p *CreateAttachmentRequest) SetMediaType(val string) {
+	p.MediaType = val
+}
+func (p *CreateAttachmentRequest) SetSizeBytes(val int64) {
+	p.SizeBytes = val
+}
+func (p *CreateAttachmentRequest) SetSha256(val string) {
+	p.Sha256 = val
+}
+func (p *CreateAttachmentRequest) SetIdempotencyKey(val *string) {
+	p.IdempotencyKey = val
+}
+
+func (p *CreateAttachmentRequest) IsSetIdempotencyKey() bool {
+	return p.IdempotencyKey != nil
+}
+
+func (p *CreateAttachmentRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("CreateAttachmentRequest(%+v)", *p)
+}
+
+var fieldIDToName_CreateAttachmentRequest = map[int16]string{
+	1: "document_id",
+	2: "filename",
+	3: "media_type",
+	4: "size_bytes",
+	5: "sha256",
+	6: "idempotency_key",
+}
+
+type AttachmentUpload struct {
+	Attachment      *Attachment       `thrift:"attachment,1,required" frugal:"1,required,Attachment" json:"attachment"`
+	UploadUrl       string            `thrift:"upload_url,2,required" frugal:"2,required,string" json:"upload_url"`
+	RequiredHeaders map[string]string `thrift:"required_headers,3,required" frugal:"3,required,map<string:string>" json:"required_headers"`
+	ExpiresAt       string            `thrift:"expires_at,4,required" frugal:"4,required,string" json:"expires_at"`
+}
+
+func NewAttachmentUpload() *AttachmentUpload {
+	return &AttachmentUpload{}
+}
+
+func (p *AttachmentUpload) InitDefault() {
+}
+
+var AttachmentUpload_Attachment_DEFAULT *Attachment
+
+func (p *AttachmentUpload) GetAttachment() (v *Attachment) {
+	if !p.IsSetAttachment() {
+		return AttachmentUpload_Attachment_DEFAULT
+	}
+	return p.Attachment
+}
+
+func (p *AttachmentUpload) GetUploadUrl() (v string) {
+	return p.UploadUrl
+}
+
+func (p *AttachmentUpload) GetRequiredHeaders() (v map[string]string) {
+	return p.RequiredHeaders
+}
+
+func (p *AttachmentUpload) GetExpiresAt() (v string) {
+	return p.ExpiresAt
+}
+func (p *AttachmentUpload) SetAttachment(val *Attachment) {
+	p.Attachment = val
+}
+func (p *AttachmentUpload) SetUploadUrl(val string) {
+	p.UploadUrl = val
+}
+func (p *AttachmentUpload) SetRequiredHeaders(val map[string]string) {
+	p.RequiredHeaders = val
+}
+func (p *AttachmentUpload) SetExpiresAt(val string) {
+	p.ExpiresAt = val
+}
+
+func (p *AttachmentUpload) IsSetAttachment() bool {
+	return p.Attachment != nil
+}
+
+func (p *AttachmentUpload) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("AttachmentUpload(%+v)", *p)
+}
+
+var fieldIDToName_AttachmentUpload = map[int16]string{
+	1: "attachment",
+	2: "upload_url",
+	3: "required_headers",
+	4: "expires_at",
+}
+
+type AttachmentIDRequest struct {
+	DocumentId   string `thrift:"document_id,1,required" frugal:"1,required,string" json:"document_id"`
+	AttachmentId string `thrift:"attachment_id,2,required" frugal:"2,required,string" json:"attachment_id"`
+}
+
+func NewAttachmentIDRequest() *AttachmentIDRequest {
+	return &AttachmentIDRequest{}
+}
+
+func (p *AttachmentIDRequest) InitDefault() {
+}
+
+func (p *AttachmentIDRequest) GetDocumentId() (v string) {
+	return p.DocumentId
+}
+
+func (p *AttachmentIDRequest) GetAttachmentId() (v string) {
+	return p.AttachmentId
+}
+func (p *AttachmentIDRequest) SetDocumentId(val string) {
+	p.DocumentId = val
+}
+func (p *AttachmentIDRequest) SetAttachmentId(val string) {
+	p.AttachmentId = val
+}
+
+func (p *AttachmentIDRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("AttachmentIDRequest(%+v)", *p)
+}
+
+var fieldIDToName_AttachmentIDRequest = map[int16]string{
+	1: "document_id",
+	2: "attachment_id",
+}
+
+type AttachmentList struct {
+	Items []*Attachment `thrift:"items,1,required" frugal:"1,required,list<Attachment>" json:"items"`
+}
+
+func NewAttachmentList() *AttachmentList {
+	return &AttachmentList{}
+}
+
+func (p *AttachmentList) InitDefault() {
+}
+
+func (p *AttachmentList) GetItems() (v []*Attachment) {
+	return p.Items
+}
+func (p *AttachmentList) SetItems(val []*Attachment) {
+	p.Items = val
+}
+
+func (p *AttachmentList) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("AttachmentList(%+v)", *p)
+}
+
+var fieldIDToName_AttachmentList = map[int16]string{
+	1: "items",
+}
+
+type AttachmentContentRequest struct {
+	AttachmentId string `thrift:"attachment_id,1,required" frugal:"1,required,string" json:"attachment_id"`
+}
+
+func NewAttachmentContentRequest() *AttachmentContentRequest {
+	return &AttachmentContentRequest{}
+}
+
+func (p *AttachmentContentRequest) InitDefault() {
+}
+
+func (p *AttachmentContentRequest) GetAttachmentId() (v string) {
+	return p.AttachmentId
+}
+func (p *AttachmentContentRequest) SetAttachmentId(val string) {
+	p.AttachmentId = val
+}
+
+func (p *AttachmentContentRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("AttachmentContentRequest(%+v)", *p)
+}
+
+var fieldIDToName_AttachmentContentRequest = map[int16]string{
+	1: "attachment_id",
+}
+
+type AttachmentContent struct {
+	Url       string `thrift:"url,1,required" frugal:"1,required,string" json:"url"`
+	ExpiresAt string `thrift:"expires_at,2,required" frugal:"2,required,string" json:"expires_at"`
+}
+
+func NewAttachmentContent() *AttachmentContent {
+	return &AttachmentContent{}
+}
+
+func (p *AttachmentContent) InitDefault() {
+}
+
+func (p *AttachmentContent) GetUrl() (v string) {
+	return p.Url
+}
+
+func (p *AttachmentContent) GetExpiresAt() (v string) {
+	return p.ExpiresAt
+}
+func (p *AttachmentContent) SetUrl(val string) {
+	p.Url = val
+}
+func (p *AttachmentContent) SetExpiresAt(val string) {
+	p.ExpiresAt = val
+}
+
+func (p *AttachmentContent) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("AttachmentContent(%+v)", *p)
+}
+
+var fieldIDToName_AttachmentContent = map[int16]string{
+	1: "url",
+	2: "expires_at",
 }
 
 type KnowledgeService interface {
 	Ping(ctx context.Context, request *common.PingRequest) (r *common.PingResponse, err error)
 
-	ListPublishedDocuments(ctx context.Context, request *DocumentListRequest) (r *DocumentList, err error)
+	ListPublishedDocuments(ctx context.Context, request *ListDocumentsRequest) (r *DocumentPage, err error)
 
-	ListDocuments(ctx context.Context, request *DocumentListRequest) (r *DocumentList, err error)
+	GetPublishedDocument(ctx context.Context, request *GetPublishedDocumentRequest) (r *DocumentDetail, err error)
 
-	GetPublishedDocument(ctx context.Context, request *DocumentIDRequest) (r *DocumentDetail, err error)
+	ListDocuments(ctx context.Context, request *ListDocumentsRequest) (r *DocumentPage, err error)
 
-	CreateDocument(ctx context.Context, request *CreateDocumentRequest) (r *DocumentDetail, err error)
+	CreateDocument(ctx context.Context, request *CreateDocumentRequest) (r *Document, err error)
 
-	GetDocument(ctx context.Context, request *DocumentIDRequest) (r *DocumentDetail, err error)
+	GetDocument(ctx context.Context, request *DocumentIDRequest) (r *Document, err error)
 
-	UpdateDocument(ctx context.Context, request *UpdateDocumentRequest) (r *DocumentDetail, err error)
+	UpdateDocument(ctx context.Context, request *UpdateDocumentRequest) (r *Document, err error)
 
-	DeleteDocument(ctx context.Context, request *DocumentIDRequest) (r *Document, err error)
+	SetPublication(ctx context.Context, request *SetPublicationRequest) (r *Document, err error)
 
-	SetDocumentStatus(ctx context.Context, request *SetDocumentStatusRequest) (r *Document, err error)
+	DeleteDocument(ctx context.Context, request *DeleteDocumentRequest) (r *Document, err error)
 
-	ApplyDocumentOperation(ctx context.Context, request *ApplyDocumentOperationRequest) (r *DocumentOperationAck, err error)
+	RestoreDeletedDocument(ctx context.Context, request *DocumentIDRequest) (r *Document, err error)
+
+	ListDeletedDocuments(ctx context.Context, request *ListDocumentsRequest) (r *DocumentPage, err error)
+
+	ListMembers(ctx context.Context, request *DocumentIDRequest) (r *MemberList, err error)
+
+	AddMember(ctx context.Context, request *AddMemberRequest) (r *Member, err error)
+
+	UpdateMember(ctx context.Context, request *UpdateMemberRequest) (r *Member, err error)
+
+	DeleteMember(ctx context.Context, request *DeleteMemberRequest) (err error)
+
+	ListAttachments(ctx context.Context, request *DocumentIDRequest) (r *AttachmentList, err error)
+
+	CreateAttachment(ctx context.Context, request *CreateAttachmentRequest) (r *AttachmentUpload, err error)
+
+	CompleteAttachment(ctx context.Context, request *AttachmentIDRequest) (r *Attachment, err error)
+
+	DeleteAttachment(ctx context.Context, request *AttachmentIDRequest) (err error)
+
+	GetAttachmentContent(ctx context.Context, request *AttachmentContentRequest) (r *AttachmentContent, err error)
 }
 
 type KnowledgeServicePingArgs struct {
@@ -834,7 +2051,7 @@ var fieldIDToName_KnowledgeServicePingResult = map[int16]string{
 }
 
 type KnowledgeServiceListPublishedDocumentsArgs struct {
-	Request *DocumentListRequest `thrift:"request,1" frugal:"1,default,DocumentListRequest" json:"request"`
+	Request *ListDocumentsRequest `thrift:"request,1" frugal:"1,default,ListDocumentsRequest" json:"request"`
 }
 
 func NewKnowledgeServiceListPublishedDocumentsArgs() *KnowledgeServiceListPublishedDocumentsArgs {
@@ -844,15 +2061,15 @@ func NewKnowledgeServiceListPublishedDocumentsArgs() *KnowledgeServiceListPublis
 func (p *KnowledgeServiceListPublishedDocumentsArgs) InitDefault() {
 }
 
-var KnowledgeServiceListPublishedDocumentsArgs_Request_DEFAULT *DocumentListRequest
+var KnowledgeServiceListPublishedDocumentsArgs_Request_DEFAULT *ListDocumentsRequest
 
-func (p *KnowledgeServiceListPublishedDocumentsArgs) GetRequest() (v *DocumentListRequest) {
+func (p *KnowledgeServiceListPublishedDocumentsArgs) GetRequest() (v *ListDocumentsRequest) {
 	if !p.IsSetRequest() {
 		return KnowledgeServiceListPublishedDocumentsArgs_Request_DEFAULT
 	}
 	return p.Request
 }
-func (p *KnowledgeServiceListPublishedDocumentsArgs) SetRequest(val *DocumentListRequest) {
+func (p *KnowledgeServiceListPublishedDocumentsArgs) SetRequest(val *ListDocumentsRequest) {
 	p.Request = val
 }
 
@@ -872,7 +2089,7 @@ var fieldIDToName_KnowledgeServiceListPublishedDocumentsArgs = map[int16]string{
 }
 
 type KnowledgeServiceListPublishedDocumentsResult struct {
-	Success *DocumentList `thrift:"success,0,optional" frugal:"0,optional,DocumentList" json:"success,omitempty"`
+	Success *DocumentPage `thrift:"success,0,optional" frugal:"0,optional,DocumentPage" json:"success,omitempty"`
 }
 
 func NewKnowledgeServiceListPublishedDocumentsResult() *KnowledgeServiceListPublishedDocumentsResult {
@@ -882,16 +2099,16 @@ func NewKnowledgeServiceListPublishedDocumentsResult() *KnowledgeServiceListPubl
 func (p *KnowledgeServiceListPublishedDocumentsResult) InitDefault() {
 }
 
-var KnowledgeServiceListPublishedDocumentsResult_Success_DEFAULT *DocumentList
+var KnowledgeServiceListPublishedDocumentsResult_Success_DEFAULT *DocumentPage
 
-func (p *KnowledgeServiceListPublishedDocumentsResult) GetSuccess() (v *DocumentList) {
+func (p *KnowledgeServiceListPublishedDocumentsResult) GetSuccess() (v *DocumentPage) {
 	if !p.IsSetSuccess() {
 		return KnowledgeServiceListPublishedDocumentsResult_Success_DEFAULT
 	}
 	return p.Success
 }
 func (p *KnowledgeServiceListPublishedDocumentsResult) SetSuccess(x interface{}) {
-	p.Success = x.(*DocumentList)
+	p.Success = x.(*DocumentPage)
 }
 
 func (p *KnowledgeServiceListPublishedDocumentsResult) IsSetSuccess() bool {
@@ -909,84 +2126,8 @@ var fieldIDToName_KnowledgeServiceListPublishedDocumentsResult = map[int16]strin
 	0: "success",
 }
 
-type KnowledgeServiceListDocumentsArgs struct {
-	Request *DocumentListRequest `thrift:"request,1" frugal:"1,default,DocumentListRequest" json:"request"`
-}
-
-func NewKnowledgeServiceListDocumentsArgs() *KnowledgeServiceListDocumentsArgs {
-	return &KnowledgeServiceListDocumentsArgs{}
-}
-
-func (p *KnowledgeServiceListDocumentsArgs) InitDefault() {
-}
-
-var KnowledgeServiceListDocumentsArgs_Request_DEFAULT *DocumentListRequest
-
-func (p *KnowledgeServiceListDocumentsArgs) GetRequest() (v *DocumentListRequest) {
-	if !p.IsSetRequest() {
-		return KnowledgeServiceListDocumentsArgs_Request_DEFAULT
-	}
-	return p.Request
-}
-func (p *KnowledgeServiceListDocumentsArgs) SetRequest(val *DocumentListRequest) {
-	p.Request = val
-}
-
-func (p *KnowledgeServiceListDocumentsArgs) IsSetRequest() bool {
-	return p.Request != nil
-}
-
-func (p *KnowledgeServiceListDocumentsArgs) String() string {
-	if p == nil {
-		return "<nil>"
-	}
-	return fmt.Sprintf("KnowledgeServiceListDocumentsArgs(%+v)", *p)
-}
-
-var fieldIDToName_KnowledgeServiceListDocumentsArgs = map[int16]string{
-	1: "request",
-}
-
-type KnowledgeServiceListDocumentsResult struct {
-	Success *DocumentList `thrift:"success,0,optional" frugal:"0,optional,DocumentList" json:"success,omitempty"`
-}
-
-func NewKnowledgeServiceListDocumentsResult() *KnowledgeServiceListDocumentsResult {
-	return &KnowledgeServiceListDocumentsResult{}
-}
-
-func (p *KnowledgeServiceListDocumentsResult) InitDefault() {
-}
-
-var KnowledgeServiceListDocumentsResult_Success_DEFAULT *DocumentList
-
-func (p *KnowledgeServiceListDocumentsResult) GetSuccess() (v *DocumentList) {
-	if !p.IsSetSuccess() {
-		return KnowledgeServiceListDocumentsResult_Success_DEFAULT
-	}
-	return p.Success
-}
-func (p *KnowledgeServiceListDocumentsResult) SetSuccess(x interface{}) {
-	p.Success = x.(*DocumentList)
-}
-
-func (p *KnowledgeServiceListDocumentsResult) IsSetSuccess() bool {
-	return p.Success != nil
-}
-
-func (p *KnowledgeServiceListDocumentsResult) String() string {
-	if p == nil {
-		return "<nil>"
-	}
-	return fmt.Sprintf("KnowledgeServiceListDocumentsResult(%+v)", *p)
-}
-
-var fieldIDToName_KnowledgeServiceListDocumentsResult = map[int16]string{
-	0: "success",
-}
-
 type KnowledgeServiceGetPublishedDocumentArgs struct {
-	Request *DocumentIDRequest `thrift:"request,1" frugal:"1,default,DocumentIDRequest" json:"request"`
+	Request *GetPublishedDocumentRequest `thrift:"request,1" frugal:"1,default,GetPublishedDocumentRequest" json:"request"`
 }
 
 func NewKnowledgeServiceGetPublishedDocumentArgs() *KnowledgeServiceGetPublishedDocumentArgs {
@@ -996,15 +2137,15 @@ func NewKnowledgeServiceGetPublishedDocumentArgs() *KnowledgeServiceGetPublished
 func (p *KnowledgeServiceGetPublishedDocumentArgs) InitDefault() {
 }
 
-var KnowledgeServiceGetPublishedDocumentArgs_Request_DEFAULT *DocumentIDRequest
+var KnowledgeServiceGetPublishedDocumentArgs_Request_DEFAULT *GetPublishedDocumentRequest
 
-func (p *KnowledgeServiceGetPublishedDocumentArgs) GetRequest() (v *DocumentIDRequest) {
+func (p *KnowledgeServiceGetPublishedDocumentArgs) GetRequest() (v *GetPublishedDocumentRequest) {
 	if !p.IsSetRequest() {
 		return KnowledgeServiceGetPublishedDocumentArgs_Request_DEFAULT
 	}
 	return p.Request
 }
-func (p *KnowledgeServiceGetPublishedDocumentArgs) SetRequest(val *DocumentIDRequest) {
+func (p *KnowledgeServiceGetPublishedDocumentArgs) SetRequest(val *GetPublishedDocumentRequest) {
 	p.Request = val
 }
 
@@ -1061,6 +2202,82 @@ var fieldIDToName_KnowledgeServiceGetPublishedDocumentResult = map[int16]string{
 	0: "success",
 }
 
+type KnowledgeServiceListDocumentsArgs struct {
+	Request *ListDocumentsRequest `thrift:"request,1" frugal:"1,default,ListDocumentsRequest" json:"request"`
+}
+
+func NewKnowledgeServiceListDocumentsArgs() *KnowledgeServiceListDocumentsArgs {
+	return &KnowledgeServiceListDocumentsArgs{}
+}
+
+func (p *KnowledgeServiceListDocumentsArgs) InitDefault() {
+}
+
+var KnowledgeServiceListDocumentsArgs_Request_DEFAULT *ListDocumentsRequest
+
+func (p *KnowledgeServiceListDocumentsArgs) GetRequest() (v *ListDocumentsRequest) {
+	if !p.IsSetRequest() {
+		return KnowledgeServiceListDocumentsArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+func (p *KnowledgeServiceListDocumentsArgs) SetRequest(val *ListDocumentsRequest) {
+	p.Request = val
+}
+
+func (p *KnowledgeServiceListDocumentsArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *KnowledgeServiceListDocumentsArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("KnowledgeServiceListDocumentsArgs(%+v)", *p)
+}
+
+var fieldIDToName_KnowledgeServiceListDocumentsArgs = map[int16]string{
+	1: "request",
+}
+
+type KnowledgeServiceListDocumentsResult struct {
+	Success *DocumentPage `thrift:"success,0,optional" frugal:"0,optional,DocumentPage" json:"success,omitempty"`
+}
+
+func NewKnowledgeServiceListDocumentsResult() *KnowledgeServiceListDocumentsResult {
+	return &KnowledgeServiceListDocumentsResult{}
+}
+
+func (p *KnowledgeServiceListDocumentsResult) InitDefault() {
+}
+
+var KnowledgeServiceListDocumentsResult_Success_DEFAULT *DocumentPage
+
+func (p *KnowledgeServiceListDocumentsResult) GetSuccess() (v *DocumentPage) {
+	if !p.IsSetSuccess() {
+		return KnowledgeServiceListDocumentsResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *KnowledgeServiceListDocumentsResult) SetSuccess(x interface{}) {
+	p.Success = x.(*DocumentPage)
+}
+
+func (p *KnowledgeServiceListDocumentsResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *KnowledgeServiceListDocumentsResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("KnowledgeServiceListDocumentsResult(%+v)", *p)
+}
+
+var fieldIDToName_KnowledgeServiceListDocumentsResult = map[int16]string{
+	0: "success",
+}
+
 type KnowledgeServiceCreateDocumentArgs struct {
 	Request *CreateDocumentRequest `thrift:"request,1" frugal:"1,default,CreateDocumentRequest" json:"request"`
 }
@@ -1100,7 +2317,7 @@ var fieldIDToName_KnowledgeServiceCreateDocumentArgs = map[int16]string{
 }
 
 type KnowledgeServiceCreateDocumentResult struct {
-	Success *DocumentDetail `thrift:"success,0,optional" frugal:"0,optional,DocumentDetail" json:"success,omitempty"`
+	Success *Document `thrift:"success,0,optional" frugal:"0,optional,Document" json:"success,omitempty"`
 }
 
 func NewKnowledgeServiceCreateDocumentResult() *KnowledgeServiceCreateDocumentResult {
@@ -1110,16 +2327,16 @@ func NewKnowledgeServiceCreateDocumentResult() *KnowledgeServiceCreateDocumentRe
 func (p *KnowledgeServiceCreateDocumentResult) InitDefault() {
 }
 
-var KnowledgeServiceCreateDocumentResult_Success_DEFAULT *DocumentDetail
+var KnowledgeServiceCreateDocumentResult_Success_DEFAULT *Document
 
-func (p *KnowledgeServiceCreateDocumentResult) GetSuccess() (v *DocumentDetail) {
+func (p *KnowledgeServiceCreateDocumentResult) GetSuccess() (v *Document) {
 	if !p.IsSetSuccess() {
 		return KnowledgeServiceCreateDocumentResult_Success_DEFAULT
 	}
 	return p.Success
 }
 func (p *KnowledgeServiceCreateDocumentResult) SetSuccess(x interface{}) {
-	p.Success = x.(*DocumentDetail)
+	p.Success = x.(*Document)
 }
 
 func (p *KnowledgeServiceCreateDocumentResult) IsSetSuccess() bool {
@@ -1176,7 +2393,7 @@ var fieldIDToName_KnowledgeServiceGetDocumentArgs = map[int16]string{
 }
 
 type KnowledgeServiceGetDocumentResult struct {
-	Success *DocumentDetail `thrift:"success,0,optional" frugal:"0,optional,DocumentDetail" json:"success,omitempty"`
+	Success *Document `thrift:"success,0,optional" frugal:"0,optional,Document" json:"success,omitempty"`
 }
 
 func NewKnowledgeServiceGetDocumentResult() *KnowledgeServiceGetDocumentResult {
@@ -1186,16 +2403,16 @@ func NewKnowledgeServiceGetDocumentResult() *KnowledgeServiceGetDocumentResult {
 func (p *KnowledgeServiceGetDocumentResult) InitDefault() {
 }
 
-var KnowledgeServiceGetDocumentResult_Success_DEFAULT *DocumentDetail
+var KnowledgeServiceGetDocumentResult_Success_DEFAULT *Document
 
-func (p *KnowledgeServiceGetDocumentResult) GetSuccess() (v *DocumentDetail) {
+func (p *KnowledgeServiceGetDocumentResult) GetSuccess() (v *Document) {
 	if !p.IsSetSuccess() {
 		return KnowledgeServiceGetDocumentResult_Success_DEFAULT
 	}
 	return p.Success
 }
 func (p *KnowledgeServiceGetDocumentResult) SetSuccess(x interface{}) {
-	p.Success = x.(*DocumentDetail)
+	p.Success = x.(*Document)
 }
 
 func (p *KnowledgeServiceGetDocumentResult) IsSetSuccess() bool {
@@ -1252,7 +2469,7 @@ var fieldIDToName_KnowledgeServiceUpdateDocumentArgs = map[int16]string{
 }
 
 type KnowledgeServiceUpdateDocumentResult struct {
-	Success *DocumentDetail `thrift:"success,0,optional" frugal:"0,optional,DocumentDetail" json:"success,omitempty"`
+	Success *Document `thrift:"success,0,optional" frugal:"0,optional,Document" json:"success,omitempty"`
 }
 
 func NewKnowledgeServiceUpdateDocumentResult() *KnowledgeServiceUpdateDocumentResult {
@@ -1262,16 +2479,16 @@ func NewKnowledgeServiceUpdateDocumentResult() *KnowledgeServiceUpdateDocumentRe
 func (p *KnowledgeServiceUpdateDocumentResult) InitDefault() {
 }
 
-var KnowledgeServiceUpdateDocumentResult_Success_DEFAULT *DocumentDetail
+var KnowledgeServiceUpdateDocumentResult_Success_DEFAULT *Document
 
-func (p *KnowledgeServiceUpdateDocumentResult) GetSuccess() (v *DocumentDetail) {
+func (p *KnowledgeServiceUpdateDocumentResult) GetSuccess() (v *Document) {
 	if !p.IsSetSuccess() {
 		return KnowledgeServiceUpdateDocumentResult_Success_DEFAULT
 	}
 	return p.Success
 }
 func (p *KnowledgeServiceUpdateDocumentResult) SetSuccess(x interface{}) {
-	p.Success = x.(*DocumentDetail)
+	p.Success = x.(*Document)
 }
 
 func (p *KnowledgeServiceUpdateDocumentResult) IsSetSuccess() bool {
@@ -1289,8 +2506,84 @@ var fieldIDToName_KnowledgeServiceUpdateDocumentResult = map[int16]string{
 	0: "success",
 }
 
+type KnowledgeServiceSetPublicationArgs struct {
+	Request *SetPublicationRequest `thrift:"request,1" frugal:"1,default,SetPublicationRequest" json:"request"`
+}
+
+func NewKnowledgeServiceSetPublicationArgs() *KnowledgeServiceSetPublicationArgs {
+	return &KnowledgeServiceSetPublicationArgs{}
+}
+
+func (p *KnowledgeServiceSetPublicationArgs) InitDefault() {
+}
+
+var KnowledgeServiceSetPublicationArgs_Request_DEFAULT *SetPublicationRequest
+
+func (p *KnowledgeServiceSetPublicationArgs) GetRequest() (v *SetPublicationRequest) {
+	if !p.IsSetRequest() {
+		return KnowledgeServiceSetPublicationArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+func (p *KnowledgeServiceSetPublicationArgs) SetRequest(val *SetPublicationRequest) {
+	p.Request = val
+}
+
+func (p *KnowledgeServiceSetPublicationArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *KnowledgeServiceSetPublicationArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("KnowledgeServiceSetPublicationArgs(%+v)", *p)
+}
+
+var fieldIDToName_KnowledgeServiceSetPublicationArgs = map[int16]string{
+	1: "request",
+}
+
+type KnowledgeServiceSetPublicationResult struct {
+	Success *Document `thrift:"success,0,optional" frugal:"0,optional,Document" json:"success,omitempty"`
+}
+
+func NewKnowledgeServiceSetPublicationResult() *KnowledgeServiceSetPublicationResult {
+	return &KnowledgeServiceSetPublicationResult{}
+}
+
+func (p *KnowledgeServiceSetPublicationResult) InitDefault() {
+}
+
+var KnowledgeServiceSetPublicationResult_Success_DEFAULT *Document
+
+func (p *KnowledgeServiceSetPublicationResult) GetSuccess() (v *Document) {
+	if !p.IsSetSuccess() {
+		return KnowledgeServiceSetPublicationResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *KnowledgeServiceSetPublicationResult) SetSuccess(x interface{}) {
+	p.Success = x.(*Document)
+}
+
+func (p *KnowledgeServiceSetPublicationResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *KnowledgeServiceSetPublicationResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("KnowledgeServiceSetPublicationResult(%+v)", *p)
+}
+
+var fieldIDToName_KnowledgeServiceSetPublicationResult = map[int16]string{
+	0: "success",
+}
+
 type KnowledgeServiceDeleteDocumentArgs struct {
-	Request *DocumentIDRequest `thrift:"request,1" frugal:"1,default,DocumentIDRequest" json:"request"`
+	Request *DeleteDocumentRequest `thrift:"request,1" frugal:"1,default,DeleteDocumentRequest" json:"request"`
 }
 
 func NewKnowledgeServiceDeleteDocumentArgs() *KnowledgeServiceDeleteDocumentArgs {
@@ -1300,15 +2593,15 @@ func NewKnowledgeServiceDeleteDocumentArgs() *KnowledgeServiceDeleteDocumentArgs
 func (p *KnowledgeServiceDeleteDocumentArgs) InitDefault() {
 }
 
-var KnowledgeServiceDeleteDocumentArgs_Request_DEFAULT *DocumentIDRequest
+var KnowledgeServiceDeleteDocumentArgs_Request_DEFAULT *DeleteDocumentRequest
 
-func (p *KnowledgeServiceDeleteDocumentArgs) GetRequest() (v *DocumentIDRequest) {
+func (p *KnowledgeServiceDeleteDocumentArgs) GetRequest() (v *DeleteDocumentRequest) {
 	if !p.IsSetRequest() {
 		return KnowledgeServiceDeleteDocumentArgs_Request_DEFAULT
 	}
 	return p.Request
 }
-func (p *KnowledgeServiceDeleteDocumentArgs) SetRequest(val *DocumentIDRequest) {
+func (p *KnowledgeServiceDeleteDocumentArgs) SetRequest(val *DeleteDocumentRequest) {
 	p.Request = val
 }
 
@@ -1365,154 +2658,800 @@ var fieldIDToName_KnowledgeServiceDeleteDocumentResult = map[int16]string{
 	0: "success",
 }
 
-type KnowledgeServiceSetDocumentStatusArgs struct {
-	Request *SetDocumentStatusRequest `thrift:"request,1" frugal:"1,default,SetDocumentStatusRequest" json:"request"`
+type KnowledgeServiceRestoreDeletedDocumentArgs struct {
+	Request *DocumentIDRequest `thrift:"request,1" frugal:"1,default,DocumentIDRequest" json:"request"`
 }
 
-func NewKnowledgeServiceSetDocumentStatusArgs() *KnowledgeServiceSetDocumentStatusArgs {
-	return &KnowledgeServiceSetDocumentStatusArgs{}
+func NewKnowledgeServiceRestoreDeletedDocumentArgs() *KnowledgeServiceRestoreDeletedDocumentArgs {
+	return &KnowledgeServiceRestoreDeletedDocumentArgs{}
 }
 
-func (p *KnowledgeServiceSetDocumentStatusArgs) InitDefault() {
+func (p *KnowledgeServiceRestoreDeletedDocumentArgs) InitDefault() {
 }
 
-var KnowledgeServiceSetDocumentStatusArgs_Request_DEFAULT *SetDocumentStatusRequest
+var KnowledgeServiceRestoreDeletedDocumentArgs_Request_DEFAULT *DocumentIDRequest
 
-func (p *KnowledgeServiceSetDocumentStatusArgs) GetRequest() (v *SetDocumentStatusRequest) {
+func (p *KnowledgeServiceRestoreDeletedDocumentArgs) GetRequest() (v *DocumentIDRequest) {
 	if !p.IsSetRequest() {
-		return KnowledgeServiceSetDocumentStatusArgs_Request_DEFAULT
+		return KnowledgeServiceRestoreDeletedDocumentArgs_Request_DEFAULT
 	}
 	return p.Request
 }
-func (p *KnowledgeServiceSetDocumentStatusArgs) SetRequest(val *SetDocumentStatusRequest) {
+func (p *KnowledgeServiceRestoreDeletedDocumentArgs) SetRequest(val *DocumentIDRequest) {
 	p.Request = val
 }
 
-func (p *KnowledgeServiceSetDocumentStatusArgs) IsSetRequest() bool {
+func (p *KnowledgeServiceRestoreDeletedDocumentArgs) IsSetRequest() bool {
 	return p.Request != nil
 }
 
-func (p *KnowledgeServiceSetDocumentStatusArgs) String() string {
+func (p *KnowledgeServiceRestoreDeletedDocumentArgs) String() string {
 	if p == nil {
 		return "<nil>"
 	}
-	return fmt.Sprintf("KnowledgeServiceSetDocumentStatusArgs(%+v)", *p)
+	return fmt.Sprintf("KnowledgeServiceRestoreDeletedDocumentArgs(%+v)", *p)
 }
 
-var fieldIDToName_KnowledgeServiceSetDocumentStatusArgs = map[int16]string{
+var fieldIDToName_KnowledgeServiceRestoreDeletedDocumentArgs = map[int16]string{
 	1: "request",
 }
 
-type KnowledgeServiceSetDocumentStatusResult struct {
+type KnowledgeServiceRestoreDeletedDocumentResult struct {
 	Success *Document `thrift:"success,0,optional" frugal:"0,optional,Document" json:"success,omitempty"`
 }
 
-func NewKnowledgeServiceSetDocumentStatusResult() *KnowledgeServiceSetDocumentStatusResult {
-	return &KnowledgeServiceSetDocumentStatusResult{}
+func NewKnowledgeServiceRestoreDeletedDocumentResult() *KnowledgeServiceRestoreDeletedDocumentResult {
+	return &KnowledgeServiceRestoreDeletedDocumentResult{}
 }
 
-func (p *KnowledgeServiceSetDocumentStatusResult) InitDefault() {
+func (p *KnowledgeServiceRestoreDeletedDocumentResult) InitDefault() {
 }
 
-var KnowledgeServiceSetDocumentStatusResult_Success_DEFAULT *Document
+var KnowledgeServiceRestoreDeletedDocumentResult_Success_DEFAULT *Document
 
-func (p *KnowledgeServiceSetDocumentStatusResult) GetSuccess() (v *Document) {
+func (p *KnowledgeServiceRestoreDeletedDocumentResult) GetSuccess() (v *Document) {
 	if !p.IsSetSuccess() {
-		return KnowledgeServiceSetDocumentStatusResult_Success_DEFAULT
+		return KnowledgeServiceRestoreDeletedDocumentResult_Success_DEFAULT
 	}
 	return p.Success
 }
-func (p *KnowledgeServiceSetDocumentStatusResult) SetSuccess(x interface{}) {
+func (p *KnowledgeServiceRestoreDeletedDocumentResult) SetSuccess(x interface{}) {
 	p.Success = x.(*Document)
 }
 
-func (p *KnowledgeServiceSetDocumentStatusResult) IsSetSuccess() bool {
+func (p *KnowledgeServiceRestoreDeletedDocumentResult) IsSetSuccess() bool {
 	return p.Success != nil
 }
 
-func (p *KnowledgeServiceSetDocumentStatusResult) String() string {
+func (p *KnowledgeServiceRestoreDeletedDocumentResult) String() string {
 	if p == nil {
 		return "<nil>"
 	}
-	return fmt.Sprintf("KnowledgeServiceSetDocumentStatusResult(%+v)", *p)
+	return fmt.Sprintf("KnowledgeServiceRestoreDeletedDocumentResult(%+v)", *p)
 }
 
-var fieldIDToName_KnowledgeServiceSetDocumentStatusResult = map[int16]string{
+var fieldIDToName_KnowledgeServiceRestoreDeletedDocumentResult = map[int16]string{
 	0: "success",
 }
 
-type KnowledgeServiceApplyDocumentOperationArgs struct {
-	Request *ApplyDocumentOperationRequest `thrift:"request,1" frugal:"1,default,ApplyDocumentOperationRequest" json:"request"`
+type KnowledgeServiceListDeletedDocumentsArgs struct {
+	Request *ListDocumentsRequest `thrift:"request,1" frugal:"1,default,ListDocumentsRequest" json:"request"`
 }
 
-func NewKnowledgeServiceApplyDocumentOperationArgs() *KnowledgeServiceApplyDocumentOperationArgs {
-	return &KnowledgeServiceApplyDocumentOperationArgs{}
+func NewKnowledgeServiceListDeletedDocumentsArgs() *KnowledgeServiceListDeletedDocumentsArgs {
+	return &KnowledgeServiceListDeletedDocumentsArgs{}
 }
 
-func (p *KnowledgeServiceApplyDocumentOperationArgs) InitDefault() {
+func (p *KnowledgeServiceListDeletedDocumentsArgs) InitDefault() {
 }
 
-var KnowledgeServiceApplyDocumentOperationArgs_Request_DEFAULT *ApplyDocumentOperationRequest
+var KnowledgeServiceListDeletedDocumentsArgs_Request_DEFAULT *ListDocumentsRequest
 
-func (p *KnowledgeServiceApplyDocumentOperationArgs) GetRequest() (v *ApplyDocumentOperationRequest) {
+func (p *KnowledgeServiceListDeletedDocumentsArgs) GetRequest() (v *ListDocumentsRequest) {
 	if !p.IsSetRequest() {
-		return KnowledgeServiceApplyDocumentOperationArgs_Request_DEFAULT
+		return KnowledgeServiceListDeletedDocumentsArgs_Request_DEFAULT
 	}
 	return p.Request
 }
-func (p *KnowledgeServiceApplyDocumentOperationArgs) SetRequest(val *ApplyDocumentOperationRequest) {
+func (p *KnowledgeServiceListDeletedDocumentsArgs) SetRequest(val *ListDocumentsRequest) {
 	p.Request = val
 }
 
-func (p *KnowledgeServiceApplyDocumentOperationArgs) IsSetRequest() bool {
+func (p *KnowledgeServiceListDeletedDocumentsArgs) IsSetRequest() bool {
 	return p.Request != nil
 }
 
-func (p *KnowledgeServiceApplyDocumentOperationArgs) String() string {
+func (p *KnowledgeServiceListDeletedDocumentsArgs) String() string {
 	if p == nil {
 		return "<nil>"
 	}
-	return fmt.Sprintf("KnowledgeServiceApplyDocumentOperationArgs(%+v)", *p)
+	return fmt.Sprintf("KnowledgeServiceListDeletedDocumentsArgs(%+v)", *p)
 }
 
-var fieldIDToName_KnowledgeServiceApplyDocumentOperationArgs = map[int16]string{
+var fieldIDToName_KnowledgeServiceListDeletedDocumentsArgs = map[int16]string{
 	1: "request",
 }
 
-type KnowledgeServiceApplyDocumentOperationResult struct {
-	Success *DocumentOperationAck `thrift:"success,0,optional" frugal:"0,optional,DocumentOperationAck" json:"success,omitempty"`
+type KnowledgeServiceListDeletedDocumentsResult struct {
+	Success *DocumentPage `thrift:"success,0,optional" frugal:"0,optional,DocumentPage" json:"success,omitempty"`
 }
 
-func NewKnowledgeServiceApplyDocumentOperationResult() *KnowledgeServiceApplyDocumentOperationResult {
-	return &KnowledgeServiceApplyDocumentOperationResult{}
+func NewKnowledgeServiceListDeletedDocumentsResult() *KnowledgeServiceListDeletedDocumentsResult {
+	return &KnowledgeServiceListDeletedDocumentsResult{}
 }
 
-func (p *KnowledgeServiceApplyDocumentOperationResult) InitDefault() {
+func (p *KnowledgeServiceListDeletedDocumentsResult) InitDefault() {
 }
 
-var KnowledgeServiceApplyDocumentOperationResult_Success_DEFAULT *DocumentOperationAck
+var KnowledgeServiceListDeletedDocumentsResult_Success_DEFAULT *DocumentPage
 
-func (p *KnowledgeServiceApplyDocumentOperationResult) GetSuccess() (v *DocumentOperationAck) {
+func (p *KnowledgeServiceListDeletedDocumentsResult) GetSuccess() (v *DocumentPage) {
 	if !p.IsSetSuccess() {
-		return KnowledgeServiceApplyDocumentOperationResult_Success_DEFAULT
+		return KnowledgeServiceListDeletedDocumentsResult_Success_DEFAULT
 	}
 	return p.Success
 }
-func (p *KnowledgeServiceApplyDocumentOperationResult) SetSuccess(x interface{}) {
-	p.Success = x.(*DocumentOperationAck)
+func (p *KnowledgeServiceListDeletedDocumentsResult) SetSuccess(x interface{}) {
+	p.Success = x.(*DocumentPage)
 }
 
-func (p *KnowledgeServiceApplyDocumentOperationResult) IsSetSuccess() bool {
+func (p *KnowledgeServiceListDeletedDocumentsResult) IsSetSuccess() bool {
 	return p.Success != nil
 }
 
-func (p *KnowledgeServiceApplyDocumentOperationResult) String() string {
+func (p *KnowledgeServiceListDeletedDocumentsResult) String() string {
 	if p == nil {
 		return "<nil>"
 	}
-	return fmt.Sprintf("KnowledgeServiceApplyDocumentOperationResult(%+v)", *p)
+	return fmt.Sprintf("KnowledgeServiceListDeletedDocumentsResult(%+v)", *p)
 }
 
-var fieldIDToName_KnowledgeServiceApplyDocumentOperationResult = map[int16]string{
+var fieldIDToName_KnowledgeServiceListDeletedDocumentsResult = map[int16]string{
+	0: "success",
+}
+
+type KnowledgeServiceListMembersArgs struct {
+	Request *DocumentIDRequest `thrift:"request,1" frugal:"1,default,DocumentIDRequest" json:"request"`
+}
+
+func NewKnowledgeServiceListMembersArgs() *KnowledgeServiceListMembersArgs {
+	return &KnowledgeServiceListMembersArgs{}
+}
+
+func (p *KnowledgeServiceListMembersArgs) InitDefault() {
+}
+
+var KnowledgeServiceListMembersArgs_Request_DEFAULT *DocumentIDRequest
+
+func (p *KnowledgeServiceListMembersArgs) GetRequest() (v *DocumentIDRequest) {
+	if !p.IsSetRequest() {
+		return KnowledgeServiceListMembersArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+func (p *KnowledgeServiceListMembersArgs) SetRequest(val *DocumentIDRequest) {
+	p.Request = val
+}
+
+func (p *KnowledgeServiceListMembersArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *KnowledgeServiceListMembersArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("KnowledgeServiceListMembersArgs(%+v)", *p)
+}
+
+var fieldIDToName_KnowledgeServiceListMembersArgs = map[int16]string{
+	1: "request",
+}
+
+type KnowledgeServiceListMembersResult struct {
+	Success *MemberList `thrift:"success,0,optional" frugal:"0,optional,MemberList" json:"success,omitempty"`
+}
+
+func NewKnowledgeServiceListMembersResult() *KnowledgeServiceListMembersResult {
+	return &KnowledgeServiceListMembersResult{}
+}
+
+func (p *KnowledgeServiceListMembersResult) InitDefault() {
+}
+
+var KnowledgeServiceListMembersResult_Success_DEFAULT *MemberList
+
+func (p *KnowledgeServiceListMembersResult) GetSuccess() (v *MemberList) {
+	if !p.IsSetSuccess() {
+		return KnowledgeServiceListMembersResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *KnowledgeServiceListMembersResult) SetSuccess(x interface{}) {
+	p.Success = x.(*MemberList)
+}
+
+func (p *KnowledgeServiceListMembersResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *KnowledgeServiceListMembersResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("KnowledgeServiceListMembersResult(%+v)", *p)
+}
+
+var fieldIDToName_KnowledgeServiceListMembersResult = map[int16]string{
+	0: "success",
+}
+
+type KnowledgeServiceAddMemberArgs struct {
+	Request *AddMemberRequest `thrift:"request,1" frugal:"1,default,AddMemberRequest" json:"request"`
+}
+
+func NewKnowledgeServiceAddMemberArgs() *KnowledgeServiceAddMemberArgs {
+	return &KnowledgeServiceAddMemberArgs{}
+}
+
+func (p *KnowledgeServiceAddMemberArgs) InitDefault() {
+}
+
+var KnowledgeServiceAddMemberArgs_Request_DEFAULT *AddMemberRequest
+
+func (p *KnowledgeServiceAddMemberArgs) GetRequest() (v *AddMemberRequest) {
+	if !p.IsSetRequest() {
+		return KnowledgeServiceAddMemberArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+func (p *KnowledgeServiceAddMemberArgs) SetRequest(val *AddMemberRequest) {
+	p.Request = val
+}
+
+func (p *KnowledgeServiceAddMemberArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *KnowledgeServiceAddMemberArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("KnowledgeServiceAddMemberArgs(%+v)", *p)
+}
+
+var fieldIDToName_KnowledgeServiceAddMemberArgs = map[int16]string{
+	1: "request",
+}
+
+type KnowledgeServiceAddMemberResult struct {
+	Success *Member `thrift:"success,0,optional" frugal:"0,optional,Member" json:"success,omitempty"`
+}
+
+func NewKnowledgeServiceAddMemberResult() *KnowledgeServiceAddMemberResult {
+	return &KnowledgeServiceAddMemberResult{}
+}
+
+func (p *KnowledgeServiceAddMemberResult) InitDefault() {
+}
+
+var KnowledgeServiceAddMemberResult_Success_DEFAULT *Member
+
+func (p *KnowledgeServiceAddMemberResult) GetSuccess() (v *Member) {
+	if !p.IsSetSuccess() {
+		return KnowledgeServiceAddMemberResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *KnowledgeServiceAddMemberResult) SetSuccess(x interface{}) {
+	p.Success = x.(*Member)
+}
+
+func (p *KnowledgeServiceAddMemberResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *KnowledgeServiceAddMemberResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("KnowledgeServiceAddMemberResult(%+v)", *p)
+}
+
+var fieldIDToName_KnowledgeServiceAddMemberResult = map[int16]string{
+	0: "success",
+}
+
+type KnowledgeServiceUpdateMemberArgs struct {
+	Request *UpdateMemberRequest `thrift:"request,1" frugal:"1,default,UpdateMemberRequest" json:"request"`
+}
+
+func NewKnowledgeServiceUpdateMemberArgs() *KnowledgeServiceUpdateMemberArgs {
+	return &KnowledgeServiceUpdateMemberArgs{}
+}
+
+func (p *KnowledgeServiceUpdateMemberArgs) InitDefault() {
+}
+
+var KnowledgeServiceUpdateMemberArgs_Request_DEFAULT *UpdateMemberRequest
+
+func (p *KnowledgeServiceUpdateMemberArgs) GetRequest() (v *UpdateMemberRequest) {
+	if !p.IsSetRequest() {
+		return KnowledgeServiceUpdateMemberArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+func (p *KnowledgeServiceUpdateMemberArgs) SetRequest(val *UpdateMemberRequest) {
+	p.Request = val
+}
+
+func (p *KnowledgeServiceUpdateMemberArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *KnowledgeServiceUpdateMemberArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("KnowledgeServiceUpdateMemberArgs(%+v)", *p)
+}
+
+var fieldIDToName_KnowledgeServiceUpdateMemberArgs = map[int16]string{
+	1: "request",
+}
+
+type KnowledgeServiceUpdateMemberResult struct {
+	Success *Member `thrift:"success,0,optional" frugal:"0,optional,Member" json:"success,omitempty"`
+}
+
+func NewKnowledgeServiceUpdateMemberResult() *KnowledgeServiceUpdateMemberResult {
+	return &KnowledgeServiceUpdateMemberResult{}
+}
+
+func (p *KnowledgeServiceUpdateMemberResult) InitDefault() {
+}
+
+var KnowledgeServiceUpdateMemberResult_Success_DEFAULT *Member
+
+func (p *KnowledgeServiceUpdateMemberResult) GetSuccess() (v *Member) {
+	if !p.IsSetSuccess() {
+		return KnowledgeServiceUpdateMemberResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *KnowledgeServiceUpdateMemberResult) SetSuccess(x interface{}) {
+	p.Success = x.(*Member)
+}
+
+func (p *KnowledgeServiceUpdateMemberResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *KnowledgeServiceUpdateMemberResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("KnowledgeServiceUpdateMemberResult(%+v)", *p)
+}
+
+var fieldIDToName_KnowledgeServiceUpdateMemberResult = map[int16]string{
+	0: "success",
+}
+
+type KnowledgeServiceDeleteMemberArgs struct {
+	Request *DeleteMemberRequest `thrift:"request,1" frugal:"1,default,DeleteMemberRequest" json:"request"`
+}
+
+func NewKnowledgeServiceDeleteMemberArgs() *KnowledgeServiceDeleteMemberArgs {
+	return &KnowledgeServiceDeleteMemberArgs{}
+}
+
+func (p *KnowledgeServiceDeleteMemberArgs) InitDefault() {
+}
+
+var KnowledgeServiceDeleteMemberArgs_Request_DEFAULT *DeleteMemberRequest
+
+func (p *KnowledgeServiceDeleteMemberArgs) GetRequest() (v *DeleteMemberRequest) {
+	if !p.IsSetRequest() {
+		return KnowledgeServiceDeleteMemberArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+func (p *KnowledgeServiceDeleteMemberArgs) SetRequest(val *DeleteMemberRequest) {
+	p.Request = val
+}
+
+func (p *KnowledgeServiceDeleteMemberArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *KnowledgeServiceDeleteMemberArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("KnowledgeServiceDeleteMemberArgs(%+v)", *p)
+}
+
+var fieldIDToName_KnowledgeServiceDeleteMemberArgs = map[int16]string{
+	1: "request",
+}
+
+type KnowledgeServiceDeleteMemberResult struct {
+}
+
+func NewKnowledgeServiceDeleteMemberResult() *KnowledgeServiceDeleteMemberResult {
+	return &KnowledgeServiceDeleteMemberResult{}
+}
+
+func (p *KnowledgeServiceDeleteMemberResult) InitDefault() {
+}
+
+func (p *KnowledgeServiceDeleteMemberResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("KnowledgeServiceDeleteMemberResult(%+v)", *p)
+}
+
+var fieldIDToName_KnowledgeServiceDeleteMemberResult = map[int16]string{}
+
+type KnowledgeServiceListAttachmentsArgs struct {
+	Request *DocumentIDRequest `thrift:"request,1" frugal:"1,default,DocumentIDRequest" json:"request"`
+}
+
+func NewKnowledgeServiceListAttachmentsArgs() *KnowledgeServiceListAttachmentsArgs {
+	return &KnowledgeServiceListAttachmentsArgs{}
+}
+
+func (p *KnowledgeServiceListAttachmentsArgs) InitDefault() {
+}
+
+var KnowledgeServiceListAttachmentsArgs_Request_DEFAULT *DocumentIDRequest
+
+func (p *KnowledgeServiceListAttachmentsArgs) GetRequest() (v *DocumentIDRequest) {
+	if !p.IsSetRequest() {
+		return KnowledgeServiceListAttachmentsArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+func (p *KnowledgeServiceListAttachmentsArgs) SetRequest(val *DocumentIDRequest) {
+	p.Request = val
+}
+
+func (p *KnowledgeServiceListAttachmentsArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *KnowledgeServiceListAttachmentsArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("KnowledgeServiceListAttachmentsArgs(%+v)", *p)
+}
+
+var fieldIDToName_KnowledgeServiceListAttachmentsArgs = map[int16]string{
+	1: "request",
+}
+
+type KnowledgeServiceListAttachmentsResult struct {
+	Success *AttachmentList `thrift:"success,0,optional" frugal:"0,optional,AttachmentList" json:"success,omitempty"`
+}
+
+func NewKnowledgeServiceListAttachmentsResult() *KnowledgeServiceListAttachmentsResult {
+	return &KnowledgeServiceListAttachmentsResult{}
+}
+
+func (p *KnowledgeServiceListAttachmentsResult) InitDefault() {
+}
+
+var KnowledgeServiceListAttachmentsResult_Success_DEFAULT *AttachmentList
+
+func (p *KnowledgeServiceListAttachmentsResult) GetSuccess() (v *AttachmentList) {
+	if !p.IsSetSuccess() {
+		return KnowledgeServiceListAttachmentsResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *KnowledgeServiceListAttachmentsResult) SetSuccess(x interface{}) {
+	p.Success = x.(*AttachmentList)
+}
+
+func (p *KnowledgeServiceListAttachmentsResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *KnowledgeServiceListAttachmentsResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("KnowledgeServiceListAttachmentsResult(%+v)", *p)
+}
+
+var fieldIDToName_KnowledgeServiceListAttachmentsResult = map[int16]string{
+	0: "success",
+}
+
+type KnowledgeServiceCreateAttachmentArgs struct {
+	Request *CreateAttachmentRequest `thrift:"request,1" frugal:"1,default,CreateAttachmentRequest" json:"request"`
+}
+
+func NewKnowledgeServiceCreateAttachmentArgs() *KnowledgeServiceCreateAttachmentArgs {
+	return &KnowledgeServiceCreateAttachmentArgs{}
+}
+
+func (p *KnowledgeServiceCreateAttachmentArgs) InitDefault() {
+}
+
+var KnowledgeServiceCreateAttachmentArgs_Request_DEFAULT *CreateAttachmentRequest
+
+func (p *KnowledgeServiceCreateAttachmentArgs) GetRequest() (v *CreateAttachmentRequest) {
+	if !p.IsSetRequest() {
+		return KnowledgeServiceCreateAttachmentArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+func (p *KnowledgeServiceCreateAttachmentArgs) SetRequest(val *CreateAttachmentRequest) {
+	p.Request = val
+}
+
+func (p *KnowledgeServiceCreateAttachmentArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *KnowledgeServiceCreateAttachmentArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("KnowledgeServiceCreateAttachmentArgs(%+v)", *p)
+}
+
+var fieldIDToName_KnowledgeServiceCreateAttachmentArgs = map[int16]string{
+	1: "request",
+}
+
+type KnowledgeServiceCreateAttachmentResult struct {
+	Success *AttachmentUpload `thrift:"success,0,optional" frugal:"0,optional,AttachmentUpload" json:"success,omitempty"`
+}
+
+func NewKnowledgeServiceCreateAttachmentResult() *KnowledgeServiceCreateAttachmentResult {
+	return &KnowledgeServiceCreateAttachmentResult{}
+}
+
+func (p *KnowledgeServiceCreateAttachmentResult) InitDefault() {
+}
+
+var KnowledgeServiceCreateAttachmentResult_Success_DEFAULT *AttachmentUpload
+
+func (p *KnowledgeServiceCreateAttachmentResult) GetSuccess() (v *AttachmentUpload) {
+	if !p.IsSetSuccess() {
+		return KnowledgeServiceCreateAttachmentResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *KnowledgeServiceCreateAttachmentResult) SetSuccess(x interface{}) {
+	p.Success = x.(*AttachmentUpload)
+}
+
+func (p *KnowledgeServiceCreateAttachmentResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *KnowledgeServiceCreateAttachmentResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("KnowledgeServiceCreateAttachmentResult(%+v)", *p)
+}
+
+var fieldIDToName_KnowledgeServiceCreateAttachmentResult = map[int16]string{
+	0: "success",
+}
+
+type KnowledgeServiceCompleteAttachmentArgs struct {
+	Request *AttachmentIDRequest `thrift:"request,1" frugal:"1,default,AttachmentIDRequest" json:"request"`
+}
+
+func NewKnowledgeServiceCompleteAttachmentArgs() *KnowledgeServiceCompleteAttachmentArgs {
+	return &KnowledgeServiceCompleteAttachmentArgs{}
+}
+
+func (p *KnowledgeServiceCompleteAttachmentArgs) InitDefault() {
+}
+
+var KnowledgeServiceCompleteAttachmentArgs_Request_DEFAULT *AttachmentIDRequest
+
+func (p *KnowledgeServiceCompleteAttachmentArgs) GetRequest() (v *AttachmentIDRequest) {
+	if !p.IsSetRequest() {
+		return KnowledgeServiceCompleteAttachmentArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+func (p *KnowledgeServiceCompleteAttachmentArgs) SetRequest(val *AttachmentIDRequest) {
+	p.Request = val
+}
+
+func (p *KnowledgeServiceCompleteAttachmentArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *KnowledgeServiceCompleteAttachmentArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("KnowledgeServiceCompleteAttachmentArgs(%+v)", *p)
+}
+
+var fieldIDToName_KnowledgeServiceCompleteAttachmentArgs = map[int16]string{
+	1: "request",
+}
+
+type KnowledgeServiceCompleteAttachmentResult struct {
+	Success *Attachment `thrift:"success,0,optional" frugal:"0,optional,Attachment" json:"success,omitempty"`
+}
+
+func NewKnowledgeServiceCompleteAttachmentResult() *KnowledgeServiceCompleteAttachmentResult {
+	return &KnowledgeServiceCompleteAttachmentResult{}
+}
+
+func (p *KnowledgeServiceCompleteAttachmentResult) InitDefault() {
+}
+
+var KnowledgeServiceCompleteAttachmentResult_Success_DEFAULT *Attachment
+
+func (p *KnowledgeServiceCompleteAttachmentResult) GetSuccess() (v *Attachment) {
+	if !p.IsSetSuccess() {
+		return KnowledgeServiceCompleteAttachmentResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *KnowledgeServiceCompleteAttachmentResult) SetSuccess(x interface{}) {
+	p.Success = x.(*Attachment)
+}
+
+func (p *KnowledgeServiceCompleteAttachmentResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *KnowledgeServiceCompleteAttachmentResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("KnowledgeServiceCompleteAttachmentResult(%+v)", *p)
+}
+
+var fieldIDToName_KnowledgeServiceCompleteAttachmentResult = map[int16]string{
+	0: "success",
+}
+
+type KnowledgeServiceDeleteAttachmentArgs struct {
+	Request *AttachmentIDRequest `thrift:"request,1" frugal:"1,default,AttachmentIDRequest" json:"request"`
+}
+
+func NewKnowledgeServiceDeleteAttachmentArgs() *KnowledgeServiceDeleteAttachmentArgs {
+	return &KnowledgeServiceDeleteAttachmentArgs{}
+}
+
+func (p *KnowledgeServiceDeleteAttachmentArgs) InitDefault() {
+}
+
+var KnowledgeServiceDeleteAttachmentArgs_Request_DEFAULT *AttachmentIDRequest
+
+func (p *KnowledgeServiceDeleteAttachmentArgs) GetRequest() (v *AttachmentIDRequest) {
+	if !p.IsSetRequest() {
+		return KnowledgeServiceDeleteAttachmentArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+func (p *KnowledgeServiceDeleteAttachmentArgs) SetRequest(val *AttachmentIDRequest) {
+	p.Request = val
+}
+
+func (p *KnowledgeServiceDeleteAttachmentArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *KnowledgeServiceDeleteAttachmentArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("KnowledgeServiceDeleteAttachmentArgs(%+v)", *p)
+}
+
+var fieldIDToName_KnowledgeServiceDeleteAttachmentArgs = map[int16]string{
+	1: "request",
+}
+
+type KnowledgeServiceDeleteAttachmentResult struct {
+}
+
+func NewKnowledgeServiceDeleteAttachmentResult() *KnowledgeServiceDeleteAttachmentResult {
+	return &KnowledgeServiceDeleteAttachmentResult{}
+}
+
+func (p *KnowledgeServiceDeleteAttachmentResult) InitDefault() {
+}
+
+func (p *KnowledgeServiceDeleteAttachmentResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("KnowledgeServiceDeleteAttachmentResult(%+v)", *p)
+}
+
+var fieldIDToName_KnowledgeServiceDeleteAttachmentResult = map[int16]string{}
+
+type KnowledgeServiceGetAttachmentContentArgs struct {
+	Request *AttachmentContentRequest `thrift:"request,1" frugal:"1,default,AttachmentContentRequest" json:"request"`
+}
+
+func NewKnowledgeServiceGetAttachmentContentArgs() *KnowledgeServiceGetAttachmentContentArgs {
+	return &KnowledgeServiceGetAttachmentContentArgs{}
+}
+
+func (p *KnowledgeServiceGetAttachmentContentArgs) InitDefault() {
+}
+
+var KnowledgeServiceGetAttachmentContentArgs_Request_DEFAULT *AttachmentContentRequest
+
+func (p *KnowledgeServiceGetAttachmentContentArgs) GetRequest() (v *AttachmentContentRequest) {
+	if !p.IsSetRequest() {
+		return KnowledgeServiceGetAttachmentContentArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+func (p *KnowledgeServiceGetAttachmentContentArgs) SetRequest(val *AttachmentContentRequest) {
+	p.Request = val
+}
+
+func (p *KnowledgeServiceGetAttachmentContentArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *KnowledgeServiceGetAttachmentContentArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("KnowledgeServiceGetAttachmentContentArgs(%+v)", *p)
+}
+
+var fieldIDToName_KnowledgeServiceGetAttachmentContentArgs = map[int16]string{
+	1: "request",
+}
+
+type KnowledgeServiceGetAttachmentContentResult struct {
+	Success *AttachmentContent `thrift:"success,0,optional" frugal:"0,optional,AttachmentContent" json:"success,omitempty"`
+}
+
+func NewKnowledgeServiceGetAttachmentContentResult() *KnowledgeServiceGetAttachmentContentResult {
+	return &KnowledgeServiceGetAttachmentContentResult{}
+}
+
+func (p *KnowledgeServiceGetAttachmentContentResult) InitDefault() {
+}
+
+var KnowledgeServiceGetAttachmentContentResult_Success_DEFAULT *AttachmentContent
+
+func (p *KnowledgeServiceGetAttachmentContentResult) GetSuccess() (v *AttachmentContent) {
+	if !p.IsSetSuccess() {
+		return KnowledgeServiceGetAttachmentContentResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *KnowledgeServiceGetAttachmentContentResult) SetSuccess(x interface{}) {
+	p.Success = x.(*AttachmentContent)
+}
+
+func (p *KnowledgeServiceGetAttachmentContentResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *KnowledgeServiceGetAttachmentContentResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("KnowledgeServiceGetAttachmentContentResult(%+v)", *p)
+}
+
+var fieldIDToName_KnowledgeServiceGetAttachmentContentResult = map[int16]string{
 	0: "success",
 }

@@ -10,17 +10,20 @@ import (
 )
 
 type Config struct {
-	App         *option.AppOptions         `mapstructure:"app" json:"app" yaml:"app"`
-	Log         *option.LogOptions         `mapstructure:"log" json:"log" yaml:"log"`
-	Trace       *option.TraceOptions       `mapstructure:"trace" json:"trace" yaml:"trace"`
-	PublicHTTP  *option.HertzServerOptions `mapstructure:"public_http" json:"public_http" yaml:"public_http"`
-	AdminHTTP   *option.HertzServerOptions `mapstructure:"admin_http" json:"admin_http" yaml:"admin_http"`
-	Redis       *option.RedisOptions       `mapstructure:"redis" json:"redis" yaml:"redis"`
-	Etcd        *option.EtcdOptions        `mapstructure:"etcd" json:"etcd" yaml:"etcd"`
-	IdentityRPC *option.KitexClientOptions `mapstructure:"identity_rpc" json:"identity_rpc" yaml:"identity_rpc"`
-	Auth        *AuthOptions               `mapstructure:"auth" json:"auth" yaml:"auth"`
-	CORS        *CORSOptions               `mapstructure:"cors" json:"cors" yaml:"cors"`
-	RateLimit   *RateLimitOptions          `mapstructure:"rate_limit" json:"rate_limit" yaml:"rate_limit"`
+	App           *option.AppOptions         `mapstructure:"app" json:"app" yaml:"app"`
+	Log           *option.LogOptions         `mapstructure:"log" json:"log" yaml:"log"`
+	Trace         *option.TraceOptions       `mapstructure:"trace" json:"trace" yaml:"trace"`
+	PublicHTTP    *option.HertzServerOptions `mapstructure:"public_http" json:"public_http" yaml:"public_http"`
+	AdminHTTP     *option.HertzServerOptions `mapstructure:"admin_http" json:"admin_http" yaml:"admin_http"`
+	Redis         *option.RedisOptions       `mapstructure:"redis" json:"redis" yaml:"redis"`
+	Etcd          *option.EtcdOptions        `mapstructure:"etcd" json:"etcd" yaml:"etcd"`
+	IdentityRPC   *option.KitexClientOptions `mapstructure:"identity_rpc" json:"identity_rpc" yaml:"identity_rpc"`
+	KnowledgeRPC  *option.KitexClientOptions `mapstructure:"knowledge_rpc" json:"knowledge_rpc" yaml:"knowledge_rpc"`
+	Collaboration *CollaborationOptions      `mapstructure:"collaboration" json:"collaboration" yaml:"collaboration"`
+	Endpoints     *EndpointOptions           `mapstructure:"endpoints" json:"endpoints" yaml:"endpoints"`
+	Auth          *AuthOptions               `mapstructure:"auth" json:"auth" yaml:"auth"`
+	CORS          *CORSOptions               `mapstructure:"cors" json:"cors" yaml:"cors"`
+	RateLimit     *RateLimitOptions          `mapstructure:"rate_limit" json:"rate_limit" yaml:"rate_limit"`
 }
 
 func New() Config {
@@ -30,10 +33,13 @@ func New() Config {
 	adminHTTP.Address = ":8082"
 	identityRPC := option.NewKitexClientOptions()
 	identityRPC.ServiceName = "knowledge-core.identity"
+	knowledgeRPC := option.NewKitexClientOptions()
+	knowledgeRPC.ServiceName = "knowledge-core.knowledge"
 	return Config{
 		App: option.NewAppOptions("gateway"), Log: option.NewLogOptions(), Trace: option.NewTraceOptions(),
 		PublicHTTP: publicHTTP, AdminHTTP: adminHTTP, Redis: option.NewRedisOptions(), Etcd: option.NewEtcdOptions(),
-		IdentityRPC: identityRPC, Auth: NewAuthOptions(), CORS: NewCORSOptions(), RateLimit: NewRateLimitOptions(),
+		IdentityRPC: identityRPC, KnowledgeRPC: knowledgeRPC, Collaboration: NewCollaborationOptions(),
+		Endpoints: NewEndpointOptions(), Auth: NewAuthOptions(), CORS: NewCORSOptions(), RateLimit: NewRateLimitOptions(),
 	}
 }
 
@@ -50,13 +56,25 @@ func (c Config) Validate() error {
 	if c.App.ShutdownTimeout < drainBudget {
 		shutdownErr = fmt.Errorf("app.shutdown_timeout must be at least public_http.shutdown_timeout + admin_http.shutdown_timeout (%s)", drainBudget)
 	}
+	var endpointErr error
+	if c.PublicHTTP.TLS.Enabled != strings.HasPrefix(c.Endpoints.PublicBaseURL, "https://") {
+		endpointErr = errors.Join(endpointErr, errors.New("endpoints.public_base_url scheme must match public_http TLS"))
+	}
+	if c.App.Environment != "development" && !strings.HasPrefix(c.Endpoints.CollaborationWebSocketURL, "wss://") {
+		endpointErr = errors.Join(endpointErr, errors.New("production collaboration WebSocket URL must use wss"))
+	}
+	if c.App.Environment == "production" {
+		endpointErr = errors.Join(endpointErr, c.Collaboration.ValidateProduction())
+	}
 	return errors.Join(
 		wrapValidation("app", c.App.Validate()), wrapValidation("log", c.Log.Validate()),
 		wrapValidation("trace", c.Trace.Validate()), wrapValidation("public_http", c.PublicHTTP.Validate()),
 		wrapValidation("admin_http", c.AdminHTTP.Validate()), wrapValidation("redis", c.Redis.Validate()),
 		wrapValidation("etcd", c.Etcd.Validate()), wrapValidation("identity_rpc", c.IdentityRPC.Validate()),
+		wrapValidation("knowledge_rpc", c.KnowledgeRPC.Validate()), wrapValidation("collaboration", c.Collaboration.Validate()),
+		wrapValidation("endpoints", c.Endpoints.Validate()),
 		wrapValidation("auth", c.Auth.Validate()), wrapValidation("cors", c.CORS.Validate()),
-		wrapValidation("rate_limit", c.RateLimit.Validate()), addressErr, shutdownErr,
+		wrapValidation("rate_limit", c.RateLimit.Validate()), addressErr, shutdownErr, endpointErr,
 	)
 }
 
@@ -64,7 +82,8 @@ func (c Config) requireSections() error {
 	sections := map[string]any{
 		"app": c.App, "log": c.Log, "trace": c.Trace, "public_http": c.PublicHTTP,
 		"admin_http": c.AdminHTTP, "redis": c.Redis, "etcd": c.Etcd,
-		"identity_rpc": c.IdentityRPC, "auth": c.Auth, "cors": c.CORS, "rate_limit": c.RateLimit,
+		"identity_rpc": c.IdentityRPC, "knowledge_rpc": c.KnowledgeRPC, "collaboration": c.Collaboration,
+		"endpoints": c.Endpoints, "auth": c.Auth, "cors": c.CORS, "rate_limit": c.RateLimit,
 	}
 	var joined error
 	for name, section := range sections {

@@ -21,6 +21,9 @@ func TestWriteHertzErrorCarriesSafeMetadata(t *testing.T) {
 	if request.Response.StatusCode() != consts.StatusConflict {
 		t.Fatalf("status = %d", request.Response.StatusCode())
 	}
+	if contentType := string(request.Response.Header.ContentType()); contentType != apperror.ProblemContentType {
+		t.Fatalf("Content-Type = %q", contentType)
+	}
 	body := string(request.Response.Body())
 	if !strings.Contains(body, `"request_id":"request-123"`) || strings.Contains(body, "private@example.com") {
 		t.Fatalf("response body = %s", body)
@@ -32,10 +35,10 @@ func TestWriteHertzErrorCarriesSafeMetadata(t *testing.T) {
 
 func TestToHTTPErrorHidesUnknownErrors(t *testing.T) {
 	status, response := apperror.ToHTTPError(context.Background(), errors.New("private database failure"))
-	if status != consts.StatusInternalServerError || response.Error.Key != apperror.Internal.Key {
+	if status != consts.StatusInternalServerError || response.Key != apperror.Internal.Key {
 		t.Fatalf("ToHTTPError() = %d, %#v", status, response)
 	}
-	if strings.Contains(response.Error.Message, "database") {
+	if strings.Contains(response.Detail, "database") {
 		t.Fatalf("unsafe response = %#v", response)
 	}
 }

@@ -2,6 +2,7 @@ package apperror
 
 import (
 	"context"
+	"net/http"
 
 	jsoncodec "github.com/HappyLadySauce/Knowledge-Core/pkg/codec/json"
 	"github.com/HappyLadySauce/Knowledge-Core/pkg/metadata"
@@ -9,34 +10,55 @@ import (
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 )
 
-type HTTPError struct {
+const ProblemContentType = "application/problem+json; charset=utf-8"
+
+// HTTPProblem is an RFC 9457 problem detail document. Code, key, request_id,
+// and trace_id are stable extension members used by Knowledge Core clients.
+type HTTPProblem struct {
+	Type      string `json:"type"`
+	Title     string `json:"title"`
+	Status    int    `json:"status"`
+	Detail    string `json:"detail"`
 	Code      int32  `json:"code"`
 	Key       string `json:"key"`
-	Kind      Kind   `json:"kind"`
-	Message   string `json:"message"`
 	RequestID string `json:"request_id,omitempty"`
 	TraceID   string `json:"trace_id,omitempty"`
 }
 
-type HTTPErrorResponse struct {
-	Error HTTPError `json:"error"`
-}
-
 // ToHTTPError converts an application error into a safe response payload and
 // status code. Unknown errors never expose their message or wrapped cause.
-func ToHTTPError(ctx context.Context, err error) (int, HTTPErrorResponse) {
+func ToHTTPError(ctx context.Context, err error) (int, HTTPProblem) {
 	definition, known := Details(err)
 	if !known {
 		definition = Internal
 	}
-	return httpStatus(definition.Kind), HTTPErrorResponse{Error: HTTPError{
+	status := httpStatus(definition.Kind)
+	return status, problem(ctx, status, definition)
+}
+
+// ToHTTPProblem converts an application error to a safe RFC 9457 document
+// using an explicit HTTP status. It is intended for protocol-specific status
+// mappings such as 423 Locked or 502 Bad Gateway.
+func ToHTTPProblem(ctx context.Context, status int, err error) HTTPProblem {
+	definition, known := Details(err)
+	if !known {
+		definition = Internal
+		status = http.StatusInternalServerError
+	}
+	return problem(ctx, status, definition)
+}
+
+func problem(ctx context.Context, status int, definition Definition) HTTPProblem {
+	return HTTPProblem{
+		Type:      "urn:knowledge-core:problem:" + definition.Key,
+		Title:     http.StatusText(status),
+		Status:    status,
+		Detail:    definition.Message,
 		Code:      definition.Code,
 		Key:       definition.Key,
-		Kind:      definition.Kind,
-		Message:   definition.Message,
 		RequestID: metadata.RequestID(ctx),
 		TraceID:   traceIDFromContext(ctx),
-	}}
+	}
 }
 
 // WriteHertzError is the common Hertz error boundary. It uses the Sonic codec
@@ -46,22 +68,22 @@ func WriteHertzError(ctx context.Context, request *app.RequestContext, err error
 		return
 	}
 	status, response := ToHTTPError(ctx, err)
-	if response.Error.RequestID != "" {
-		request.Header("X-Request-ID", response.Error.RequestID)
+	if response.RequestID != "" {
+		request.Header("X-Request-ID", response.RequestID)
 	}
-	if response.Error.TraceID != "" {
-		request.Header("X-Trace-ID", response.Error.TraceID)
+	if response.TraceID != "" {
+		request.Header("X-Trace-ID", response.TraceID)
 	}
 	payload, marshalErr := jsoncodec.Marshal(response)
 	if marshalErr != nil {
 		request.Data(
 			consts.StatusInternalServerError,
-			consts.MIMEApplicationJSONUTF8,
-			[]byte(`{"error":{"code":20999,"key":"common.internal","kind":"internal","message":"internal server error"}}`),
+			ProblemContentType,
+			[]byte(`{"type":"urn:knowledge-core:problem:common.internal","title":"Internal Server Error","status":500,"detail":"internal server error","code":1,"key":"common.internal"}`),
 		)
 		return
 	}
-	request.Data(status, consts.MIMEApplicationJSONUTF8, payload)
+	request.Data(status, ProblemContentType, payload)
 }
 
 func httpStatus(kind Kind) int {

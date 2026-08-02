@@ -35,10 +35,17 @@ var serviceMethods = map[string]kitex.MethodInfo{
 		false,
 		kitex.WithStreamingMode(kitex.StreamingNone),
 	),
-	"GetUser": kitex.NewMethodInfo(
-		getUserHandler,
-		newIdentityServiceGetUserArgs,
-		newIdentityServiceGetUserResult,
+	"GetCurrentUser": kitex.NewMethodInfo(
+		getCurrentUserHandler,
+		newIdentityServiceGetCurrentUserArgs,
+		newIdentityServiceGetCurrentUserResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
+	"ResolveUser": kitex.NewMethodInfo(
+		resolveUserHandler,
+		newIdentityServiceResolveUserArgs,
+		newIdentityServiceResolveUserResult,
 		false,
 		kitex.WithStreamingMode(kitex.StreamingNone),
 	),
@@ -162,22 +169,40 @@ func newIdentityServiceAuthenticateResult() interface{} {
 	return identity.NewIdentityServiceAuthenticateResult()
 }
 
-func getUserHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
-	realArg := arg.(*identity.IdentityServiceGetUserArgs)
-	realResult := result.(*identity.IdentityServiceGetUserResult)
-	success, err := handler.(identity.IdentityService).GetUser(ctx, realArg.Request)
+func getCurrentUserHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*identity.IdentityServiceGetCurrentUserArgs)
+	realResult := result.(*identity.IdentityServiceGetCurrentUserResult)
+	success, err := handler.(identity.IdentityService).GetCurrentUser(ctx, realArg.Request)
 	if err != nil {
 		return err
 	}
 	realResult.Success = success
 	return nil
 }
-func newIdentityServiceGetUserArgs() interface{} {
-	return identity.NewIdentityServiceGetUserArgs()
+func newIdentityServiceGetCurrentUserArgs() interface{} {
+	return identity.NewIdentityServiceGetCurrentUserArgs()
 }
 
-func newIdentityServiceGetUserResult() interface{} {
-	return identity.NewIdentityServiceGetUserResult()
+func newIdentityServiceGetCurrentUserResult() interface{} {
+	return identity.NewIdentityServiceGetCurrentUserResult()
+}
+
+func resolveUserHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*identity.IdentityServiceResolveUserArgs)
+	realResult := result.(*identity.IdentityServiceResolveUserResult)
+	success, err := handler.(identity.IdentityService).ResolveUser(ctx, realArg.Request)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newIdentityServiceResolveUserArgs() interface{} {
+	return identity.NewIdentityServiceResolveUserArgs()
+}
+
+func newIdentityServiceResolveUserResult() interface{} {
+	return identity.NewIdentityServiceResolveUserResult()
 }
 
 type kClient struct {
@@ -220,11 +245,21 @@ func (p *kClient) Authenticate(ctx context.Context, request *identity.Authentica
 	return _result.GetSuccess(), nil
 }
 
-func (p *kClient) GetUser(ctx context.Context, request *identity.GetUserRequest) (r *identity.User, err error) {
-	var _args identity.IdentityServiceGetUserArgs
+func (p *kClient) GetCurrentUser(ctx context.Context, request *identity.CurrentUserRequest) (r *identity.User, err error) {
+	var _args identity.IdentityServiceGetCurrentUserArgs
 	_args.Request = request
-	var _result identity.IdentityServiceGetUserResult
-	if err = p.c.Call(ctx, "GetUser", &_args, &_result); err != nil {
+	var _result identity.IdentityServiceGetCurrentUserResult
+	if err = p.c.Call(ctx, "GetCurrentUser", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) ResolveUser(ctx context.Context, request *identity.ResolveUserRequest) (r *identity.PublicUser, err error) {
+	var _args identity.IdentityServiceResolveUserArgs
+	_args.Request = request
+	var _result identity.IdentityServiceResolveUserResult
+	if err = p.c.Call(ctx, "ResolveUser", &_args, &_result); err != nil {
 		return
 	}
 	return _result.GetSuccess(), nil

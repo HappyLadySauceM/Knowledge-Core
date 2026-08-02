@@ -12,3 +12,8 @@ logs/
 bin/
 coverage.out
 *.exe
+
+# Node.js services
+node_modules/
+dist/
+coverage/

@@ -25,22 +25,20 @@ const (
 
 	CodeForbidden = 20008
 
-	CodeUnimplemented = 20009
-
 	CodeInternal = 20999
 )
 
 type User struct {
-	Id            int64  `thrift:"id,1,required" frugal:"1,required,i64" json:"id"`
-	Username      string `thrift:"username,2,required" frugal:"2,required,string" json:"username"`
-	Email         string `thrift:"email,3,required" frugal:"3,required,string" json:"email"`
-	Role          string `thrift:"role,4,required" frugal:"4,required,string" json:"role"`
-	Status        string `thrift:"status,5,required" frugal:"5,required,string" json:"status"`
-	TokenVersion  int64  `thrift:"token_version,6,required" frugal:"6,required,i64" json:"token_version"`
-	Avatar        string `thrift:"avatar,7,required" frugal:"7,required,string" json:"avatar"`
-	Bio           string `thrift:"bio,8,required" frugal:"8,required,string" json:"bio"`
-	CreatedAtUnix int64  `thrift:"created_at_unix,9,required" frugal:"9,required,i64" json:"created_at_unix"`
-	UpdatedAtUnix int64  `thrift:"updated_at_unix,10,required" frugal:"10,required,i64" json:"updated_at_unix"`
+	Id           int64  `thrift:"id,1,required" frugal:"1,required,i64" json:"id"`
+	Username     string `thrift:"username,2,required" frugal:"2,required,string" json:"username"`
+	Email        string `thrift:"email,3,required" frugal:"3,required,string" json:"email"`
+	Role         string `thrift:"role,4,required" frugal:"4,required,string" json:"role"`
+	Status       string `thrift:"status,5,required" frugal:"5,required,string" json:"status"`
+	TokenVersion int64  `thrift:"token_version,6,required" frugal:"6,required,i64" json:"token_version"`
+	Avatar       string `thrift:"avatar,7,required" frugal:"7,required,string" json:"avatar"`
+	Bio          string `thrift:"bio,8,required" frugal:"8,required,string" json:"bio"`
+	CreatedAt    string `thrift:"created_at,9,required" frugal:"9,required,string" json:"created_at"`
+	UpdatedAt    string `thrift:"updated_at,10,required" frugal:"10,required,string" json:"updated_at"`
 }
 
 func NewUser() *User {
@@ -82,12 +80,12 @@ func (p *User) GetBio() (v string) {
 	return p.Bio
 }
 
-func (p *User) GetCreatedAtUnix() (v int64) {
-	return p.CreatedAtUnix
+func (p *User) GetCreatedAt() (v string) {
+	return p.CreatedAt
 }
 
-func (p *User) GetUpdatedAtUnix() (v int64) {
-	return p.UpdatedAtUnix
+func (p *User) GetUpdatedAt() (v string) {
+	return p.UpdatedAt
 }
 func (p *User) SetId(val int64) {
 	p.Id = val
@@ -113,11 +111,11 @@ func (p *User) SetAvatar(val string) {
 func (p *User) SetBio(val string) {
 	p.Bio = val
 }
-func (p *User) SetCreatedAtUnix(val int64) {
-	p.CreatedAtUnix = val
+func (p *User) SetCreatedAt(val string) {
+	p.CreatedAt = val
 }
-func (p *User) SetUpdatedAtUnix(val int64) {
-	p.UpdatedAtUnix = val
+func (p *User) SetUpdatedAt(val string) {
+	p.UpdatedAt = val
 }
 
 func (p *User) String() string {
@@ -136,8 +134,55 @@ var fieldIDToName_User = map[int16]string{
 	6:  "token_version",
 	7:  "avatar",
 	8:  "bio",
-	9:  "created_at_unix",
-	10: "updated_at_unix",
+	9:  "created_at",
+	10: "updated_at",
+}
+
+type PublicUser struct {
+	Id       int64  `thrift:"id,1,required" frugal:"1,required,i64" json:"id"`
+	Username string `thrift:"username,2,required" frugal:"2,required,string" json:"username"`
+	Avatar   string `thrift:"avatar,3,required" frugal:"3,required,string" json:"avatar"`
+}
+
+func NewPublicUser() *PublicUser {
+	return &PublicUser{}
+}
+
+func (p *PublicUser) InitDefault() {
+}
+
+func (p *PublicUser) GetId() (v int64) {
+	return p.Id
+}
+
+func (p *PublicUser) GetUsername() (v string) {
+	return p.Username
+}
+
+func (p *PublicUser) GetAvatar() (v string) {
+	return p.Avatar
+}
+func (p *PublicUser) SetId(val int64) {
+	p.Id = val
+}
+func (p *PublicUser) SetUsername(val string) {
+	p.Username = val
+}
+func (p *PublicUser) SetAvatar(val string) {
+	p.Avatar = val
+}
+
+func (p *PublicUser) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("PublicUser(%+v)", *p)
+}
+
+var fieldIDToName_PublicUser = map[int16]string{
+	1: "id",
+	2: "username",
+	3: "avatar",
 }
 
 type RegisterRequest struct {
@@ -226,9 +271,9 @@ var fieldIDToName_AuthenticateRequest = map[int16]string{
 }
 
 type Authentication struct {
-	User          *User  `thrift:"user,1,required" frugal:"1,required,User" json:"user"`
-	AccessToken   string `thrift:"access_token,2,required" frugal:"2,required,string" json:"access_token"`
-	ExpiresAtUnix int64  `thrift:"expires_at_unix,3,required" frugal:"3,required,i64" json:"expires_at_unix"`
+	User        *User  `thrift:"user,1,required" frugal:"1,required,User" json:"user"`
+	AccessToken string `thrift:"access_token,2,required" frugal:"2,required,string" json:"access_token"`
+	ExpiresAt   string `thrift:"expires_at,3,required" frugal:"3,required,string" json:"expires_at"`
 }
 
 func NewAuthentication() *Authentication {
@@ -251,8 +296,8 @@ func (p *Authentication) GetAccessToken() (v string) {
 	return p.AccessToken
 }
 
-func (p *Authentication) GetExpiresAtUnix() (v int64) {
-	return p.ExpiresAtUnix
+func (p *Authentication) GetExpiresAt() (v string) {
+	return p.ExpiresAt
 }
 func (p *Authentication) SetUser(val *User) {
 	p.User = val
@@ -260,8 +305,8 @@ func (p *Authentication) SetUser(val *User) {
 func (p *Authentication) SetAccessToken(val string) {
 	p.AccessToken = val
 }
-func (p *Authentication) SetExpiresAtUnix(val int64) {
-	p.ExpiresAtUnix = val
+func (p *Authentication) SetExpiresAt(val string) {
+	p.ExpiresAt = val
 }
 
 func (p *Authentication) IsSetUser() bool {
@@ -278,36 +323,55 @@ func (p *Authentication) String() string {
 var fieldIDToName_Authentication = map[int16]string{
 	1: "user",
 	2: "access_token",
-	3: "expires_at_unix",
+	3: "expires_at",
 }
 
-type GetUserRequest struct {
-	UserId int64 `thrift:"user_id,1,required" frugal:"1,required,i64" json:"user_id"`
+type CurrentUserRequest struct {
 }
 
-func NewGetUserRequest() *GetUserRequest {
-	return &GetUserRequest{}
+func NewCurrentUserRequest() *CurrentUserRequest {
+	return &CurrentUserRequest{}
 }
 
-func (p *GetUserRequest) InitDefault() {
+func (p *CurrentUserRequest) InitDefault() {
 }
 
-func (p *GetUserRequest) GetUserId() (v int64) {
-	return p.UserId
-}
-func (p *GetUserRequest) SetUserId(val int64) {
-	p.UserId = val
-}
-
-func (p *GetUserRequest) String() string {
+func (p *CurrentUserRequest) String() string {
 	if p == nil {
 		return "<nil>"
 	}
-	return fmt.Sprintf("GetUserRequest(%+v)", *p)
+	return fmt.Sprintf("CurrentUserRequest(%+v)", *p)
 }
 
-var fieldIDToName_GetUserRequest = map[int16]string{
-	1: "user_id",
+var fieldIDToName_CurrentUserRequest = map[int16]string{}
+
+type ResolveUserRequest struct {
+	Username string `thrift:"username,1,required" frugal:"1,required,string" json:"username"`
+}
+
+func NewResolveUserRequest() *ResolveUserRequest {
+	return &ResolveUserRequest{}
+}
+
+func (p *ResolveUserRequest) InitDefault() {
+}
+
+func (p *ResolveUserRequest) GetUsername() (v string) {
+	return p.Username
+}
+func (p *ResolveUserRequest) SetUsername(val string) {
+	p.Username = val
+}
+
+func (p *ResolveUserRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("ResolveUserRequest(%+v)", *p)
+}
+
+var fieldIDToName_ResolveUserRequest = map[int16]string{
+	1: "username",
 }
 
 type IdentityService interface {
@@ -317,7 +381,9 @@ type IdentityService interface {
 
 	Authenticate(ctx context.Context, request *AuthenticateRequest) (r *Authentication, err error)
 
-	GetUser(ctx context.Context, request *GetUserRequest) (r *User, err error)
+	GetCurrentUser(ctx context.Context, request *CurrentUserRequest) (r *User, err error)
+
+	ResolveUser(ctx context.Context, request *ResolveUserRequest) (r *PublicUser, err error)
 }
 
 type IdentityServicePingArgs struct {
@@ -548,78 +614,154 @@ var fieldIDToName_IdentityServiceAuthenticateResult = map[int16]string{
 	0: "success",
 }
 
-type IdentityServiceGetUserArgs struct {
-	Request *GetUserRequest `thrift:"request,1" frugal:"1,default,GetUserRequest" json:"request"`
+type IdentityServiceGetCurrentUserArgs struct {
+	Request *CurrentUserRequest `thrift:"request,1" frugal:"1,default,CurrentUserRequest" json:"request"`
 }
 
-func NewIdentityServiceGetUserArgs() *IdentityServiceGetUserArgs {
-	return &IdentityServiceGetUserArgs{}
+func NewIdentityServiceGetCurrentUserArgs() *IdentityServiceGetCurrentUserArgs {
+	return &IdentityServiceGetCurrentUserArgs{}
 }
 
-func (p *IdentityServiceGetUserArgs) InitDefault() {
+func (p *IdentityServiceGetCurrentUserArgs) InitDefault() {
 }
 
-var IdentityServiceGetUserArgs_Request_DEFAULT *GetUserRequest
+var IdentityServiceGetCurrentUserArgs_Request_DEFAULT *CurrentUserRequest
 
-func (p *IdentityServiceGetUserArgs) GetRequest() (v *GetUserRequest) {
+func (p *IdentityServiceGetCurrentUserArgs) GetRequest() (v *CurrentUserRequest) {
 	if !p.IsSetRequest() {
-		return IdentityServiceGetUserArgs_Request_DEFAULT
+		return IdentityServiceGetCurrentUserArgs_Request_DEFAULT
 	}
 	return p.Request
 }
-func (p *IdentityServiceGetUserArgs) SetRequest(val *GetUserRequest) {
+func (p *IdentityServiceGetCurrentUserArgs) SetRequest(val *CurrentUserRequest) {
 	p.Request = val
 }
 
-func (p *IdentityServiceGetUserArgs) IsSetRequest() bool {
+func (p *IdentityServiceGetCurrentUserArgs) IsSetRequest() bool {
 	return p.Request != nil
 }
 
-func (p *IdentityServiceGetUserArgs) String() string {
+func (p *IdentityServiceGetCurrentUserArgs) String() string {
 	if p == nil {
 		return "<nil>"
 	}
-	return fmt.Sprintf("IdentityServiceGetUserArgs(%+v)", *p)
+	return fmt.Sprintf("IdentityServiceGetCurrentUserArgs(%+v)", *p)
 }
 
-var fieldIDToName_IdentityServiceGetUserArgs = map[int16]string{
+var fieldIDToName_IdentityServiceGetCurrentUserArgs = map[int16]string{
 	1: "request",
 }
 
-type IdentityServiceGetUserResult struct {
+type IdentityServiceGetCurrentUserResult struct {
 	Success *User `thrift:"success,0,optional" frugal:"0,optional,User" json:"success,omitempty"`
 }
 
-func NewIdentityServiceGetUserResult() *IdentityServiceGetUserResult {
-	return &IdentityServiceGetUserResult{}
+func NewIdentityServiceGetCurrentUserResult() *IdentityServiceGetCurrentUserResult {
+	return &IdentityServiceGetCurrentUserResult{}
 }
 
-func (p *IdentityServiceGetUserResult) InitDefault() {
+func (p *IdentityServiceGetCurrentUserResult) InitDefault() {
 }
 
-var IdentityServiceGetUserResult_Success_DEFAULT *User
+var IdentityServiceGetCurrentUserResult_Success_DEFAULT *User
 
-func (p *IdentityServiceGetUserResult) GetSuccess() (v *User) {
+func (p *IdentityServiceGetCurrentUserResult) GetSuccess() (v *User) {
 	if !p.IsSetSuccess() {
-		return IdentityServiceGetUserResult_Success_DEFAULT
+		return IdentityServiceGetCurrentUserResult_Success_DEFAULT
 	}
 	return p.Success
 }
-func (p *IdentityServiceGetUserResult) SetSuccess(x interface{}) {
+func (p *IdentityServiceGetCurrentUserResult) SetSuccess(x interface{}) {
 	p.Success = x.(*User)
 }
 
-func (p *IdentityServiceGetUserResult) IsSetSuccess() bool {
+func (p *IdentityServiceGetCurrentUserResult) IsSetSuccess() bool {
 	return p.Success != nil
 }
 
-func (p *IdentityServiceGetUserResult) String() string {
+func (p *IdentityServiceGetCurrentUserResult) String() string {
 	if p == nil {
 		return "<nil>"
 	}
-	return fmt.Sprintf("IdentityServiceGetUserResult(%+v)", *p)
+	return fmt.Sprintf("IdentityServiceGetCurrentUserResult(%+v)", *p)
 }
 
-var fieldIDToName_IdentityServiceGetUserResult = map[int16]string{
+var fieldIDToName_IdentityServiceGetCurrentUserResult = map[int16]string{
+	0: "success",
+}
+
+type IdentityServiceResolveUserArgs struct {
+	Request *ResolveUserRequest `thrift:"request,1" frugal:"1,default,ResolveUserRequest" json:"request"`
+}
+
+func NewIdentityServiceResolveUserArgs() *IdentityServiceResolveUserArgs {
+	return &IdentityServiceResolveUserArgs{}
+}
+
+func (p *IdentityServiceResolveUserArgs) InitDefault() {
+}
+
+var IdentityServiceResolveUserArgs_Request_DEFAULT *ResolveUserRequest
+
+func (p *IdentityServiceResolveUserArgs) GetRequest() (v *ResolveUserRequest) {
+	if !p.IsSetRequest() {
+		return IdentityServiceResolveUserArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+func (p *IdentityServiceResolveUserArgs) SetRequest(val *ResolveUserRequest) {
+	p.Request = val
+}
+
+func (p *IdentityServiceResolveUserArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *IdentityServiceResolveUserArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("IdentityServiceResolveUserArgs(%+v)", *p)
+}
+
+var fieldIDToName_IdentityServiceResolveUserArgs = map[int16]string{
+	1: "request",
+}
+
+type IdentityServiceResolveUserResult struct {
+	Success *PublicUser `thrift:"success,0,optional" frugal:"0,optional,PublicUser" json:"success,omitempty"`
+}
+
+func NewIdentityServiceResolveUserResult() *IdentityServiceResolveUserResult {
+	return &IdentityServiceResolveUserResult{}
+}
+
+func (p *IdentityServiceResolveUserResult) InitDefault() {
+}
+
+var IdentityServiceResolveUserResult_Success_DEFAULT *PublicUser
+
+func (p *IdentityServiceResolveUserResult) GetSuccess() (v *PublicUser) {
+	if !p.IsSetSuccess() {
+		return IdentityServiceResolveUserResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *IdentityServiceResolveUserResult) SetSuccess(x interface{}) {
+	p.Success = x.(*PublicUser)
+}
+
+func (p *IdentityServiceResolveUserResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *IdentityServiceResolveUserResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("IdentityServiceResolveUserResult(%+v)", *p)
+}
+
+var fieldIDToName_IdentityServiceResolveUserResult = map[int16]string{
 	0: "success",
 }

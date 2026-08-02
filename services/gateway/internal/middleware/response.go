@@ -6,11 +6,13 @@ import (
 	"net/http"
 
 	identityv1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/identity"
+	knowledgev1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/knowledge"
 	jsoncodec "github.com/HappyLadySauce/Knowledge-Core/pkg/codec/json"
 	apperror "github.com/HappyLadySauce/Knowledge-Core/pkg/error"
 	"github.com/HappyLadySauce/Knowledge-Core/pkg/metadata"
 	coretrace "github.com/HappyLadySauce/Knowledge-Core/pkg/trace"
 	gatewaymodel "github.com/HappyLadySauce/Knowledge-Core/services/gateway/biz/model/gateway"
+	gatewayclient "github.com/HappyLadySauce/Knowledge-Core/services/gateway/internal/client"
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 	"github.com/cloudwego/kitex/pkg/kerrors"
@@ -33,7 +35,7 @@ var (
 	ErrRateLimited             = responseError(gatewaymodel.CodeRateLimited, "gateway.rate_limited", apperror.KindRateLimited, "rate limit exceeded")
 	ErrUpstreamTimeout         = responseError(gatewaymodel.CodeUpstreamTimeout, "gateway.upstream_timeout", apperror.KindDeadlineExceeded, "upstream request timed out")
 	ErrInvalidUpstreamResponse = responseErrorWithStatus(gatewaymodel.CodeInvalidUpstreamResponse, http.StatusBadGateway, "gateway.invalid_upstream_response", apperror.KindUnavailable, "invalid upstream response")
-	ErrUnimplemented           = responseErrorWithStatus(gatewaymodel.CodeUnimplemented, http.StatusNotImplemented, "gateway.unimplemented", apperror.KindUnimplemented, "operation is not implemented")
+	ErrPreconditionFailed      = responseErrorWithStatus(gatewaymodel.CodePreconditionFailed, http.StatusPreconditionFailed, "gateway.precondition_failed", apperror.KindConflict, "resource revision does not match")
 	ErrInternal                = responseError(gatewaymodel.CodeInternal, "gateway.internal", apperror.KindInternal, "internal server error")
 )
 
@@ -47,8 +49,31 @@ var identityErrors = []rpcErrorMapping{
 	{identityv1.CodeUserNotFound, "identity.user_not_found", responseError(identityv1.CodeUserNotFound, "identity.user_not_found", apperror.KindNotFound, "user not found")},
 	{identityv1.CodeUnauthenticated, "identity.unauthenticated", responseError(identityv1.CodeUnauthenticated, "identity.unauthenticated", apperror.KindUnauthenticated, "authentication is required")},
 	{identityv1.CodeForbidden, "identity.forbidden", responseError(identityv1.CodeForbidden, "identity.forbidden", apperror.KindPermissionDenied, "access is forbidden")},
-	{identityv1.CodeUnimplemented, "identity.unimplemented", responseErrorWithStatus(identityv1.CodeUnimplemented, http.StatusNotImplemented, "identity.unimplemented", apperror.KindUnimplemented, "identity operation is not implemented")},
 	{identityv1.CodeInternal, "identity.internal", responseErrorWithStatus(identityv1.CodeInternal, http.StatusBadGateway, "identity.internal", apperror.KindUnavailable, "identity service unavailable")},
+}
+
+var knowledgeErrors = []rpcErrorMapping{
+	{knowledgev1.CodeInvalidInput, "knowledge.invalid_input", responseError(knowledgev1.CodeInvalidInput, "knowledge.invalid_input", apperror.KindInvalidArgument, "invalid knowledge input")},
+	{knowledgev1.CodeNotFound, "knowledge.not_found", responseError(knowledgev1.CodeNotFound, "knowledge.not_found", apperror.KindNotFound, "resource not found")},
+	{knowledgev1.CodeConflict, "knowledge.conflict", responseError(knowledgev1.CodeConflict, "knowledge.conflict", apperror.KindConflict, "resource conflict")},
+	{knowledgev1.CodeForbidden, "knowledge.forbidden", responseError(knowledgev1.CodeForbidden, "knowledge.forbidden", apperror.KindPermissionDenied, "permission denied")},
+	{knowledgev1.CodeUnauthenticated, "knowledge.unauthenticated", responseError(knowledgev1.CodeUnauthenticated, "knowledge.unauthenticated", apperror.KindUnauthenticated, "authentication required")},
+	{knowledgev1.CodeUnavailable, "knowledge.unavailable", responseError(knowledgev1.CodeUnavailable, "knowledge.unavailable", apperror.KindUnavailable, "service unavailable")},
+	{knowledgev1.CodePreconditionFailed, "knowledge.precondition_failed", responseErrorWithStatus(knowledgev1.CodePreconditionFailed, http.StatusPreconditionFailed, "knowledge.precondition_failed", apperror.KindConflict, "resource revision does not match")},
+	{knowledgev1.CodeGone, "knowledge.gone", responseErrorWithStatus(knowledgev1.CodeGone, http.StatusGone, "knowledge.gone", apperror.KindNotFound, "resource is permanently unavailable")},
+	{knowledgev1.CodeQuotaExceeded, "knowledge.quota_exceeded", responseError(knowledgev1.CodeQuotaExceeded, "knowledge.quota_exceeded", apperror.KindConflict, "storage quota exceeded")},
+	{knowledgev1.CodeInternal, "knowledge.internal", responseErrorWithStatus(knowledgev1.CodeInternal, http.StatusBadGateway, "knowledge.internal", apperror.KindUnavailable, "knowledge service unavailable")},
+}
+
+var collaborationErrors = []rpcErrorMapping{
+	{40001, "collaboration.invalid_input", responseErrorWithStatus(40001, http.StatusBadRequest, "collaboration.invalid_input", apperror.KindInvalidArgument, "invalid collaboration input")},
+	{40002, "collaboration.unauthenticated", responseErrorWithStatus(40002, http.StatusUnauthorized, "collaboration.unauthenticated", apperror.KindUnauthenticated, "authentication required")},
+	{40003, "collaboration.forbidden", responseErrorWithStatus(40003, http.StatusForbidden, "collaboration.forbidden", apperror.KindPermissionDenied, "permission denied")},
+	{40004, "collaboration.not_found", responseErrorWithStatus(40004, http.StatusNotFound, "collaboration.not_found", apperror.KindNotFound, "version not found")},
+	{40005, "collaboration.conflict", responseErrorWithStatus(40005, http.StatusConflict, "collaboration.conflict", apperror.KindConflict, "resource conflict")},
+	{40006, "collaboration.precondition_failed", responseErrorWithStatus(40006, http.StatusPreconditionFailed, "collaboration.precondition_failed", apperror.KindConflict, "document sequence does not match")},
+	{40007, "collaboration.unavailable", responseErrorWithStatus(40007, http.StatusServiceUnavailable, "collaboration.unavailable", apperror.KindUnavailable, "service unavailable")},
+	{40999, "collaboration.internal", responseErrorWithStatus(40999, http.StatusBadGateway, "collaboration.internal", apperror.KindUnavailable, "collaboration service unavailable")},
 }
 
 type rpcErrorMapping struct {
@@ -59,18 +84,46 @@ type rpcErrorMapping struct {
 
 func WriteError(ctx context.Context, request *app.RequestContext, responseError ResponseError) {
 	requestID, traceID := responseMetadata(ctx, request)
-	payload := &gatewaymodel.ErrorResponse{
-		Code: responseError.Code, Message: responseError.Definition.Message,
-		Data: &gatewaymodel.EmptyData{}, RequestID: requestID, TraceID: traceID,
+	problemContext := metadata.WithRequestID(ctx, requestID)
+	payload := apperror.ToHTTPProblem(problemContext, responseError.HTTPStatus, responseError.Definition.New())
+	if traceID != nil {
+		payload.TraceID = *traceID
 	}
 	request.Abort()
-	WriteJSON(request, responseError.HTTPStatus, payload)
+	writeProblem(request, responseError.HTTPStatus, payload)
 }
 
 func WriteIdentityError(ctx context.Context, request *app.RequestContext, err error) {
+	writeRPCError(ctx, request, err, identityErrors)
+}
+
+func WriteKnowledgeError(ctx context.Context, request *app.RequestContext, err error) {
+	writeRPCError(ctx, request, err, knowledgeErrors)
+}
+
+func WriteCollaborationError(ctx context.Context, request *app.RequestContext, err error) {
+	var upstream *gatewayclient.CollaborationError
+	if errors.As(err, &upstream) {
+		for _, mapping := range collaborationErrors {
+			if mapping.code == upstream.Code && mapping.key == upstream.Key && mapping.response.HTTPStatus == upstream.Status {
+				WriteError(ctx, request, mapping.response)
+				return
+			}
+		}
+		WriteError(ctx, request, ErrInvalidUpstreamResponse)
+		return
+	}
+	if isTimeout(err) {
+		WriteError(ctx, request, ErrUpstreamTimeout)
+		return
+	}
+	WriteError(ctx, request, ErrDependencyUnavailable)
+}
+
+func writeRPCError(ctx context.Context, request *app.RequestContext, err error, mappings []rpcErrorMapping) {
 	if businessError, ok := kerrors.FromBizStatusError(err); ok {
 		key := businessError.BizExtra()[apperror.ExtraErrorKey]
-		for _, mapping := range identityErrors {
+		for _, mapping := range mappings {
 			if mapping.code == businessError.BizStatusCode() && mapping.key == key {
 				WriteError(ctx, request, mapping.response)
 				return
@@ -79,20 +132,45 @@ func WriteIdentityError(ctx context.Context, request *app.RequestContext, err er
 		WriteError(ctx, request, ErrInvalidUpstreamResponse)
 		return
 	}
-	if errors.Is(err, context.DeadlineExceeded) || kerrors.IsTimeoutError(err) {
+	if isTimeout(err) {
 		WriteError(ctx, request, ErrUpstreamTimeout)
 		return
 	}
 	WriteError(ctx, request, ErrDependencyUnavailable)
 }
 
+func isTimeout(err error) bool {
+	if errors.Is(err, context.DeadlineExceeded) || kerrors.IsTimeoutError(err) {
+		return true
+	}
+	var timeout interface{ Timeout() bool }
+	return errors.As(err, &timeout) && timeout.Timeout()
+}
+
 func WriteJSON(request *app.RequestContext, status int, value any) {
 	payload, err := jsoncodec.Marshal(value)
 	if err != nil {
-		request.Data(consts.StatusInternalServerError, consts.MIMEApplicationJSONUTF8, []byte(`{"code":10999,"message":"internal server error","data":{},"request_id":""}`))
+		request.Data(
+			consts.StatusInternalServerError,
+			apperror.ProblemContentType,
+			[]byte(`{"type":"urn:knowledge-core:problem:common.internal","title":"Internal Server Error","status":500,"detail":"internal server error","code":1,"key":"common.internal"}`),
+		)
 		return
 	}
 	request.Data(status, consts.MIMEApplicationJSONUTF8, payload)
+}
+
+func writeProblem(request *app.RequestContext, status int, value any) {
+	payload, err := jsoncodec.Marshal(value)
+	if err != nil {
+		request.Data(
+			consts.StatusInternalServerError,
+			apperror.ProblemContentType,
+			[]byte(`{"type":"urn:knowledge-core:problem:common.internal","title":"Internal Server Error","status":500,"detail":"internal server error","code":1,"key":"common.internal"}`),
+		)
+		return
+	}
+	request.Data(status, apperror.ProblemContentType, payload)
 }
 
 func ResponseMetadata(ctx context.Context, request *app.RequestContext) (string, *string) {

@@ -1,0 +1,16 @@
+.git
+.github
+.vscode
+.zed
+.cursor
+.codex
+.env
+.env.*
+**/node_modules
+**/dist
+**/coverage
+data
+logs
+bin
+coverage.out
+*.exe

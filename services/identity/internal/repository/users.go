@@ -28,9 +28,22 @@ var (
 type UserRepository interface {
 	Create(context.Context, *domain.User) error
 	FindByID(context.Context, int64) (*domain.User, error)
+	FindByUsername(context.Context, string) (*domain.User, error)
 	FindByLogin(context.Context, string) (*domain.User, error)
 	RecordLoginFailure(context.Context, int64, time.Time, time.Time, int) (bool, error)
 	CompleteLoginSuccess(context.Context, int64, time.Time) (*domain.User, error)
+}
+
+func (r *postgresUserRepository) FindByUsername(ctx context.Context, username string) (*domain.User, error) {
+	username = strings.ToLower(strings.TrimSpace(username))
+	var record model.User
+	if err := r.db.WithContext(ctx).Where("lower(username) = ?", username).First(&record).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrUserNotFound
+		}
+		return nil, fmt.Errorf("find identity user by username: %w", err)
+	}
+	return fromModel(&record), nil
 }
 
 func (r *postgresUserRepository) FindByID(ctx context.Context, id int64) (*domain.User, error) {

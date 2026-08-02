@@ -9,8 +9,10 @@ import (
 
 	commonv1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/common"
 	identityv1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/identity"
+	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/knowledge/knowledgeservice"
 	coreauth "github.com/HappyLadySauce/Knowledge-Core/pkg/auth"
 	"github.com/HappyLadySauce/Knowledge-Core/pkg/health"
+	gatewayclient "github.com/HappyLadySauce/Knowledge-Core/services/gateway/internal/client"
 	"github.com/HappyLadySauce/Knowledge-Core/services/gateway/internal/config"
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/kitex/client/callopt"
@@ -20,7 +22,6 @@ const (
 	dependenciesKey = "gateway.dependencies"
 	principalKey    = "gateway.principal"
 	accessTokenKey  = "gateway.access_token"
-	currentUserKey  = "gateway.current_user"
 	clientIPKey     = "gateway.client_ip"
 )
 
@@ -28,7 +29,7 @@ type IdentityClient interface {
 	Ping(context.Context, *commonv1.PingRequest, ...callopt.Option) (*commonv1.PingResponse, error)
 	Register(context.Context, *identityv1.RegisterRequest, ...callopt.Option) (*identityv1.User, error)
 	Authenticate(context.Context, *identityv1.AuthenticateRequest, ...callopt.Option) (*identityv1.Authentication, error)
-	GetUser(context.Context, *identityv1.GetUserRequest, ...callopt.Option) (*identityv1.User, error)
+	GetCurrentUser(context.Context, *identityv1.CurrentUserRequest, ...callopt.Option) (*identityv1.User, error)
 }
 
 type TokenVerifier interface {
@@ -41,6 +42,8 @@ type RateLimiter interface {
 
 type Dependencies struct {
 	Identity       IdentityClient
+	Knowledge      knowledgeservice.Client
+	Collaboration  CollaborationClient
 	Verifier       TokenVerifier
 	Limiter        RateLimiter
 	Health         *health.Registry
@@ -48,27 +51,42 @@ type Dependencies struct {
 	AllowedOrigins map[string]struct{}
 	TrustedProxies []*net.IPNet
 	RateLimit      config.RateLimitOptions
+	Endpoints      config.EndpointOptions
 	Secure         bool
 	Now            func() time.Time
 }
 
+type CollaborationClient interface {
+	Ping(context.Context) error
+	ListVersions(context.Context, string, string, string, int32) (*gatewayclient.VersionPage, error)
+	CreateVersion(context.Context, string, string, string, string) (*gatewayclient.Version, error)
+	GetVersion(context.Context, string, string, string) (*gatewayclient.VersionDetail, error)
+	RestoreVersion(context.Context, string, string, string, int64, string) (*gatewayclient.Version, error)
+}
+
 func NewDependencies(
 	identity IdentityClient,
+	knowledge knowledgeservice.Client,
+	collaboration CollaborationClient,
 	verifier TokenVerifier,
 	limiter RateLimiter,
 	healthRegistry *health.Registry,
 	logger *slog.Logger,
 	cors config.CORSOptions,
 	rateLimit config.RateLimitOptions,
+	endpoints config.EndpointOptions,
 	secure bool,
 ) (*Dependencies, error) {
-	if identity == nil || verifier == nil || limiter == nil || healthRegistry == nil || logger == nil {
-		return nil, errors.New("create gateway middleware dependencies: identity, verifier, limiter, health, and logger are required")
+	if identity == nil || knowledge == nil || collaboration == nil || verifier == nil || limiter == nil || healthRegistry == nil || logger == nil {
+		return nil, errors.New("create gateway middleware dependencies: upstream clients, verifier, limiter, health, and logger are required")
 	}
 	if err := cors.Validate(); err != nil {
 		return nil, err
 	}
 	if err := rateLimit.Validate(); err != nil {
+		return nil, err
+	}
+	if err := endpoints.Validate(); err != nil {
 		return nil, err
 	}
 	trustedProxies, err := cors.ParsedTrustedProxyCIDRs()
@@ -80,8 +98,9 @@ func NewDependencies(
 		allowedOrigins[origin] = struct{}{}
 	}
 	return &Dependencies{
-		Identity: identity, Verifier: verifier, Limiter: limiter, Health: healthRegistry, Logger: logger,
-		AllowedOrigins: allowedOrigins, TrustedProxies: trustedProxies, RateLimit: rateLimit, Secure: secure,
+		Identity: identity, Knowledge: knowledge, Collaboration: collaboration,
+		Verifier: verifier, Limiter: limiter, Health: healthRegistry, Logger: logger,
+		AllowedOrigins: allowedOrigins, TrustedProxies: trustedProxies, RateLimit: rateLimit, Endpoints: endpoints, Secure: secure,
 		Now: time.Now,
 	}, nil
 }
@@ -106,11 +125,20 @@ func FromRequest(request *app.RequestContext) (*Dependencies, bool) {
 	return dependencies, exists && ok && dependencies != nil
 }
 
-func CurrentUser(request *app.RequestContext) (*identityv1.User, bool) {
+func Principal(request *app.RequestContext) (coreauth.Principal, bool) {
 	if request == nil {
-		return nil, false
+		return coreauth.Principal{}, false
 	}
-	value, exists := request.Get(currentUserKey)
-	user, ok := value.(*identityv1.User)
-	return user, exists && ok && user != nil
+	value, exists := request.Get(principalKey)
+	principal, ok := value.(coreauth.Principal)
+	return principal, exists && ok && principal.UserID > 0
+}
+
+func AccessToken(request *app.RequestContext) (string, bool) {
+	if request == nil {
+		return "", false
+	}
+	value, exists := request.Get(accessTokenKey)
+	token, ok := value.(string)
+	return token, exists && ok && token != ""
 }

@@ -41,7 +41,15 @@ func (s authenticateStub) Authenticate(ctx context.Context, input identitylogic.
 }
 
 type getUserStub struct {
-	getUser func(context.Context, int64) (*domain.User, error)
+	getUser     func(context.Context, int64) (*domain.User, error)
+	resolveUser func(context.Context, string) (*domain.User, error)
+}
+
+func (s getUserStub) ResolveUser(ctx context.Context, username string) (*domain.User, error) {
+	if s.resolveUser == nil {
+		return nil, errors.New("unexpected ResolveUser call")
+	}
+	return s.resolveUser(ctx, username)
 }
 
 func (s getUserStub) GetUser(ctx context.Context, id int64) (*domain.User, error) {
@@ -98,7 +106,7 @@ func TestHandlerRegisterMapsUserAndErrors(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Register() error = %v", err)
 	}
-	if user.Id != 7 || user.CreatedAtUnix != 100 || user.UpdatedAtUnix != 200 {
+	if user.Id != 7 || user.CreatedAt != createdAt.UTC().Format(time.RFC3339Nano) || user.UpdatedAt != updatedAt.UTC().Format(time.RFC3339Nano) {
 		t.Fatalf("Register() = %#v", user)
 	}
 
@@ -151,13 +159,16 @@ func TestHandlerAuthenticateAndGetUser(t *testing.T) {
 		t.Fatalf("Authenticate() = %#v, %v", authentication, err)
 	}
 	ctx := coreauth.WithAccessToken(context.Background(), "signed-token")
-	response, err := handler.GetUser(ctx, &identityv1.GetUserRequest{UserId: 42})
+	response, err := handler.GetCurrentUser(ctx, &identityv1.CurrentUserRequest{})
 	if err != nil || response.Id != 42 || verifier.value != "signed-token" {
-		t.Fatalf("GetUser() = %#v, %v, token %q", response, err, verifier.value)
+		t.Fatalf("GetCurrentUser() = %#v, %v, token %q", response, err, verifier.value)
+	}
+	if authentication.ExpiresAt != now.Add(time.Minute).UTC().Format(time.RFC3339Nano) {
+		t.Fatalf("Authenticate() expires_at = %q", authentication.ExpiresAt)
 	}
 }
 
-func TestHandlerGetUserRejectsStaleOrCrossUserToken(t *testing.T) {
+func TestHandlerGetCurrentUserRejectsStaleOrMismatchedUser(t *testing.T) {
 	user := &domain.User{
 		ID: 42, Role: domain.RoleUser, Status: domain.StatusActive, TokenVersion: 4,
 		CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0),
@@ -168,7 +179,7 @@ func TestHandlerGetUserRejectsStaleOrCrossUserToken(t *testing.T) {
 		code      int32
 	}{
 		{name: "stale token version", principal: coreauth.Principal{UserID: 42, Role: domain.RoleUser, TokenVersion: 3}, code: identityv1.CodeUnauthenticated},
-		{name: "cross user", principal: coreauth.Principal{UserID: 7, Role: domain.RoleUser, TokenVersion: 4}, code: identityv1.CodeForbidden},
+		{name: "mismatched user", principal: coreauth.Principal{UserID: 7, Role: domain.RoleUser, TokenVersion: 4}, code: identityv1.CodeUnauthenticated},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -183,15 +194,41 @@ func TestHandlerGetUserRejectsStaleOrCrossUserToken(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			_, err = handler.GetUser(
+			_, err = handler.GetCurrentUser(
 				coreauth.WithAccessToken(context.Background(), "signed-token"),
-				&identityv1.GetUserRequest{UserId: 42},
+				&identityv1.CurrentUserRequest{},
 			)
 			businessError, ok := kerrors.FromBizStatusError(err)
 			if !ok || businessError.BizStatusCode() != test.code {
-				t.Fatalf("GetUser() error = %v", err)
+				t.Fatalf("GetCurrentUser() error = %v", err)
 			}
 		})
+	}
+}
+
+func TestHandlerResolveUserReturnsOnlyPublicProfile(t *testing.T) {
+	current := &domain.User{ID: 42, Username: "owner", Role: domain.RoleUser, Status: domain.StatusActive, TokenVersion: 4}
+	target := &domain.User{ID: 7, Username: "alice", Email: "private@example.com", Avatar: "avatar", Status: domain.StatusActive}
+	handler, err := NewHandler(
+		serviceStub{register: unexpectedRegister(t)}, defaultAuthenticateStub(t),
+		getUserStub{
+			getUser: func(context.Context, int64) (*domain.User, error) { return current, nil },
+			resolveUser: func(_ context.Context, username string) (*domain.User, error) {
+				if username != "alice" {
+					t.Fatalf("username = %q", username)
+				}
+				return target, nil
+			},
+		},
+		&verifierStub{principal: coreauth.Principal{UserID: 42, Role: domain.RoleUser, TokenVersion: 4}},
+		readinessStub{}, slog.New(slog.NewTextHandler(io.Discard, nil)),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	user, err := handler.ResolveUser(coreauth.WithAccessToken(context.Background(), "signed-token"), &identityv1.ResolveUserRequest{Username: "alice"})
+	if err != nil || user.Id != 7 || user.Username != "alice" || user.Avatar != "avatar" {
+		t.Fatalf("ResolveUser() = %#v, %v", user, err)
 	}
 }
 

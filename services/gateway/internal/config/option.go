@@ -9,6 +9,7 @@ import (
 	"time"
 
 	coreauth "github.com/HappyLadySauce/Knowledge-Core/pkg/auth"
+	"github.com/HappyLadySauce/Knowledge-Core/pkg/option"
 )
 
 type AuthOptions struct {
@@ -69,6 +70,86 @@ type RateLimitOptions struct {
 	Window      time.Duration `mapstructure:"window" json:"window" yaml:"window"`
 	GlobalLimit int64         `mapstructure:"global_limit" json:"global_limit" yaml:"global_limit"`
 	AuthLimit   int64         `mapstructure:"auth_limit" json:"auth_limit" yaml:"auth_limit"`
+}
+
+type CollaborationOptions struct {
+	BaseURL        string            `mapstructure:"base_url" json:"base_url" yaml:"base_url"`
+	RequestTimeout time.Duration     `mapstructure:"request_timeout" json:"request_timeout" yaml:"request_timeout"`
+	TLS            option.TLSOptions `mapstructure:"tls" json:"tls" yaml:"tls"`
+}
+
+func NewCollaborationOptions() *CollaborationOptions {
+	return &CollaborationOptions{BaseURL: "http://127.0.0.1:8092", RequestTimeout: 5 * time.Second}
+}
+
+func (o CollaborationOptions) Validate() error {
+	parsed, err := url.Parse(o.BaseURL)
+	var endpointErr error
+	if err != nil || parsed == nil || parsed.Host == "" || parsed.Hostname() == "" || parsed.User != nil ||
+		parsed.RawQuery != "" || parsed.Fragment != "" || (parsed.Path != "" && parsed.Path != "/") ||
+		(parsed.Scheme != "http" && parsed.Scheme != "https") {
+		endpointErr = errors.New("collaboration.base_url must be an absolute HTTP origin without credentials")
+	} else if (parsed.Scheme == "https") != o.TLS.Enabled {
+		endpointErr = errors.New("collaboration TLS settings must match collaboration.base_url")
+	}
+	var timeoutErr error
+	if o.RequestTimeout <= 0 {
+		timeoutErr = errors.New("collaboration.request_timeout must be positive")
+	}
+	return errors.Join(endpointErr, timeoutErr, o.TLS.Validate())
+}
+
+func (o CollaborationOptions) ValidateProduction() error {
+	parsed, err := url.Parse(o.BaseURL)
+	if err != nil || parsed == nil || parsed.Scheme != "https" {
+		return errors.New("production Collaboration traffic must use HTTPS")
+	}
+	var joined error
+	if !o.TLS.Enabled || strings.TrimSpace(o.TLS.CAFile) == "" || strings.TrimSpace(o.TLS.CertFile) == "" || strings.TrimSpace(o.TLS.KeyFile) == "" {
+		joined = errors.Join(joined, errors.New("production Collaboration traffic requires a CA and client certificate for mTLS"))
+	}
+	if o.TLS.InsecureSkipVerify {
+		joined = errors.Join(joined, errors.New("production Collaboration TLS verification cannot be disabled"))
+	}
+	return joined
+}
+
+type EndpointOptions struct {
+	PublicBaseURL             string `mapstructure:"public_base_url" json:"public_base_url" yaml:"public_base_url"`
+	CollaborationWebSocketURL string `mapstructure:"collaboration_websocket_url" json:"collaboration_websocket_url" yaml:"collaboration_websocket_url"`
+}
+
+func NewEndpointOptions() *EndpointOptions {
+	return &EndpointOptions{
+		PublicBaseURL: "http://localhost:8080", CollaborationWebSocketURL: "ws://localhost:8091/collaboration",
+	}
+}
+
+func (o EndpointOptions) Validate() error {
+	public, publicErr := url.Parse(o.PublicBaseURL)
+	if publicErr != nil || !validOrigin(public, "http", "https") {
+		publicErr = errors.New("endpoints.public_base_url must be an absolute HTTP origin without credentials")
+	}
+	websocket, websocketErr := url.Parse(o.CollaborationWebSocketURL)
+	if websocketErr != nil || websocket == nil || websocket.Host == "" || websocket.Hostname() == "" || websocket.User != nil ||
+		websocket.RawQuery != "" || websocket.Fragment != "" || websocket.Path == "" || websocket.Path == "/" ||
+		(websocket.Scheme != "ws" && websocket.Scheme != "wss") {
+		websocketErr = errors.New("endpoints.collaboration_websocket_url must be an absolute ws/wss URL with a path")
+	}
+	return errors.Join(publicErr, websocketErr)
+}
+
+func validOrigin(parsed *url.URL, schemes ...string) bool {
+	if parsed == nil || parsed.Host == "" || parsed.Hostname() == "" || parsed.User != nil || parsed.Path != "" ||
+		parsed.RawQuery != "" || parsed.Fragment != "" {
+		return false
+	}
+	for _, scheme := range schemes {
+		if parsed.Scheme == scheme {
+			return true
+		}
+	}
+	return false
 }
 
 func NewRateLimitOptions() *RateLimitOptions {

@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	identityv1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/identity"
 	coreauth "github.com/HappyLadySauce/Knowledge-Core/pkg/auth"
 	"github.com/HappyLadySauce/Knowledge-Core/pkg/metadata"
 	"github.com/cloudwego/hertz/pkg/app"
@@ -75,11 +74,16 @@ func SecurityHeaders() app.HandlerFunc {
 
 func CORS() app.HandlerFunc {
 	return func(ctx context.Context, request *app.RequestContext) {
-		origin := strings.TrimSpace(string(request.GetHeader("Origin")))
-		if origin == "" {
+		origins := request.Request.Header.PeekAll("Origin")
+		if len(origins) == 0 {
 			request.Next(ctx)
 			return
 		}
+		if len(origins) != 1 || strings.TrimSpace(string(origins[0])) != string(origins[0]) || len(origins[0]) == 0 {
+			WriteError(ctx, request, ErrInvalidRequest)
+			return
+		}
+		origin := string(origins[0])
 		dependencies, ok := FromRequest(request)
 		if !ok {
 			WriteError(ctx, request, ErrInternal)
@@ -90,10 +94,11 @@ func CORS() app.HandlerFunc {
 			return
 		}
 		request.Header("Access-Control-Allow-Origin", origin)
+		request.Header("Access-Control-Expose-Headers", "ETag, Location, X-Request-ID, X-Trace-ID")
 		request.Header("Vary", "Origin")
 		if string(request.Method()) == consts.MethodOptions && request.GetHeader("Access-Control-Request-Method") != nil {
-			request.Header("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Request-ID")
-			request.Header("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
+			request.Header("Access-Control-Allow-Headers", "Authorization, Content-Type, Idempotency-Key, If-Match, X-Request-ID")
+			request.Header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 			request.Header("Access-Control-Max-Age", "600")
 			request.Abort()
 			request.Status(consts.StatusNoContent)
@@ -105,13 +110,20 @@ func CORS() app.HandlerFunc {
 
 func OptionalAuthentication() app.HandlerFunc {
 	return func(ctx context.Context, request *app.RequestContext) {
-		header := strings.TrimSpace(string(request.GetHeader("Authorization")))
-		if header == "" {
+		headers := request.Request.Header.PeekAll("Authorization")
+		if len(headers) == 0 {
 			request.Next(ctx)
 			return
 		}
-		parts := strings.Fields(header)
-		if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") || len(parts[1]) > coreauth.MaxTokenLength {
+		if len(headers) != 1 {
+			request.Header("WWW-Authenticate", "Bearer")
+			WriteError(ctx, request, ErrAuthenticationRequired)
+			return
+		}
+		header := string(headers[0])
+		scheme, token, found := strings.Cut(header, " ")
+		if !found || !strings.EqualFold(scheme, "Bearer") || token == "" || strings.ContainsAny(token, " \t\r\n") ||
+			len(token) > coreauth.MaxTokenLength {
 			request.Header("WWW-Authenticate", "Bearer")
 			WriteError(ctx, request, ErrAuthenticationRequired)
 			return
@@ -121,47 +133,25 @@ func OptionalAuthentication() app.HandlerFunc {
 			WriteError(ctx, request, ErrInternal)
 			return
 		}
-		principal, err := dependencies.Verifier.Verify(parts[1])
+		principal, err := dependencies.Verifier.Verify(token)
 		if err != nil {
 			request.Header("WWW-Authenticate", "Bearer")
 			WriteError(ctx, request, ErrAuthenticationRequired)
 			return
 		}
 		request.Set(principalKey, principal)
-		request.Set(accessTokenKey, parts[1])
+		request.Set(accessTokenKey, token)
 		request.Next(metadata.WithUserID(ctx, principal.UserID))
 	}
 }
 
 func RequireAuthenticated() app.HandlerFunc {
 	return func(ctx context.Context, request *app.RequestContext) {
-		principalValue, principalExists := request.Get(principalKey)
-		principal, principalOK := principalValue.(coreauth.Principal)
-		tokenValue, tokenExists := request.Get(accessTokenKey)
-		token, tokenOK := tokenValue.(string)
-		if !principalExists || !principalOK || principal.UserID <= 0 || !tokenExists || !tokenOK || token == "" {
+		if _, ok := Principal(request); !ok {
 			request.Header("WWW-Authenticate", "Bearer")
 			WriteError(ctx, request, ErrAuthenticationRequired)
 			return
 		}
-		dependencies, ok := FromRequest(request)
-		if !ok {
-			WriteError(ctx, request, ErrInternal)
-			return
-		}
-		user, err := dependencies.Identity.GetUser(
-			coreauth.WithAccessToken(ctx, token),
-			&identityv1.GetUserRequest{UserId: principal.UserID},
-		)
-		if err != nil {
-			WriteIdentityError(ctx, request, err)
-			return
-		}
-		if user == nil || user.Id != principal.UserID || user.TokenVersion != principal.TokenVersion {
-			WriteError(ctx, request, ErrInvalidUpstreamResponse)
-			return
-		}
-		request.Set(currentUserKey, user)
 		request.Next(ctx)
 	}
 }

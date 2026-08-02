@@ -20,7 +20,7 @@ import (
 
 const (
 	IssuerName     = "knowledge-core.identity"
-	AudienceName   = "knowledge-core.gateway"
+	AudienceName   = "knowledge-core.api"
 	MaxTokenLength = 4096
 )
 
@@ -28,6 +28,7 @@ type Principal struct {
 	UserID       int64
 	Role         string
 	TokenVersion int64
+	ExpiresAt    time.Time
 }
 
 type IssuedToken struct {
@@ -189,7 +190,10 @@ func (v *Verifier) Verify(value string) (Principal, error) {
 	if err != nil {
 		return Principal{}, errors.New("verify access token: subject is invalid")
 	}
-	return Principal{UserID: userID, Role: claims.Role, TokenVersion: claims.TokenVersion}, nil
+	return Principal{
+		UserID: userID, Role: claims.Role, TokenVersion: claims.TokenVersion,
+		ExpiresAt: claims.ExpiresAt.UTC(),
+	}, nil
 }
 
 func parsePrivateKey(encoded string) (ed25519.PrivateKey, error) {

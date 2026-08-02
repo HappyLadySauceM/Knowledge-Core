@@ -10,6 +10,9 @@ linters:
 formatters:
   enable:
     - gofmt
+  exclusions:
+    paths:
+      - services/collaboration
 
 issues:
   max-issues-per-linter: 0
