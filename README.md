@@ -293,18 +293,11 @@ go run ./scripts/idlguard compat-git $mergeBase idl
 
 `dev` 的 `verify` job 运行在组织自托管 Linux runner `home` 上，并使用专用的 `Knowledge-Core CI` runner group。该组只授权本仓库；具有仓库写权限的自动 PR、合并和分支同步 job 仍运行在 GitHub 托管 runner 上。
 
-在 GitHub 组织的 **Settings -> Actions -> Runners** 中确认 `home` 显示 `Online` 且标签包含 `self-hosted`、`Linux`、`X64`、`home`。Runner 主机需要提供 `bash`、`git`、GNU Make 和 `gcc`；Go 版本由 workflow 根据 `go.mod` 自动准备。`gcc` 是执行 `make race` 的必要依赖。
+在 GitHub 组织的 **Settings -> Actions -> Runners** 中确认 `home` 显示 `Online` 且标签包含 `self-hosted`、`Linux`、`X64`、`home`。Runner 主机只需提供 `bash`、`git`、Docker CLI 与可用的 rootless Docker daemon；Go、GNU Make、GCC、golangci-lint 和代码生成器全部固定在 [`.github/ci/Dockerfile`](.github/ci/Dockerfile) 中。
 
-Ubuntu/Debian 主机可由系统管理员在 runner 服务账号之外一次性安装缺失依赖：
+workflow 触发后直接执行 [`.github/ci/run.sh`](.github/ci/run.sh)。CI 镜像固定 Go 基础镜像 digest，并按 Dockerfile 内容生成本地 image tag。容器不会挂载 Docker socket，不获得额外 capability，根文件系统只读；仅 workspace 和专用 Go module/build cache 可写。Go module 与工具下载统一使用 `GOPROXY=https://goproxy.cn,direct`，依赖完整性仍由 Go module checksum 校验。仓库不管理 runner、Docker 或代理服务的 systemd 配置。
 
-```bash
-sudo apt-get update
-sudo apt-get install -y git make gcc
-```
-
-不要在 workflow 中授予 runner 服务账号 `sudo` 权限。
-
-自托管 runner 会保留 Go module、build cache 和固定版本的代码生成工具，避免每次运行上传或下载大型 GitHub Actions cache。Go module 和工具下载统一使用 `GOPROXY=https://goproxy.cn,direct`，依赖完整性仍由 Go module checksum 校验。checkout 前后都会清理仓库 workspace，但不会清理 runner 的 Go/tool cache。`home` 离线或正在执行其他任务时，`verify` 会在队列中等待，不会自动回退到未授权的机器。
+checkout 前后都会清理仓库 workspace，但不会删除 rootless Docker image 和专用 Go cache。`home` 离线或正在执行其他任务时，`verify` 会在队列中等待，不会自动回退到未授权的机器。不要把 runner 加入宿主机 `docker` 组，也不要在 workflow 中授予 runner 服务账号 sudo。
 
 仓库是 public，但 workflow 不处理 fork pull request，只响应受保护的 `dev`/`main` push 和手动触发。所有能 push `dev` 的成员都能让提交中的代码在 `home` 上执行，因此 runner 必须使用无特权的独立系统账号，不得保存生产 Secret、个人 SSH key，或开放 sudo 与生产网络访问。
 
