@@ -19,7 +19,7 @@ Knowledge Core 是一个正在演进的知识协作后端。仓库目前交付�
 
 ## 技术栈与架构
 
-- Go 1.26.1
+- Go 1.26.5
 - CloudWeGo Hertz、Kitex 与 Thrift
 - Sonic 严格 JSON 编解码
 - PostgreSQL、GORM、Redis 与 Etcd
@@ -57,7 +57,7 @@ docs/                详细设计文档
 ## 环境要求
 
 - Git
-- Go `1.26.1`
+- Go `1.26.5`
 - Docker Desktop 或 Docker Engine，并启用 Compose v2
 - GNU Make
 - Windows PowerShell 5.1 或 PowerShell 7（以下快速开始使用 PowerShell）
@@ -276,10 +276,12 @@ git pull --ff-only origin dev
 
 ```powershell
 make fmt
+make vuln
 make ci
 ```
 
-- `make ci` 依次检查格式、vet、lint、测试、构建和生成代码漂移，是常规改动的最终本地门禁。
+- `make vuln` 使用仓库固定版本的 `govulncheck` 检查调用链可达的 Go 漏洞。
+- `make ci` 依次检查格式、vet、lint、测试、构建、可达漏洞和生成代码漂移，是常规改动的最终本地门禁。
 - 修改并发或生命周期代码时，额外运行 `make race`。
 - 修改依赖后运行 `make tidy`，并审查 `go.mod`、`go.sum` 差异。
 - IDL 兼容检查尚未包含在 `make ci` 中；修改 `idl/` 时必须额外运行：

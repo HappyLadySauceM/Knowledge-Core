@@ -67,8 +67,8 @@ func TestHertzMiddlewareExtractsTraceAndCreatesRequestID(t *testing.T) {
 		t.Fatalf("span = name %q, parent %s, remote %t", span.Name(), span.Parent().SpanID(), span.Parent().IsRemote())
 	}
 	for _, item := range span.Attributes() {
-		if strings.Contains(string(item.Key), "url") || strings.Contains(item.Value.Emit(), "must-not-appear") {
-			t.Fatalf("span attribute leaked URL data: %s=%q", item.Key, item.Value.Emit())
+		if strings.Contains(string(item.Key), "url") || strings.Contains(item.Value.String(), "must-not-appear") {
+			t.Fatalf("span attribute leaked URL data: %s=%q", item.Key, item.Value.String())
 		}
 	}
 }

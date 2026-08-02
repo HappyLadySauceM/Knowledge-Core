@@ -1,5 +1,7 @@
 GOLANGCI_LINT_VERSION ?= v2.12.2
 GOLANGCI_LINT ?= go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
+GOVULNCHECK_VERSION ?= v1.6.0
+GOVULNCHECK ?= go run golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION)
 IDL_COMPAT_BASE ?= HEAD^
 
 ifneq ($(strip $(ComSpec)),)
@@ -12,7 +14,7 @@ endif
 
 .DEFAULT_GOAL := help
 
-.PHONY: help fmt fmt-check vet lint line test race build tidy generate generate-check check ci
+.PHONY: help fmt fmt-check vet lint line test race build vuln tidy generate generate-check check ci
 
 help:
 	@echo Knowledge Core development targets:
@@ -24,6 +26,7 @@ help:
 	@echo   make test            Run all tests without cached results
 	@echo   make race            Run all tests with the race detector
 	@echo   make build           Compile all packages
+	@echo   make vuln            Check reachable Go vulnerabilities
 	@echo   make tidy            Normalize go.mod and go.sum
 	@echo   make generate        Regenerate Hertz and Kitex code
 	@echo   make generate-check  Regenerate and fail on generated-code drift
@@ -53,6 +56,9 @@ race:
 build:
 	go build ./...
 
+vuln:
+	$(GOVULNCHECK) ./...
+
 tidy:
 	go mod tidy
 
@@ -62,6 +68,6 @@ generate:
 generate-check:
 	$(CODEGEN_CHECK)
 
-check: fmt-check vet lint test build
+check: fmt-check vet lint test build vuln
 
 ci: check generate-check

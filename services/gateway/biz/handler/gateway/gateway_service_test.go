@@ -23,11 +23,12 @@ import (
 )
 
 type identityStub struct {
-	registered      *identityv1.User
-	authentication  *identityv1.Authentication
-	registerErr     error
-	authenticateErr error
-	registerCalls   int
+	registered        *identityv1.User
+	authentication    *identityv1.Authentication
+	registerErr       error
+	authenticateErr   error
+	registerCalls     int
+	authenticateCalls int
 }
 
 func (s *identityStub) Ping(context.Context, *commonv1.PingRequest, ...callopt.Option) (*commonv1.PingResponse, error) {
@@ -38,6 +39,7 @@ func (s *identityStub) Register(context.Context, *identityv1.RegisterRequest, ..
 	return s.registered, s.registerErr
 }
 func (s *identityStub) Authenticate(context.Context, *identityv1.AuthenticateRequest, ...callopt.Option) (*identityv1.Authentication, error) {
+	s.authenticateCalls++
 	return s.authentication, s.authenticateErr
 }
 
@@ -93,6 +95,64 @@ func TestRegisterUsesStrictJSONAndMapsUser(t *testing.T) {
 	}
 	if response.Code != 0 || response.Data == nil || response.Data.ID != 7 || response.RequestID == "" {
 		t.Fatalf("response = %#v", response)
+	}
+}
+
+func TestRegisterRejectsMissingOrEmptyRequiredFields(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+	}{
+		{name: "missing username", body: `{"email":"alice@example.com","password":"password"}`},
+		{name: "missing email", body: `{"username":"alice","password":"password"}`},
+		{name: "missing password", body: `{"username":"alice","email":"alice@example.com"}`},
+		{name: "empty username", body: `{"username":"","email":"alice@example.com","password":"password"}`},
+		{name: "empty email", body: `{"username":"alice","email":"","password":"password"}`},
+		{name: "empty password", body: `{"username":"alice","email":"alice@example.com","password":""}`},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			identity := &identityStub{}
+			request := handlerRequest(identity, test.body)
+
+			Register(context.Background(), request)
+
+			if request.Response.StatusCode() != consts.StatusBadRequest {
+				t.Fatalf("status = %d, body = %s", request.Response.StatusCode(), request.Response.Body())
+			}
+			if identity.registerCalls != 0 {
+				t.Fatalf("Register() calls = %d, want 0", identity.registerCalls)
+			}
+		})
+	}
+}
+
+func TestLoginRejectsMissingOrEmptyRequiredFields(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+	}{
+		{name: "missing identifier", body: `{"password":"password"}`},
+		{name: "missing password", body: `{"identifier":"alice"}`},
+		{name: "empty identifier", body: `{"identifier":"","password":"password"}`},
+		{name: "empty password", body: `{"identifier":"alice","password":""}`},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			identity := &identityStub{}
+			request := handlerRequest(identity, test.body)
+
+			Login(context.Background(), request)
+
+			if request.Response.StatusCode() != consts.StatusBadRequest {
+				t.Fatalf("status = %d, body = %s", request.Response.StatusCode(), request.Response.Body())
+			}
+			if identity.authenticateCalls != 0 {
+				t.Fatalf("Authenticate() calls = %d, want 0", identity.authenticateCalls)
+			}
+		})
 	}
 }
 

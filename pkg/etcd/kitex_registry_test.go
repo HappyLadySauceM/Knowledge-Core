@@ -94,6 +94,45 @@ func TestEtcdRegistryUsesRegistryEtcdAddressOverrides(t *testing.T) {
 	}
 }
 
+func TestRegistrationAddressValidatesOverrides(t *testing.T) {
+	tests := []struct {
+		name        string
+		host        string
+		port        string
+		wantAddress string
+		wantError   string
+	}{
+		{name: "IPv4", host: "10.0.0.8", port: "1", wantAddress: "10.0.0.8:1"},
+		{name: "IPv6", host: "2001:db8::8", port: "65535", wantAddress: "[2001:db8::8]:65535"},
+		{name: "invalid host", host: "identity.internal", port: "7777", wantError: "invalid IP address"},
+		{name: "unspecified host", host: "0.0.0.0", port: "7777", wantError: "unspecified IP address"},
+		{name: "non-numeric port", host: "10.0.0.8", port: "http", wantError: "parse registry info port"},
+		{name: "zero port", host: "10.0.0.8", port: "0", wantError: "must be between 1 and 65535"},
+		{name: "port above maximum", host: "10.0.0.8", port: "65536", wantError: "must be between 1 and 65535"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Setenv(ipEnvironment, test.host)
+			t.Setenv(portEnvironment, test.port)
+
+			got, err := registrationAddress(&net.TCPAddr{IP: net.IPv4zero, Port: 9002})
+			if test.wantError != "" {
+				if err == nil || !strings.Contains(err.Error(), test.wantError) {
+					t.Fatalf("registrationAddress() error = %v, want containing %q", err, test.wantError)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("registrationAddress() error = %v", err)
+			}
+			if got != test.wantAddress {
+				t.Fatalf("registrationAddress() = %q, want %q", got, test.wantAddress)
+			}
+		})
+	}
+}
+
 func TestEtcdRegistryDeleteFailureKeepsRegistrationAliveForRetry(t *testing.T) {
 	deleteErr := errors.New("delete failed")
 	client := newFakeRegistryClient(43)

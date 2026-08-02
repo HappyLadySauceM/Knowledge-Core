@@ -51,6 +51,10 @@ func Register(ctx context.Context, request *app.RequestContext) {
 		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidRequest)
 		return
 	}
+	if input.Username == "" || input.Email == "" || input.Password == "" {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidRequest)
+		return
+	}
 	dependencies, ok := gatewaymiddleware.FromRequest(request)
 	if !ok {
 		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInternal)
@@ -80,6 +84,10 @@ func Register(ctx context.Context, request *app.RequestContext) {
 func Login(ctx context.Context, request *app.RequestContext) {
 	var input gatewaymodel.LoginRequest
 	if err := decodeBody(request, &input); err != nil {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidRequest)
+		return
+	}
+	if input.Identifier == "" || input.Password == "" {
 		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidRequest)
 		return
 	}
