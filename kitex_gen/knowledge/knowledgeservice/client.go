@@ -13,15 +13,25 @@ import (
 // Client is designed to provide IDL-compatible methods with call-option parameter for kitex framework.
 type Client interface {
 	Ping(ctx context.Context, request *common.PingRequest, callOptions ...callopt.Option) (r *common.PingResponse, err error)
-	ListPublishedDocuments(ctx context.Context, request *knowledge.DocumentListRequest, callOptions ...callopt.Option) (r *knowledge.DocumentList, err error)
-	ListDocuments(ctx context.Context, request *knowledge.DocumentListRequest, callOptions ...callopt.Option) (r *knowledge.DocumentList, err error)
-	GetPublishedDocument(ctx context.Context, request *knowledge.DocumentIDRequest, callOptions ...callopt.Option) (r *knowledge.DocumentDetail, err error)
-	CreateDocument(ctx context.Context, request *knowledge.CreateDocumentRequest, callOptions ...callopt.Option) (r *knowledge.DocumentDetail, err error)
-	GetDocument(ctx context.Context, request *knowledge.DocumentIDRequest, callOptions ...callopt.Option) (r *knowledge.DocumentDetail, err error)
-	UpdateDocument(ctx context.Context, request *knowledge.UpdateDocumentRequest, callOptions ...callopt.Option) (r *knowledge.DocumentDetail, err error)
-	DeleteDocument(ctx context.Context, request *knowledge.DocumentIDRequest, callOptions ...callopt.Option) (r *knowledge.Document, err error)
-	SetDocumentStatus(ctx context.Context, request *knowledge.SetDocumentStatusRequest, callOptions ...callopt.Option) (r *knowledge.Document, err error)
-	ApplyDocumentOperation(ctx context.Context, request *knowledge.ApplyDocumentOperationRequest, callOptions ...callopt.Option) (r *knowledge.DocumentOperationAck, err error)
+	ListPublishedDocuments(ctx context.Context, request *knowledge.ListDocumentsRequest, callOptions ...callopt.Option) (r *knowledge.DocumentPage, err error)
+	GetPublishedDocument(ctx context.Context, request *knowledge.GetPublishedDocumentRequest, callOptions ...callopt.Option) (r *knowledge.DocumentDetail, err error)
+	ListDocuments(ctx context.Context, request *knowledge.ListDocumentsRequest, callOptions ...callopt.Option) (r *knowledge.DocumentPage, err error)
+	CreateDocument(ctx context.Context, request *knowledge.CreateDocumentRequest, callOptions ...callopt.Option) (r *knowledge.Document, err error)
+	GetDocument(ctx context.Context, request *knowledge.DocumentIDRequest, callOptions ...callopt.Option) (r *knowledge.Document, err error)
+	UpdateDocument(ctx context.Context, request *knowledge.UpdateDocumentRequest, callOptions ...callopt.Option) (r *knowledge.Document, err error)
+	SetPublication(ctx context.Context, request *knowledge.SetPublicationRequest, callOptions ...callopt.Option) (r *knowledge.Document, err error)
+	DeleteDocument(ctx context.Context, request *knowledge.DeleteDocumentRequest, callOptions ...callopt.Option) (r *knowledge.Document, err error)
+	RestoreDeletedDocument(ctx context.Context, request *knowledge.DocumentIDRequest, callOptions ...callopt.Option) (r *knowledge.Document, err error)
+	ListDeletedDocuments(ctx context.Context, request *knowledge.ListDocumentsRequest, callOptions ...callopt.Option) (r *knowledge.DocumentPage, err error)
+	ListMembers(ctx context.Context, request *knowledge.DocumentIDRequest, callOptions ...callopt.Option) (r *knowledge.MemberList, err error)
+	AddMember(ctx context.Context, request *knowledge.AddMemberRequest, callOptions ...callopt.Option) (r *knowledge.Member, err error)
+	UpdateMember(ctx context.Context, request *knowledge.UpdateMemberRequest, callOptions ...callopt.Option) (r *knowledge.Member, err error)
+	DeleteMember(ctx context.Context, request *knowledge.DeleteMemberRequest, callOptions ...callopt.Option) (err error)
+	ListAttachments(ctx context.Context, request *knowledge.DocumentIDRequest, callOptions ...callopt.Option) (r *knowledge.AttachmentList, err error)
+	CreateAttachment(ctx context.Context, request *knowledge.CreateAttachmentRequest, callOptions ...callopt.Option) (r *knowledge.AttachmentUpload, err error)
+	CompleteAttachment(ctx context.Context, request *knowledge.AttachmentIDRequest, callOptions ...callopt.Option) (r *knowledge.Attachment, err error)
+	DeleteAttachment(ctx context.Context, request *knowledge.AttachmentIDRequest, callOptions ...callopt.Option) (err error)
+	GetAttachmentContent(ctx context.Context, request *knowledge.AttachmentContentRequest, callOptions ...callopt.Option) (r *knowledge.AttachmentContent, err error)
 }
 
 // NewClient creates a client for the service defined in IDL.
@@ -58,47 +68,97 @@ func (p *kKnowledgeServiceClient) Ping(ctx context.Context, request *common.Ping
 	return p.kClient.Ping(ctx, request)
 }
 
-func (p *kKnowledgeServiceClient) ListPublishedDocuments(ctx context.Context, request *knowledge.DocumentListRequest, callOptions ...callopt.Option) (r *knowledge.DocumentList, err error) {
+func (p *kKnowledgeServiceClient) ListPublishedDocuments(ctx context.Context, request *knowledge.ListDocumentsRequest, callOptions ...callopt.Option) (r *knowledge.DocumentPage, err error) {
 	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
 	return p.kClient.ListPublishedDocuments(ctx, request)
 }
 
-func (p *kKnowledgeServiceClient) ListDocuments(ctx context.Context, request *knowledge.DocumentListRequest, callOptions ...callopt.Option) (r *knowledge.DocumentList, err error) {
-	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
-	return p.kClient.ListDocuments(ctx, request)
-}
-
-func (p *kKnowledgeServiceClient) GetPublishedDocument(ctx context.Context, request *knowledge.DocumentIDRequest, callOptions ...callopt.Option) (r *knowledge.DocumentDetail, err error) {
+func (p *kKnowledgeServiceClient) GetPublishedDocument(ctx context.Context, request *knowledge.GetPublishedDocumentRequest, callOptions ...callopt.Option) (r *knowledge.DocumentDetail, err error) {
 	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
 	return p.kClient.GetPublishedDocument(ctx, request)
 }
 
-func (p *kKnowledgeServiceClient) CreateDocument(ctx context.Context, request *knowledge.CreateDocumentRequest, callOptions ...callopt.Option) (r *knowledge.DocumentDetail, err error) {
+func (p *kKnowledgeServiceClient) ListDocuments(ctx context.Context, request *knowledge.ListDocumentsRequest, callOptions ...callopt.Option) (r *knowledge.DocumentPage, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.ListDocuments(ctx, request)
+}
+
+func (p *kKnowledgeServiceClient) CreateDocument(ctx context.Context, request *knowledge.CreateDocumentRequest, callOptions ...callopt.Option) (r *knowledge.Document, err error) {
 	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
 	return p.kClient.CreateDocument(ctx, request)
 }
 
-func (p *kKnowledgeServiceClient) GetDocument(ctx context.Context, request *knowledge.DocumentIDRequest, callOptions ...callopt.Option) (r *knowledge.DocumentDetail, err error) {
+func (p *kKnowledgeServiceClient) GetDocument(ctx context.Context, request *knowledge.DocumentIDRequest, callOptions ...callopt.Option) (r *knowledge.Document, err error) {
 	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
 	return p.kClient.GetDocument(ctx, request)
 }
 
-func (p *kKnowledgeServiceClient) UpdateDocument(ctx context.Context, request *knowledge.UpdateDocumentRequest, callOptions ...callopt.Option) (r *knowledge.DocumentDetail, err error) {
+func (p *kKnowledgeServiceClient) UpdateDocument(ctx context.Context, request *knowledge.UpdateDocumentRequest, callOptions ...callopt.Option) (r *knowledge.Document, err error) {
 	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
 	return p.kClient.UpdateDocument(ctx, request)
 }
 
-func (p *kKnowledgeServiceClient) DeleteDocument(ctx context.Context, request *knowledge.DocumentIDRequest, callOptions ...callopt.Option) (r *knowledge.Document, err error) {
+func (p *kKnowledgeServiceClient) SetPublication(ctx context.Context, request *knowledge.SetPublicationRequest, callOptions ...callopt.Option) (r *knowledge.Document, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.SetPublication(ctx, request)
+}
+
+func (p *kKnowledgeServiceClient) DeleteDocument(ctx context.Context, request *knowledge.DeleteDocumentRequest, callOptions ...callopt.Option) (r *knowledge.Document, err error) {
 	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
 	return p.kClient.DeleteDocument(ctx, request)
 }
 
-func (p *kKnowledgeServiceClient) SetDocumentStatus(ctx context.Context, request *knowledge.SetDocumentStatusRequest, callOptions ...callopt.Option) (r *knowledge.Document, err error) {
+func (p *kKnowledgeServiceClient) RestoreDeletedDocument(ctx context.Context, request *knowledge.DocumentIDRequest, callOptions ...callopt.Option) (r *knowledge.Document, err error) {
 	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
-	return p.kClient.SetDocumentStatus(ctx, request)
+	return p.kClient.RestoreDeletedDocument(ctx, request)
 }
 
-func (p *kKnowledgeServiceClient) ApplyDocumentOperation(ctx context.Context, request *knowledge.ApplyDocumentOperationRequest, callOptions ...callopt.Option) (r *knowledge.DocumentOperationAck, err error) {
+func (p *kKnowledgeServiceClient) ListDeletedDocuments(ctx context.Context, request *knowledge.ListDocumentsRequest, callOptions ...callopt.Option) (r *knowledge.DocumentPage, err error) {
 	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
-	return p.kClient.ApplyDocumentOperation(ctx, request)
+	return p.kClient.ListDeletedDocuments(ctx, request)
+}
+
+func (p *kKnowledgeServiceClient) ListMembers(ctx context.Context, request *knowledge.DocumentIDRequest, callOptions ...callopt.Option) (r *knowledge.MemberList, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.ListMembers(ctx, request)
+}
+
+func (p *kKnowledgeServiceClient) AddMember(ctx context.Context, request *knowledge.AddMemberRequest, callOptions ...callopt.Option) (r *knowledge.Member, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.AddMember(ctx, request)
+}
+
+func (p *kKnowledgeServiceClient) UpdateMember(ctx context.Context, request *knowledge.UpdateMemberRequest, callOptions ...callopt.Option) (r *knowledge.Member, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.UpdateMember(ctx, request)
+}
+
+func (p *kKnowledgeServiceClient) DeleteMember(ctx context.Context, request *knowledge.DeleteMemberRequest, callOptions ...callopt.Option) (err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.DeleteMember(ctx, request)
+}
+
+func (p *kKnowledgeServiceClient) ListAttachments(ctx context.Context, request *knowledge.DocumentIDRequest, callOptions ...callopt.Option) (r *knowledge.AttachmentList, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.ListAttachments(ctx, request)
+}
+
+func (p *kKnowledgeServiceClient) CreateAttachment(ctx context.Context, request *knowledge.CreateAttachmentRequest, callOptions ...callopt.Option) (r *knowledge.AttachmentUpload, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.CreateAttachment(ctx, request)
+}
+
+func (p *kKnowledgeServiceClient) CompleteAttachment(ctx context.Context, request *knowledge.AttachmentIDRequest, callOptions ...callopt.Option) (r *knowledge.Attachment, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.CompleteAttachment(ctx, request)
+}
+
+func (p *kKnowledgeServiceClient) DeleteAttachment(ctx context.Context, request *knowledge.AttachmentIDRequest, callOptions ...callopt.Option) (err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.DeleteAttachment(ctx, request)
+}
+
+func (p *kKnowledgeServiceClient) GetAttachmentContent(ctx context.Context, request *knowledge.AttachmentContentRequest, callOptions ...callopt.Option) (r *knowledge.AttachmentContent, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.GetAttachmentContent(ctx, request)
 }

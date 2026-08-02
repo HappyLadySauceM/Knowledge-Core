@@ -1,0 +1,25 @@
+# syntax=docker/dockerfile:1.7
+
+ARG NODE_VERSION=24.18.1
+
+FROM node:${NODE_VERSION}-bookworm-slim AS build
+
+WORKDIR /app
+COPY services/collaboration/package.json services/collaboration/package-lock.json ./
+RUN --mount=type=cache,target=/root/.npm npm ci
+
+COPY services/collaboration/tsconfig.json services/collaboration/tsconfig.build.json ./
+COPY services/collaboration/src ./src
+RUN npm run build && npm prune --omit=dev
+
+FROM node:${NODE_VERSION}-bookworm-slim AS runtime
+
+ENV NODE_ENV=production
+WORKDIR /app
+COPY --from=build --chown=node:node /app/package.json /app/package-lock.json ./
+COPY --from=build --chown=node:node /app/node_modules ./node_modules
+COPY --from=build --chown=node:node /app/dist ./dist
+
+EXPOSE 8091 8092
+USER node
+ENTRYPOINT ["node", "dist/main.js"]

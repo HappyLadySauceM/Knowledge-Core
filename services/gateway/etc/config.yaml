@@ -67,6 +67,23 @@ identity_rpc:
   tls:
     enabled: false
 
+knowledge_rpc:
+  service_name: knowledge-core.knowledge
+  connect_timeout: 500ms
+  request_timeout: 5s
+  tls:
+    enabled: false
+
+collaboration:
+  base_url: http://127.0.0.1:8092
+  request_timeout: 5s
+  tls:
+    enabled: false
+
+endpoints:
+  public_base_url: http://localhost:8080
+  collaboration_websocket_url: ws://localhost:8091/collaboration
+
 cors:
   allowed_origins:
     - http://localhost:3000

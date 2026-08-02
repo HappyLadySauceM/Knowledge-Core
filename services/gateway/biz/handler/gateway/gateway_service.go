@@ -5,9 +5,11 @@ package gateway
 import (
 	"context"
 	"errors"
+	"strconv"
+	"time"
 
 	identityv1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/identity"
-	jsoncodec "github.com/HappyLadySauce/Knowledge-Core/pkg/codec/json"
+	coreauth "github.com/HappyLadySauce/Knowledge-Core/pkg/auth"
 	gatewaymodel "github.com/HappyLadySauce/Knowledge-Core/services/gateway/biz/model/gateway"
 	gatewaymiddleware "github.com/HappyLadySauce/Knowledge-Core/services/gateway/internal/middleware"
 	"github.com/cloudwego/hertz/pkg/app"
@@ -16,7 +18,6 @@ import (
 
 const gatewayServiceName = "gateway"
 
-// Live handles GET /health/live.
 func Live(ctx context.Context, request *app.RequestContext) {
 	dependencies, ok := gatewaymiddleware.FromRequest(request)
 	if !ok {
@@ -30,7 +31,6 @@ func Live(ctx context.Context, request *app.RequestContext) {
 	writeHealth(ctx, request, "ok")
 }
 
-// Ready handles GET /health/ready.
 func Ready(ctx context.Context, request *app.RequestContext) {
 	dependencies, ok := gatewaymiddleware.FromRequest(request)
 	if !ok {
@@ -44,14 +44,9 @@ func Ready(ctx context.Context, request *app.RequestContext) {
 	writeHealth(ctx, request, "ready")
 }
 
-// Register handles POST /api/v1/auth/register.
 func Register(ctx context.Context, request *app.RequestContext) {
 	var input gatewaymodel.RegisterRequest
-	if err := decodeBody(request, &input); err != nil {
-		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidRequest)
-		return
-	}
-	if input.Username == "" || input.Email == "" || input.Password == "" {
+	if err := decodeJSONBody(request, &input); err != nil || input.Username == "" || input.Email == "" || input.Password == "" {
 		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidRequest)
 		return
 	}
@@ -74,20 +69,13 @@ func Register(ctx context.Context, request *app.RequestContext) {
 		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidUpstreamResponse)
 		return
 	}
-	requestID, traceID := gatewaymiddleware.ResponseMetadata(ctx, request)
-	gatewaymiddleware.WriteJSON(request, consts.StatusCreated, &gatewaymodel.RegisterResponse{
-		Code: 0, Message: "ok", Data: data, RequestID: requestID, TraceID: traceID,
-	})
+	gatewaymiddleware.ResponseMetadata(ctx, request)
+	gatewaymiddleware.WriteJSON(request, consts.StatusCreated, data)
 }
 
-// Login handles POST /api/v1/auth/login.
 func Login(ctx context.Context, request *app.RequestContext) {
 	var input gatewaymodel.LoginRequest
-	if err := decodeBody(request, &input); err != nil {
-		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidRequest)
-		return
-	}
-	if input.Identifier == "" || input.Password == "" {
+	if err := decodeJSONBody(request, &input); err != nil || input.Identifier == "" || input.Password == "" {
 		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidRequest)
 		return
 	}
@@ -104,7 +92,7 @@ func Login(ctx context.Context, request *app.RequestContext) {
 		gatewaymiddleware.WriteIdentityError(ctx, request, err)
 		return
 	}
-	if authentication == nil || authentication.AccessToken == "" || authentication.ExpiresAtUnix <= 0 {
+	if authentication == nil || authentication.AccessToken == "" || !validRFC3339(authentication.ExpiresAt) {
 		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidUpstreamResponse)
 		return
 	}
@@ -113,24 +101,35 @@ func Login(ctx context.Context, request *app.RequestContext) {
 		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidUpstreamResponse)
 		return
 	}
-	requestID, traceID := gatewaymiddleware.ResponseMetadata(ctx, request)
-	gatewaymiddleware.WriteJSON(request, consts.StatusOK, &gatewaymodel.LoginResponse{
-		Code:    0,
-		Message: "ok",
-		Data: &gatewaymodel.LoginData{
-			User: user, AccessToken: authentication.AccessToken,
-			TokenType: "Bearer", ExpiresAtUnix: authentication.ExpiresAtUnix,
-		},
-		RequestID: requestID,
-		TraceID:   traceID,
-	})
+	data := &gatewaymodel.SessionData{
+		User: user, AccessToken: authentication.AccessToken, TokenType: "Bearer", ExpiresAt: authentication.ExpiresAt,
+	}
+	gatewaymiddleware.ResponseMetadata(ctx, request)
+	gatewaymiddleware.WriteJSON(request, consts.StatusOK, data)
 }
 
-// CurrentUser handles GET /api/v1/users/me.
 func CurrentUser(ctx context.Context, request *app.RequestContext) {
-	user, ok := gatewaymiddleware.CurrentUser(request)
-	if !ok {
+	principal, principalOK := gatewaymiddleware.Principal(request)
+	token, tokenOK := gatewaymiddleware.AccessToken(request)
+	if !principalOK || !tokenOK {
 		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrAuthenticationRequired)
+		return
+	}
+	dependencies, ok := gatewaymiddleware.FromRequest(request)
+	if !ok {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInternal)
+		return
+	}
+	user, err := dependencies.Identity.GetCurrentUser(
+		coreauth.WithAccessToken(ctx, token),
+		&identityv1.CurrentUserRequest{},
+	)
+	if err != nil {
+		gatewaymiddleware.WriteIdentityError(ctx, request, err)
+		return
+	}
+	if user == nil || user.Id != principal.UserID || user.TokenVersion != principal.TokenVersion {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidUpstreamResponse)
 		return
 	}
 	data, err := toUserData(user)
@@ -138,75 +137,125 @@ func CurrentUser(ctx context.Context, request *app.RequestContext) {
 		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidUpstreamResponse)
 		return
 	}
-	requestID, traceID := gatewaymiddleware.ResponseMetadata(ctx, request)
-	gatewaymiddleware.WriteJSON(request, consts.StatusOK, &gatewaymodel.CurrentUserResponse{
-		Code: 0, Message: "ok", Data: data, RequestID: requestID, TraceID: traceID,
-	})
-}
-
-func ListPublishedDocuments(ctx context.Context, request *app.RequestContext) {
-	writeUnimplemented(ctx, request)
-}
-
-func GetPublishedDocument(ctx context.Context, request *app.RequestContext) {
-	writeUnimplemented(ctx, request)
-}
-
-func ListDocuments(ctx context.Context, request *app.RequestContext) {
-	writeUnimplemented(ctx, request)
-}
-
-func CreateDocument(ctx context.Context, request *app.RequestContext) {
-	writeUnimplemented(ctx, request)
-}
-
-func GetDocument(ctx context.Context, request *app.RequestContext) {
-	writeUnimplemented(ctx, request)
-}
-
-func UpdateDocument(ctx context.Context, request *app.RequestContext) {
-	writeUnimplemented(ctx, request)
-}
-
-func DeleteDocument(ctx context.Context, request *app.RequestContext) {
-	writeUnimplemented(ctx, request)
-}
-
-func SetDocumentStatus(ctx context.Context, request *app.RequestContext) {
-	writeUnimplemented(ctx, request)
-}
-
-func ApplyDocumentOperation(ctx context.Context, request *app.RequestContext) {
-	writeUnimplemented(ctx, request)
+	gatewaymiddleware.ResponseMetadata(ctx, request)
+	gatewaymiddleware.WriteJSON(request, consts.StatusOK, data)
 }
 
 func writeHealth(ctx context.Context, request *app.RequestContext, status string) {
-	requestID, traceID := gatewaymiddleware.ResponseMetadata(ctx, request)
-	gatewaymiddleware.WriteJSON(request, consts.StatusOK, &gatewaymodel.HealthResponse{
-		Code: 0, Message: "ok",
-		Data:      &gatewaymodel.HealthData{Status: status, Service: gatewayServiceName},
-		RequestID: requestID, TraceID: traceID,
+	gatewaymiddleware.ResponseMetadata(ctx, request)
+	gatewaymiddleware.WriteJSON(request, consts.StatusOK, &gatewaymodel.HealthData{
+		Status: status, Service: gatewayServiceName,
 	})
-}
-
-func writeUnimplemented(ctx context.Context, request *app.RequestContext) {
-	gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrUnimplemented)
-}
-
-func decodeBody(request *app.RequestContext, target any) error {
-	if request == nil || target == nil || len(request.Request.Body()) == 0 {
-		return errors.New("request body is required")
-	}
-	return jsoncodec.Unmarshal(request.Request.Body(), target)
 }
 
 func toUserData(user *identityv1.User) (*gatewaymodel.UserData, error) {
 	if user == nil || user.Id <= 0 || user.Username == "" || user.Email == "" || user.Role == "" || user.Status == "" ||
-		user.TokenVersion <= 0 || user.CreatedAtUnix <= 0 || user.UpdatedAtUnix <= 0 {
+		user.TokenVersion <= 0 || !validRFC3339(user.CreatedAt) || !validRFC3339(user.UpdatedAt) {
 		return nil, errors.New("identity user is incomplete")
 	}
 	return &gatewaymodel.UserData{
-		ID: user.Id, Username: user.Username, Email: user.Email, Role: user.Role, Status: user.Status,
-		Avatar: user.Avatar, Bio: user.Bio, CreatedAtUnix: user.CreatedAtUnix, UpdatedAtUnix: user.UpdatedAtUnix,
+		ID: strconv.FormatInt(user.Id, 10), Username: user.Username, Email: user.Email, Role: user.Role, Status: user.Status,
+		Avatar: user.Avatar, Bio: user.Bio, CreatedAt: user.CreatedAt, UpdatedAt: user.UpdatedAt,
 	}, nil
+}
+
+func validRFC3339(value string) bool {
+	_, err := time.Parse(time.RFC3339, value)
+	return err == nil
+}
+
+func ListPublishedDocuments(ctx context.Context, request *app.RequestContext) {
+	handleListPublishedDocuments(ctx, request)
+}
+
+func GetPublishedDocument(ctx context.Context, request *app.RequestContext) {
+	handleGetPublishedDocument(ctx, request)
+}
+
+func GetAttachmentContent(ctx context.Context, request *app.RequestContext) {
+	handleGetAttachmentContent(ctx, request)
+}
+
+func ListDocuments(ctx context.Context, request *app.RequestContext) {
+	handleListDocuments(ctx, request)
+}
+
+func CreateDocument(ctx context.Context, request *app.RequestContext) {
+	handleCreateDocument(ctx, request)
+}
+
+func GetDocument(ctx context.Context, request *app.RequestContext) {
+	handleGetDocument(ctx, request)
+}
+
+func UpdateDocument(ctx context.Context, request *app.RequestContext) {
+	handleUpdateDocument(ctx, request)
+}
+
+func DeleteDocument(ctx context.Context, request *app.RequestContext) {
+	handleDeleteDocument(ctx, request)
+}
+
+func PublishDocument(ctx context.Context, request *app.RequestContext) {
+	handlePublishDocument(ctx, request)
+}
+
+func UnpublishDocument(ctx context.Context, request *app.RequestContext) {
+	handleUnpublishDocument(ctx, request)
+}
+
+func ListMembers(ctx context.Context, request *app.RequestContext) {
+	handleListMembers(ctx, request)
+}
+
+func AddMember(ctx context.Context, request *app.RequestContext) {
+	handleAddMember(ctx, request)
+}
+
+func UpdateMember(ctx context.Context, request *app.RequestContext) {
+	handleUpdateMember(ctx, request)
+}
+
+func DeleteMember(ctx context.Context, request *app.RequestContext) {
+	handleDeleteMember(ctx, request)
+}
+
+func ListVersions(ctx context.Context, request *app.RequestContext) {
+	handleListVersions(ctx, request)
+}
+
+func CreateVersion(ctx context.Context, request *app.RequestContext) {
+	handleCreateVersion(ctx, request)
+}
+
+func GetVersion(ctx context.Context, request *app.RequestContext) {
+	handleGetVersion(ctx, request)
+}
+
+func RestoreVersion(ctx context.Context, request *app.RequestContext) {
+	handleRestoreVersion(ctx, request)
+}
+
+func ListAttachments(ctx context.Context, request *app.RequestContext) {
+	handleListAttachments(ctx, request)
+}
+
+func CreateAttachment(ctx context.Context, request *app.RequestContext) {
+	handleCreateAttachment(ctx, request)
+}
+
+func CompleteAttachment(ctx context.Context, request *app.RequestContext) {
+	handleCompleteAttachment(ctx, request)
+}
+
+func DeleteAttachment(ctx context.Context, request *app.RequestContext) {
+	handleDeleteAttachment(ctx, request)
+}
+
+func ListDeletedDocuments(ctx context.Context, request *app.RequestContext) {
+	handleListDeletedDocuments(ctx, request)
+}
+
+func RestoreDeletedDocument(ctx context.Context, request *app.RequestContext) {
+	handleRestoreDeletedDocument(ctx, request)
 }

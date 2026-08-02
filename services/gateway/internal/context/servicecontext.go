@@ -10,13 +10,14 @@ import (
 
 	commonv1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/common"
 	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/identity/identityservice"
+	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/knowledge/knowledgeservice"
 	coreapp "github.com/HappyLadySauce/Knowledge-Core/pkg/app"
 	coreauth "github.com/HappyLadySauce/Knowledge-Core/pkg/auth"
 	etcdresource "github.com/HappyLadySauce/Knowledge-Core/pkg/etcd"
 	"github.com/HappyLadySauce/Knowledge-Core/pkg/health"
 	redisresource "github.com/HappyLadySauce/Knowledge-Core/pkg/redis"
 	hertztransport "github.com/HappyLadySauce/Knowledge-Core/pkg/transport/hertz"
-	identityclient "github.com/HappyLadySauce/Knowledge-Core/services/gateway/internal/client"
+	gatewayclient "github.com/HappyLadySauce/Knowledge-Core/services/gateway/internal/client"
 	"github.com/HappyLadySauce/Knowledge-Core/services/gateway/internal/config"
 	gatewaymiddleware "github.com/HappyLadySauce/Knowledge-Core/services/gateway/internal/middleware"
 	"github.com/HappyLadySauce/Knowledge-Core/services/gateway/internal/ratelimit"
@@ -24,15 +25,17 @@ import (
 )
 
 type ServiceContext struct {
-	Config       config.Config
-	Redis        *redisresource.Resource
-	Etcd         *etcdresource.ResolverResources
-	Identity     identityservice.Client
-	Verifier     *coreauth.Verifier
-	Limiter      *ratelimit.RedisLimiter
-	Middleware   *gatewaymiddleware.Dependencies
-	AdminServer  *hertztransport.AdminServer
-	PublicServer *publichttp.Server
+	Config        config.Config
+	Redis         *redisresource.Resource
+	Etcd          *etcdresource.ResolverResources
+	Identity      identityservice.Client
+	Knowledge     knowledgeservice.Client
+	Collaboration *gatewayclient.Collaboration
+	Verifier      *coreauth.Verifier
+	Limiter       *ratelimit.RedisLimiter
+	Middleware    *gatewaymiddleware.Dependencies
+	AdminServer   *hertztransport.AdminServer
+	PublicServer  *publichttp.Server
 }
 
 func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *coreapp.Runtime) (*ServiceContext, error) {
@@ -59,9 +62,20 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 		return nil, errors.Join(err, resolver.Close())
 	}
 
-	identity, err := identityclient.NewIdentity(*cfg.IdentityRPC, resolver.Resolver, runtime.Trace, runtime.Metrics)
+	identity, err := gatewayclient.NewIdentity(*cfg.IdentityRPC, resolver.Resolver, runtime.Trace, runtime.Metrics)
 	if err != nil {
 		return nil, err
+	}
+	knowledge, err := gatewayclient.NewKnowledge(*cfg.KnowledgeRPC, resolver.Resolver, runtime.Trace, runtime.Metrics)
+	if err != nil {
+		return nil, err
+	}
+	collaboration, err := gatewayclient.NewCollaboration(*cfg.Collaboration)
+	if err != nil {
+		return nil, err
+	}
+	if err := runtime.AddCleanup("collaboration-http-client", func(stdcontext.Context) error { return collaboration.Close() }); err != nil {
+		return nil, errors.Join(err, collaboration.Close())
 	}
 	verifier, err := coreauth.NewVerifier(cfg.Auth.PublicKey)
 	if err != nil {
@@ -72,12 +86,13 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 		return nil, err
 	}
 	middlewareDependencies, err := gatewaymiddleware.NewDependencies(
-		identity, verifier, limiter, runtime.Health, runtime.Logger, *cfg.CORS, *cfg.RateLimit, cfg.PublicHTTP.TLS.Enabled,
+		identity, knowledge, collaboration, verifier, limiter, runtime.Health, runtime.Logger,
+		*cfg.CORS, *cfg.RateLimit, *cfg.Endpoints, cfg.PublicHTTP.TLS.Enabled,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("create gateway HTTP middleware: %w", err)
 	}
-	if err := addReadinessChecks(runtime.Health, cfg, cache, resolver, identity); err != nil {
+	if err := addReadinessChecks(runtime.Health, cfg, cache, resolver, identity, knowledge, collaboration); err != nil {
 		return nil, err
 	}
 
@@ -125,7 +140,7 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 		slog.String("event", "dependencies_ready"),
 	)
 	return &ServiceContext{
-		Config: cfg, Redis: cache, Etcd: resolver, Identity: identity, Verifier: verifier,
+		Config: cfg, Redis: cache, Etcd: resolver, Identity: identity, Knowledge: knowledge, Collaboration: collaboration, Verifier: verifier,
 		Limiter: limiter, Middleware: middlewareDependencies, AdminServer: admin, PublicServer: public,
 	}, nil
 }
@@ -136,6 +151,8 @@ func addReadinessChecks(
 	cache *redisresource.Resource,
 	etcd *etcdresource.ResolverResources,
 	identity identityservice.Client,
+	knowledge knowledgeservice.Client,
+	collaboration *gatewayclient.Collaboration,
 ) error {
 	return errors.Join(
 		registry.AddReadiness("redis", withTimeout(cfg.Redis.ReadTimeout, cache.Ping)),
@@ -150,6 +167,17 @@ func addReadinessChecks(
 			}
 			return nil
 		})),
+		registry.AddReadiness("knowledge", withTimeout(cfg.KnowledgeRPC.RequestTimeout, func(ctx stdcontext.Context) error {
+			response, err := knowledge.Ping(ctx, &commonv1.PingRequest{})
+			if err != nil {
+				return fmt.Errorf("ping Knowledge: %w", err)
+			}
+			if response == nil || response.Service != "knowledge" || response.Status != "ready" {
+				return errors.New("ping Knowledge: service is not ready")
+			}
+			return nil
+		})),
+		registry.AddReadiness("collaboration", withTimeout(cfg.Collaboration.RequestTimeout, collaboration.Ping)),
 	)
 }
 

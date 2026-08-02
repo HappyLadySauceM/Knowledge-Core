@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-ARG GO_VERSION=1.26.2
+ARG GO_VERSION=1.26.5
 
 FROM --platform=$BUILDPLATFORM golang:${GO_VERSION}-alpine AS build
 
@@ -13,6 +13,7 @@ RUN --mount=type=cache,target=/go/pkg/mod go mod download
 COPY pkg ./pkg
 COPY kitex_gen/common ./kitex_gen/common
 COPY kitex_gen/identity ./kitex_gen/identity
+COPY kitex_gen/knowledge ./kitex_gen/knowledge
 COPY services/gateway ./services/gateway
 
 ARG TARGETOS=linux

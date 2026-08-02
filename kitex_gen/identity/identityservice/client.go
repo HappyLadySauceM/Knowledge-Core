@@ -15,7 +15,8 @@ type Client interface {
 	Ping(ctx context.Context, request *common.PingRequest, callOptions ...callopt.Option) (r *common.PingResponse, err error)
 	Register(ctx context.Context, request *identity.RegisterRequest, callOptions ...callopt.Option) (r *identity.User, err error)
 	Authenticate(ctx context.Context, request *identity.AuthenticateRequest, callOptions ...callopt.Option) (r *identity.Authentication, err error)
-	GetUser(ctx context.Context, request *identity.GetUserRequest, callOptions ...callopt.Option) (r *identity.User, err error)
+	GetCurrentUser(ctx context.Context, request *identity.CurrentUserRequest, callOptions ...callopt.Option) (r *identity.User, err error)
+	ResolveUser(ctx context.Context, request *identity.ResolveUserRequest, callOptions ...callopt.Option) (r *identity.PublicUser, err error)
 }
 
 // NewClient creates a client for the service defined in IDL.
@@ -62,7 +63,12 @@ func (p *kIdentityServiceClient) Authenticate(ctx context.Context, request *iden
 	return p.kClient.Authenticate(ctx, request)
 }
 
-func (p *kIdentityServiceClient) GetUser(ctx context.Context, request *identity.GetUserRequest, callOptions ...callopt.Option) (r *identity.User, err error) {
+func (p *kIdentityServiceClient) GetCurrentUser(ctx context.Context, request *identity.CurrentUserRequest, callOptions ...callopt.Option) (r *identity.User, err error) {
 	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
-	return p.kClient.GetUser(ctx, request)
+	return p.kClient.GetCurrentUser(ctx, request)
+}
+
+func (p *kIdentityServiceClient) ResolveUser(ctx context.Context, request *identity.ResolveUserRequest, callOptions ...callopt.Option) (r *identity.PublicUser, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.ResolveUser(ctx, request)
 }

@@ -63,6 +63,146 @@ services:
     volumes:
       - knowledge-core-etcd-data:/etcd-data
 
+  minio:
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    container_name: knowledge-core-minio
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${KC_MINIO_ACCESS_KEY:?KC_MINIO_ACCESS_KEY is required}
+      MINIO_ROOT_PASSWORD: ${KC_MINIO_SECRET_KEY:?KC_MINIO_SECRET_KEY is required}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - knowledge-core-minio-data:/data
+
+  clamav:
+    image: clamav/clamav:1.4.3
+    container_name: knowledge-core-clamav
+    ports:
+      - "3310:3310"
+    volumes:
+      - knowledge-core-clamav-data:/var/lib/clamav
+
+  identity:
+    build:
+      context: ../..
+      dockerfile: docker/identity/dockerfile
+    container_name: knowledge-core-identity
+    environment:
+      IDENTITY_POSTGRES_HOST: postgres
+      IDENTITY_POSTGRES_PASSWORD: ${KC_POSTGRES_PASSWORD:?KC_POSTGRES_PASSWORD is required}
+      IDENTITY_REDIS_ADDRESS: redis:6379
+      IDENTITY_ETCD_ENDPOINTS: etcd:2379
+      IDENTITY_AUTH_PRIVATE_KEY: ${KC_AUTH_PRIVATE_KEY:?KC_AUTH_PRIVATE_KEY is required}
+      IDENTITY_AUTH_PUBLIC_KEY: ${KC_AUTH_PUBLIC_KEY:?KC_AUTH_PUBLIC_KEY is required}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      etcd:
+        condition: service_healthy
+    ports:
+      - "8081:8081"
+      - "8881:8881"
+    restart: unless-stopped
+
+  knowledge:
+    build:
+      context: ../..
+      dockerfile: docker/knowledge/dockerfile
+    container_name: knowledge-core-knowledge
+    environment:
+      KNOWLEDGE_POSTGRES_HOST: postgres
+      KNOWLEDGE_POSTGRES_PASSWORD: ${KC_POSTGRES_PASSWORD:?KC_POSTGRES_PASSWORD is required}
+      KNOWLEDGE_ETCD_ENDPOINTS: etcd:2379
+      KNOWLEDGE_NATS_SERVERS: nats://nats:4222
+      KNOWLEDGE_AUTH_PUBLIC_KEY: ${KC_AUTH_PUBLIC_KEY:?KC_AUTH_PUBLIC_KEY is required}
+      KNOWLEDGE_OBJECT_STORAGE_ENDPOINT: minio:9000
+      KNOWLEDGE_OBJECT_STORAGE_ACCESS_KEY: ${KC_MINIO_ACCESS_KEY:?KC_MINIO_ACCESS_KEY is required}
+      KNOWLEDGE_OBJECT_STORAGE_SECRET_KEY: ${KC_MINIO_SECRET_KEY:?KC_MINIO_SECRET_KEY is required}
+      KNOWLEDGE_SCANNER_ADDRESS: clamav:3310
+      KNOWLEDGE_COLLABORATION_BASE_URL: http://collaboration:8092
+    depends_on:
+      postgres:
+        condition: service_healthy
+      etcd:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+      identity:
+        condition: service_started
+      minio:
+        condition: service_started
+      clamav:
+        condition: service_started
+    ports:
+      - "8083:8083"
+      - "8090:8090"
+      - "8882:8882"
+    restart: unless-stopped
+
+  collaboration:
+    build:
+      context: ../..
+      dockerfile: docker/collaboration/dockerfile
+    container_name: knowledge-core-collaboration
+    environment:
+      COLLABORATION_ENVIRONMENT: development
+      COLLABORATION_PUBLIC_HOST: 0.0.0.0
+      COLLABORATION_PUBLIC_PORT: 8091
+      COLLABORATION_PUBLIC_WEBSOCKET_URL: ws://localhost:8091/collaboration
+      COLLABORATION_ALLOWED_ORIGINS: ${KC_ALLOWED_ORIGIN:-http://localhost:3000}
+      COLLABORATION_INTERNAL_HOST: 0.0.0.0
+      COLLABORATION_INTERNAL_PORT: 8092
+      COLLABORATION_POSTGRES_URL: ${KC_COLLABORATION_POSTGRES_URL:?KC_COLLABORATION_POSTGRES_URL is required}
+      COLLABORATION_REDIS_URL: redis://redis:6379/1
+      COLLABORATION_NATS_SERVERS: nats://nats:4222
+      COLLABORATION_KNOWLEDGE_BASE_URL: http://knowledge:8090
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+      knowledge:
+        condition: service_started
+    ports:
+      - "8091:8091"
+      - "8092:8092"
+    restart: unless-stopped
+
+  gateway:
+    build:
+      context: ../..
+      dockerfile: docker/gateway/dockerfile
+    container_name: knowledge-core-gateway
+    environment:
+      GATEWAY_REDIS_ADDRESS: redis:6379
+      GATEWAY_ETCD_ENDPOINTS: etcd:2379
+      GATEWAY_AUTH_PUBLIC_KEY: ${KC_AUTH_PUBLIC_KEY:?KC_AUTH_PUBLIC_KEY is required}
+      GATEWAY_COLLABORATION_BASE_URL: http://collaboration:8092
+      GATEWAY_ENDPOINTS_PUBLIC_BASE_URL: http://localhost:8080
+      GATEWAY_ENDPOINTS_COLLABORATION_WEBSOCKET_URL: ws://localhost:8091/collaboration
+      GATEWAY_CORS_ALLOWED_ORIGINS: ${KC_ALLOWED_ORIGIN:-http://localhost:3000}
+    depends_on:
+      redis:
+        condition: service_healthy
+      etcd:
+        condition: service_healthy
+      identity:
+        condition: service_started
+      knowledge:
+        condition: service_started
+      collaboration:
+        condition: service_started
+    ports:
+      - "8080:8080"
+      - "8082:8082"
+    restart: unless-stopped
+
   prometheus:
     image: prom/prometheus:v3.5.0
     container_name: knowledge-core-prometheus
@@ -72,8 +212,6 @@ services:
       - --storage.tsdb.retention.time=15d
     ports:
       - "9090:9090"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:9090/-/ready"]
       interval: 5s
@@ -88,4 +226,6 @@ volumes:
   knowledge-core-redis-data:
   knowledge-core-nats-data:
   knowledge-core-etcd-data:
+  knowledge-core-minio-data:
+  knowledge-core-clamav-data:
   knowledge-core-prometheus-data:

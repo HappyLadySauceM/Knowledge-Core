@@ -4,6 +4,15 @@ GOVULNCHECK_VERSION ?= v1.6.0
 GOVULNCHECK ?= go run golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION)
 IDL_COMPAT_BASE ?= HEAD^
 
+# Keep the TypeScript service and its dependency tree out of Go discovery.
+GO_PACKAGES ?= \
+	./pkg/... \
+	./services/gateway/... \
+	./services/identity/... \
+	./services/knowledge/... \
+	./kitex_gen/... \
+	./scripts/...
+
 ifneq ($(strip $(ComSpec)),)
 CODEGEN = powershell -NoProfile -ExecutionPolicy Bypass -File scripts/codegen.ps1
 CODEGEN_CHECK = $(CODEGEN) -Check
@@ -34,30 +43,30 @@ help:
 	@echo   make ci              Run check plus generated-code drift detection
 
 fmt:
-	go fmt ./...
+	go fmt $(GO_PACKAGES)
 
 fmt-check:
 	$(GOLANGCI_LINT) fmt --diff
 
 vet:
-	go vet ./...
+	go vet $(GO_PACKAGES)
 
 lint:
-	$(GOLANGCI_LINT) run ./...
+	$(GOLANGCI_LINT) run $(GO_PACKAGES)
 
 line: lint
 
 test:
-	go test -count=1 ./...
+	go test -count=1 $(GO_PACKAGES)
 
 race:
-	go test -race -count=1 ./...
+	go test -race -count=1 $(GO_PACKAGES)
 
 build:
-	go build ./...
+	go build $(GO_PACKAGES)
 
 vuln:
-	$(GOVULNCHECK) ./...
+	$(GOVULNCHECK) $(GO_PACKAGES)
 
 tidy:
 	go mod tidy

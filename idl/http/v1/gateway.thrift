@@ -10,44 +10,33 @@ const i32 CodeMethodNotAllowed = 10009
 const i32 CodeRateLimited = 10010
 const i32 CodeUpstreamTimeout = 10011
 const i32 CodeInvalidUpstreamResponse = 10012
-const i32 CodeUnimplemented = 10013
+const i32 CodePreconditionFailed = 10013
 const i32 CodeInternal = 10999
 
-struct HealthRequest {}
-
-struct EmptyData {}
-
-struct ErrorResponse {
-  1: required i32 code (api.body="code")
-  2: required string message (api.body="message")
-  3: required EmptyData data (api.body="data")
-  4: required string request_id (api.body="request_id")
-  5: optional string trace_id (api.body="trace_id")
-}
+struct EmptyRequest {}
+struct EmptyResponse {}
 
 struct HealthData {
   1: required string status (api.body="status")
   2: required string service (api.body="service")
 }
 
-struct HealthResponse {
-  1: required i32 code (api.body="code")
-  2: required string message (api.body="message")
-  3: required HealthData data (api.body="data")
-  4: required string request_id (api.body="request_id")
-  5: optional string trace_id (api.body="trace_id")
-}
-
 struct UserData {
-  1: required i64 id (api.body="id")
+  1: required string id (api.body="id")
   2: required string username (api.body="username")
   3: required string email (api.body="email")
   4: required string role (api.body="role")
   5: required string status (api.body="status")
   6: required string avatar (api.body="avatar")
   7: required string bio (api.body="bio")
-  8: required i64 created_at_unix (api.body="created_at_unix")
-  9: required i64 updated_at_unix (api.body="updated_at_unix")
+  8: required string created_at (api.body="created_at")
+  9: required string updated_at (api.body="updated_at")
+}
+
+struct PublicUserData {
+  1: required string id (api.body="id")
+  2: required string username (api.body="username")
+  3: required string avatar (api.body="avatar")
 }
 
 struct RegisterRequest {
@@ -56,171 +45,261 @@ struct RegisterRequest {
   3: required string password (api.body="password")
 }
 
-struct RegisterResponse {
-  1: required i32 code (api.body="code")
-  2: required string message (api.body="message")
-  3: required UserData data (api.body="data")
-  4: required string request_id (api.body="request_id")
-  5: optional string trace_id (api.body="trace_id")
-}
-
 struct LoginRequest {
   1: required string identifier (api.body="identifier")
   2: required string password (api.body="password")
 }
 
-struct LoginData {
+struct SessionData {
   1: required UserData user (api.body="user")
   2: required string access_token (api.body="access_token")
   3: required string token_type (api.body="token_type")
-  4: required i64 expires_at_unix (api.body="expires_at_unix")
+  4: required string expires_at (api.body="expires_at")
 }
 
-struct LoginResponse {
-  1: required i32 code (api.body="code")
-  2: required string message (api.body="message")
-  3: required LoginData data (api.body="data")
-  4: required string request_id (api.body="request_id")
-  5: optional string trace_id (api.body="trace_id")
+struct RichTextAttrsData {
+  1: optional i32 level (api.body="level")
+  2: optional i32 start (api.body="start")
+  3: optional bool checked (api.body="checked")
+  4: optional string language (api.body="language")
+  5: optional string href (api.body="href")
+  6: optional string attachment_id (api.body="attachmentId")
+  7: optional string alt (api.body="alt")
+  8: optional string title (api.body="title")
+  9: optional string text_align (api.body="textAlign")
+  10: optional i32 colspan (api.body="colspan")
+  11: optional i32 rowspan (api.body="rowspan")
+  12: optional list<i32> colwidth (api.body="colwidth")
 }
 
-struct CurrentUserRequest {}
+struct RichTextMarkData {
+  1: required string type (api.body="type")
+  2: optional RichTextAttrsData attrs (api.body="attrs")
+}
 
-struct CurrentUserResponse {
-  1: required i32 code (api.body="code")
-  2: required string message (api.body="message")
-  3: required UserData data (api.body="data")
-  4: required string request_id (api.body="request_id")
-  5: optional string trace_id (api.body="trace_id")
+struct RichTextNodeData {
+  1: required string type (api.body="type")
+  2: optional RichTextAttrsData attrs (api.body="attrs")
+  3: optional list<RichTextNodeData> content (api.body="content")
+  4: optional string text (api.body="text")
+  5: optional list<RichTextMarkData> marks (api.body="marks")
+}
+
+struct RichTextDocumentData {
+  1: required string type (api.body="type")
+  2: required list<RichTextNodeData> content (api.body="content")
 }
 
 struct DocumentData {
-  1: required i64 id (api.body="id")
+  1: required string id (api.body="id")
   2: required string title (api.body="title")
   3: required string summary (api.body="summary")
   4: required string slug (api.body="slug")
-  5: required string status (api.body="status")
-  6: required i64 author_id (api.body="author_id")
-  7: required i64 current_version (api.body="current_version")
-  8: optional i64 published_at_unix (api.body="published_at_unix")
-  9: required i64 created_at_unix (api.body="created_at_unix")
-  10: required i64 updated_at_unix (api.body="updated_at_unix")
+  5: required PublicUserData owner (api.body="owner")
+  6: required string access (api.body="access")
+  7: required bool published (api.body="published")
+  8: required i64 metadata_revision (api.body="metadata_revision")
+  9: required i64 content_revision (api.body="content_revision")
+  10: optional string published_at (api.body="published_at")
+  11: optional string deleted_at (api.body="deleted_at")
+  12: optional string projected_at (api.body="projected_at")
+  13: required string created_at (api.body="created_at")
+  14: required string updated_at (api.body="updated_at")
 }
 
-struct DocumentBlockData {
-  1: required string block_id (api.body="block_id")
-  2: required i64 document_id (api.body="document_id")
-  3: required string position_key (api.body="position_key")
-  4: required string type (api.body="type")
-  5: required string content_json (api.body="content_json")
-  6: required string text_content (api.body="text_content")
-  7: required i64 version (api.body="version")
-  8: required i64 updated_by (api.body="updated_by")
-  9: required i64 updated_at_unix (api.body="updated_at_unix")
+struct AttachmentData {
+  1: required string id (api.body="id")
+  2: required string document_id (api.body="document_id")
+  3: required string filename (api.body="filename")
+  4: required string media_type (api.body="media_type")
+  5: required i64 size_bytes (api.body="size_bytes")
+  6: required string status (api.body="status")
+  7: required string content_url (api.body="content_url")
+  8: required string created_at (api.body="created_at")
 }
 
 struct DocumentDetailData {
   1: required DocumentData document (api.body="document")
-  2: required list<DocumentBlockData> blocks (api.body="blocks")
+  2: required RichTextDocumentData content (api.body="content")
+  3: required string plain_text (api.body="plain_text")
+  4: required list<AttachmentData> attachments (api.body="attachments")
+  5: optional string websocket_url (api.body="websocket_url")
+  6: optional string fragment (api.body="fragment")
 }
 
-struct DocumentListData {
+struct PageInfoData {
+  1: optional string next_cursor (api.body="next_cursor")
+  2: required bool has_more (api.body="has_more")
+}
+
+struct DocumentPageData {
   1: required list<DocumentData> items (api.body="items")
-  2: required i64 total (api.body="total")
-  3: required i32 page (api.body="page")
-  4: required i32 page_size (api.body="page_size")
+  2: required PageInfoData page (api.body="page")
 }
 
-struct DocumentListRequest {
-  1: optional string query (api.query="query")
-  2: optional i32 page (api.query="page")
-  3: optional i32 page_size (api.query="page_size")
+struct ListDocumentsRequest {
+  1: optional string query (api.query="q")
+  2: optional string cursor (api.query="cursor")
+  3: optional i32 limit (api.query="limit")
+  4: optional string access (api.query="access")
+  5: optional string publication (api.query="publication")
 }
 
-struct DocumentIDRequest {
-  1: required i64 document_id (api.path="document_id")
-}
+struct SlugRequest { 1: required string slug (api.path="slug") }
+struct DocumentIDRequest { 1: required string document_id (api.path="document_id") }
 
 struct CreateDocumentRequest {
   1: required string title (api.body="title")
   2: optional string summary (api.body="summary")
+  3: optional string slug (api.body="slug")
+  4: optional string idempotency_key (api.header="Idempotency-Key")
 }
 
 struct UpdateDocumentRequest {
-  1: required i64 document_id (api.path="document_id")
-  2: required string title (api.body="title")
-  3: required string summary (api.body="summary")
+  1: required string document_id (api.path="document_id")
+  2: required string if_match (api.header="If-Match")
+  3: optional string title (api.body="title")
+  4: optional string summary (api.body="summary")
+  5: optional string slug (api.body="slug")
 }
 
-struct SetDocumentStatusRequest {
-  1: required i64 document_id (api.path="document_id")
-  2: required string status (api.body="status")
+struct PublicationRequest {
+  1: required string document_id (api.path="document_id")
+  2: required string if_match (api.header="If-Match")
 }
 
-struct ApplyDocumentOperationRequest {
-  1: required i64 document_id (api.path="document_id")
-  2: required string op_id (api.body="op_id")
-  3: required i64 base_document_version (api.body="base_document_version")
-  4: required string block_id (api.body="block_id")
-  5: required i64 base_block_version (api.body="base_block_version")
-  6: required string position_key (api.body="position_key")
-  7: required string content_json (api.body="content_json")
-  8: required string text_content (api.body="text_content")
+struct DeleteDocumentRequest {
+  1: required string document_id (api.path="document_id")
+  2: required string if_match (api.header="If-Match")
 }
 
-struct DocumentOperationAckData {
-  1: required i64 document_id (api.body="document_id")
-  2: required string op_id (api.body="op_id")
-  3: required i64 document_version (api.body="document_version")
-  4: required i64 block_version (api.body="block_version")
-  5: required bool duplicate (api.body="duplicate")
+struct MemberData {
+  1: required PublicUserData user (api.body="user")
+  2: required string role (api.body="role")
+  3: required i64 revision (api.body="revision")
+  4: required string created_at (api.body="created_at")
+  5: required string updated_at (api.body="updated_at")
 }
 
-struct DocumentResponse {
-  1: required i32 code (api.body="code")
-  2: required string message (api.body="message")
-  3: required DocumentData data (api.body="data")
-  4: required string request_id (api.body="request_id")
-  5: optional string trace_id (api.body="trace_id")
+struct MemberListData { 1: required list<MemberData> items (api.body="items") }
+
+struct AddMemberRequest {
+  1: required string document_id (api.path="document_id")
+  2: required string username (api.body="username")
+  3: required string role (api.body="role")
+  4: optional string idempotency_key (api.header="Idempotency-Key")
 }
 
-struct DocumentDetailResponse {
-  1: required i32 code (api.body="code")
-  2: required string message (api.body="message")
-  3: required DocumentDetailData data (api.body="data")
-  4: required string request_id (api.body="request_id")
-  5: optional string trace_id (api.body="trace_id")
+struct MemberPathRequest {
+  1: required string document_id (api.path="document_id")
+  2: required string user_id (api.path="user_id")
+  3: required string if_match (api.header="If-Match")
 }
 
-struct DocumentListResponse {
-  1: required i32 code (api.body="code")
-  2: required string message (api.body="message")
-  3: required DocumentListData data (api.body="data")
-  4: required string request_id (api.body="request_id")
-  5: optional string trace_id (api.body="trace_id")
+struct UpdateMemberRequest {
+  1: required string document_id (api.path="document_id")
+  2: required string user_id (api.path="user_id")
+  3: required string if_match (api.header="If-Match")
+  4: required string role (api.body="role")
 }
 
-struct DocumentOperationAckResponse {
-  1: required i32 code (api.body="code")
-  2: required string message (api.body="message")
-  3: required DocumentOperationAckData data (api.body="data")
-  4: required string request_id (api.body="request_id")
-  5: optional string trace_id (api.body="trace_id")
+struct VersionData {
+  1: required string id (api.body="id")
+  2: required string document_id (api.body="document_id")
+  3: required i64 sequence (api.body="sequence")
+  4: required string kind (api.body="kind")
+  5: optional string label (api.body="label")
+  6: required PublicUserData created_by (api.body="created_by")
+  7: required string created_at (api.body="created_at")
 }
+
+struct VersionDetailData {
+  1: required VersionData version (api.body="version")
+  2: required RichTextDocumentData content (api.body="content")
+  3: required string plain_text (api.body="plain_text")
+}
+
+struct VersionPageData {
+  1: required list<VersionData> items (api.body="items")
+  2: required PageInfoData page (api.body="page")
+}
+
+struct ListVersionsRequest {
+  1: required string document_id (api.path="document_id")
+  2: optional string cursor (api.query="cursor")
+  3: optional i32 limit (api.query="limit")
+}
+
+struct CreateVersionRequest {
+  1: required string document_id (api.path="document_id")
+  2: optional string label (api.body="label")
+  3: optional string idempotency_key (api.header="Idempotency-Key")
+}
+
+struct VersionPathRequest {
+  1: required string document_id (api.path="document_id")
+  2: required string version_id (api.path="version_id")
+}
+
+struct RestoreVersionRequest {
+  1: required string document_id (api.path="document_id")
+  2: required string version_id (api.path="version_id")
+  3: required i64 expected_sequence (api.body="expected_sequence")
+  4: optional string idempotency_key (api.header="Idempotency-Key")
+}
+
+struct CreateAttachmentRequest {
+  1: required string document_id (api.path="document_id")
+  2: required string filename (api.body="filename")
+  3: required string media_type (api.body="media_type")
+  4: required i64 size_bytes (api.body="size_bytes")
+  5: required string sha256 (api.body="sha256")
+  6: optional string idempotency_key (api.header="Idempotency-Key")
+}
+
+struct AttachmentUploadData {
+  1: required AttachmentData attachment (api.body="attachment")
+  2: required string upload_url (api.body="upload_url")
+  3: required map<string,string> required_headers (api.body="required_headers")
+  4: required string expires_at (api.body="expires_at")
+}
+
+struct AttachmentPathRequest {
+  1: required string document_id (api.path="document_id")
+  2: required string attachment_id (api.path="attachment_id")
+}
+
+struct PublicAttachmentRequest { 1: required string attachment_id (api.path="attachment_id") }
+struct AttachmentListData { 1: required list<AttachmentData> items (api.body="items") }
 
 service GatewayService {
-  HealthResponse Live(1: HealthRequest request) (api.get="/health/live")
-  HealthResponse Ready(1: HealthRequest request) (api.get="/health/ready")
-  RegisterResponse Register(1: RegisterRequest request) (api.post="/api/v1/auth/register")
-  LoginResponse Login(1: LoginRequest request) (api.post="/api/v1/auth/login")
-  CurrentUserResponse CurrentUser(1: CurrentUserRequest request) (api.get="/api/v1/users/me")
-  DocumentListResponse ListPublishedDocuments(1: DocumentListRequest request) (api.get="/api/v1/documents")
-  DocumentDetailResponse GetPublishedDocument(1: DocumentIDRequest request) (api.get="/api/v1/documents/:document_id")
-  DocumentListResponse ListDocuments(1: DocumentListRequest request) (api.get="/api/v1/studio/documents")
-  DocumentDetailResponse CreateDocument(1: CreateDocumentRequest request) (api.post="/api/v1/studio/documents")
-  DocumentDetailResponse GetDocument(1: DocumentIDRequest request) (api.get="/api/v1/studio/documents/:document_id")
-  DocumentDetailResponse UpdateDocument(1: UpdateDocumentRequest request) (api.patch="/api/v1/studio/documents/:document_id")
-  DocumentResponse DeleteDocument(1: DocumentIDRequest request) (api.delete="/api/v1/studio/documents/:document_id")
-  DocumentResponse SetDocumentStatus(1: SetDocumentStatusRequest request) (api.patch="/api/v1/studio/documents/:document_id/status")
-  DocumentOperationAckResponse ApplyDocumentOperation(1: ApplyDocumentOperationRequest request) (api.post="/api/v1/studio/documents/:document_id/ops")
+  HealthData Live(1: EmptyRequest request) (api.get="/health/live")
+  HealthData Ready(1: EmptyRequest request) (api.get="/health/ready")
+  UserData Register(1: RegisterRequest request) (api.post="/api/v1/users")
+  SessionData Login(1: LoginRequest request) (api.post="/api/v1/sessions")
+  UserData CurrentUser(1: EmptyRequest request) (api.get="/api/v1/users/me")
+  DocumentPageData ListPublishedDocuments(1: ListDocumentsRequest request) (api.get="/api/v1/documents")
+  DocumentDetailData GetPublishedDocument(1: SlugRequest request) (api.get="/api/v1/documents/:slug")
+  EmptyResponse GetAttachmentContent(1: PublicAttachmentRequest request) (api.get="/api/v1/attachments/:attachment_id/content")
+  DocumentPageData ListDocuments(1: ListDocumentsRequest request) (api.get="/api/v1/studio/documents")
+  DocumentData CreateDocument(1: CreateDocumentRequest request) (api.post="/api/v1/studio/documents")
+  DocumentData GetDocument(1: DocumentIDRequest request) (api.get="/api/v1/studio/documents/:document_id")
+  DocumentData UpdateDocument(1: UpdateDocumentRequest request) (api.patch="/api/v1/studio/documents/:document_id")
+  EmptyResponse DeleteDocument(1: DeleteDocumentRequest request) (api.delete="/api/v1/studio/documents/:document_id")
+  DocumentData PublishDocument(1: PublicationRequest request) (api.put="/api/v1/studio/documents/:document_id/publication")
+  EmptyResponse UnpublishDocument(1: PublicationRequest request) (api.delete="/api/v1/studio/documents/:document_id/publication")
+  MemberListData ListMembers(1: DocumentIDRequest request) (api.get="/api/v1/studio/documents/:document_id/members")
+  MemberData AddMember(1: AddMemberRequest request) (api.post="/api/v1/studio/documents/:document_id/members")
+  MemberData UpdateMember(1: UpdateMemberRequest request) (api.patch="/api/v1/studio/documents/:document_id/members/:user_id")
+  EmptyResponse DeleteMember(1: MemberPathRequest request) (api.delete="/api/v1/studio/documents/:document_id/members/:user_id")
+  VersionPageData ListVersions(1: ListVersionsRequest request) (api.get="/api/v1/studio/documents/:document_id/versions")
+  VersionData CreateVersion(1: CreateVersionRequest request) (api.post="/api/v1/studio/documents/:document_id/versions")
+  VersionDetailData GetVersion(1: VersionPathRequest request) (api.get="/api/v1/studio/documents/:document_id/versions/:version_id")
+  VersionData RestoreVersion(1: RestoreVersionRequest request) (api.post="/api/v1/studio/documents/:document_id/versions/:version_id/restorations")
+  AttachmentListData ListAttachments(1: DocumentIDRequest request) (api.get="/api/v1/studio/documents/:document_id/attachments")
+  AttachmentUploadData CreateAttachment(1: CreateAttachmentRequest request) (api.post="/api/v1/studio/documents/:document_id/attachments")
+  AttachmentData CompleteAttachment(1: AttachmentPathRequest request) (api.post="/api/v1/studio/documents/:document_id/attachments/:attachment_id/complete")
+  EmptyResponse DeleteAttachment(1: AttachmentPathRequest request) (api.delete="/api/v1/studio/documents/:document_id/attachments/:attachment_id")
+  DocumentPageData ListDeletedDocuments(1: ListDocumentsRequest request) (api.get="/api/v1/studio/trash")
+  DocumentData RestoreDeletedDocument(1: DocumentIDRequest request) (api.post="/api/v1/studio/trash/:document_id/restore")
 }

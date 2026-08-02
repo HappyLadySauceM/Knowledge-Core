@@ -33,7 +33,7 @@ func (s *identityClientStub) Register(context.Context, *identityv1.RegisterReque
 func (s *identityClientStub) Authenticate(context.Context, *identityv1.AuthenticateRequest, ...callopt.Option) (*identityv1.Authentication, error) {
 	return nil, nil
 }
-func (s *identityClientStub) GetUser(ctx context.Context, _ *identityv1.GetUserRequest, _ ...callopt.Option) (*identityv1.User, error) {
+func (s *identityClientStub) GetCurrentUser(ctx context.Context, _ *identityv1.CurrentUserRequest, _ ...callopt.Option) (*identityv1.User, error) {
 	s.tokenSeen = coreauth.AccessToken(ctx)
 	return s.user, s.getUserErr
 }
@@ -48,7 +48,7 @@ func (s limiterStub) Consume(context.Context, string, string, time.Time, time.Du
 	return s.allowed, s.retry, s.err
 }
 
-func TestAuthenticationVerifiesAndRefreshesCurrentUser(t *testing.T) {
+func TestAuthenticationVerifiesWithoutRefreshingCurrentUser(t *testing.T) {
 	keys, err := coreauth.GenerateKeyPair()
 	if err != nil {
 		t.Fatal(err)
@@ -71,11 +71,14 @@ func TestAuthenticationVerifiesAndRefreshesCurrentUser(t *testing.T) {
 		func(context.Context, *app.RequestContext) { reached = true },
 	})
 	request.Next(context.Background())
-	if !reached || identity.tokenSeen != issued.Value {
+	if !reached || identity.tokenSeen != "" {
 		t.Fatalf("reached = %v, tokenSeen = %q", reached, identity.tokenSeen)
 	}
-	if user, ok := CurrentUser(request); !ok || user.Id != 7 {
-		t.Fatalf("CurrentUser() = %#v, %v", user, ok)
+	if principal, ok := Principal(request); !ok || principal.UserID != 7 || principal.TokenVersion != 2 {
+		t.Fatalf("Principal() = %#v, %v", principal, ok)
+	}
+	if token, ok := AccessToken(request); !ok || token != issued.Value {
+		t.Fatalf("AccessToken() = %q, %v", token, ok)
 	}
 }
 

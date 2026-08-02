@@ -28,17 +28,17 @@ var serviceMethods = map[string]kitex.MethodInfo{
 		false,
 		kitex.WithStreamingMode(kitex.StreamingNone),
 	),
-	"ListDocuments": kitex.NewMethodInfo(
-		listDocumentsHandler,
-		newKnowledgeServiceListDocumentsArgs,
-		newKnowledgeServiceListDocumentsResult,
-		false,
-		kitex.WithStreamingMode(kitex.StreamingNone),
-	),
 	"GetPublishedDocument": kitex.NewMethodInfo(
 		getPublishedDocumentHandler,
 		newKnowledgeServiceGetPublishedDocumentArgs,
 		newKnowledgeServiceGetPublishedDocumentResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
+	"ListDocuments": kitex.NewMethodInfo(
+		listDocumentsHandler,
+		newKnowledgeServiceListDocumentsArgs,
+		newKnowledgeServiceListDocumentsResult,
 		false,
 		kitex.WithStreamingMode(kitex.StreamingNone),
 	),
@@ -63,6 +63,13 @@ var serviceMethods = map[string]kitex.MethodInfo{
 		false,
 		kitex.WithStreamingMode(kitex.StreamingNone),
 	),
+	"SetPublication": kitex.NewMethodInfo(
+		setPublicationHandler,
+		newKnowledgeServiceSetPublicationArgs,
+		newKnowledgeServiceSetPublicationResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
 	"DeleteDocument": kitex.NewMethodInfo(
 		deleteDocumentHandler,
 		newKnowledgeServiceDeleteDocumentArgs,
@@ -70,17 +77,80 @@ var serviceMethods = map[string]kitex.MethodInfo{
 		false,
 		kitex.WithStreamingMode(kitex.StreamingNone),
 	),
-	"SetDocumentStatus": kitex.NewMethodInfo(
-		setDocumentStatusHandler,
-		newKnowledgeServiceSetDocumentStatusArgs,
-		newKnowledgeServiceSetDocumentStatusResult,
+	"RestoreDeletedDocument": kitex.NewMethodInfo(
+		restoreDeletedDocumentHandler,
+		newKnowledgeServiceRestoreDeletedDocumentArgs,
+		newKnowledgeServiceRestoreDeletedDocumentResult,
 		false,
 		kitex.WithStreamingMode(kitex.StreamingNone),
 	),
-	"ApplyDocumentOperation": kitex.NewMethodInfo(
-		applyDocumentOperationHandler,
-		newKnowledgeServiceApplyDocumentOperationArgs,
-		newKnowledgeServiceApplyDocumentOperationResult,
+	"ListDeletedDocuments": kitex.NewMethodInfo(
+		listDeletedDocumentsHandler,
+		newKnowledgeServiceListDeletedDocumentsArgs,
+		newKnowledgeServiceListDeletedDocumentsResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
+	"ListMembers": kitex.NewMethodInfo(
+		listMembersHandler,
+		newKnowledgeServiceListMembersArgs,
+		newKnowledgeServiceListMembersResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
+	"AddMember": kitex.NewMethodInfo(
+		addMemberHandler,
+		newKnowledgeServiceAddMemberArgs,
+		newKnowledgeServiceAddMemberResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
+	"UpdateMember": kitex.NewMethodInfo(
+		updateMemberHandler,
+		newKnowledgeServiceUpdateMemberArgs,
+		newKnowledgeServiceUpdateMemberResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
+	"DeleteMember": kitex.NewMethodInfo(
+		deleteMemberHandler,
+		newKnowledgeServiceDeleteMemberArgs,
+		newKnowledgeServiceDeleteMemberResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
+	"ListAttachments": kitex.NewMethodInfo(
+		listAttachmentsHandler,
+		newKnowledgeServiceListAttachmentsArgs,
+		newKnowledgeServiceListAttachmentsResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
+	"CreateAttachment": kitex.NewMethodInfo(
+		createAttachmentHandler,
+		newKnowledgeServiceCreateAttachmentArgs,
+		newKnowledgeServiceCreateAttachmentResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
+	"CompleteAttachment": kitex.NewMethodInfo(
+		completeAttachmentHandler,
+		newKnowledgeServiceCompleteAttachmentArgs,
+		newKnowledgeServiceCompleteAttachmentResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
+	"DeleteAttachment": kitex.NewMethodInfo(
+		deleteAttachmentHandler,
+		newKnowledgeServiceDeleteAttachmentArgs,
+		newKnowledgeServiceDeleteAttachmentResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
+	"GetAttachmentContent": kitex.NewMethodInfo(
+		getAttachmentContentHandler,
+		newKnowledgeServiceGetAttachmentContentArgs,
+		newKnowledgeServiceGetAttachmentContentResult,
 		false,
 		kitex.WithStreamingMode(kitex.StreamingNone),
 	),
@@ -186,24 +256,6 @@ func newKnowledgeServiceListPublishedDocumentsResult() interface{} {
 	return knowledge.NewKnowledgeServiceListPublishedDocumentsResult()
 }
 
-func listDocumentsHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
-	realArg := arg.(*knowledge.KnowledgeServiceListDocumentsArgs)
-	realResult := result.(*knowledge.KnowledgeServiceListDocumentsResult)
-	success, err := handler.(knowledge.KnowledgeService).ListDocuments(ctx, realArg.Request)
-	if err != nil {
-		return err
-	}
-	realResult.Success = success
-	return nil
-}
-func newKnowledgeServiceListDocumentsArgs() interface{} {
-	return knowledge.NewKnowledgeServiceListDocumentsArgs()
-}
-
-func newKnowledgeServiceListDocumentsResult() interface{} {
-	return knowledge.NewKnowledgeServiceListDocumentsResult()
-}
-
 func getPublishedDocumentHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
 	realArg := arg.(*knowledge.KnowledgeServiceGetPublishedDocumentArgs)
 	realResult := result.(*knowledge.KnowledgeServiceGetPublishedDocumentResult)
@@ -220,6 +272,24 @@ func newKnowledgeServiceGetPublishedDocumentArgs() interface{} {
 
 func newKnowledgeServiceGetPublishedDocumentResult() interface{} {
 	return knowledge.NewKnowledgeServiceGetPublishedDocumentResult()
+}
+
+func listDocumentsHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*knowledge.KnowledgeServiceListDocumentsArgs)
+	realResult := result.(*knowledge.KnowledgeServiceListDocumentsResult)
+	success, err := handler.(knowledge.KnowledgeService).ListDocuments(ctx, realArg.Request)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newKnowledgeServiceListDocumentsArgs() interface{} {
+	return knowledge.NewKnowledgeServiceListDocumentsArgs()
+}
+
+func newKnowledgeServiceListDocumentsResult() interface{} {
+	return knowledge.NewKnowledgeServiceListDocumentsResult()
 }
 
 func createDocumentHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
@@ -276,6 +346,24 @@ func newKnowledgeServiceUpdateDocumentResult() interface{} {
 	return knowledge.NewKnowledgeServiceUpdateDocumentResult()
 }
 
+func setPublicationHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*knowledge.KnowledgeServiceSetPublicationArgs)
+	realResult := result.(*knowledge.KnowledgeServiceSetPublicationResult)
+	success, err := handler.(knowledge.KnowledgeService).SetPublication(ctx, realArg.Request)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newKnowledgeServiceSetPublicationArgs() interface{} {
+	return knowledge.NewKnowledgeServiceSetPublicationArgs()
+}
+
+func newKnowledgeServiceSetPublicationResult() interface{} {
+	return knowledge.NewKnowledgeServiceSetPublicationResult()
+}
+
 func deleteDocumentHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
 	realArg := arg.(*knowledge.KnowledgeServiceDeleteDocumentArgs)
 	realResult := result.(*knowledge.KnowledgeServiceDeleteDocumentResult)
@@ -294,40 +382,202 @@ func newKnowledgeServiceDeleteDocumentResult() interface{} {
 	return knowledge.NewKnowledgeServiceDeleteDocumentResult()
 }
 
-func setDocumentStatusHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
-	realArg := arg.(*knowledge.KnowledgeServiceSetDocumentStatusArgs)
-	realResult := result.(*knowledge.KnowledgeServiceSetDocumentStatusResult)
-	success, err := handler.(knowledge.KnowledgeService).SetDocumentStatus(ctx, realArg.Request)
+func restoreDeletedDocumentHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*knowledge.KnowledgeServiceRestoreDeletedDocumentArgs)
+	realResult := result.(*knowledge.KnowledgeServiceRestoreDeletedDocumentResult)
+	success, err := handler.(knowledge.KnowledgeService).RestoreDeletedDocument(ctx, realArg.Request)
 	if err != nil {
 		return err
 	}
 	realResult.Success = success
 	return nil
 }
-func newKnowledgeServiceSetDocumentStatusArgs() interface{} {
-	return knowledge.NewKnowledgeServiceSetDocumentStatusArgs()
+func newKnowledgeServiceRestoreDeletedDocumentArgs() interface{} {
+	return knowledge.NewKnowledgeServiceRestoreDeletedDocumentArgs()
 }
 
-func newKnowledgeServiceSetDocumentStatusResult() interface{} {
-	return knowledge.NewKnowledgeServiceSetDocumentStatusResult()
+func newKnowledgeServiceRestoreDeletedDocumentResult() interface{} {
+	return knowledge.NewKnowledgeServiceRestoreDeletedDocumentResult()
 }
 
-func applyDocumentOperationHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
-	realArg := arg.(*knowledge.KnowledgeServiceApplyDocumentOperationArgs)
-	realResult := result.(*knowledge.KnowledgeServiceApplyDocumentOperationResult)
-	success, err := handler.(knowledge.KnowledgeService).ApplyDocumentOperation(ctx, realArg.Request)
+func listDeletedDocumentsHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*knowledge.KnowledgeServiceListDeletedDocumentsArgs)
+	realResult := result.(*knowledge.KnowledgeServiceListDeletedDocumentsResult)
+	success, err := handler.(knowledge.KnowledgeService).ListDeletedDocuments(ctx, realArg.Request)
 	if err != nil {
 		return err
 	}
 	realResult.Success = success
 	return nil
 }
-func newKnowledgeServiceApplyDocumentOperationArgs() interface{} {
-	return knowledge.NewKnowledgeServiceApplyDocumentOperationArgs()
+func newKnowledgeServiceListDeletedDocumentsArgs() interface{} {
+	return knowledge.NewKnowledgeServiceListDeletedDocumentsArgs()
 }
 
-func newKnowledgeServiceApplyDocumentOperationResult() interface{} {
-	return knowledge.NewKnowledgeServiceApplyDocumentOperationResult()
+func newKnowledgeServiceListDeletedDocumentsResult() interface{} {
+	return knowledge.NewKnowledgeServiceListDeletedDocumentsResult()
+}
+
+func listMembersHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*knowledge.KnowledgeServiceListMembersArgs)
+	realResult := result.(*knowledge.KnowledgeServiceListMembersResult)
+	success, err := handler.(knowledge.KnowledgeService).ListMembers(ctx, realArg.Request)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newKnowledgeServiceListMembersArgs() interface{} {
+	return knowledge.NewKnowledgeServiceListMembersArgs()
+}
+
+func newKnowledgeServiceListMembersResult() interface{} {
+	return knowledge.NewKnowledgeServiceListMembersResult()
+}
+
+func addMemberHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*knowledge.KnowledgeServiceAddMemberArgs)
+	realResult := result.(*knowledge.KnowledgeServiceAddMemberResult)
+	success, err := handler.(knowledge.KnowledgeService).AddMember(ctx, realArg.Request)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newKnowledgeServiceAddMemberArgs() interface{} {
+	return knowledge.NewKnowledgeServiceAddMemberArgs()
+}
+
+func newKnowledgeServiceAddMemberResult() interface{} {
+	return knowledge.NewKnowledgeServiceAddMemberResult()
+}
+
+func updateMemberHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*knowledge.KnowledgeServiceUpdateMemberArgs)
+	realResult := result.(*knowledge.KnowledgeServiceUpdateMemberResult)
+	success, err := handler.(knowledge.KnowledgeService).UpdateMember(ctx, realArg.Request)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newKnowledgeServiceUpdateMemberArgs() interface{} {
+	return knowledge.NewKnowledgeServiceUpdateMemberArgs()
+}
+
+func newKnowledgeServiceUpdateMemberResult() interface{} {
+	return knowledge.NewKnowledgeServiceUpdateMemberResult()
+}
+
+func deleteMemberHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*knowledge.KnowledgeServiceDeleteMemberArgs)
+
+	err := handler.(knowledge.KnowledgeService).DeleteMember(ctx, realArg.Request)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+func newKnowledgeServiceDeleteMemberArgs() interface{} {
+	return knowledge.NewKnowledgeServiceDeleteMemberArgs()
+}
+
+func newKnowledgeServiceDeleteMemberResult() interface{} {
+	return knowledge.NewKnowledgeServiceDeleteMemberResult()
+}
+
+func listAttachmentsHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*knowledge.KnowledgeServiceListAttachmentsArgs)
+	realResult := result.(*knowledge.KnowledgeServiceListAttachmentsResult)
+	success, err := handler.(knowledge.KnowledgeService).ListAttachments(ctx, realArg.Request)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newKnowledgeServiceListAttachmentsArgs() interface{} {
+	return knowledge.NewKnowledgeServiceListAttachmentsArgs()
+}
+
+func newKnowledgeServiceListAttachmentsResult() interface{} {
+	return knowledge.NewKnowledgeServiceListAttachmentsResult()
+}
+
+func createAttachmentHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*knowledge.KnowledgeServiceCreateAttachmentArgs)
+	realResult := result.(*knowledge.KnowledgeServiceCreateAttachmentResult)
+	success, err := handler.(knowledge.KnowledgeService).CreateAttachment(ctx, realArg.Request)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newKnowledgeServiceCreateAttachmentArgs() interface{} {
+	return knowledge.NewKnowledgeServiceCreateAttachmentArgs()
+}
+
+func newKnowledgeServiceCreateAttachmentResult() interface{} {
+	return knowledge.NewKnowledgeServiceCreateAttachmentResult()
+}
+
+func completeAttachmentHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*knowledge.KnowledgeServiceCompleteAttachmentArgs)
+	realResult := result.(*knowledge.KnowledgeServiceCompleteAttachmentResult)
+	success, err := handler.(knowledge.KnowledgeService).CompleteAttachment(ctx, realArg.Request)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newKnowledgeServiceCompleteAttachmentArgs() interface{} {
+	return knowledge.NewKnowledgeServiceCompleteAttachmentArgs()
+}
+
+func newKnowledgeServiceCompleteAttachmentResult() interface{} {
+	return knowledge.NewKnowledgeServiceCompleteAttachmentResult()
+}
+
+func deleteAttachmentHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*knowledge.KnowledgeServiceDeleteAttachmentArgs)
+
+	err := handler.(knowledge.KnowledgeService).DeleteAttachment(ctx, realArg.Request)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+func newKnowledgeServiceDeleteAttachmentArgs() interface{} {
+	return knowledge.NewKnowledgeServiceDeleteAttachmentArgs()
+}
+
+func newKnowledgeServiceDeleteAttachmentResult() interface{} {
+	return knowledge.NewKnowledgeServiceDeleteAttachmentResult()
+}
+
+func getAttachmentContentHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*knowledge.KnowledgeServiceGetAttachmentContentArgs)
+	realResult := result.(*knowledge.KnowledgeServiceGetAttachmentContentResult)
+	success, err := handler.(knowledge.KnowledgeService).GetAttachmentContent(ctx, realArg.Request)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newKnowledgeServiceGetAttachmentContentArgs() interface{} {
+	return knowledge.NewKnowledgeServiceGetAttachmentContentArgs()
+}
+
+func newKnowledgeServiceGetAttachmentContentResult() interface{} {
+	return knowledge.NewKnowledgeServiceGetAttachmentContentResult()
 }
 
 type kClient struct {
@@ -350,7 +600,7 @@ func (p *kClient) Ping(ctx context.Context, request *common.PingRequest) (r *com
 	return _result.GetSuccess(), nil
 }
 
-func (p *kClient) ListPublishedDocuments(ctx context.Context, request *knowledge.DocumentListRequest) (r *knowledge.DocumentList, err error) {
+func (p *kClient) ListPublishedDocuments(ctx context.Context, request *knowledge.ListDocumentsRequest) (r *knowledge.DocumentPage, err error) {
 	var _args knowledge.KnowledgeServiceListPublishedDocumentsArgs
 	_args.Request = request
 	var _result knowledge.KnowledgeServiceListPublishedDocumentsResult
@@ -360,17 +610,7 @@ func (p *kClient) ListPublishedDocuments(ctx context.Context, request *knowledge
 	return _result.GetSuccess(), nil
 }
 
-func (p *kClient) ListDocuments(ctx context.Context, request *knowledge.DocumentListRequest) (r *knowledge.DocumentList, err error) {
-	var _args knowledge.KnowledgeServiceListDocumentsArgs
-	_args.Request = request
-	var _result knowledge.KnowledgeServiceListDocumentsResult
-	if err = p.c.Call(ctx, "ListDocuments", &_args, &_result); err != nil {
-		return
-	}
-	return _result.GetSuccess(), nil
-}
-
-func (p *kClient) GetPublishedDocument(ctx context.Context, request *knowledge.DocumentIDRequest) (r *knowledge.DocumentDetail, err error) {
+func (p *kClient) GetPublishedDocument(ctx context.Context, request *knowledge.GetPublishedDocumentRequest) (r *knowledge.DocumentDetail, err error) {
 	var _args knowledge.KnowledgeServiceGetPublishedDocumentArgs
 	_args.Request = request
 	var _result knowledge.KnowledgeServiceGetPublishedDocumentResult
@@ -380,7 +620,17 @@ func (p *kClient) GetPublishedDocument(ctx context.Context, request *knowledge.D
 	return _result.GetSuccess(), nil
 }
 
-func (p *kClient) CreateDocument(ctx context.Context, request *knowledge.CreateDocumentRequest) (r *knowledge.DocumentDetail, err error) {
+func (p *kClient) ListDocuments(ctx context.Context, request *knowledge.ListDocumentsRequest) (r *knowledge.DocumentPage, err error) {
+	var _args knowledge.KnowledgeServiceListDocumentsArgs
+	_args.Request = request
+	var _result knowledge.KnowledgeServiceListDocumentsResult
+	if err = p.c.Call(ctx, "ListDocuments", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) CreateDocument(ctx context.Context, request *knowledge.CreateDocumentRequest) (r *knowledge.Document, err error) {
 	var _args knowledge.KnowledgeServiceCreateDocumentArgs
 	_args.Request = request
 	var _result knowledge.KnowledgeServiceCreateDocumentResult
@@ -390,7 +640,7 @@ func (p *kClient) CreateDocument(ctx context.Context, request *knowledge.CreateD
 	return _result.GetSuccess(), nil
 }
 
-func (p *kClient) GetDocument(ctx context.Context, request *knowledge.DocumentIDRequest) (r *knowledge.DocumentDetail, err error) {
+func (p *kClient) GetDocument(ctx context.Context, request *knowledge.DocumentIDRequest) (r *knowledge.Document, err error) {
 	var _args knowledge.KnowledgeServiceGetDocumentArgs
 	_args.Request = request
 	var _result knowledge.KnowledgeServiceGetDocumentResult
@@ -400,7 +650,7 @@ func (p *kClient) GetDocument(ctx context.Context, request *knowledge.DocumentID
 	return _result.GetSuccess(), nil
 }
 
-func (p *kClient) UpdateDocument(ctx context.Context, request *knowledge.UpdateDocumentRequest) (r *knowledge.DocumentDetail, err error) {
+func (p *kClient) UpdateDocument(ctx context.Context, request *knowledge.UpdateDocumentRequest) (r *knowledge.Document, err error) {
 	var _args knowledge.KnowledgeServiceUpdateDocumentArgs
 	_args.Request = request
 	var _result knowledge.KnowledgeServiceUpdateDocumentResult
@@ -410,7 +660,17 @@ func (p *kClient) UpdateDocument(ctx context.Context, request *knowledge.UpdateD
 	return _result.GetSuccess(), nil
 }
 
-func (p *kClient) DeleteDocument(ctx context.Context, request *knowledge.DocumentIDRequest) (r *knowledge.Document, err error) {
+func (p *kClient) SetPublication(ctx context.Context, request *knowledge.SetPublicationRequest) (r *knowledge.Document, err error) {
+	var _args knowledge.KnowledgeServiceSetPublicationArgs
+	_args.Request = request
+	var _result knowledge.KnowledgeServiceSetPublicationResult
+	if err = p.c.Call(ctx, "SetPublication", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) DeleteDocument(ctx context.Context, request *knowledge.DeleteDocumentRequest) (r *knowledge.Document, err error) {
 	var _args knowledge.KnowledgeServiceDeleteDocumentArgs
 	_args.Request = request
 	var _result knowledge.KnowledgeServiceDeleteDocumentResult
@@ -420,21 +680,111 @@ func (p *kClient) DeleteDocument(ctx context.Context, request *knowledge.Documen
 	return _result.GetSuccess(), nil
 }
 
-func (p *kClient) SetDocumentStatus(ctx context.Context, request *knowledge.SetDocumentStatusRequest) (r *knowledge.Document, err error) {
-	var _args knowledge.KnowledgeServiceSetDocumentStatusArgs
+func (p *kClient) RestoreDeletedDocument(ctx context.Context, request *knowledge.DocumentIDRequest) (r *knowledge.Document, err error) {
+	var _args knowledge.KnowledgeServiceRestoreDeletedDocumentArgs
 	_args.Request = request
-	var _result knowledge.KnowledgeServiceSetDocumentStatusResult
-	if err = p.c.Call(ctx, "SetDocumentStatus", &_args, &_result); err != nil {
+	var _result knowledge.KnowledgeServiceRestoreDeletedDocumentResult
+	if err = p.c.Call(ctx, "RestoreDeletedDocument", &_args, &_result); err != nil {
 		return
 	}
 	return _result.GetSuccess(), nil
 }
 
-func (p *kClient) ApplyDocumentOperation(ctx context.Context, request *knowledge.ApplyDocumentOperationRequest) (r *knowledge.DocumentOperationAck, err error) {
-	var _args knowledge.KnowledgeServiceApplyDocumentOperationArgs
+func (p *kClient) ListDeletedDocuments(ctx context.Context, request *knowledge.ListDocumentsRequest) (r *knowledge.DocumentPage, err error) {
+	var _args knowledge.KnowledgeServiceListDeletedDocumentsArgs
 	_args.Request = request
-	var _result knowledge.KnowledgeServiceApplyDocumentOperationResult
-	if err = p.c.Call(ctx, "ApplyDocumentOperation", &_args, &_result); err != nil {
+	var _result knowledge.KnowledgeServiceListDeletedDocumentsResult
+	if err = p.c.Call(ctx, "ListDeletedDocuments", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) ListMembers(ctx context.Context, request *knowledge.DocumentIDRequest) (r *knowledge.MemberList, err error) {
+	var _args knowledge.KnowledgeServiceListMembersArgs
+	_args.Request = request
+	var _result knowledge.KnowledgeServiceListMembersResult
+	if err = p.c.Call(ctx, "ListMembers", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) AddMember(ctx context.Context, request *knowledge.AddMemberRequest) (r *knowledge.Member, err error) {
+	var _args knowledge.KnowledgeServiceAddMemberArgs
+	_args.Request = request
+	var _result knowledge.KnowledgeServiceAddMemberResult
+	if err = p.c.Call(ctx, "AddMember", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) UpdateMember(ctx context.Context, request *knowledge.UpdateMemberRequest) (r *knowledge.Member, err error) {
+	var _args knowledge.KnowledgeServiceUpdateMemberArgs
+	_args.Request = request
+	var _result knowledge.KnowledgeServiceUpdateMemberResult
+	if err = p.c.Call(ctx, "UpdateMember", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) DeleteMember(ctx context.Context, request *knowledge.DeleteMemberRequest) (err error) {
+	var _args knowledge.KnowledgeServiceDeleteMemberArgs
+	_args.Request = request
+	var _result knowledge.KnowledgeServiceDeleteMemberResult
+	if err = p.c.Call(ctx, "DeleteMember", &_args, &_result); err != nil {
+		return
+	}
+	return nil
+}
+
+func (p *kClient) ListAttachments(ctx context.Context, request *knowledge.DocumentIDRequest) (r *knowledge.AttachmentList, err error) {
+	var _args knowledge.KnowledgeServiceListAttachmentsArgs
+	_args.Request = request
+	var _result knowledge.KnowledgeServiceListAttachmentsResult
+	if err = p.c.Call(ctx, "ListAttachments", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) CreateAttachment(ctx context.Context, request *knowledge.CreateAttachmentRequest) (r *knowledge.AttachmentUpload, err error) {
+	var _args knowledge.KnowledgeServiceCreateAttachmentArgs
+	_args.Request = request
+	var _result knowledge.KnowledgeServiceCreateAttachmentResult
+	if err = p.c.Call(ctx, "CreateAttachment", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) CompleteAttachment(ctx context.Context, request *knowledge.AttachmentIDRequest) (r *knowledge.Attachment, err error) {
+	var _args knowledge.KnowledgeServiceCompleteAttachmentArgs
+	_args.Request = request
+	var _result knowledge.KnowledgeServiceCompleteAttachmentResult
+	if err = p.c.Call(ctx, "CompleteAttachment", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) DeleteAttachment(ctx context.Context, request *knowledge.AttachmentIDRequest) (err error) {
+	var _args knowledge.KnowledgeServiceDeleteAttachmentArgs
+	_args.Request = request
+	var _result knowledge.KnowledgeServiceDeleteAttachmentResult
+	if err = p.c.Call(ctx, "DeleteAttachment", &_args, &_result); err != nil {
+		return
+	}
+	return nil
+}
+
+func (p *kClient) GetAttachmentContent(ctx context.Context, request *knowledge.AttachmentContentRequest) (r *knowledge.AttachmentContent, err error) {
+	var _args knowledge.KnowledgeServiceGetAttachmentContentArgs
+	_args.Request = request
+	var _result knowledge.KnowledgeServiceGetAttachmentContentResult
+	if err = p.c.Call(ctx, "GetAttachmentContent", &_args, &_result); err != nil {
 		return
 	}
 	return _result.GetSuccess(), nil

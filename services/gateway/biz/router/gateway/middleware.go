@@ -27,18 +27,12 @@ func _listpublisheddocumentsMw() []app.HandlerFunc {
 	return nil
 }
 
-func _authMw() []app.HandlerFunc {
+func _loginMw() []app.HandlerFunc {
 	return []app.HandlerFunc{gatewaymiddleware.AuthRateLimit()}
 }
 
-func _loginMw() []app.HandlerFunc {
-	// your code...
-	return nil
-}
-
 func _registerMw() []app.HandlerFunc {
-	// your code...
-	return nil
+	return []app.HandlerFunc{gatewaymiddleware.AuthRateLimit()}
 }
 
 func _documentsMw() []app.HandlerFunc {
@@ -52,8 +46,7 @@ func _getpublisheddocumentMw() []app.HandlerFunc {
 }
 
 func _studioMw() []app.HandlerFunc {
-	// your code...
-	return nil
+	return []app.HandlerFunc{gatewaymiddleware.RequireAuthenticated()}
 }
 
 func _listdocumentsMw() []app.HandlerFunc {
@@ -91,16 +84,6 @@ func _document_idMw() []app.HandlerFunc {
 	return nil
 }
 
-func _applydocumentoperationMw() []app.HandlerFunc {
-	// your code...
-	return nil
-}
-
-func _setdocumentstatusMw() []app.HandlerFunc {
-	// your code...
-	return nil
-}
-
 func _usersMw() []app.HandlerFunc {
 	// your code...
 	return nil
@@ -121,6 +104,136 @@ func _liveMw() []app.HandlerFunc {
 }
 
 func _readyMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _attachmentsMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _attachment_idMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _getattachmentcontentMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _listdeleteddocumentsMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _listattachmentsMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _createattachmentMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _listmembersMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _addmemberMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _unpublishdocumentMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _publishdocumentMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _listversionsMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _createversionMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _attachments0Mw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _deleteattachmentMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _attachment_id0Mw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _completeattachmentMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _membersMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _deletememberMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _updatememberMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _versionsMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _getversionMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _version_idMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _restoreversionMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _trashMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _document_id0Mw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _restoredeleteddocumentMw() []app.HandlerFunc {
 	// your code...
 	return nil
 }

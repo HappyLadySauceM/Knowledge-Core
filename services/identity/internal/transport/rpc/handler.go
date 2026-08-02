@@ -32,6 +32,7 @@ type AuthenticateService interface {
 
 type GetUserService interface {
 	GetUser(context.Context, int64) (*domain.User, error)
+	ResolveUser(context.Context, string) (*domain.User, error)
 }
 
 type TokenVerifier interface {
@@ -171,35 +172,61 @@ func (h *Handler) Authenticate(ctx context.Context, request *identityv1.Authenti
 		return nil, h.transportError(ctx, "authenticate_failed", errors.New("identity authentication returned an incomplete result"))
 	}
 	return &identityv1.Authentication{
-		User:          toTransportUser(authentication.User),
-		AccessToken:   authentication.AccessToken.Value,
-		ExpiresAtUnix: authentication.AccessToken.ExpiresAt.UTC().Unix(),
+		User:        toTransportUser(authentication.User),
+		AccessToken: authentication.AccessToken.Value,
+		ExpiresAt:   authentication.AccessToken.ExpiresAt.UTC().Format(time.RFC3339Nano),
 	}, nil
 }
 
-func (h *Handler) GetUser(ctx context.Context, request *identityv1.GetUserRequest) (*identityv1.User, error) {
+func (h *Handler) GetCurrentUser(ctx context.Context, request *identityv1.CurrentUserRequest) (*identityv1.User, error) {
 	ctx = metadata.EnsureRequestID(ctx)
-	if request == nil || request.UserId <= 0 {
+	if request == nil {
 		return nil, apperror.ToKitexBizStatus(ctx, identityerrors.InvalidInput.New())
 	}
+	principal, user, err := h.authenticateRequest(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if user.ID != principal.UserID {
+		return nil, apperror.ToKitexBizStatus(ctx, identityerrors.Unauthenticated.New())
+	}
+	return toTransportUser(user), nil
+}
+
+func (h *Handler) ResolveUser(ctx context.Context, request *identityv1.ResolveUserRequest) (*identityv1.PublicUser, error) {
+	ctx = metadata.EnsureRequestID(ctx)
+	if request == nil {
+		return nil, apperror.ToKitexBizStatus(ctx, identityerrors.InvalidInput.New())
+	}
+	if _, _, err := h.authenticateRequest(ctx); err != nil {
+		return nil, err
+	}
+	user, err := h.users.ResolveUser(ctx, request.Username)
+	if err != nil {
+		return nil, h.transportError(ctx, "resolve_user_failed", err)
+	}
+	if user == nil || user.Status != domain.StatusActive {
+		return nil, apperror.ToKitexBizStatus(ctx, identityerrors.UserNotFound.New())
+	}
+	return &identityv1.PublicUser{Id: user.ID, Username: user.Username, Avatar: user.Avatar}, nil
+}
+
+func (h *Handler) authenticateRequest(ctx context.Context) (coreauth.Principal, *domain.User, error) {
 	principal, err := h.verifier.Verify(coreauth.AccessToken(ctx))
 	if err != nil {
-		return nil, apperror.ToKitexBizStatus(ctx, identityerrors.Unauthenticated.Wrap(err))
+		return coreauth.Principal{}, nil, apperror.ToKitexBizStatus(ctx, identityerrors.Unauthenticated.Wrap(err))
 	}
-	if principal.UserID != request.UserId {
-		return nil, apperror.ToKitexBizStatus(ctx, identityerrors.Forbidden.New())
-	}
-	user, err := h.users.GetUser(ctx, request.UserId)
+	user, err := h.users.GetUser(ctx, principal.UserID)
 	if err != nil {
 		if apperror.KindOf(err) == apperror.KindNotFound {
 			err = identityerrors.Unauthenticated.Wrap(err)
 		}
-		return nil, h.transportError(ctx, "get_user_failed", err)
+		return coreauth.Principal{}, nil, h.transportError(ctx, "get_current_user_failed", err)
 	}
 	if user == nil || user.Status != domain.StatusActive || user.TokenVersion != principal.TokenVersion {
-		return nil, apperror.ToKitexBizStatus(ctx, identityerrors.Unauthenticated.New())
+		return coreauth.Principal{}, nil, apperror.ToKitexBizStatus(ctx, identityerrors.Unauthenticated.New())
 	}
-	return toTransportUser(user), nil
+	return principal, user, nil
 }
 
 func (h *Handler) transportError(ctx context.Context, event string, err error) error {
@@ -237,16 +264,16 @@ func toTransportUser(user *domain.User) *identityv1.User {
 		return nil
 	}
 	return &identityv1.User{
-		Id:            user.ID,
-		Username:      user.Username,
-		Email:         user.Email,
-		Role:          user.Role,
-		Status:        user.Status,
-		TokenVersion:  user.TokenVersion,
-		Avatar:        user.Avatar,
-		Bio:           user.Bio,
-		CreatedAtUnix: user.CreatedAt.UTC().Unix(),
-		UpdatedAtUnix: user.UpdatedAt.UTC().Unix(),
+		Id:           user.ID,
+		Username:     user.Username,
+		Email:        user.Email,
+		Role:         user.Role,
+		Status:       user.Status,
+		TokenVersion: user.TokenVersion,
+		Avatar:       user.Avatar,
+		Bio:          user.Bio,
+		CreatedAt:    user.CreatedAt.UTC().Format(time.RFC3339Nano),
+		UpdatedAt:    user.UpdatedAt.UTC().Format(time.RFC3339Nano),
 	}
 }
 

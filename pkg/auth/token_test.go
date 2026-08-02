@@ -36,7 +36,7 @@ func TestIssuerAndVerifierRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Verify() error = %v", err)
 	}
-	if principal != (Principal{UserID: 42, Role: "user", TokenVersion: 3}) {
+	if principal != (Principal{UserID: 42, Role: "user", TokenVersion: 3, ExpiresAt: issued.ExpiresAt}) {
 		t.Fatalf("principal = %#v", principal)
 	}
 

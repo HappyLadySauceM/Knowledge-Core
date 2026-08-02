@@ -22,19 +22,24 @@ func Register(r *server.Hertz) {
 		{
 			_v1 := _api.Group("/v1", _v1Mw()...)
 			_v1.GET("/documents", append(_listpublisheddocumentsMw(), gateway.ListPublishedDocuments)...)
+			_v1.POST("/sessions", append(_loginMw(), gateway.Login)...)
+			_v1.POST("/users", append(_registerMw(), gateway.Register)...)
 			{
-				_auth := _v1.Group("/auth", _authMw()...)
-				_auth.POST("/login", append(_loginMw(), gateway.Login)...)
-				_auth.POST("/register", append(_registerMw(), gateway.Register)...)
+				_attachments := _v1.Group("/attachments", _attachmentsMw()...)
+				{
+					_attachment_id := _attachments.Group("/:attachment_id", _attachment_idMw()...)
+					_attachment_id.GET("/content", append(_getattachmentcontentMw(), gateway.GetAttachmentContent)...)
+				}
 			}
 			{
 				_documents := _v1.Group("/documents", _documentsMw()...)
-				_documents.GET("/:document_id", append(_getpublisheddocumentMw(), gateway.GetPublishedDocument)...)
+				_documents.GET("/:slug", append(_getpublisheddocumentMw(), gateway.GetPublishedDocument)...)
 			}
 			{
 				_studio := _v1.Group("/studio", _studioMw()...)
 				_studio.GET("/documents", append(_listdocumentsMw(), gateway.ListDocuments)...)
 				_studio.POST("/documents", append(_createdocumentMw(), gateway.CreateDocument)...)
+				_studio.GET("/trash", append(_listdeleteddocumentsMw(), gateway.ListDeletedDocuments)...)
 				{
 					_documents0 := _studio.Group("/documents", _documents0Mw()...)
 					_documents0.DELETE("/:document_id", append(_deletedocumentMw(), gateway.DeleteDocument)...)
@@ -42,8 +47,42 @@ func Register(r *server.Hertz) {
 					_documents0.PATCH("/:document_id", append(_updatedocumentMw(), gateway.UpdateDocument)...)
 					{
 						_document_id := _documents0.Group("/:document_id", _document_idMw()...)
-						_document_id.POST("/ops", append(_applydocumentoperationMw(), gateway.ApplyDocumentOperation)...)
-						_document_id.PATCH("/status", append(_setdocumentstatusMw(), gateway.SetDocumentStatus)...)
+						_document_id.GET("/attachments", append(_listattachmentsMw(), gateway.ListAttachments)...)
+						_document_id.POST("/attachments", append(_createattachmentMw(), gateway.CreateAttachment)...)
+						_document_id.GET("/members", append(_listmembersMw(), gateway.ListMembers)...)
+						_document_id.POST("/members", append(_addmemberMw(), gateway.AddMember)...)
+						_document_id.DELETE("/publication", append(_unpublishdocumentMw(), gateway.UnpublishDocument)...)
+						_document_id.PUT("/publication", append(_publishdocumentMw(), gateway.PublishDocument)...)
+						_document_id.GET("/versions", append(_listversionsMw(), gateway.ListVersions)...)
+						_document_id.POST("/versions", append(_createversionMw(), gateway.CreateVersion)...)
+						{
+							_attachments0 := _document_id.Group("/attachments", _attachments0Mw()...)
+							_attachments0.DELETE("/:attachment_id", append(_deleteattachmentMw(), gateway.DeleteAttachment)...)
+							{
+								_attachment_id0 := _attachments0.Group("/:attachment_id", _attachment_id0Mw()...)
+								_attachment_id0.POST("/complete", append(_completeattachmentMw(), gateway.CompleteAttachment)...)
+							}
+						}
+						{
+							_members := _document_id.Group("/members", _membersMw()...)
+							_members.DELETE("/:user_id", append(_deletememberMw(), gateway.DeleteMember)...)
+							_members.PATCH("/:user_id", append(_updatememberMw(), gateway.UpdateMember)...)
+						}
+						{
+							_versions := _document_id.Group("/versions", _versionsMw()...)
+							_versions.GET("/:version_id", append(_getversionMw(), gateway.GetVersion)...)
+							{
+								_version_id := _versions.Group("/:version_id", _version_idMw()...)
+								_version_id.POST("/restorations", append(_restoreversionMw(), gateway.RestoreVersion)...)
+							}
+						}
+					}
+				}
+				{
+					_trash := _studio.Group("/trash", _trashMw()...)
+					{
+						_document_id0 := _trash.Group("/:document_id", _document_id0Mw()...)
+						_document_id0.POST("/restore", append(_restoredeleteddocumentMw(), gateway.RestoreDeletedDocument)...)
 					}
 				}
 			}
