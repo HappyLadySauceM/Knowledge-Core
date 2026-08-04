@@ -6,21 +6,31 @@ module="github.com/HappyLadySauce/Knowledge-Core"
 kitex_version="v0.16.2"
 hz_version="v0.9.7"
 thriftgo_version="0.4.5"
+rust_version="1.97.1"
 owned_manifest="scripts/generated-files.txt"
 
 check=false
 include_hertz=false
+generate_go=true
+generate_rust_output=true
 while (( $# > 0 )); do
   case "$1" in
     --check) check=true ;;
     --hertz) include_hertz=true ;;
+    --go-only) generate_rust_output=false ;;
+    --rust-only) generate_go=false ;;
     *)
-      echo "usage: $0 [--check] [--hertz]" >&2
+      echo "usage: $0 [--check] [--hertz] [--go-only|--rust-only]" >&2
       exit 2
       ;;
   esac
   shift
 done
+
+if ! $generate_go && ! $generate_rust_output; then
+  echo "--go-only and --rust-only cannot be combined" >&2
+  exit 2
+fi
 
 tool_version() {
   local command="$1" pattern="$2" output
@@ -51,10 +61,26 @@ owned_files() {
     for relative in \
       services/gateway/biz/model/gateway/gateway.go \
       services/gateway/biz/router/gateway/gateway.go \
-      services/gateway/biz/router/register.go; do
+      services/gateway/biz/router/register.go \
+      services/collaboration/src/generated/mod.rs \
+      services/collaboration/src/generated/volo_gen.rs; do
       [[ ! -f "$root/$relative" ]] || printf '%s\n' "$relative"
     done
   } | LC_ALL=C sort -u
+}
+
+generate_rust() {
+  local root="$1" actual cargo_target rust_workspace
+  rust_workspace="$root/services/collaboration"
+  cd "$rust_workspace"
+  actual="$(rustc --version)"
+  if [[ "$actual" != "rustc $rust_version "* ]]; then
+    echo "rustc version does not match required $rust_version: $actual" >&2
+    return 1
+  fi
+  cargo_target="${CARGO_TARGET_DIR:-$repository_root/services/collaboration/target/codegen}"
+  CARGO_TARGET_DIR="$cargo_target" cargo run --locked -p knowledge-core-rust-codegen -- --root "$root"
+  rustfmt --edition 2024 src/generated/mod.rs src/generated/volo_gen.rs
 }
 
 validate_manifest() {
@@ -136,8 +162,13 @@ generate_hertz() {
 }
 
 if ! $check; then
-  generate_rpc "$repository_root"
-  generate_hertz "$repository_root"
+  if $generate_go; then
+    generate_rpc "$repository_root"
+    generate_hertz "$repository_root"
+  fi
+  if $generate_rust_output; then
+    generate_rust "$repository_root"
+  fi
   validate_manifest "$repository_root"
   exit 0
 fi
@@ -158,12 +189,24 @@ for file in go.mod go.sum; do
 done
 cp -a "$repository_root/idl" "$temporary_root/idl"
 cp -a "$repository_root/scripts" "$temporary_root/scripts"
+[[ ! -d "$repository_root/kitex_gen" ]] || cp -a "$repository_root/kitex_gen" "$temporary_root/kitex_gen"
+mkdir -p "$temporary_root/services/collaboration"
+for file in Cargo.toml Cargo.lock rust-toolchain.toml; do
+  cp -a "$repository_root/services/collaboration/$file" "$temporary_root/services/collaboration/$file"
+done
+cp -a "$repository_root/services/collaboration/tools" "$temporary_root/services/collaboration/tools"
+cp -a "$repository_root/services/collaboration/src" "$temporary_root/services/collaboration/src"
 mkdir -p "$temporary_root/services/gateway"
 cp -a "$repository_root/services/gateway/biz" "$temporary_root/services/gateway/biz"
 [[ ! -f "$repository_root/.hz" ]] || cp -a "$repository_root/.hz" "$temporary_root/.hz"
 
-generate_rpc "$temporary_root"
-generate_hertz "$temporary_root"
+if $generate_go; then
+  generate_rpc "$temporary_root"
+  generate_hertz "$temporary_root"
+fi
+if $generate_rust_output; then
+  generate_rust "$temporary_root"
+fi
 validate_manifest "$temporary_root"
 
 expected_snapshot="$(mktemp)"

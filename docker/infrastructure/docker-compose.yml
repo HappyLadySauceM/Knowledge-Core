@@ -123,7 +123,6 @@ services:
       KNOWLEDGE_OBJECT_STORAGE_ACCESS_KEY: ${KC_MINIO_ACCESS_KEY:?KC_MINIO_ACCESS_KEY is required}
       KNOWLEDGE_OBJECT_STORAGE_SECRET_KEY: ${KC_MINIO_SECRET_KEY:?KC_MINIO_SECRET_KEY is required}
       KNOWLEDGE_SCANNER_ADDRESS: clamav:3310
-      KNOWLEDGE_COLLABORATION_BASE_URL: http://collaboration:8092
     depends_on:
       postgres:
         condition: service_healthy
@@ -139,7 +138,6 @@ services:
         condition: service_started
     ports:
       - "8083:8083"
-      - "8090:8090"
       - "8882:8882"
     restart: unless-stopped
 
@@ -150,16 +148,20 @@ services:
     container_name: knowledge-core-collaboration
     environment:
       COLLABORATION_ENVIRONMENT: development
-      COLLABORATION_PUBLIC_HOST: 0.0.0.0
-      COLLABORATION_PUBLIC_PORT: 8091
-      COLLABORATION_PUBLIC_WEBSOCKET_URL: ws://localhost:8091/collaboration
+      COLLABORATION_INSTANCE_ID: collaboration-compose
+      COLLABORATION_PUBLIC_ADDRESS: 0.0.0.0:8091
       COLLABORATION_ALLOWED_ORIGINS: ${KC_ALLOWED_ORIGIN:-http://localhost:3000}
-      COLLABORATION_INTERNAL_HOST: 0.0.0.0
-      COLLABORATION_INTERNAL_PORT: 8092
+      COLLABORATION_RPC_ADDRESS: 0.0.0.0:8883
+      COLLABORATION_RPC_ADVERTISED_ADDRESS: collaboration:8883
+      COLLABORATION_ADMIN_ADDRESS: 0.0.0.0:8084
       COLLABORATION_POSTGRES_URL: ${KC_COLLABORATION_POSTGRES_URL:?KC_COLLABORATION_POSTGRES_URL is required}
       COLLABORATION_REDIS_URL: redis://redis:6379/1
       COLLABORATION_NATS_SERVERS: nats://nats:4222
-      COLLABORATION_KNOWLEDGE_BASE_URL: http://knowledge:8090
+      COLLABORATION_NATS_STREAM: KNOWLEDGE_CORE_EVENTS
+      COLLABORATION_NATS_PERMISSION_STREAM: KNOWLEDGE_CORE_PERMISSIONS
+      COLLABORATION_ETCD_ENDPOINTS: http://etcd:2379
+      COLLABORATION_ETCD_PREFIX: /knowledge-core/development/registry
+      COLLABORATION_KNOWLEDGE_SERVICE_NAME: knowledge-core.knowledge
     depends_on:
       postgres:
         condition: service_healthy
@@ -167,11 +169,14 @@ services:
         condition: service_healthy
       nats:
         condition: service_healthy
+      etcd:
+        condition: service_healthy
       knowledge:
         condition: service_started
     ports:
       - "8091:8091"
-      - "8092:8092"
+      - "8883:8883"
+      - "8084:8084"
     restart: unless-stopped
 
   gateway:
@@ -183,9 +188,8 @@ services:
       GATEWAY_REDIS_ADDRESS: redis:6379
       GATEWAY_ETCD_ENDPOINTS: etcd:2379
       GATEWAY_AUTH_PUBLIC_KEY: ${KC_AUTH_PUBLIC_KEY:?KC_AUTH_PUBLIC_KEY is required}
-      GATEWAY_COLLABORATION_BASE_URL: http://collaboration:8092
       GATEWAY_ENDPOINTS_PUBLIC_BASE_URL: http://localhost:8080
-      GATEWAY_ENDPOINTS_COLLABORATION_WEBSOCKET_URL: ws://localhost:8091/collaboration
+      GATEWAY_ENDPOINTS_COLLABORATION_WEBSOCKET_BASE_URL: ws://localhost:8091
       GATEWAY_CORS_ALLOWED_ORIGINS: ${KC_ALLOWED_ORIGIN:-http://localhost:3000}
     depends_on:
       redis:

@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	coreapp "github.com/HappyLadySauce/Knowledge-Core/pkg/app"
+	"github.com/HappyLadySauce/Knowledge-Core/pkg/configcenter"
 	"github.com/bytedance/sonic"
 	mapstructure "github.com/go-viper/mapstructure/v2"
 	"github.com/spf13/cobra"
@@ -29,6 +31,7 @@ type Provider struct {
 	defaults   Config
 	configFile string
 	flagsAdded bool
+	remote     *configcenter.Manager
 }
 
 func NewProvider() *Provider {
@@ -85,10 +88,41 @@ func (p *Provider) Load(ctx context.Context, command *cobra.Command) (Config, er
 	if err := v.UnmarshalExact(&loaded, viper.DecodeHook(configurationDecodeHook())); err != nil {
 		return Config{}, fmt.Errorf("decode identity configuration: %w", err)
 	}
+	remoteBootstrap, err := configcenter.BootstrapFromEnvironment(p.defaults.App.Name)
+	if err != nil {
+		return Config{}, fmt.Errorf("load identity dynamic configuration bootstrap: %w", err)
+	}
+	remote := configcenter.NewManager(remoteBootstrap)
+	document, err := remote.Load(ctx)
+	if err != nil {
+		return Config{}, fmt.Errorf("load identity dynamic configuration: %w", err)
+	}
+	if document != nil {
+		loaded.Log.Level = document.Log.Level
+	}
 	if err := loaded.Validate(); err != nil {
 		return Config{}, err
 	}
+	p.remote = remote
 	return loaded, nil
+}
+
+func (p *Provider) BindRuntime(ctx context.Context, runtime *coreapp.Runtime) error {
+	if runtime == nil {
+		return fmt.Errorf("bind identity runtime configuration: runtime is required")
+	}
+	if p.remote == nil || !p.remote.Enabled() {
+		return nil
+	}
+	return p.remote.Start(
+		ctx,
+		runtime.Logger,
+		runtime.Metrics.Registerer(),
+		func(document configcenter.DynamicDocument) error {
+			return runtime.SetLogLevel(document.Log.Level)
+		},
+		runtime.AddCleanup,
+	)
 }
 
 func readYAMLConfig(v *viper.Viper, path string) error {

@@ -24,7 +24,6 @@ import (
 	knowledgerepository "github.com/HappyLadySauce/Knowledge-Core/services/knowledge/internal/repository"
 	"github.com/HappyLadySauce/Knowledge-Core/services/knowledge/internal/scanner"
 	"github.com/HappyLadySauce/Knowledge-Core/services/knowledge/internal/storage"
-	internalhttp "github.com/HappyLadySauce/Knowledge-Core/services/knowledge/internal/transport/internalhttp"
 	knowledgerpc "github.com/HappyLadySauce/Knowledge-Core/services/knowledge/internal/transport/rpc"
 	"github.com/HappyLadySauce/Knowledge-Core/services/knowledge/internal/worker"
 	"gorm.io/gorm"
@@ -35,7 +34,7 @@ type ServiceContext struct {
 	Database         *gorm.DB
 	EtcdRegistry     *etcdresource.Resources
 	EtcdResolver     *etcdresource.ResolverResources
-	NATS             *natsresource.RealtimeBus
+	NATS             *natsresource.DurableBroker
 	Identity         identityservice.Client
 	Directory        *knowledgeclient.Directory
 	Collaboration    *knowledgeclient.Collaboration
@@ -48,8 +47,6 @@ type ServiceContext struct {
 	CollaborationAPI *knowledgelogic.CollaborationLogic
 	RPCHandler       *knowledgerpc.Handler
 	RPCServer        *knowledgerpc.RPCServer
-	InternalHandler  *internalhttp.Handler
-	InternalServer   *internalhttp.Server
 	Workers          *worker.Worker
 	Admin            *hertztransport.AdminServer
 }
@@ -95,7 +92,7 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 		return nil, errors.Join(err, resolver.Close())
 	}
 
-	events, err := natsresource.OpenRealtime(ctx, *cfg.NATS, runtime.Logger)
+	events, err := natsresource.OpenDurable(ctx, *cfg.NATS, runtime.Logger)
 	if err != nil {
 		return nil, err
 	}
@@ -111,12 +108,11 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 	if err != nil {
 		return nil, err
 	}
-	collaboration, err := knowledgeclient.NewCollaboration(*cfg.Collaboration)
+	collaboration, err := knowledgeclient.NewCollaboration(
+		*cfg.CollaborationRPC, resolver.Resolver, runtime.Trace, runtime.Metrics,
+	)
 	if err != nil {
 		return nil, err
-	}
-	if err := runtime.AddCleanup("collaboration-http", func(stdcontext.Context) error { return collaboration.Close() }); err != nil {
-		return nil, errors.Join(err, collaboration.Close())
 	}
 
 	objects, err := storage.Open(ctx, *cfg.ObjectStorage)
@@ -155,11 +151,9 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 	if err := addReadinessChecks(runtime.Health, cfg, db, registry, resolver, events, identity, objects, malwareScanner, collaboration); err != nil {
 		return nil, err
 	}
-	rpcHandler, err := knowledgerpc.NewHandler(documents, members, attachments, verifier, runtime.Health, runtime.Logger)
-	if err != nil {
-		return nil, err
-	}
-	internalHandler, err := internalhttp.NewHandler(collaborationLogic, verifier)
+	rpcHandler, err := knowledgerpc.NewHandler(
+		documents, members, attachments, collaborationLogic, verifier, runtime.Health, runtime.Logger,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -193,20 +187,6 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 		return nil, errors.Join(err, workers.Shutdown(ctx))
 	}
 
-	internalTLS, err := cfg.InternalHTTP.TLS.ServerTLSConfig()
-	if err != nil {
-		return nil, fmt.Errorf("load knowledge internal HTTP TLS configuration: %w", err)
-	}
-	internalServer, err := internalhttp.NewServer(
-		ctx, *cfg.InternalHTTP, internalTLS, internalHandler, runtime.Trace, runtime.Metrics, runtime.Logger,
-	)
-	if err != nil {
-		return nil, err
-	}
-	if err := runtime.AddComponent(internalServer); err != nil {
-		return nil, errors.Join(err, internalServer.Shutdown(ctx))
-	}
-
 	rpcTLS, err := cfg.RPC.TLS.ServerTLSConfig()
 	if err != nil {
 		return nil, fmt.Errorf("load knowledge RPC TLS configuration: %w", err)
@@ -229,8 +209,8 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 		Identity: identity, Directory: directory, Collaboration: collaboration, Objects: objects,
 		Scanner: malwareScanner, Store: store, Documents: documents, Members: members,
 		Attachments: attachments, CollaborationAPI: collaborationLogic, RPCHandler: rpcHandler,
-		RPCServer: rpcServer, InternalHandler: internalHandler, InternalServer: internalServer,
-		Workers: workers, Admin: admin,
+		RPCServer: rpcServer,
+		Workers:   workers, Admin: admin,
 	}, nil
 }
 
@@ -240,7 +220,7 @@ func addReadinessChecks(
 	db *gorm.DB,
 	etcdRegistry *etcdresource.Resources,
 	etcdResolver *etcdresource.ResolverResources,
-	events *natsresource.RealtimeBus,
+	events *natsresource.DurableBroker,
 	identity identityservice.Client,
 	objects *storage.S3,
 	malwareScanner *scanner.ClamAV,
@@ -265,7 +245,7 @@ func addReadinessChecks(
 		})),
 		registry.AddReadiness("object-storage", withTimeout(cfg.ObjectStorage.DownloadTTL, objects.Ping)),
 		registry.AddReadiness("clamav", withTimeout(cfg.Scanner.DialTimeout+cfg.Scanner.ScanTimeout, malwareScanner.Ping)),
-		registry.AddReadiness("collaboration", withTimeout(cfg.Collaboration.RequestTimeout, collaboration.Ping)),
+		registry.AddReadiness("collaboration", withTimeout(cfg.CollaborationRPC.RequestTimeout, collaboration.Ping)),
 	)
 }
 

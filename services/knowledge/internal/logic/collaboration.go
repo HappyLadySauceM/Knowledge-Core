@@ -8,6 +8,7 @@ import (
 
 	jsoncodec "github.com/HappyLadySauce/Knowledge-Core/pkg/codec/json"
 	"github.com/HappyLadySauce/Knowledge-Core/services/knowledge/internal/domain"
+	knowledgeerrors "github.com/HappyLadySauce/Knowledge-Core/services/knowledge/internal/errors"
 	"github.com/HappyLadySauce/Knowledge-Core/services/knowledge/internal/repository"
 )
 
@@ -38,22 +39,21 @@ func (l *CollaborationLogic) Authorize(ctx context.Context, documentID string, a
 	if err := domain.ValidateID("document_id", documentID); err != nil {
 		return nil, mapError(err)
 	}
-	var user *domain.PublicUser
-	if actorID > 0 {
-		resolved, err := l.directory.CurrentUser(ctx)
-		if err != nil {
-			return nil, mapError(err)
-		}
-		if resolved.ID != actorID {
-			return nil, mapError(repository.ErrForbidden)
-		}
-		user = &resolved
+	if actorID <= 0 {
+		return nil, knowledgeerrors.Unauthenticated.New()
+	}
+	resolved, err := l.directory.CurrentUser(ctx)
+	if err != nil {
+		return nil, mapError(err)
+	}
+	if resolved.ID != actorID {
+		return nil, mapError(repository.ErrForbidden)
 	}
 	document, err := l.repository.AuthorizeCollaboration(ctx, documentID, actorID)
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return &CollaborationAuthorization{Document: document, User: user}, nil
+	return &CollaborationAuthorization{Document: document, User: &resolved}, nil
 }
 
 func (l *CollaborationLogic) Project(

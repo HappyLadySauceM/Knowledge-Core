@@ -3,6 +3,7 @@ package ratelimit
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -22,9 +23,20 @@ func TestNormalizeIP(t *testing.T) {
 	}
 }
 
+func TestNormalizeSubjectAcceptsOnlyCanonicalPositiveUserID(t *testing.T) {
+	if got, err := normalizeSubject("user:42"); err != nil || got != "user:42" {
+		t.Fatalf("normalizeSubject(user) = %q, %v", got, err)
+	}
+	for _, value := range []string{"user:0", "user:+42", "user:042", "user:not-a-number"} {
+		if _, err := normalizeSubject(value); err == nil {
+			t.Fatalf("normalizeSubject(%q) succeeded", value)
+		}
+	}
+}
+
 func TestConsumeUsesFixedWindowBucket(t *testing.T) {
 	client := &scripterStub{counts: make(map[string]int64)}
-	limiter := &RedisLimiter{client: client}
+	limiter := &RedisLimiter{client: client, keyPrefix: "knowledge-core:test:gateway:rate-limit"}
 	now := time.Unix(120, 0).UTC()
 	allowed, retryAfter, err := limiter.Consume(context.Background(), "auth", "127.0.0.1", now, time.Minute, 2)
 	if err != nil || !allowed || retryAfter != time.Minute {
@@ -42,6 +54,11 @@ func TestConsumeUsesFixedWindowBucket(t *testing.T) {
 	allowed, _, err = limiter.Consume(context.Background(), "auth", "127.0.0.1", now.Add(time.Minute), time.Minute, 2)
 	if err != nil || !allowed || len(client.counts) != 2 {
 		t.Fatalf("next-window Consume() = %v, %v, keys = %#v", allowed, err, client.counts)
+	}
+	for key := range client.counts {
+		if !strings.HasPrefix(key, "knowledge-core:test:gateway:rate-limit:") {
+			t.Fatalf("rate-limit key %q is outside the configured environment prefix", key)
+		}
 	}
 }
 

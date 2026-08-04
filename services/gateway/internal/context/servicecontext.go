@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/collaboration/collaborationservice"
 	commonv1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/common"
 	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/identity/identityservice"
 	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/knowledge/knowledgeservice"
@@ -30,7 +31,7 @@ type ServiceContext struct {
 	Etcd          *etcdresource.ResolverResources
 	Identity      identityservice.Client
 	Knowledge     knowledgeservice.Client
-	Collaboration *gatewayclient.Collaboration
+	Collaboration collaborationservice.Client
 	Verifier      *coreauth.Verifier
 	Limiter       *ratelimit.RedisLimiter
 	Middleware    *gatewaymiddleware.Dependencies
@@ -70,18 +71,17 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 	if err != nil {
 		return nil, err
 	}
-	collaboration, err := gatewayclient.NewCollaboration(*cfg.Collaboration)
+	collaboration, err := gatewayclient.NewCollaboration(
+		*cfg.CollaborationRPC, resolver.Resolver, runtime.Trace, runtime.Metrics,
+	)
 	if err != nil {
 		return nil, err
-	}
-	if err := runtime.AddCleanup("collaboration-http-client", func(stdcontext.Context) error { return collaboration.Close() }); err != nil {
-		return nil, errors.Join(err, collaboration.Close())
 	}
 	verifier, err := coreauth.NewVerifier(cfg.Auth.PublicKey)
 	if err != nil {
 		return nil, fmt.Errorf("create gateway access-token verifier: %w", err)
 	}
-	limiter, err := ratelimit.NewRedisLimiter(cache.Client)
+	limiter, err := ratelimit.NewRedisLimiter(cache.Client, cfg.RateLimit.KeyPrefix)
 	if err != nil {
 		return nil, err
 	}
@@ -152,7 +152,7 @@ func addReadinessChecks(
 	etcd *etcdresource.ResolverResources,
 	identity identityservice.Client,
 	knowledge knowledgeservice.Client,
-	collaboration *gatewayclient.Collaboration,
+	collaboration collaborationservice.Client,
 ) error {
 	return errors.Join(
 		registry.AddReadiness("redis", withTimeout(cfg.Redis.ReadTimeout, cache.Ping)),
@@ -177,7 +177,16 @@ func addReadinessChecks(
 			}
 			return nil
 		})),
-		registry.AddReadiness("collaboration", withTimeout(cfg.Collaboration.RequestTimeout, collaboration.Ping)),
+		registry.AddReadiness("collaboration", withTimeout(cfg.CollaborationRPC.RequestTimeout, func(ctx stdcontext.Context) error {
+			response, err := collaboration.Ping(ctx, &commonv1.PingRequest{})
+			if err != nil {
+				return fmt.Errorf("ping Collaboration: %w", err)
+			}
+			if response == nil || response.Service != "collaboration" || response.Status != "ready" {
+				return errors.New("ping Collaboration: service is not ready")
+			}
+			return nil
+		})),
 	)
 }
 

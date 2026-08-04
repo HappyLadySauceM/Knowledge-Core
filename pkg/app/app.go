@@ -26,6 +26,12 @@ type ConfigLoader[C any] interface {
 	Load(context.Context, *cobra.Command) (C, error)
 }
 
+// RuntimeBinder attaches configuration sources that need process-owned
+// lifecycle, logging, metrics, or cleanup after the runtime exists.
+type RuntimeBinder interface {
+	BindRuntime(context.Context, *Runtime) error
+}
+
 // RuntimeOptions contains the process-wide settings needed before service
 // dependencies can be constructed.
 type RuntimeOptions struct {
@@ -203,9 +209,14 @@ func execute[C any](ctx context.Context, cfg C, spec Spec[C]) (runErr error) {
 		return errors.Join(fmt.Errorf("initialize application metrics: %w", err), telemetry.Shutdown(context.Background()))
 	}
 
-	runtime := newRuntime(logger, telemetry, metricsRegistry, opts.ShutdownTimeout)
+	runtime := newRuntime(logger, levelControl, telemetry, metricsRegistry, opts.ShutdownTimeout)
 	if err := runtime.AddCleanup("telemetry", telemetry.Shutdown); err != nil {
 		return errors.Join(err, telemetry.Shutdown(context.Background()))
+	}
+	if binder, ok := spec.Config.(RuntimeBinder); ok {
+		if err := binder.BindRuntime(ctx, runtime); err != nil {
+			return fmt.Errorf("bind %s runtime configuration: %w", spec.Name, err)
+		}
 	}
 	defer func() {
 		if runtime.closed() {

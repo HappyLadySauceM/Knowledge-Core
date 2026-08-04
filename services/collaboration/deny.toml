@@ -1,0 +1,66 @@
+[graph]
+targets = ["x86_64-unknown-linux-gnu"]
+all-features = true
+
+[advisories]
+ignore = [
+    { id = "RUSTSEC-2024-0436", reason = "Pinned Volo/Pilota depends on paste; the advisory is unmaintained-only and has no patched release." },
+    { id = "RUSTSEC-2025-0134", reason = "Direct PEM parsing uses rustls-pki-types; pinned Volo still transitively retains the unmaintained wrapper with no patched release." },
+    { id = "RUSTSEC-2026-0215", reason = "Pinned Yrs depends on smallstr; the advisory is unmaintained-only and has no patched Yrs release." },
+]
+
+[licenses]
+allow = [
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "BSL-1.0",
+    "CC0-1.0",
+    "CDLA-Permissive-2.0",
+    "ISC",
+    "MIT",
+    "Unicode-3.0",
+    "Unlicense",
+    "Zlib",
+]
+confidence-threshold = 0.8
+
+[licenses.private]
+ignore = false
+
+[bans]
+multiple-versions = "deny"
+wildcards = "deny"
+highlight = "simplest-path"
+workspace-default-features = "warn"
+external-default-features = "allow"
+allow = []
+deny = []
+skip = [
+    { crate = "block-buffer@0.10.4", reason = "Axum, Tungstenite, and part of SQLx still use the digest 0.10 crypto stack." },
+    { crate = "cpufeatures@0.2.17", reason = "The digest 0.10 crypto stack is not compatible with cpufeatures 0.3." },
+    { crate = "crypto-common@0.1.6", reason = "Axum, Tungstenite, and part of SQLx still use the digest 0.10 crypto stack." },
+    { crate = "digest@0.10.7", reason = "Axum, Tungstenite, and part of SQLx have not converged on digest 0.11." },
+    { crate = "foldhash@0.1.5", reason = "Pinned Pilota build dependencies and SQLx require incompatible hashbrown generations." },
+    { crate = "getrandom@0.2.17", reason = "Ring retains getrandom 0.2 while the pinned Rustls clients use Ring." },
+    { crate = "getrandom@0.3.4", reason = "Pinned Volo/Pilota dependencies retain the rand 0.9 generation." },
+    { crate = "hashbrown@0.14.5", reason = "Pinned Volo/Pilota and Yrs dependencies have not converged on one hashbrown generation." },
+    { crate = "hashbrown@0.15.5", reason = "Pinned Pilota build dependencies retain the hashbrown 0.15 generation." },
+    { crate = "hashbrown@0.16.1", reason = "SQLx 0.9 retains the hashbrown 0.16 generation." },
+    { crate = "rand@0.9.5", reason = "Pinned Volo/Pilota dependencies retain rand 0.9 while NATS and SQLx use rand 0.10." },
+    { crate = "rand_core@0.6.4", reason = "AES-GCM 0.10 retains the rand_core 0.6 crypto trait generation." },
+    { crate = "rand_core@0.9.5", reason = "Pinned Volo/Pilota dependencies retain the rand 0.9 generation." },
+    { crate = "sha2@0.10.9", reason = "SQLx 0.9 spans the digest 0.10 and digest 0.11 crypto stacks." },
+    { crate = "syn@2.0.119", reason = "Pinned Volo/Pilota and Tonic macros have not all migrated to syn 3." },
+    { crate = "thiserror@1.0.69", reason = "Pinned Protobuf 3 build tooling retains thiserror 1.x." },
+    { crate = "thiserror-impl@1.0.69", reason = "Pinned Protobuf 3 build tooling retains thiserror 1.x." },
+    { crate = "tower-http@0.6.11", reason = "Nacos SDK 0.8 uses Reqwest 0.12, which has not converged on tower-http 0.7." },
+]
+skip-tree = []
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

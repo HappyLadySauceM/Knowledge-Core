@@ -123,8 +123,16 @@ struct DocumentDetailData {
   2: required RichTextDocumentData content (api.body="content")
   3: required string plain_text (api.body="plain_text")
   4: required list<AttachmentData> attachments (api.body="attachments")
-  5: optional string websocket_url (api.body="websocket_url")
-  6: optional string fragment (api.body="fragment")
+}
+
+struct CollaborationSessionData {
+  1: required string websocket_url (api.body="websocket_url")
+  2: required string ticket (api.body="ticket")
+  3: required string subprotocol (api.body="subprotocol")
+  4: required string fragment (api.body="fragment")
+  5: required string access (api.body="access")
+  6: required string ticket_expires_at (api.body="ticket_expires_at")
+  7: required string session_expires_at (api.body="session_expires_at")
 }
 
 struct PageInfoData {
@@ -284,6 +292,7 @@ service GatewayService {
   DocumentPageData ListDocuments(1: ListDocumentsRequest request) (api.get="/api/v1/studio/documents")
   DocumentData CreateDocument(1: CreateDocumentRequest request) (api.post="/api/v1/studio/documents")
   DocumentData GetDocument(1: DocumentIDRequest request) (api.get="/api/v1/studio/documents/:document_id")
+  CollaborationSessionData CreateCollaborationSession(1: DocumentIDRequest request) (api.post="/api/v1/studio/documents/:document_id/collaboration-sessions")
   DocumentData UpdateDocument(1: UpdateDocumentRequest request) (api.patch="/api/v1/studio/documents/:document_id")
   EmptyResponse DeleteDocument(1: DeleteDocumentRequest request) (api.delete="/api/v1/studio/documents/:document_id")
   DocumentData PublishDocument(1: PublicationRequest request) (api.put="/api/v1/studio/documents/:document_id/publication")

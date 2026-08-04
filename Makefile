@@ -2,9 +2,12 @@ GOLANGCI_LINT_VERSION ?= v2.12.2
 GOLANGCI_LINT ?= go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
 GOVULNCHECK_VERSION ?= v1.6.0
 GOVULNCHECK ?= go run golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION)
+CARGO ?= cargo
+CARGO_DENY ?= cargo deny
+RUST_ROOT ?= services/collaboration
 IDL_COMPAT_BASE ?= HEAD^
 
-# Keep the TypeScript service and its dependency tree out of Go discovery.
+# Keep the Node interoperability fixture and its dependency tree out of Go discovery.
 GO_PACKAGES ?= \
 	./pkg/... \
 	./services/gateway/... \
@@ -16,26 +19,31 @@ GO_PACKAGES ?= \
 ifneq ($(strip $(ComSpec)),)
 CODEGEN = powershell -NoProfile -ExecutionPolicy Bypass -File scripts/codegen.ps1
 CODEGEN_CHECK = $(CODEGEN) -Check
+CODEGEN_GO_CHECK = $(CODEGEN) -Check -Scope Go
+CODEGEN_RUST_CHECK = $(CODEGEN) -Check -Scope Rust
 else
 CODEGEN = bash scripts/codegen.sh
 CODEGEN_CHECK = $(CODEGEN) --check
+CODEGEN_GO_CHECK = $(CODEGEN) --check --go-only
+CODEGEN_RUST_CHECK = $(CODEGEN) --check --rust-only
 endif
 
 .DEFAULT_GOAL := help
 
-.PHONY: help fmt fmt-check vet lint line test race build vuln tidy generate generate-check check ci
+.PHONY: help fmt fmt-check vet lint line test race build vuln supply-chain tidy generate generate-check generate-go-check generate-rust-check check go-ci rust-ci ci
 
 help:
 	@echo Knowledge Core development targets:
-	@echo   make fmt             Format all Go packages
-	@echo   make fmt-check       Check formatting without changing files
+	@echo   make fmt             Format all Go and Rust packages
+	@echo   make fmt-check       Check Go and Rust formatting without changing files
 	@echo   make vet             Run go vet
-	@echo   make lint            Run golangci-lint
+	@echo   make lint            Run golangci-lint and Clippy
 	@echo   make line            Alias for make lint
-	@echo   make test            Run all tests without cached results
-	@echo   make race            Run all tests with the race detector
-	@echo   make build           Compile all packages
-	@echo   make vuln            Check reachable Go vulnerabilities
+	@echo   make test            Run all Go and Rust tests without cached Go results
+	@echo   make race            Run all Go tests with the race detector
+	@echo   make build           Compile all Go packages and the release Rust workspace
+	@echo   make vuln            Check reachable Go and Rust vulnerabilities
+	@echo   make supply-chain    Check Rust advisories, bans, licenses, and sources
 	@echo   make tidy            Normalize go.mod and go.sum
 	@echo   make generate        Regenerate Hertz and Kitex code
 	@echo   make generate-check  Regenerate and fail on generated-code drift
@@ -44,29 +52,38 @@ help:
 
 fmt:
 	go fmt $(GO_PACKAGES)
+	cd $(RUST_ROOT) && $(CARGO) fmt --all
 
 fmt-check:
 	$(GOLANGCI_LINT) fmt --diff
+	cd $(RUST_ROOT) && $(CARGO) fmt --all --check
 
 vet:
 	go vet $(GO_PACKAGES)
 
 lint:
 	$(GOLANGCI_LINT) run $(GO_PACKAGES)
+	cd $(RUST_ROOT) && $(CARGO) clippy --workspace --all-targets --all-features --locked -- -D warnings
 
 line: lint
 
 test:
 	go test -count=1 $(GO_PACKAGES)
+	cd $(RUST_ROOT) && $(CARGO) test --workspace --all-targets --all-features --locked
 
 race:
 	go test -race -count=1 $(GO_PACKAGES)
 
 build:
 	go build $(GO_PACKAGES)
+	cd $(RUST_ROOT) && $(CARGO) build --workspace --release --locked
 
 vuln:
 	$(GOVULNCHECK) $(GO_PACKAGES)
+	cd $(RUST_ROOT) && $(CARGO_DENY) check advisories
+
+supply-chain:
+	cd $(RUST_ROOT) && $(CARGO_DENY) check advisories bans licenses sources
 
 tidy:
 	go mod tidy
@@ -77,6 +94,29 @@ generate:
 generate-check:
 	$(CODEGEN_CHECK)
 
-check: fmt-check vet lint test build vuln
+generate-go-check:
+	$(CODEGEN_GO_CHECK)
+
+generate-rust-check:
+	$(CODEGEN_RUST_CHECK)
+
+check: fmt-check vet lint test build vuln supply-chain
+
+go-ci:
+	$(GOLANGCI_LINT) fmt --diff
+	go vet $(GO_PACKAGES)
+	$(GOLANGCI_LINT) run $(GO_PACKAGES)
+	go test -count=1 $(GO_PACKAGES)
+	go build $(GO_PACKAGES)
+	$(GOVULNCHECK) $(GO_PACKAGES)
+	$(CODEGEN_GO_CHECK)
+
+rust-ci:
+	cd $(RUST_ROOT) && $(CARGO) fmt --all --check
+	cd $(RUST_ROOT) && $(CARGO) clippy --workspace --all-targets --all-features --locked -- -D warnings
+	cd $(RUST_ROOT) && $(CARGO) test --workspace --all-targets --all-features --locked
+	cd $(RUST_ROOT) && $(CARGO) build --workspace --release --locked
+	cd $(RUST_ROOT) && $(CARGO_DENY) check advisories bans licenses sources
+	$(CODEGEN_RUST_CHECK)
 
 ci: check generate-check

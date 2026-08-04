@@ -13,6 +13,7 @@ import (
 // Client is designed to provide IDL-compatible methods with call-option parameter for kitex framework.
 type Client interface {
 	Ping(ctx context.Context, request *common.PingRequest, callOptions ...callopt.Option) (r *common.PingResponse, err error)
+	Live(ctx context.Context, request *common.PingRequest, callOptions ...callopt.Option) (r *common.PingResponse, err error)
 	ListPublishedDocuments(ctx context.Context, request *knowledge.ListDocumentsRequest, callOptions ...callopt.Option) (r *knowledge.DocumentPage, err error)
 	GetPublishedDocument(ctx context.Context, request *knowledge.GetPublishedDocumentRequest, callOptions ...callopt.Option) (r *knowledge.DocumentDetail, err error)
 	ListDocuments(ctx context.Context, request *knowledge.ListDocumentsRequest, callOptions ...callopt.Option) (r *knowledge.DocumentPage, err error)
@@ -32,6 +33,8 @@ type Client interface {
 	CompleteAttachment(ctx context.Context, request *knowledge.AttachmentIDRequest, callOptions ...callopt.Option) (r *knowledge.Attachment, err error)
 	DeleteAttachment(ctx context.Context, request *knowledge.AttachmentIDRequest, callOptions ...callopt.Option) (err error)
 	GetAttachmentContent(ctx context.Context, request *knowledge.AttachmentContentRequest, callOptions ...callopt.Option) (r *knowledge.AttachmentContent, err error)
+	AuthorizeCollaboration(ctx context.Context, request *knowledge.AuthorizeCollaborationRequest, callOptions ...callopt.Option) (r *knowledge.CollaborationAuthorization, err error)
+	ProjectCollaboration(ctx context.Context, request *knowledge.ProjectCollaborationRequest, callOptions ...callopt.Option) (err error)
 }
 
 // NewClient creates a client for the service defined in IDL.
@@ -66,6 +69,11 @@ type kKnowledgeServiceClient struct {
 func (p *kKnowledgeServiceClient) Ping(ctx context.Context, request *common.PingRequest, callOptions ...callopt.Option) (r *common.PingResponse, err error) {
 	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
 	return p.kClient.Ping(ctx, request)
+}
+
+func (p *kKnowledgeServiceClient) Live(ctx context.Context, request *common.PingRequest, callOptions ...callopt.Option) (r *common.PingResponse, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.Live(ctx, request)
 }
 
 func (p *kKnowledgeServiceClient) ListPublishedDocuments(ctx context.Context, request *knowledge.ListDocumentsRequest, callOptions ...callopt.Option) (r *knowledge.DocumentPage, err error) {
@@ -161,4 +169,14 @@ func (p *kKnowledgeServiceClient) DeleteAttachment(ctx context.Context, request 
 func (p *kKnowledgeServiceClient) GetAttachmentContent(ctx context.Context, request *knowledge.AttachmentContentRequest, callOptions ...callopt.Option) (r *knowledge.AttachmentContent, err error) {
 	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
 	return p.kClient.GetAttachmentContent(ctx, request)
+}
+
+func (p *kKnowledgeServiceClient) AuthorizeCollaboration(ctx context.Context, request *knowledge.AuthorizeCollaborationRequest, callOptions ...callopt.Option) (r *knowledge.CollaborationAuthorization, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.AuthorizeCollaboration(ctx, request)
+}
+
+func (p *kKnowledgeServiceClient) ProjectCollaboration(ctx context.Context, request *knowledge.ProjectCollaborationRequest, callOptions ...callopt.Option) (err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.ProjectCollaboration(ctx, request)
 }

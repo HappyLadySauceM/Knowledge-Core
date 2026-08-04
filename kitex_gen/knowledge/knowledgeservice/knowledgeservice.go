@@ -21,6 +21,13 @@ var serviceMethods = map[string]kitex.MethodInfo{
 		false,
 		kitex.WithStreamingMode(kitex.StreamingNone),
 	),
+	"Live": kitex.NewMethodInfo(
+		liveHandler,
+		newKnowledgeServiceLiveArgs,
+		newKnowledgeServiceLiveResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
 	"ListPublishedDocuments": kitex.NewMethodInfo(
 		listPublishedDocumentsHandler,
 		newKnowledgeServiceListPublishedDocumentsArgs,
@@ -154,6 +161,20 @@ var serviceMethods = map[string]kitex.MethodInfo{
 		false,
 		kitex.WithStreamingMode(kitex.StreamingNone),
 	),
+	"AuthorizeCollaboration": kitex.NewMethodInfo(
+		authorizeCollaborationHandler,
+		newKnowledgeServiceAuthorizeCollaborationArgs,
+		newKnowledgeServiceAuthorizeCollaborationResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
+	"ProjectCollaboration": kitex.NewMethodInfo(
+		projectCollaborationHandler,
+		newKnowledgeServiceProjectCollaborationArgs,
+		newKnowledgeServiceProjectCollaborationResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
 }
 
 var (
@@ -236,6 +257,24 @@ func newKnowledgeServicePingArgs() interface{} {
 
 func newKnowledgeServicePingResult() interface{} {
 	return knowledge.NewKnowledgeServicePingResult()
+}
+
+func liveHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*knowledge.KnowledgeServiceLiveArgs)
+	realResult := result.(*knowledge.KnowledgeServiceLiveResult)
+	success, err := handler.(knowledge.KnowledgeService).Live(ctx, realArg.Request)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newKnowledgeServiceLiveArgs() interface{} {
+	return knowledge.NewKnowledgeServiceLiveArgs()
+}
+
+func newKnowledgeServiceLiveResult() interface{} {
+	return knowledge.NewKnowledgeServiceLiveResult()
 }
 
 func listPublishedDocumentsHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
@@ -580,6 +619,42 @@ func newKnowledgeServiceGetAttachmentContentResult() interface{} {
 	return knowledge.NewKnowledgeServiceGetAttachmentContentResult()
 }
 
+func authorizeCollaborationHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*knowledge.KnowledgeServiceAuthorizeCollaborationArgs)
+	realResult := result.(*knowledge.KnowledgeServiceAuthorizeCollaborationResult)
+	success, err := handler.(knowledge.KnowledgeService).AuthorizeCollaboration(ctx, realArg.Request)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newKnowledgeServiceAuthorizeCollaborationArgs() interface{} {
+	return knowledge.NewKnowledgeServiceAuthorizeCollaborationArgs()
+}
+
+func newKnowledgeServiceAuthorizeCollaborationResult() interface{} {
+	return knowledge.NewKnowledgeServiceAuthorizeCollaborationResult()
+}
+
+func projectCollaborationHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*knowledge.KnowledgeServiceProjectCollaborationArgs)
+
+	err := handler.(knowledge.KnowledgeService).ProjectCollaboration(ctx, realArg.Request)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+func newKnowledgeServiceProjectCollaborationArgs() interface{} {
+	return knowledge.NewKnowledgeServiceProjectCollaborationArgs()
+}
+
+func newKnowledgeServiceProjectCollaborationResult() interface{} {
+	return knowledge.NewKnowledgeServiceProjectCollaborationResult()
+}
+
 type kClient struct {
 	c client.Client
 }
@@ -595,6 +670,16 @@ func (p *kClient) Ping(ctx context.Context, request *common.PingRequest) (r *com
 	_args.Request = request
 	var _result knowledge.KnowledgeServicePingResult
 	if err = p.c.Call(ctx, "Ping", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) Live(ctx context.Context, request *common.PingRequest) (r *common.PingResponse, err error) {
+	var _args knowledge.KnowledgeServiceLiveArgs
+	_args.Request = request
+	var _result knowledge.KnowledgeServiceLiveResult
+	if err = p.c.Call(ctx, "Live", &_args, &_result); err != nil {
 		return
 	}
 	return _result.GetSuccess(), nil
@@ -788,4 +873,24 @@ func (p *kClient) GetAttachmentContent(ctx context.Context, request *knowledge.A
 		return
 	}
 	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) AuthorizeCollaboration(ctx context.Context, request *knowledge.AuthorizeCollaborationRequest) (r *knowledge.CollaborationAuthorization, err error) {
+	var _args knowledge.KnowledgeServiceAuthorizeCollaborationArgs
+	_args.Request = request
+	var _result knowledge.KnowledgeServiceAuthorizeCollaborationResult
+	if err = p.c.Call(ctx, "AuthorizeCollaboration", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) ProjectCollaboration(ctx context.Context, request *knowledge.ProjectCollaborationRequest) (err error) {
+	var _args knowledge.KnowledgeServiceProjectCollaborationArgs
+	_args.Request = request
+	var _result knowledge.KnowledgeServiceProjectCollaborationResult
+	if err = p.c.Call(ctx, "ProjectCollaboration", &_args, &_result); err != nil {
+		return
+	}
+	return nil
 }

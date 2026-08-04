@@ -1,4 +1,5 @@
 namespace go knowledge
+namespace rs knowledge
 
 include "common.thrift"
 
@@ -195,8 +196,28 @@ struct AttachmentContent {
   2: required string expires_at
 }
 
+struct AuthorizeCollaborationRequest {
+  1: required string document_id
+}
+
+struct CollaborationAuthorization {
+  1: required string document_id
+  2: required PublicUser actor
+  3: required string access
+  4: required i64 permission_revision
+  5: required string token_expires_at
+}
+
+struct ProjectCollaborationRequest {
+  1: required string document_id
+  2: required i64 sequence
+  3: required RichTextDocument content
+  4: required string plain_text
+}
+
 service KnowledgeService {
   common.PingResponse Ping(1: common.PingRequest request)
+  common.PingResponse Live(1: common.PingRequest request)
   DocumentPage ListPublishedDocuments(1: ListDocumentsRequest request)
   DocumentDetail GetPublishedDocument(1: GetPublishedDocumentRequest request)
   DocumentPage ListDocuments(1: ListDocumentsRequest request)
@@ -216,4 +237,6 @@ service KnowledgeService {
   Attachment CompleteAttachment(1: AttachmentIDRequest request)
   void DeleteAttachment(1: AttachmentIDRequest request)
   AttachmentContent GetAttachmentContent(1: AttachmentContentRequest request)
+  CollaborationAuthorization AuthorizeCollaboration(1: AuthorizeCollaborationRequest request)
+  void ProjectCollaboration(1: ProjectCollaborationRequest request)
 }

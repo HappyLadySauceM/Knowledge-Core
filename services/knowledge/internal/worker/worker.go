@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	natsresource "github.com/HappyLadySauce/Knowledge-Core/pkg/nats"
 	"github.com/HappyLadySauce/Knowledge-Core/services/knowledge/internal/config"
 	"github.com/HappyLadySauce/Knowledge-Core/services/knowledge/internal/domain"
 	"github.com/HappyLadySauce/Knowledge-Core/services/knowledge/internal/repository"
@@ -43,7 +44,7 @@ type Scanner interface {
 }
 
 type Publisher interface {
-	Publish(context.Context, string, []byte) error
+	Publish(context.Context, natsresource.Message, natsresource.PublishOptions) error
 }
 
 type DocumentPurger interface {
@@ -164,7 +165,12 @@ func (w *Worker) processOutbox(ctx context.Context) error {
 		return err
 	}
 	for _, message := range messages {
-		if err := w.publisher.Publish(ctx, message.Subject, message.Payload); err != nil {
+		if err := w.publisher.Publish(ctx, natsresource.Message{
+			ID:          message.ID,
+			Subject:     message.Subject,
+			ContentType: "application/json",
+			Body:        message.Payload,
+		}, natsresource.PublishOptions{DeduplicationID: message.ID}); err != nil {
 			if retryErr := w.repository.RetryOutbox(ctx, message.ID, boundedBackoff(message.Attempts)); retryErr != nil {
 				return errors.Join(err, retryErr)
 			}

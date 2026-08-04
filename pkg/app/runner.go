@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/HappyLadySauce/Knowledge-Core/pkg/health"
+	corelog "github.com/HappyLadySauce/Knowledge-Core/pkg/log"
 	"github.com/HappyLadySauce/Knowledge-Core/pkg/metrics"
 	"github.com/HappyLadySauce/Knowledge-Core/pkg/trace"
 )
@@ -65,6 +66,7 @@ type Runtime struct {
 	Trace    *trace.Runtime
 	Health   *health.Registry
 	Metrics  *metrics.Registry
+	logLevel *slog.LevelVar
 	shutdown time.Duration
 
 	mu         sync.Mutex
@@ -76,14 +78,25 @@ type Runtime struct {
 	isClosed   bool
 }
 
-func newRuntime(logger *slog.Logger, telemetry *trace.Runtime, metricRegistry *metrics.Registry, shutdown time.Duration) *Runtime {
+func newRuntime(logger *slog.Logger, levelControl *slog.LevelVar, telemetry *trace.Runtime, metricRegistry *metrics.Registry, shutdown time.Duration) *Runtime {
 	return &Runtime{
 		Logger:   logger,
 		Trace:    telemetry,
 		Health:   health.NewRegistry(),
 		Metrics:  metricRegistry,
+		logLevel: levelControl,
 		shutdown: shutdown,
 	}
+}
+
+func (r *Runtime) SetLogLevel(level string) error {
+	if r == nil {
+		return errors.New("set application log level: runtime is required")
+	}
+	if err := corelog.SetLevel(r.logLevel, level); err != nil {
+		return fmt.Errorf("set application log level: %w", err)
+	}
+	return nil
 }
 
 // AddComponent registers a transport or worker before the runtime starts.

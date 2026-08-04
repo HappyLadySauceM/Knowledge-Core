@@ -9,6 +9,7 @@
 **/node_modules
 **/dist
 **/coverage
+target
 data
 logs
 bin

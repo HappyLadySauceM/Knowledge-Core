@@ -4,13 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"net/url"
 	"regexp"
 	"strings"
 	"time"
 
 	coreauth "github.com/HappyLadySauce/Knowledge-Core/pkg/auth"
-	"github.com/HappyLadySauce/Knowledge-Core/pkg/option"
 )
 
 var bucketPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$`)
@@ -99,32 +97,6 @@ func (o ScannerOptions) Validate() error {
 		joined = errors.Join(joined, errors.New("scanner.maximum_stream must be between 1 byte and 1 GiB"))
 	}
 	return joined
-}
-
-type CollaborationOptions struct {
-	BaseURL        string            `mapstructure:"base_url" json:"base_url" yaml:"base_url"`
-	RequestTimeout time.Duration     `mapstructure:"request_timeout" json:"request_timeout" yaml:"request_timeout"`
-	TLS            option.TLSOptions `mapstructure:"tls" json:"tls" yaml:"tls"`
-}
-
-func NewCollaborationOptions() *CollaborationOptions {
-	return &CollaborationOptions{BaseURL: "http://127.0.0.1:8092", RequestTimeout: 5 * time.Second}
-}
-
-func (o CollaborationOptions) Validate() error {
-	parsed, err := url.Parse(o.BaseURL)
-	var endpointErr error
-	if err != nil || parsed == nil || parsed.Host == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" ||
-		(parsed.Scheme != "http" && parsed.Scheme != "https") || (parsed.Path != "" && parsed.Path != "/") {
-		endpointErr = errors.New("collaboration.base_url must be an absolute HTTP origin without credentials")
-	} else if parsed.Scheme == "https" != o.TLS.Enabled {
-		endpointErr = errors.New("collaboration TLS settings must match the base_url scheme")
-	}
-	var timeoutErr error
-	if o.RequestTimeout <= 0 {
-		timeoutErr = errors.New("collaboration.request_timeout must be positive")
-	}
-	return errors.Join(endpointErr, timeoutErr, o.TLS.Validate())
 }
 
 type WorkerOptions struct {

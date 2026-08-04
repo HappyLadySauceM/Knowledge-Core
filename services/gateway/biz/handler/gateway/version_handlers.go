@@ -7,9 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	jsoncodec "github.com/HappyLadySauce/Knowledge-Core/pkg/codec/json"
+	collaborationv1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/collaboration"
 	gatewaymodel "github.com/HappyLadySauce/Knowledge-Core/services/gateway/biz/model/gateway"
-	gatewayclient "github.com/HappyLadySauce/Knowledge-Core/services/gateway/internal/client"
 	gatewaymiddleware "github.com/HappyLadySauce/Knowledge-Core/services/gateway/internal/middleware"
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
@@ -25,12 +24,14 @@ func handleListVersions(ctx context.Context, request *app.RequestContext) {
 		return
 	}
 	dependencies, ok := gatewaymiddleware.FromRequest(request)
-	token, tokenOK := gatewaymiddleware.AccessToken(request)
+	_, tokenOK := gatewaymiddleware.AccessToken(request)
 	if !ok || !tokenOK {
 		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInternal)
 		return
 	}
-	page, err := dependencies.Collaboration.ListVersions(ctx, documentID, token, cursor, limit)
+	page, err := dependencies.Collaboration.ListVersions(upstreamContext(ctx, request), &collaborationv1.ListVersionsRequest{
+		DocumentId: documentID, Cursor: optionalString(cursor), Limit: optionalInt32(limit),
+	})
 	if err != nil {
 		gatewaymiddleware.WriteCollaborationError(ctx, request, err)
 		return
@@ -53,12 +54,14 @@ func handleCreateVersion(ctx context.Context, request *app.RequestContext) {
 		return
 	}
 	dependencies, ok := gatewaymiddleware.FromRequest(request)
-	token, tokenOK := gatewaymiddleware.AccessToken(request)
+	_, tokenOK := gatewaymiddleware.AccessToken(request)
 	if !ok || !tokenOK {
 		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInternal)
 		return
 	}
-	version, err := dependencies.Collaboration.CreateVersion(ctx, documentID, token, stringValue(body.Label), idempotency)
+	version, err := dependencies.Collaboration.CreateVersion(upstreamContext(ctx, request), &collaborationv1.CreateVersionRequest{
+		DocumentId: documentID, Label: copyString(body.Label), IdempotencyKey: optionalString(idempotency),
+	})
 	if err != nil {
 		gatewaymiddleware.WriteCollaborationError(ctx, request, err)
 		return
@@ -80,12 +83,14 @@ func handleGetVersion(ctx context.Context, request *app.RequestContext) {
 		return
 	}
 	dependencies, ok := gatewaymiddleware.FromRequest(request)
-	token, tokenOK := gatewaymiddleware.AccessToken(request)
+	_, tokenOK := gatewaymiddleware.AccessToken(request)
 	if !ok || !tokenOK {
 		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInternal)
 		return
 	}
-	detail, err := dependencies.Collaboration.GetVersion(ctx, documentID, versionID, token)
+	detail, err := dependencies.Collaboration.GetVersion(upstreamContext(ctx, request), &collaborationv1.GetVersionRequest{
+		DocumentId: documentID, VersionId: versionID,
+	})
 	if err != nil {
 		gatewaymiddleware.WriteCollaborationError(ctx, request, err)
 		return
@@ -109,14 +114,15 @@ func handleRestoreVersion(ctx context.Context, request *app.RequestContext) {
 		return
 	}
 	dependencies, ok := gatewaymiddleware.FromRequest(request)
-	token, tokenOK := gatewaymiddleware.AccessToken(request)
+	_, tokenOK := gatewaymiddleware.AccessToken(request)
 	if !ok || !tokenOK {
 		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInternal)
 		return
 	}
-	version, err := dependencies.Collaboration.RestoreVersion(
-		ctx, documentID, versionID, token, body.ExpectedSequence, idempotency,
-	)
+	version, err := dependencies.Collaboration.RestoreVersion(upstreamContext(ctx, request), &collaborationv1.RestoreVersionRequest{
+		DocumentId: documentID, VersionId: versionID, ExpectedSequence: body.ExpectedSequence,
+		IdempotencyKey: optionalString(idempotency),
+	})
 	if err != nil {
 		gatewaymiddleware.WriteCollaborationError(ctx, request, err)
 		return
@@ -151,8 +157,8 @@ func validVersionLabel(value *string) bool {
 	return strings.TrimSpace(*value) == *value && len([]rune(*value)) >= 1 && len([]rune(*value)) <= 200 && !containsControl(*value)
 }
 
-func toVersionPageData(value *gatewayclient.VersionPage) (*gatewaymodel.VersionPageData, error) {
-	if value == nil || value.Page.HasMore != (value.Page.NextCursor != nil) {
+func toVersionPageData(value *collaborationv1.VersionPage) (*gatewaymodel.VersionPageData, error) {
+	if value == nil || value.Page == nil || value.Page.HasMore != (value.Page.NextCursor != nil) {
 		return nil, errors.New("collaboration version page is incomplete")
 	}
 	if value.Page.NextCursor != nil && (len(*value.Page.NextCursor) == 0 || len(*value.Page.NextCursor) > 1024) {
@@ -160,7 +166,7 @@ func toVersionPageData(value *gatewayclient.VersionPage) (*gatewaymodel.VersionP
 	}
 	items := make([]*gatewaymodel.VersionData, 0, len(value.Items))
 	for index := range value.Items {
-		converted, err := toVersionData(&value.Items[index])
+		converted, err := toVersionData(value.Items[index])
 		if err != nil {
 			return nil, err
 		}
@@ -172,41 +178,44 @@ func toVersionPageData(value *gatewayclient.VersionPage) (*gatewaymodel.VersionP
 	}, nil
 }
 
-func toVersionDetailData(value *gatewayclient.VersionDetail) (*gatewaymodel.VersionDetailData, error) {
-	if value == nil || value.Content == nil {
+func toVersionDetailData(value *collaborationv1.VersionDetail) (*gatewaymodel.VersionDetailData, error) {
+	if value == nil || value.Version == nil || value.Content == nil {
 		return nil, errors.New("collaboration version detail is incomplete")
 	}
-	version, err := toVersionData(&value.Version)
+	version, err := toVersionData(value.Version)
 	if err != nil {
 		return nil, err
 	}
-	payload, err := jsoncodec.Marshal(value.Content)
-	if err != nil {
-		return nil, err
-	}
-	var content gatewaymodel.RichTextDocumentData
-	if err := jsoncodec.Unmarshal(payload, &content); err != nil || !validPublicRichTextDocument(&content, 0) {
+	content, err := toRichTextDocumentData(value.Content)
+	if err != nil || !validPublicRichTextDocument(content, 0) {
 		return nil, errors.New("collaboration version content is invalid")
 	}
 	if content.Content == nil {
 		content.Content = make([]*gatewaymodel.RichTextNodeData, 0)
 	}
-	return &gatewaymodel.VersionDetailData{Version: version, Content: &content, PlainText: value.PlainText}, nil
+	return &gatewaymodel.VersionDetailData{Version: version, Content: content, PlainText: value.PlainText}, nil
 }
 
-func toVersionData(value *gatewayclient.Version) (*gatewaymodel.VersionData, error) {
-	if value == nil || !validUUIDv7(value.ID) || !validUUIDv7(value.DocumentID) || value.Sequence < 0 ||
+func toVersionData(value *collaborationv1.Version) (*gatewaymodel.VersionData, error) {
+	if value == nil || !validUUIDv7(value.Id) || !validUUIDv7(value.DocumentId) || value.Sequence < 0 ||
 		(value.Kind != "manual" && value.Kind != "automatic" && value.Kind != "restoration") ||
-		!validVersionLabel(value.Label) || value.CreatedBy.ID <= 0 || strings.TrimSpace(value.CreatedBy.Username) == "" ||
+		!validVersionLabel(value.Label) || value.CreatedBy == nil || value.CreatedBy.Id <= 0 || strings.TrimSpace(value.CreatedBy.Username) == "" ||
 		!validRFC3339(value.CreatedAt) {
 		return nil, errors.New("collaboration version is incomplete")
 	}
 	return &gatewaymodel.VersionData{
-		ID: value.ID, DocumentID: value.DocumentID, Sequence: value.Sequence, Kind: value.Kind,
+		ID: value.Id, DocumentID: value.DocumentId, Sequence: value.Sequence, Kind: value.Kind,
 		Label: copyString(value.Label), CreatedBy: &gatewaymodel.PublicUserData{
-			ID: strconv.FormatInt(value.CreatedBy.ID, 10), Username: value.CreatedBy.Username, Avatar: value.CreatedBy.Avatar,
+			ID: strconv.FormatInt(value.CreatedBy.Id, 10), Username: value.CreatedBy.Username, Avatar: value.CreatedBy.Avatar,
 		}, CreatedAt: value.CreatedAt,
 	}, nil
+}
+
+func optionalInt32(value int32) *int32 {
+	if value <= 0 {
+		return nil
+	}
+	return &value
 }
 
 func validPublicRichTextDocument(value *gatewaymodel.RichTextDocumentData, depth int) bool {

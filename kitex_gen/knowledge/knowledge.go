@@ -1932,8 +1932,178 @@ var fieldIDToName_AttachmentContent = map[int16]string{
 	2: "expires_at",
 }
 
+type AuthorizeCollaborationRequest struct {
+	DocumentId string `thrift:"document_id,1,required" frugal:"1,required,string" json:"document_id"`
+}
+
+func NewAuthorizeCollaborationRequest() *AuthorizeCollaborationRequest {
+	return &AuthorizeCollaborationRequest{}
+}
+
+func (p *AuthorizeCollaborationRequest) InitDefault() {
+}
+
+func (p *AuthorizeCollaborationRequest) GetDocumentId() (v string) {
+	return p.DocumentId
+}
+func (p *AuthorizeCollaborationRequest) SetDocumentId(val string) {
+	p.DocumentId = val
+}
+
+func (p *AuthorizeCollaborationRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("AuthorizeCollaborationRequest(%+v)", *p)
+}
+
+var fieldIDToName_AuthorizeCollaborationRequest = map[int16]string{
+	1: "document_id",
+}
+
+type CollaborationAuthorization struct {
+	DocumentId         string      `thrift:"document_id,1,required" frugal:"1,required,string" json:"document_id"`
+	Actor              *PublicUser `thrift:"actor,2,required" frugal:"2,required,PublicUser" json:"actor"`
+	Access             string      `thrift:"access,3,required" frugal:"3,required,string" json:"access"`
+	PermissionRevision int64       `thrift:"permission_revision,4,required" frugal:"4,required,i64" json:"permission_revision"`
+	TokenExpiresAt     string      `thrift:"token_expires_at,5,required" frugal:"5,required,string" json:"token_expires_at"`
+}
+
+func NewCollaborationAuthorization() *CollaborationAuthorization {
+	return &CollaborationAuthorization{}
+}
+
+func (p *CollaborationAuthorization) InitDefault() {
+}
+
+func (p *CollaborationAuthorization) GetDocumentId() (v string) {
+	return p.DocumentId
+}
+
+var CollaborationAuthorization_Actor_DEFAULT *PublicUser
+
+func (p *CollaborationAuthorization) GetActor() (v *PublicUser) {
+	if !p.IsSetActor() {
+		return CollaborationAuthorization_Actor_DEFAULT
+	}
+	return p.Actor
+}
+
+func (p *CollaborationAuthorization) GetAccess() (v string) {
+	return p.Access
+}
+
+func (p *CollaborationAuthorization) GetPermissionRevision() (v int64) {
+	return p.PermissionRevision
+}
+
+func (p *CollaborationAuthorization) GetTokenExpiresAt() (v string) {
+	return p.TokenExpiresAt
+}
+func (p *CollaborationAuthorization) SetDocumentId(val string) {
+	p.DocumentId = val
+}
+func (p *CollaborationAuthorization) SetActor(val *PublicUser) {
+	p.Actor = val
+}
+func (p *CollaborationAuthorization) SetAccess(val string) {
+	p.Access = val
+}
+func (p *CollaborationAuthorization) SetPermissionRevision(val int64) {
+	p.PermissionRevision = val
+}
+func (p *CollaborationAuthorization) SetTokenExpiresAt(val string) {
+	p.TokenExpiresAt = val
+}
+
+func (p *CollaborationAuthorization) IsSetActor() bool {
+	return p.Actor != nil
+}
+
+func (p *CollaborationAuthorization) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("CollaborationAuthorization(%+v)", *p)
+}
+
+var fieldIDToName_CollaborationAuthorization = map[int16]string{
+	1: "document_id",
+	2: "actor",
+	3: "access",
+	4: "permission_revision",
+	5: "token_expires_at",
+}
+
+type ProjectCollaborationRequest struct {
+	DocumentId string            `thrift:"document_id,1,required" frugal:"1,required,string" json:"document_id"`
+	Sequence   int64             `thrift:"sequence,2,required" frugal:"2,required,i64" json:"sequence"`
+	Content    *RichTextDocument `thrift:"content,3,required" frugal:"3,required,RichTextDocument" json:"content"`
+	PlainText  string            `thrift:"plain_text,4,required" frugal:"4,required,string" json:"plain_text"`
+}
+
+func NewProjectCollaborationRequest() *ProjectCollaborationRequest {
+	return &ProjectCollaborationRequest{}
+}
+
+func (p *ProjectCollaborationRequest) InitDefault() {
+}
+
+func (p *ProjectCollaborationRequest) GetDocumentId() (v string) {
+	return p.DocumentId
+}
+
+func (p *ProjectCollaborationRequest) GetSequence() (v int64) {
+	return p.Sequence
+}
+
+var ProjectCollaborationRequest_Content_DEFAULT *RichTextDocument
+
+func (p *ProjectCollaborationRequest) GetContent() (v *RichTextDocument) {
+	if !p.IsSetContent() {
+		return ProjectCollaborationRequest_Content_DEFAULT
+	}
+	return p.Content
+}
+
+func (p *ProjectCollaborationRequest) GetPlainText() (v string) {
+	return p.PlainText
+}
+func (p *ProjectCollaborationRequest) SetDocumentId(val string) {
+	p.DocumentId = val
+}
+func (p *ProjectCollaborationRequest) SetSequence(val int64) {
+	p.Sequence = val
+}
+func (p *ProjectCollaborationRequest) SetContent(val *RichTextDocument) {
+	p.Content = val
+}
+func (p *ProjectCollaborationRequest) SetPlainText(val string) {
+	p.PlainText = val
+}
+
+func (p *ProjectCollaborationRequest) IsSetContent() bool {
+	return p.Content != nil
+}
+
+func (p *ProjectCollaborationRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("ProjectCollaborationRequest(%+v)", *p)
+}
+
+var fieldIDToName_ProjectCollaborationRequest = map[int16]string{
+	1: "document_id",
+	2: "sequence",
+	3: "content",
+	4: "plain_text",
+}
+
 type KnowledgeService interface {
 	Ping(ctx context.Context, request *common.PingRequest) (r *common.PingResponse, err error)
+
+	Live(ctx context.Context, request *common.PingRequest) (r *common.PingResponse, err error)
 
 	ListPublishedDocuments(ctx context.Context, request *ListDocumentsRequest) (r *DocumentPage, err error)
 
@@ -1972,6 +2142,10 @@ type KnowledgeService interface {
 	DeleteAttachment(ctx context.Context, request *AttachmentIDRequest) (err error)
 
 	GetAttachmentContent(ctx context.Context, request *AttachmentContentRequest) (r *AttachmentContent, err error)
+
+	AuthorizeCollaboration(ctx context.Context, request *AuthorizeCollaborationRequest) (r *CollaborationAuthorization, err error)
+
+	ProjectCollaboration(ctx context.Context, request *ProjectCollaborationRequest) (err error)
 }
 
 type KnowledgeServicePingArgs struct {
@@ -2047,6 +2221,82 @@ func (p *KnowledgeServicePingResult) String() string {
 }
 
 var fieldIDToName_KnowledgeServicePingResult = map[int16]string{
+	0: "success",
+}
+
+type KnowledgeServiceLiveArgs struct {
+	Request *common.PingRequest `thrift:"request,1" frugal:"1,default,common.PingRequest" json:"request"`
+}
+
+func NewKnowledgeServiceLiveArgs() *KnowledgeServiceLiveArgs {
+	return &KnowledgeServiceLiveArgs{}
+}
+
+func (p *KnowledgeServiceLiveArgs) InitDefault() {
+}
+
+var KnowledgeServiceLiveArgs_Request_DEFAULT *common.PingRequest
+
+func (p *KnowledgeServiceLiveArgs) GetRequest() (v *common.PingRequest) {
+	if !p.IsSetRequest() {
+		return KnowledgeServiceLiveArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+func (p *KnowledgeServiceLiveArgs) SetRequest(val *common.PingRequest) {
+	p.Request = val
+}
+
+func (p *KnowledgeServiceLiveArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *KnowledgeServiceLiveArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("KnowledgeServiceLiveArgs(%+v)", *p)
+}
+
+var fieldIDToName_KnowledgeServiceLiveArgs = map[int16]string{
+	1: "request",
+}
+
+type KnowledgeServiceLiveResult struct {
+	Success *common.PingResponse `thrift:"success,0,optional" frugal:"0,optional,common.PingResponse" json:"success,omitempty"`
+}
+
+func NewKnowledgeServiceLiveResult() *KnowledgeServiceLiveResult {
+	return &KnowledgeServiceLiveResult{}
+}
+
+func (p *KnowledgeServiceLiveResult) InitDefault() {
+}
+
+var KnowledgeServiceLiveResult_Success_DEFAULT *common.PingResponse
+
+func (p *KnowledgeServiceLiveResult) GetSuccess() (v *common.PingResponse) {
+	if !p.IsSetSuccess() {
+		return KnowledgeServiceLiveResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *KnowledgeServiceLiveResult) SetSuccess(x interface{}) {
+	p.Success = x.(*common.PingResponse)
+}
+
+func (p *KnowledgeServiceLiveResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *KnowledgeServiceLiveResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("KnowledgeServiceLiveResult(%+v)", *p)
+}
+
+var fieldIDToName_KnowledgeServiceLiveResult = map[int16]string{
 	0: "success",
 }
 
@@ -3455,3 +3705,136 @@ func (p *KnowledgeServiceGetAttachmentContentResult) String() string {
 var fieldIDToName_KnowledgeServiceGetAttachmentContentResult = map[int16]string{
 	0: "success",
 }
+
+type KnowledgeServiceAuthorizeCollaborationArgs struct {
+	Request *AuthorizeCollaborationRequest `thrift:"request,1" frugal:"1,default,AuthorizeCollaborationRequest" json:"request"`
+}
+
+func NewKnowledgeServiceAuthorizeCollaborationArgs() *KnowledgeServiceAuthorizeCollaborationArgs {
+	return &KnowledgeServiceAuthorizeCollaborationArgs{}
+}
+
+func (p *KnowledgeServiceAuthorizeCollaborationArgs) InitDefault() {
+}
+
+var KnowledgeServiceAuthorizeCollaborationArgs_Request_DEFAULT *AuthorizeCollaborationRequest
+
+func (p *KnowledgeServiceAuthorizeCollaborationArgs) GetRequest() (v *AuthorizeCollaborationRequest) {
+	if !p.IsSetRequest() {
+		return KnowledgeServiceAuthorizeCollaborationArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+func (p *KnowledgeServiceAuthorizeCollaborationArgs) SetRequest(val *AuthorizeCollaborationRequest) {
+	p.Request = val
+}
+
+func (p *KnowledgeServiceAuthorizeCollaborationArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *KnowledgeServiceAuthorizeCollaborationArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("KnowledgeServiceAuthorizeCollaborationArgs(%+v)", *p)
+}
+
+var fieldIDToName_KnowledgeServiceAuthorizeCollaborationArgs = map[int16]string{
+	1: "request",
+}
+
+type KnowledgeServiceAuthorizeCollaborationResult struct {
+	Success *CollaborationAuthorization `thrift:"success,0,optional" frugal:"0,optional,CollaborationAuthorization" json:"success,omitempty"`
+}
+
+func NewKnowledgeServiceAuthorizeCollaborationResult() *KnowledgeServiceAuthorizeCollaborationResult {
+	return &KnowledgeServiceAuthorizeCollaborationResult{}
+}
+
+func (p *KnowledgeServiceAuthorizeCollaborationResult) InitDefault() {
+}
+
+var KnowledgeServiceAuthorizeCollaborationResult_Success_DEFAULT *CollaborationAuthorization
+
+func (p *KnowledgeServiceAuthorizeCollaborationResult) GetSuccess() (v *CollaborationAuthorization) {
+	if !p.IsSetSuccess() {
+		return KnowledgeServiceAuthorizeCollaborationResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *KnowledgeServiceAuthorizeCollaborationResult) SetSuccess(x interface{}) {
+	p.Success = x.(*CollaborationAuthorization)
+}
+
+func (p *KnowledgeServiceAuthorizeCollaborationResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *KnowledgeServiceAuthorizeCollaborationResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("KnowledgeServiceAuthorizeCollaborationResult(%+v)", *p)
+}
+
+var fieldIDToName_KnowledgeServiceAuthorizeCollaborationResult = map[int16]string{
+	0: "success",
+}
+
+type KnowledgeServiceProjectCollaborationArgs struct {
+	Request *ProjectCollaborationRequest `thrift:"request,1" frugal:"1,default,ProjectCollaborationRequest" json:"request"`
+}
+
+func NewKnowledgeServiceProjectCollaborationArgs() *KnowledgeServiceProjectCollaborationArgs {
+	return &KnowledgeServiceProjectCollaborationArgs{}
+}
+
+func (p *KnowledgeServiceProjectCollaborationArgs) InitDefault() {
+}
+
+var KnowledgeServiceProjectCollaborationArgs_Request_DEFAULT *ProjectCollaborationRequest
+
+func (p *KnowledgeServiceProjectCollaborationArgs) GetRequest() (v *ProjectCollaborationRequest) {
+	if !p.IsSetRequest() {
+		return KnowledgeServiceProjectCollaborationArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+func (p *KnowledgeServiceProjectCollaborationArgs) SetRequest(val *ProjectCollaborationRequest) {
+	p.Request = val
+}
+
+func (p *KnowledgeServiceProjectCollaborationArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *KnowledgeServiceProjectCollaborationArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("KnowledgeServiceProjectCollaborationArgs(%+v)", *p)
+}
+
+var fieldIDToName_KnowledgeServiceProjectCollaborationArgs = map[int16]string{
+	1: "request",
+}
+
+type KnowledgeServiceProjectCollaborationResult struct {
+}
+
+func NewKnowledgeServiceProjectCollaborationResult() *KnowledgeServiceProjectCollaborationResult {
+	return &KnowledgeServiceProjectCollaborationResult{}
+}
+
+func (p *KnowledgeServiceProjectCollaborationResult) InitDefault() {
+}
+
+func (p *KnowledgeServiceProjectCollaborationResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("KnowledgeServiceProjectCollaborationResult(%+v)", *p)
+}
+
+var fieldIDToName_KnowledgeServiceProjectCollaborationResult = map[int16]string{}

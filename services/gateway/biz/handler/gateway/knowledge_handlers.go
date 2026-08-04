@@ -60,8 +60,6 @@ func handleGetPublishedDocument(ctx context.Context, request *app.RequestContext
 		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidUpstreamResponse)
 		return
 	}
-	websocketURL := dependencies.Endpoints.CollaborationWebSocketURL
-	data.WebsocketURL = &websocketURL
 	request.Header("ETag", formatETag(data.Document.MetadataRevision))
 	writeJSON(ctx, request, consts.StatusOK, data)
 }

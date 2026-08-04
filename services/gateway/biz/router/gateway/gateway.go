@@ -49,6 +49,7 @@ func Register(r *server.Hertz) {
 						_document_id := _documents0.Group("/:document_id", _document_idMw()...)
 						_document_id.GET("/attachments", append(_listattachmentsMw(), gateway.ListAttachments)...)
 						_document_id.POST("/attachments", append(_createattachmentMw(), gateway.CreateAttachment)...)
+						_document_id.POST("/collaboration-sessions", append(_createcollaborationsessionMw(), gateway.CreateCollaborationSession)...)
 						_document_id.GET("/members", append(_listmembersMw(), gateway.ListMembers)...)
 						_document_id.POST("/members", append(_addmemberMw(), gateway.AddMember)...)
 						_document_id.DELETE("/publication", append(_unpublishdocumentMw(), gateway.UnpublishDocument)...)

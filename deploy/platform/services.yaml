@@ -1,0 +1,58 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: knowledge-core-nats
+  namespace: knowledge-core-platform
+spec:
+  selector:
+    app.kubernetes.io/name: knowledge-core-nats
+  ports:
+    - {name: client, port: 4222, targetPort: client}
+    - {name: monitor, port: 8222, targetPort: monitor}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: knowledge-core-etcd
+  namespace: knowledge-core-platform
+spec:
+  selector:
+    app.kubernetes.io/name: knowledge-core-etcd
+  ports:
+    - {name: client, port: 2379, targetPort: client}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: knowledge-core-minio
+  namespace: knowledge-core-platform
+spec:
+  selector:
+    app.kubernetes.io/name: knowledge-core-minio
+  ports:
+    - {name: api, port: 9000, targetPort: api}
+    - {name: console, port: 9001, targetPort: console}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: knowledge-core-clamav
+  namespace: knowledge-core-platform
+spec:
+  selector:
+    app.kubernetes.io/name: knowledge-core-clamav
+  ports:
+    - {name: clamd, port: 3310, targetPort: clamd}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: knowledge-core-nacos
+  namespace: config-system
+spec:
+  selector:
+    app.kubernetes.io/name: knowledge-core-nacos
+  ports:
+    - {name: http, port: 8848, targetPort: http}
+    - {name: grpc-client, port: 9848, targetPort: grpc-client}
+    - {name: grpc-cluster, port: 9849, targetPort: grpc-cluster}

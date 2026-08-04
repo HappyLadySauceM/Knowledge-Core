@@ -9,11 +9,17 @@
 
 data/
 logs/
-bin/
+/bin/
 coverage.out
 *.exe
 
-# Node.js services
+# Node.js dependencies and build output
 node_modules/
 dist/
 coverage/
+
+# Rust build output
+target/
+
+kubectl/
+*.lnk

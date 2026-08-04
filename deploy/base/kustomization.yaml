@@ -1,0 +1,41 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - serviceaccounts.yaml
+  - services.yaml
+  - deployments.yaml
+  - network-policies.yaml
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: knowledge-core
+    includeTemplates: true
+
+configMapGenerator:
+  - name: knowledge-core-common-config
+    literals:
+      - KNOWLEDGE_CORE_NACOS_TIMEOUT=5s
+      - KNOWLEDGE_CORE_NACOS_POLL_INTERVAL=30s
+      - KNOWLEDGE_CORE_NACOS_RUNTIME_DIR=/var/run/knowledge-core/nacos
+  - name: knowledge-core-gateway-config
+    literals:
+      - GATEWAY_LOG_LEVEL=info
+  - name: knowledge-core-identity-config
+    literals:
+      - IDENTITY_LOG_LEVEL=info
+  - name: knowledge-core-knowledge-config
+    literals:
+      - KNOWLEDGE_LOG_LEVEL=info
+  - name: knowledge-core-collaboration-config
+    literals:
+      - COLLABORATION_LOG_LEVEL=info
+
+patches:
+  - target:
+      kind: Deployment
+    patch: |-
+      - op: add
+        path: /spec/template/spec/imagePullSecrets
+        value:
+          - name: harbor-pull-secrets

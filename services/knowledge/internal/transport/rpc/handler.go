@@ -48,6 +48,11 @@ type AttachmentService interface {
 	Content(context.Context, string, int64) (*domain.AttachmentContent, error)
 }
 
+type CollaborationService interface {
+	Authorize(context.Context, string, int64) (*knowledgelogic.CollaborationAuthorization, error)
+	Project(context.Context, string, int64, domain.RichTextDocument, string) error
+}
+
 type TokenVerifier interface {
 	Verify(string) (coreauth.Principal, error)
 }
@@ -57,39 +62,52 @@ type Readiness interface {
 }
 
 type Handler struct {
-	documents   DocumentService
-	members     MemberService
-	attachments AttachmentService
-	verifier    TokenVerifier
-	readiness   Readiness
-	logger      *slog.Logger
-	now         func() time.Time
+	documents     DocumentService
+	members       MemberService
+	attachments   AttachmentService
+	collaboration CollaborationService
+	verifier      TokenVerifier
+	readiness     Readiness
+	logger        *slog.Logger
+	now           func() time.Time
 }
 
 func NewHandler(
 	documents DocumentService,
 	members MemberService,
 	attachments AttachmentService,
+	collaboration CollaborationService,
 	verifier TokenVerifier,
 	readiness Readiness,
 	logger *slog.Logger,
 ) (*Handler, error) {
-	if documents == nil || members == nil || attachments == nil || verifier == nil || readiness == nil || logger == nil {
+	if documents == nil || members == nil || attachments == nil || collaboration == nil || verifier == nil || readiness == nil || logger == nil {
 		return nil, errors.New("create knowledge RPC handler: use cases, verifier, readiness, and logger are required")
 	}
 	return &Handler{
-		documents: documents, members: members, attachments: attachments,
+		documents: documents, members: members, attachments: attachments, collaboration: collaboration,
 		verifier: verifier, readiness: readiness, logger: logger, now: time.Now,
 	}, nil
 }
 
-func (h *Handler) Ping(ctx context.Context, _ *commonv1.PingRequest) (*commonv1.PingResponse, error) {
+func (h *Handler) Ping(ctx context.Context, request *commonv1.PingRequest) (*commonv1.PingResponse, error) {
 	ctx = metadata.EnsureRequestID(ctx)
+	if request == nil {
+		return nil, h.invalidInput(ctx)
+	}
 	status := "ready"
 	if err := h.readiness.Ready(ctx); err != nil {
 		status = "not_ready"
 	}
 	return &commonv1.PingResponse{Service: serviceName, Status: status, UnixTime: h.now().UTC().Unix()}, nil
+}
+
+func (h *Handler) Live(ctx context.Context, request *commonv1.PingRequest) (*commonv1.PingResponse, error) {
+	ctx = metadata.EnsureRequestID(ctx)
+	if request == nil {
+		return nil, h.invalidInput(ctx)
+	}
+	return &commonv1.PingResponse{Service: serviceName, Status: "live", UnixTime: h.now().UTC().Unix()}, nil
 }
 
 func (h *Handler) ListPublishedDocuments(ctx context.Context, request *knowledgev1.ListDocumentsRequest) (*knowledgev1.DocumentPage, error) {
@@ -389,6 +407,51 @@ func (h *Handler) GetAttachmentContent(ctx context.Context, request *knowledgev1
 	return &knowledgev1.AttachmentContent{Url: content.URL, ExpiresAt: content.ExpiresAt.UTC().Format(time.RFC3339Nano)}, nil
 }
 
+func (h *Handler) AuthorizeCollaboration(
+	ctx context.Context,
+	request *knowledgev1.AuthorizeCollaborationRequest,
+) (*knowledgev1.CollaborationAuthorization, error) {
+	ctx = metadata.EnsureRequestID(ctx)
+	principal, err := h.requirePrincipal(ctx, request != nil)
+	if err != nil {
+		return nil, err
+	}
+	authorization, serviceErr := h.collaboration.Authorize(ctx, request.DocumentId, principal.UserID)
+	if serviceErr != nil {
+		return nil, h.transportError(ctx, "authorize_collaboration_failed", serviceErr)
+	}
+	if authorization == nil || authorization.Document == nil || authorization.User == nil ||
+		authorization.Document.ID != request.DocumentId || authorization.User.ID != principal.UserID ||
+		(authorization.Document.Access != domain.AccessOwner && authorization.Document.Access != domain.AccessEditor &&
+			authorization.Document.Access != domain.AccessViewer) || principal.ExpiresAt.IsZero() {
+		return nil, h.transportError(ctx, "authorize_collaboration_failed", errors.New("knowledge returned incomplete collaboration authorization"))
+	}
+	return &knowledgev1.CollaborationAuthorization{
+		DocumentId:         authorization.Document.ID,
+		Actor:              toTransportUser(*authorization.User),
+		Access:             authorization.Document.Access,
+		PermissionRevision: authorization.Document.PermissionRevision,
+		TokenExpiresAt:     principal.ExpiresAt.UTC().Format(time.RFC3339Nano),
+	}, nil
+}
+
+func (h *Handler) ProjectCollaboration(ctx context.Context, request *knowledgev1.ProjectCollaborationRequest) error {
+	ctx = metadata.EnsureRequestID(ctx)
+	if request == nil || request.Content == nil {
+		return h.invalidInput(ctx)
+	}
+	content, err := fromTransportRichText(request.Content)
+	if err != nil {
+		return h.invalidInput(ctx)
+	}
+	if err := h.collaboration.Project(
+		ctx, request.DocumentId, request.Sequence, content, request.PlainText,
+	); err != nil {
+		return h.transportError(ctx, "project_collaboration_failed", err)
+	}
+	return nil
+}
+
 func (h *Handler) documentResult(ctx context.Context, event string, document *domain.Document) (*knowledgev1.Document, error) {
 	if document == nil {
 		return nil, h.transportError(ctx, event, errors.New("knowledge returned a nil document"))
@@ -409,17 +472,26 @@ func (h *Handler) optionalActor(ctx context.Context) (int64, error) {
 }
 
 func (h *Handler) requireActor(ctx context.Context, validRequest bool) (int64, error) {
-	if !validRequest {
-		return 0, h.invalidInput(ctx)
-	}
-	actorID, err := h.optionalActor(ctx)
+	principal, err := h.requirePrincipal(ctx, validRequest)
 	if err != nil {
 		return 0, err
 	}
-	if actorID <= 0 {
-		return 0, apperror.ToKitexBizStatus(ctx, knowledgeerrors.Unauthenticated.New())
+	return principal.UserID, nil
+}
+
+func (h *Handler) requirePrincipal(ctx context.Context, validRequest bool) (coreauth.Principal, error) {
+	if !validRequest {
+		return coreauth.Principal{}, h.invalidInput(ctx)
 	}
-	return actorID, nil
+	token := strings.TrimSpace(coreauth.AccessToken(ctx))
+	if token == "" {
+		return coreauth.Principal{}, apperror.ToKitexBizStatus(ctx, knowledgeerrors.Unauthenticated.New())
+	}
+	principal, err := h.verifier.Verify(token)
+	if err != nil || principal.UserID <= 0 || principal.ExpiresAt.IsZero() {
+		return coreauth.Principal{}, apperror.ToKitexBizStatus(ctx, knowledgeerrors.Unauthenticated.Wrap(err))
+	}
+	return principal, nil
 }
 
 func (h *Handler) invalidInput(ctx context.Context) error {
@@ -548,6 +620,64 @@ func toTransportRichTextAttrs(value *domain.RichTextAttrs) *knowledgev1.RichText
 	return &knowledgev1.RichTextAttrs{
 		Level: value.Level, Start: value.Start, Checked: value.Checked, Language: value.Language,
 		Href: value.Href, AttachmentId: value.AttachmentID, Alt: value.Alt, Title: value.Title,
+		TextAlign: value.TextAlign, Colspan: value.Colspan, Rowspan: value.Rowspan,
+		Colwidth: append([]int32(nil), value.Colwidth...),
+	}
+}
+
+func fromTransportRichText(value *knowledgev1.RichTextDocument) (domain.RichTextDocument, error) {
+	if value == nil {
+		return domain.RichTextDocument{}, errors.New("rich-text document is required")
+	}
+	count := 0
+	content := make([]*domain.RichTextNode, 0, len(value.Content))
+	for _, node := range value.Content {
+		converted, err := fromTransportRichTextNode(node, 1, &count)
+		if err != nil {
+			return domain.RichTextDocument{}, err
+		}
+		content = append(content, converted)
+	}
+	return domain.RichTextDocument{Type: value.Type, Content: content}, nil
+}
+
+func fromTransportRichTextNode(value *knowledgev1.RichTextNode, depth int, count *int) (*domain.RichTextNode, error) {
+	if value == nil || depth > 64 || count == nil {
+		return nil, errors.New("rich-text node structure is invalid")
+	}
+	*count++
+	if *count > 100000 {
+		return nil, errors.New("rich-text document contains too many nodes")
+	}
+	content := make([]*domain.RichTextNode, 0, len(value.Content))
+	for _, child := range value.Content {
+		converted, err := fromTransportRichTextNode(child, depth+1, count)
+		if err != nil {
+			return nil, err
+		}
+		content = append(content, converted)
+	}
+	marks := make([]domain.RichTextMark, 0, len(value.Marks))
+	for _, mark := range value.Marks {
+		if mark == nil {
+			marks = append(marks, domain.RichTextMark{})
+			continue
+		}
+		marks = append(marks, domain.RichTextMark{Type: mark.Type, Attrs: fromTransportRichTextAttrs(mark.Attrs)})
+	}
+	return &domain.RichTextNode{
+		Type: value.Type, Attrs: fromTransportRichTextAttrs(value.Attrs), Content: content,
+		Text: value.Text, Marks: marks,
+	}, nil
+}
+
+func fromTransportRichTextAttrs(value *knowledgev1.RichTextAttrs) *domain.RichTextAttrs {
+	if value == nil {
+		return nil
+	}
+	return &domain.RichTextAttrs{
+		Level: value.Level, Start: value.Start, Checked: value.Checked, Language: value.Language,
+		Href: value.Href, AttachmentID: value.AttachmentId, Alt: value.Alt, Title: value.Title,
 		TextAlign: value.TextAlign, Colspan: value.Colspan, Rowspan: value.Rowspan,
 		Colwidth: append([]int32(nil), value.Colwidth...),
 	}

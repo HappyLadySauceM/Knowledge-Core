@@ -5004,12 +5004,10 @@ func (p *AttachmentData) String() string {
 }
 
 type DocumentDetailData struct {
-	Document     *DocumentData         `thrift:"document,1,required" form:"document,required" json:"document,required"`
-	Content      *RichTextDocumentData `thrift:"content,2,required" form:"content,required" json:"content,required"`
-	PlainText    string                `thrift:"plain_text,3,required" form:"plain_text,required" json:"plain_text,required"`
-	Attachments  []*AttachmentData     `thrift:"attachments,4,required,list<AttachmentData>" form:"attachments,required" json:"attachments,required"`
-	WebsocketURL *string               `thrift:"websocket_url,5,optional" form:"websocket_url" json:"websocket_url,omitempty"`
-	Fragment     *string               `thrift:"fragment,6,optional" form:"fragment" json:"fragment,omitempty"`
+	Document    *DocumentData         `thrift:"document,1,required" form:"document,required" json:"document,required"`
+	Content     *RichTextDocumentData `thrift:"content,2,required" form:"content,required" json:"content,required"`
+	PlainText   string                `thrift:"plain_text,3,required" form:"plain_text,required" json:"plain_text,required"`
+	Attachments []*AttachmentData     `thrift:"attachments,4,required,list<AttachmentData>" form:"attachments,required" json:"attachments,required"`
 }
 
 func NewDocumentDetailData() *DocumentDetailData {
@@ -5045,31 +5043,11 @@ func (p *DocumentDetailData) GetAttachments() (v []*AttachmentData) {
 	return p.Attachments
 }
 
-var DocumentDetailData_WebsocketURL_DEFAULT string
-
-func (p *DocumentDetailData) GetWebsocketURL() (v string) {
-	if !p.IsSetWebsocketURL() {
-		return DocumentDetailData_WebsocketURL_DEFAULT
-	}
-	return *p.WebsocketURL
-}
-
-var DocumentDetailData_Fragment_DEFAULT string
-
-func (p *DocumentDetailData) GetFragment() (v string) {
-	if !p.IsSetFragment() {
-		return DocumentDetailData_Fragment_DEFAULT
-	}
-	return *p.Fragment
-}
-
 var fieldIDToName_DocumentDetailData = map[int16]string{
 	1: "document",
 	2: "content",
 	3: "plain_text",
 	4: "attachments",
-	5: "websocket_url",
-	6: "fragment",
 }
 
 func (p *DocumentDetailData) IsSetDocument() bool {
@@ -5078,14 +5056,6 @@ func (p *DocumentDetailData) IsSetDocument() bool {
 
 func (p *DocumentDetailData) IsSetContent() bool {
 	return p.Content != nil
-}
-
-func (p *DocumentDetailData) IsSetWebsocketURL() bool {
-	return p.WebsocketURL != nil
-}
-
-func (p *DocumentDetailData) IsSetFragment() bool {
-	return p.Fragment != nil
 }
 
 func (p *DocumentDetailData) Read(iprot thrift.TProtocol) (err error) {
@@ -5144,22 +5114,6 @@ func (p *DocumentDetailData) Read(iprot thrift.TProtocol) (err error) {
 					goto ReadFieldError
 				}
 				issetAttachments = true
-			} else if err = iprot.Skip(fieldTypeId); err != nil {
-				goto SkipFieldError
-			}
-		case 5:
-			if fieldTypeId == thrift.STRING {
-				if err = p.ReadField5(iprot); err != nil {
-					goto ReadFieldError
-				}
-			} else if err = iprot.Skip(fieldTypeId); err != nil {
-				goto SkipFieldError
-			}
-		case 6:
-			if fieldTypeId == thrift.STRING {
-				if err = p.ReadField6(iprot); err != nil {
-					goto ReadFieldError
-				}
 			} else if err = iprot.Skip(fieldTypeId); err != nil {
 				goto SkipFieldError
 			}
@@ -5263,28 +5217,6 @@ func (p *DocumentDetailData) ReadField4(iprot thrift.TProtocol) error {
 	p.Attachments = _field
 	return nil
 }
-func (p *DocumentDetailData) ReadField5(iprot thrift.TProtocol) error {
-
-	var _field *string
-	if v, err := iprot.ReadString(); err != nil {
-		return err
-	} else {
-		_field = &v
-	}
-	p.WebsocketURL = _field
-	return nil
-}
-func (p *DocumentDetailData) ReadField6(iprot thrift.TProtocol) error {
-
-	var _field *string
-	if v, err := iprot.ReadString(); err != nil {
-		return err
-	} else {
-		_field = &v
-	}
-	p.Fragment = _field
-	return nil
-}
 
 func (p *DocumentDetailData) Write(oprot thrift.TProtocol) (err error) {
 	var fieldId int16
@@ -5306,14 +5238,6 @@ func (p *DocumentDetailData) Write(oprot thrift.TProtocol) (err error) {
 		}
 		if err = p.writeField4(oprot); err != nil {
 			fieldId = 4
-			goto WriteFieldError
-		}
-		if err = p.writeField5(oprot); err != nil {
-			fieldId = 5
-			goto WriteFieldError
-		}
-		if err = p.writeField6(oprot); err != nil {
-			fieldId = 6
 			goto WriteFieldError
 		}
 	}
@@ -5410,17 +5334,430 @@ WriteFieldEndError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 4 end error: ", p), err)
 }
 
-func (p *DocumentDetailData) writeField5(oprot thrift.TProtocol) (err error) {
-	if p.IsSetWebsocketURL() {
-		if err = oprot.WriteFieldBegin("websocket_url", thrift.STRING, 5); err != nil {
-			goto WriteFieldBeginError
+func (p *DocumentDetailData) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("DocumentDetailData(%+v)", *p)
+
+}
+
+type CollaborationSessionData struct {
+	WebsocketURL     string `thrift:"websocket_url,1,required" form:"websocket_url,required" json:"websocket_url,required"`
+	Ticket           string `thrift:"ticket,2,required" form:"ticket,required" json:"ticket,required"`
+	Subprotocol      string `thrift:"subprotocol,3,required" form:"subprotocol,required" json:"subprotocol,required"`
+	Fragment         string `thrift:"fragment,4,required" form:"fragment,required" json:"fragment,required"`
+	Access           string `thrift:"access,5,required" form:"access,required" json:"access,required"`
+	TicketExpiresAt  string `thrift:"ticket_expires_at,6,required" form:"ticket_expires_at,required" json:"ticket_expires_at,required"`
+	SessionExpiresAt string `thrift:"session_expires_at,7,required" form:"session_expires_at,required" json:"session_expires_at,required"`
+}
+
+func NewCollaborationSessionData() *CollaborationSessionData {
+	return &CollaborationSessionData{}
+}
+
+func (p *CollaborationSessionData) InitDefault() {
+}
+
+func (p *CollaborationSessionData) GetWebsocketURL() (v string) {
+	return p.WebsocketURL
+}
+
+func (p *CollaborationSessionData) GetTicket() (v string) {
+	return p.Ticket
+}
+
+func (p *CollaborationSessionData) GetSubprotocol() (v string) {
+	return p.Subprotocol
+}
+
+func (p *CollaborationSessionData) GetFragment() (v string) {
+	return p.Fragment
+}
+
+func (p *CollaborationSessionData) GetAccess() (v string) {
+	return p.Access
+}
+
+func (p *CollaborationSessionData) GetTicketExpiresAt() (v string) {
+	return p.TicketExpiresAt
+}
+
+func (p *CollaborationSessionData) GetSessionExpiresAt() (v string) {
+	return p.SessionExpiresAt
+}
+
+var fieldIDToName_CollaborationSessionData = map[int16]string{
+	1: "websocket_url",
+	2: "ticket",
+	3: "subprotocol",
+	4: "fragment",
+	5: "access",
+	6: "ticket_expires_at",
+	7: "session_expires_at",
+}
+
+func (p *CollaborationSessionData) Read(iprot thrift.TProtocol) (err error) {
+
+	var fieldTypeId thrift.TType
+	var fieldId int16
+	var issetWebsocketURL bool = false
+	var issetTicket bool = false
+	var issetSubprotocol bool = false
+	var issetFragment bool = false
+	var issetAccess bool = false
+	var issetTicketExpiresAt bool = false
+	var issetSessionExpiresAt bool = false
+
+	if _, err = iprot.ReadStructBegin(); err != nil {
+		goto ReadStructBeginError
+	}
+
+	for {
+		_, fieldTypeId, fieldId, err = iprot.ReadFieldBegin()
+		if err != nil {
+			goto ReadFieldBeginError
 		}
-		if err := oprot.WriteString(*p.WebsocketURL); err != nil {
-			return err
+		if fieldTypeId == thrift.STOP {
+			break
 		}
-		if err = oprot.WriteFieldEnd(); err != nil {
-			goto WriteFieldEndError
+
+		switch fieldId {
+		case 1:
+			if fieldTypeId == thrift.STRING {
+				if err = p.ReadField1(iprot); err != nil {
+					goto ReadFieldError
+				}
+				issetWebsocketURL = true
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		case 2:
+			if fieldTypeId == thrift.STRING {
+				if err = p.ReadField2(iprot); err != nil {
+					goto ReadFieldError
+				}
+				issetTicket = true
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		case 3:
+			if fieldTypeId == thrift.STRING {
+				if err = p.ReadField3(iprot); err != nil {
+					goto ReadFieldError
+				}
+				issetSubprotocol = true
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		case 4:
+			if fieldTypeId == thrift.STRING {
+				if err = p.ReadField4(iprot); err != nil {
+					goto ReadFieldError
+				}
+				issetFragment = true
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		case 5:
+			if fieldTypeId == thrift.STRING {
+				if err = p.ReadField5(iprot); err != nil {
+					goto ReadFieldError
+				}
+				issetAccess = true
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		case 6:
+			if fieldTypeId == thrift.STRING {
+				if err = p.ReadField6(iprot); err != nil {
+					goto ReadFieldError
+				}
+				issetTicketExpiresAt = true
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		case 7:
+			if fieldTypeId == thrift.STRING {
+				if err = p.ReadField7(iprot); err != nil {
+					goto ReadFieldError
+				}
+				issetSessionExpiresAt = true
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		default:
+			if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
 		}
+		if err = iprot.ReadFieldEnd(); err != nil {
+			goto ReadFieldEndError
+		}
+	}
+	if err = iprot.ReadStructEnd(); err != nil {
+		goto ReadStructEndError
+	}
+
+	if !issetWebsocketURL {
+		fieldId = 1
+		goto RequiredFieldNotSetError
+	}
+
+	if !issetTicket {
+		fieldId = 2
+		goto RequiredFieldNotSetError
+	}
+
+	if !issetSubprotocol {
+		fieldId = 3
+		goto RequiredFieldNotSetError
+	}
+
+	if !issetFragment {
+		fieldId = 4
+		goto RequiredFieldNotSetError
+	}
+
+	if !issetAccess {
+		fieldId = 5
+		goto RequiredFieldNotSetError
+	}
+
+	if !issetTicketExpiresAt {
+		fieldId = 6
+		goto RequiredFieldNotSetError
+	}
+
+	if !issetSessionExpiresAt {
+		fieldId = 7
+		goto RequiredFieldNotSetError
+	}
+	return nil
+ReadStructBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T read struct begin error: ", p), err)
+ReadFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
+ReadFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_CollaborationSessionData[fieldId]), err)
+SkipFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T field %d skip type %d error: ", p, fieldId, fieldTypeId), err)
+
+ReadFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T read field end error", p), err)
+ReadStructEndError:
+	return thrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
+RequiredFieldNotSetError:
+	return thrift.NewTProtocolExceptionWithType(thrift.INVALID_DATA, fmt.Errorf("required field %s is not set", fieldIDToName_CollaborationSessionData[fieldId]))
+}
+
+func (p *CollaborationSessionData) ReadField1(iprot thrift.TProtocol) error {
+
+	var _field string
+	if v, err := iprot.ReadString(); err != nil {
+		return err
+	} else {
+		_field = v
+	}
+	p.WebsocketURL = _field
+	return nil
+}
+func (p *CollaborationSessionData) ReadField2(iprot thrift.TProtocol) error {
+
+	var _field string
+	if v, err := iprot.ReadString(); err != nil {
+		return err
+	} else {
+		_field = v
+	}
+	p.Ticket = _field
+	return nil
+}
+func (p *CollaborationSessionData) ReadField3(iprot thrift.TProtocol) error {
+
+	var _field string
+	if v, err := iprot.ReadString(); err != nil {
+		return err
+	} else {
+		_field = v
+	}
+	p.Subprotocol = _field
+	return nil
+}
+func (p *CollaborationSessionData) ReadField4(iprot thrift.TProtocol) error {
+
+	var _field string
+	if v, err := iprot.ReadString(); err != nil {
+		return err
+	} else {
+		_field = v
+	}
+	p.Fragment = _field
+	return nil
+}
+func (p *CollaborationSessionData) ReadField5(iprot thrift.TProtocol) error {
+
+	var _field string
+	if v, err := iprot.ReadString(); err != nil {
+		return err
+	} else {
+		_field = v
+	}
+	p.Access = _field
+	return nil
+}
+func (p *CollaborationSessionData) ReadField6(iprot thrift.TProtocol) error {
+
+	var _field string
+	if v, err := iprot.ReadString(); err != nil {
+		return err
+	} else {
+		_field = v
+	}
+	p.TicketExpiresAt = _field
+	return nil
+}
+func (p *CollaborationSessionData) ReadField7(iprot thrift.TProtocol) error {
+
+	var _field string
+	if v, err := iprot.ReadString(); err != nil {
+		return err
+	} else {
+		_field = v
+	}
+	p.SessionExpiresAt = _field
+	return nil
+}
+
+func (p *CollaborationSessionData) Write(oprot thrift.TProtocol) (err error) {
+	var fieldId int16
+	if err = oprot.WriteStructBegin("CollaborationSessionData"); err != nil {
+		goto WriteStructBeginError
+	}
+	if p != nil {
+		if err = p.writeField1(oprot); err != nil {
+			fieldId = 1
+			goto WriteFieldError
+		}
+		if err = p.writeField2(oprot); err != nil {
+			fieldId = 2
+			goto WriteFieldError
+		}
+		if err = p.writeField3(oprot); err != nil {
+			fieldId = 3
+			goto WriteFieldError
+		}
+		if err = p.writeField4(oprot); err != nil {
+			fieldId = 4
+			goto WriteFieldError
+		}
+		if err = p.writeField5(oprot); err != nil {
+			fieldId = 5
+			goto WriteFieldError
+		}
+		if err = p.writeField6(oprot); err != nil {
+			fieldId = 6
+			goto WriteFieldError
+		}
+		if err = p.writeField7(oprot); err != nil {
+			fieldId = 7
+			goto WriteFieldError
+		}
+	}
+	if err = oprot.WriteFieldStop(); err != nil {
+		goto WriteFieldStopError
+	}
+	if err = oprot.WriteStructEnd(); err != nil {
+		goto WriteStructEndError
+	}
+	return nil
+WriteStructBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
+WriteFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T write field %d error: ", p, fieldId), err)
+WriteFieldStopError:
+	return thrift.PrependError(fmt.Sprintf("%T write field stop error: ", p), err)
+WriteStructEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write struct end error: ", p), err)
+}
+
+func (p *CollaborationSessionData) writeField1(oprot thrift.TProtocol) (err error) {
+	if err = oprot.WriteFieldBegin("websocket_url", thrift.STRING, 1); err != nil {
+		goto WriteFieldBeginError
+	}
+	if err := oprot.WriteString(p.WebsocketURL); err != nil {
+		return err
+	}
+	if err = oprot.WriteFieldEnd(); err != nil {
+		goto WriteFieldEndError
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 1 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 1 end error: ", p), err)
+}
+
+func (p *CollaborationSessionData) writeField2(oprot thrift.TProtocol) (err error) {
+	if err = oprot.WriteFieldBegin("ticket", thrift.STRING, 2); err != nil {
+		goto WriteFieldBeginError
+	}
+	if err := oprot.WriteString(p.Ticket); err != nil {
+		return err
+	}
+	if err = oprot.WriteFieldEnd(); err != nil {
+		goto WriteFieldEndError
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 2 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 2 end error: ", p), err)
+}
+
+func (p *CollaborationSessionData) writeField3(oprot thrift.TProtocol) (err error) {
+	if err = oprot.WriteFieldBegin("subprotocol", thrift.STRING, 3); err != nil {
+		goto WriteFieldBeginError
+	}
+	if err := oprot.WriteString(p.Subprotocol); err != nil {
+		return err
+	}
+	if err = oprot.WriteFieldEnd(); err != nil {
+		goto WriteFieldEndError
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 3 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 3 end error: ", p), err)
+}
+
+func (p *CollaborationSessionData) writeField4(oprot thrift.TProtocol) (err error) {
+	if err = oprot.WriteFieldBegin("fragment", thrift.STRING, 4); err != nil {
+		goto WriteFieldBeginError
+	}
+	if err := oprot.WriteString(p.Fragment); err != nil {
+		return err
+	}
+	if err = oprot.WriteFieldEnd(); err != nil {
+		goto WriteFieldEndError
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 4 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 4 end error: ", p), err)
+}
+
+func (p *CollaborationSessionData) writeField5(oprot thrift.TProtocol) (err error) {
+	if err = oprot.WriteFieldBegin("access", thrift.STRING, 5); err != nil {
+		goto WriteFieldBeginError
+	}
+	if err := oprot.WriteString(p.Access); err != nil {
+		return err
+	}
+	if err = oprot.WriteFieldEnd(); err != nil {
+		goto WriteFieldEndError
 	}
 	return nil
 WriteFieldBeginError:
@@ -5429,17 +5766,15 @@ WriteFieldEndError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 5 end error: ", p), err)
 }
 
-func (p *DocumentDetailData) writeField6(oprot thrift.TProtocol) (err error) {
-	if p.IsSetFragment() {
-		if err = oprot.WriteFieldBegin("fragment", thrift.STRING, 6); err != nil {
-			goto WriteFieldBeginError
-		}
-		if err := oprot.WriteString(*p.Fragment); err != nil {
-			return err
-		}
-		if err = oprot.WriteFieldEnd(); err != nil {
-			goto WriteFieldEndError
-		}
+func (p *CollaborationSessionData) writeField6(oprot thrift.TProtocol) (err error) {
+	if err = oprot.WriteFieldBegin("ticket_expires_at", thrift.STRING, 6); err != nil {
+		goto WriteFieldBeginError
+	}
+	if err := oprot.WriteString(p.TicketExpiresAt); err != nil {
+		return err
+	}
+	if err = oprot.WriteFieldEnd(); err != nil {
+		goto WriteFieldEndError
 	}
 	return nil
 WriteFieldBeginError:
@@ -5448,11 +5783,28 @@ WriteFieldEndError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 6 end error: ", p), err)
 }
 
-func (p *DocumentDetailData) String() string {
+func (p *CollaborationSessionData) writeField7(oprot thrift.TProtocol) (err error) {
+	if err = oprot.WriteFieldBegin("session_expires_at", thrift.STRING, 7); err != nil {
+		goto WriteFieldBeginError
+	}
+	if err := oprot.WriteString(p.SessionExpiresAt); err != nil {
+		return err
+	}
+	if err = oprot.WriteFieldEnd(); err != nil {
+		goto WriteFieldEndError
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 7 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 7 end error: ", p), err)
+}
+
+func (p *CollaborationSessionData) String() string {
 	if p == nil {
 		return "<nil>"
 	}
-	return fmt.Sprintf("DocumentDetailData(%+v)", *p)
+	return fmt.Sprintf("CollaborationSessionData(%+v)", *p)
 
 }
 
@@ -12366,6 +12718,8 @@ type GatewayService interface {
 
 	GetDocument(ctx context.Context, request *DocumentIDRequest) (r *DocumentData, err error)
 
+	CreateCollaborationSession(ctx context.Context, request *DocumentIDRequest) (r *CollaborationSessionData, err error)
+
 	UpdateDocument(ctx context.Context, request *UpdateDocumentRequest) (r *DocumentData, err error)
 
 	DeleteDocument(ctx context.Context, request *DeleteDocumentRequest) (r *EmptyResponse, err error)
@@ -12524,6 +12878,15 @@ func (p *GatewayServiceClient) GetDocument(ctx context.Context, request *Documen
 	_args.Request = request
 	var _result GatewayServiceGetDocumentResult
 	if err = p.Client_().Call(ctx, "GetDocument", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+func (p *GatewayServiceClient) CreateCollaborationSession(ctx context.Context, request *DocumentIDRequest) (r *CollaborationSessionData, err error) {
+	var _args GatewayServiceCreateCollaborationSessionArgs
+	_args.Request = request
+	var _result GatewayServiceCreateCollaborationSessionResult
+	if err = p.Client_().Call(ctx, "CreateCollaborationSession", &_args, &_result); err != nil {
 		return
 	}
 	return _result.GetSuccess(), nil
@@ -12722,6 +13085,7 @@ func NewGatewayServiceProcessor(handler GatewayService) *GatewayServiceProcessor
 	self.AddToProcessorMap("ListDocuments", &gatewayServiceProcessorListDocuments{handler: handler})
 	self.AddToProcessorMap("CreateDocument", &gatewayServiceProcessorCreateDocument{handler: handler})
 	self.AddToProcessorMap("GetDocument", &gatewayServiceProcessorGetDocument{handler: handler})
+	self.AddToProcessorMap("CreateCollaborationSession", &gatewayServiceProcessorCreateCollaborationSession{handler: handler})
 	self.AddToProcessorMap("UpdateDocument", &gatewayServiceProcessorUpdateDocument{handler: handler})
 	self.AddToProcessorMap("DeleteDocument", &gatewayServiceProcessorDeleteDocument{handler: handler})
 	self.AddToProcessorMap("PublishDocument", &gatewayServiceProcessorPublishDocument{handler: handler})
@@ -13271,6 +13635,54 @@ func (p *gatewayServiceProcessorGetDocument) Process(ctx context.Context, seqId 
 		result.Success = retval
 	}
 	if err2 = oprot.WriteMessageBegin("GetDocument", thrift.REPLY, seqId); err2 != nil {
+		err = err2
+	}
+	if err2 = result.Write(oprot); err == nil && err2 != nil {
+		err = err2
+	}
+	if err2 = oprot.WriteMessageEnd(); err == nil && err2 != nil {
+		err = err2
+	}
+	if err2 = oprot.Flush(ctx); err == nil && err2 != nil {
+		err = err2
+	}
+	if err != nil {
+		return
+	}
+	return true, err
+}
+
+type gatewayServiceProcessorCreateCollaborationSession struct {
+	handler GatewayService
+}
+
+func (p *gatewayServiceProcessorCreateCollaborationSession) Process(ctx context.Context, seqId int32, iprot, oprot thrift.TProtocol) (success bool, err thrift.TException) {
+	args := GatewayServiceCreateCollaborationSessionArgs{}
+	if err = args.Read(iprot); err != nil {
+		iprot.ReadMessageEnd()
+		x := thrift.NewTApplicationException(thrift.PROTOCOL_ERROR, err.Error())
+		oprot.WriteMessageBegin("CreateCollaborationSession", thrift.EXCEPTION, seqId)
+		x.Write(oprot)
+		oprot.WriteMessageEnd()
+		oprot.Flush(ctx)
+		return false, err
+	}
+
+	iprot.ReadMessageEnd()
+	var err2 error
+	result := GatewayServiceCreateCollaborationSessionResult{}
+	var retval *CollaborationSessionData
+	if retval, err2 = p.handler.CreateCollaborationSession(ctx, args.Request); err2 != nil {
+		x := thrift.NewTApplicationException(thrift.INTERNAL_ERROR, "Internal error processing CreateCollaborationSession: "+err2.Error())
+		oprot.WriteMessageBegin("CreateCollaborationSession", thrift.EXCEPTION, seqId)
+		x.Write(oprot)
+		oprot.WriteMessageEnd()
+		oprot.Flush(ctx)
+		return true, err2
+	} else {
+		result.Success = retval
+	}
+	if err2 = oprot.WriteMessageBegin("CreateCollaborationSession", thrift.REPLY, seqId); err2 != nil {
 		err = err2
 	}
 	if err2 = result.Write(oprot); err == nil && err2 != nil {
@@ -17383,6 +17795,300 @@ func (p *GatewayServiceGetDocumentResult) String() string {
 		return "<nil>"
 	}
 	return fmt.Sprintf("GatewayServiceGetDocumentResult(%+v)", *p)
+
+}
+
+type GatewayServiceCreateCollaborationSessionArgs struct {
+	Request *DocumentIDRequest `thrift:"request,1"`
+}
+
+func NewGatewayServiceCreateCollaborationSessionArgs() *GatewayServiceCreateCollaborationSessionArgs {
+	return &GatewayServiceCreateCollaborationSessionArgs{}
+}
+
+func (p *GatewayServiceCreateCollaborationSessionArgs) InitDefault() {
+}
+
+var GatewayServiceCreateCollaborationSessionArgs_Request_DEFAULT *DocumentIDRequest
+
+func (p *GatewayServiceCreateCollaborationSessionArgs) GetRequest() (v *DocumentIDRequest) {
+	if !p.IsSetRequest() {
+		return GatewayServiceCreateCollaborationSessionArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+
+var fieldIDToName_GatewayServiceCreateCollaborationSessionArgs = map[int16]string{
+	1: "request",
+}
+
+func (p *GatewayServiceCreateCollaborationSessionArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *GatewayServiceCreateCollaborationSessionArgs) Read(iprot thrift.TProtocol) (err error) {
+
+	var fieldTypeId thrift.TType
+	var fieldId int16
+
+	if _, err = iprot.ReadStructBegin(); err != nil {
+		goto ReadStructBeginError
+	}
+
+	for {
+		_, fieldTypeId, fieldId, err = iprot.ReadFieldBegin()
+		if err != nil {
+			goto ReadFieldBeginError
+		}
+		if fieldTypeId == thrift.STOP {
+			break
+		}
+
+		switch fieldId {
+		case 1:
+			if fieldTypeId == thrift.STRUCT {
+				if err = p.ReadField1(iprot); err != nil {
+					goto ReadFieldError
+				}
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		default:
+			if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		}
+		if err = iprot.ReadFieldEnd(); err != nil {
+			goto ReadFieldEndError
+		}
+	}
+	if err = iprot.ReadStructEnd(); err != nil {
+		goto ReadStructEndError
+	}
+
+	return nil
+ReadStructBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T read struct begin error: ", p), err)
+ReadFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
+ReadFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_GatewayServiceCreateCollaborationSessionArgs[fieldId]), err)
+SkipFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T field %d skip type %d error: ", p, fieldId, fieldTypeId), err)
+
+ReadFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T read field end error", p), err)
+ReadStructEndError:
+	return thrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
+}
+
+func (p *GatewayServiceCreateCollaborationSessionArgs) ReadField1(iprot thrift.TProtocol) error {
+	_field := NewDocumentIDRequest()
+	if err := _field.Read(iprot); err != nil {
+		return err
+	}
+	p.Request = _field
+	return nil
+}
+
+func (p *GatewayServiceCreateCollaborationSessionArgs) Write(oprot thrift.TProtocol) (err error) {
+	var fieldId int16
+	if err = oprot.WriteStructBegin("CreateCollaborationSession_args"); err != nil {
+		goto WriteStructBeginError
+	}
+	if p != nil {
+		if err = p.writeField1(oprot); err != nil {
+			fieldId = 1
+			goto WriteFieldError
+		}
+	}
+	if err = oprot.WriteFieldStop(); err != nil {
+		goto WriteFieldStopError
+	}
+	if err = oprot.WriteStructEnd(); err != nil {
+		goto WriteStructEndError
+	}
+	return nil
+WriteStructBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
+WriteFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T write field %d error: ", p, fieldId), err)
+WriteFieldStopError:
+	return thrift.PrependError(fmt.Sprintf("%T write field stop error: ", p), err)
+WriteStructEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write struct end error: ", p), err)
+}
+
+func (p *GatewayServiceCreateCollaborationSessionArgs) writeField1(oprot thrift.TProtocol) (err error) {
+	if err = oprot.WriteFieldBegin("request", thrift.STRUCT, 1); err != nil {
+		goto WriteFieldBeginError
+	}
+	if err := p.Request.Write(oprot); err != nil {
+		return err
+	}
+	if err = oprot.WriteFieldEnd(); err != nil {
+		goto WriteFieldEndError
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 1 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 1 end error: ", p), err)
+}
+
+func (p *GatewayServiceCreateCollaborationSessionArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("GatewayServiceCreateCollaborationSessionArgs(%+v)", *p)
+
+}
+
+type GatewayServiceCreateCollaborationSessionResult struct {
+	Success *CollaborationSessionData `thrift:"success,0,optional"`
+}
+
+func NewGatewayServiceCreateCollaborationSessionResult() *GatewayServiceCreateCollaborationSessionResult {
+	return &GatewayServiceCreateCollaborationSessionResult{}
+}
+
+func (p *GatewayServiceCreateCollaborationSessionResult) InitDefault() {
+}
+
+var GatewayServiceCreateCollaborationSessionResult_Success_DEFAULT *CollaborationSessionData
+
+func (p *GatewayServiceCreateCollaborationSessionResult) GetSuccess() (v *CollaborationSessionData) {
+	if !p.IsSetSuccess() {
+		return GatewayServiceCreateCollaborationSessionResult_Success_DEFAULT
+	}
+	return p.Success
+}
+
+var fieldIDToName_GatewayServiceCreateCollaborationSessionResult = map[int16]string{
+	0: "success",
+}
+
+func (p *GatewayServiceCreateCollaborationSessionResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *GatewayServiceCreateCollaborationSessionResult) Read(iprot thrift.TProtocol) (err error) {
+
+	var fieldTypeId thrift.TType
+	var fieldId int16
+
+	if _, err = iprot.ReadStructBegin(); err != nil {
+		goto ReadStructBeginError
+	}
+
+	for {
+		_, fieldTypeId, fieldId, err = iprot.ReadFieldBegin()
+		if err != nil {
+			goto ReadFieldBeginError
+		}
+		if fieldTypeId == thrift.STOP {
+			break
+		}
+
+		switch fieldId {
+		case 0:
+			if fieldTypeId == thrift.STRUCT {
+				if err = p.ReadField0(iprot); err != nil {
+					goto ReadFieldError
+				}
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		default:
+			if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		}
+		if err = iprot.ReadFieldEnd(); err != nil {
+			goto ReadFieldEndError
+		}
+	}
+	if err = iprot.ReadStructEnd(); err != nil {
+		goto ReadStructEndError
+	}
+
+	return nil
+ReadStructBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T read struct begin error: ", p), err)
+ReadFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
+ReadFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_GatewayServiceCreateCollaborationSessionResult[fieldId]), err)
+SkipFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T field %d skip type %d error: ", p, fieldId, fieldTypeId), err)
+
+ReadFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T read field end error", p), err)
+ReadStructEndError:
+	return thrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
+}
+
+func (p *GatewayServiceCreateCollaborationSessionResult) ReadField0(iprot thrift.TProtocol) error {
+	_field := NewCollaborationSessionData()
+	if err := _field.Read(iprot); err != nil {
+		return err
+	}
+	p.Success = _field
+	return nil
+}
+
+func (p *GatewayServiceCreateCollaborationSessionResult) Write(oprot thrift.TProtocol) (err error) {
+	var fieldId int16
+	if err = oprot.WriteStructBegin("CreateCollaborationSession_result"); err != nil {
+		goto WriteStructBeginError
+	}
+	if p != nil {
+		if err = p.writeField0(oprot); err != nil {
+			fieldId = 0
+			goto WriteFieldError
+		}
+	}
+	if err = oprot.WriteFieldStop(); err != nil {
+		goto WriteFieldStopError
+	}
+	if err = oprot.WriteStructEnd(); err != nil {
+		goto WriteStructEndError
+	}
+	return nil
+WriteStructBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
+WriteFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T write field %d error: ", p, fieldId), err)
+WriteFieldStopError:
+	return thrift.PrependError(fmt.Sprintf("%T write field stop error: ", p), err)
+WriteStructEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write struct end error: ", p), err)
+}
+
+func (p *GatewayServiceCreateCollaborationSessionResult) writeField0(oprot thrift.TProtocol) (err error) {
+	if p.IsSetSuccess() {
+		if err = oprot.WriteFieldBegin("success", thrift.STRUCT, 0); err != nil {
+			goto WriteFieldBeginError
+		}
+		if err := p.Success.Write(oprot); err != nil {
+			return err
+		}
+		if err = oprot.WriteFieldEnd(); err != nil {
+			goto WriteFieldEndError
+		}
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 0 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 0 end error: ", p), err)
+}
+
+func (p *GatewayServiceCreateCollaborationSessionResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("GatewayServiceCreateCollaborationSessionResult(%+v)", *p)
 
 }
 
