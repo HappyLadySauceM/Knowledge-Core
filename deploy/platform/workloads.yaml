@@ -1,0 +1,426 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: knowledge-core-nats
+  namespace: knowledge-core-platform
+spec:
+  serviceName: knowledge-core-nats
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: knowledge-core-nats
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: knowledge-core-nats
+    spec:
+      serviceAccountName: knowledge-core-platform
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: nats
+          image: nats:2.11-alpine@sha256:e4bf19f15fd3218814a4e3c9e0064e1334bd8aa20d5984b9f1a0afd084f8cc00
+          args: ["--config", "/etc/nats/nats.conf"]
+          ports:
+            - {name: client, containerPort: 4222}
+            - {name: monitor, containerPort: 8222}
+          startupProbe:
+            httpGet: {path: /healthz, port: monitor}
+            periodSeconds: 2
+            failureThreshold: 60
+          readinessProbe:
+            httpGet: {path: /healthz, port: monitor}
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: {path: /healthz, port: monitor}
+            periodSeconds: 10
+          resources:
+            requests: {cpu: 100m, memory: 128Mi}
+            limits: {cpu: 500m, memory: 512Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+            seccompProfile: {type: RuntimeDefault}
+          volumeMounts:
+            - {name: config, mountPath: /etc/nats, readOnly: true}
+            - {name: data, mountPath: /data}
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - name: config
+          secret:
+            secretName: knowledge-core-nats-config
+            defaultMode: 0440
+        - name: data
+          persistentVolumeClaim:
+            claimName: knowledge-core-nats-data
+        - name: tmp
+          emptyDir: {sizeLimit: 64Mi}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: knowledge-core-etcd
+  namespace: knowledge-core-platform
+spec:
+  serviceName: knowledge-core-etcd
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: knowledge-core-etcd
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: knowledge-core-etcd
+    spec:
+      serviceAccountName: knowledge-core-platform
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile: {type: RuntimeDefault}
+      initContainers:
+        - name: initialize-auth
+          image: quay.io/coreos/etcd@sha256:3f179425019536765a47fecff29221ed4453a4f4e91aa33e21e1a2326079ad9e
+          command: ["/bin/sh", "-ec"]
+          args:
+            - |
+              /usr/local/bin/etcd \
+                --name=knowledge-core-etcd \
+                --data-dir=/data \
+                --listen-client-urls=http://127.0.0.1:2379 \
+                --advertise-client-urls=http://127.0.0.1:2379 &
+              pid=$!
+              trap 'kill "$pid" 2>/dev/null || true; wait "$pid" 2>/dev/null || true' EXIT
+              for i in $(seq 1 60); do
+                ETCDCTL_API=3 etcdctl --endpoints=http://127.0.0.1:2379 endpoint health >/dev/null 2>&1 && break
+                [ "$i" -lt 60 ] || exit 1
+                sleep 1
+              done
+              if ETCDCTL_API=3 etcdctl --endpoints=http://127.0.0.1:2379 \
+                   --user="root:${ETCD_ROOT_PASSWORD}" user get root >/dev/null 2>&1; then
+                exit 0
+              fi
+              ETCDCTL_API=3 etcdctl --endpoints=http://127.0.0.1:2379 \
+                user add "root:${ETCD_ROOT_PASSWORD}" --interactive=false >/dev/null
+              ETCDCTL_API=3 etcdctl --endpoints=http://127.0.0.1:2379 \
+                user grant-role root root >/dev/null
+              ETCDCTL_API=3 etcdctl --endpoints=http://127.0.0.1:2379 auth enable >/dev/null
+          env:
+            - name: ETCD_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: knowledge-core-etcd-credentials, key: root-password}
+          resources:
+            requests: {cpu: 50m, memory: 64Mi}
+            limits: {cpu: 250m, memory: 256Mi}
+          securityContext: &etcd-restricted
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+            seccompProfile: {type: RuntimeDefault}
+          volumeMounts:
+            - {name: data, mountPath: /data}
+      containers:
+        - name: etcd
+          image: quay.io/coreos/etcd@sha256:3f179425019536765a47fecff29221ed4453a4f4e91aa33e21e1a2326079ad9e
+          command: ["/usr/local/bin/etcd"]
+          args:
+            - --name=knowledge-core-etcd
+            - --data-dir=/data
+            - --listen-client-urls=http://0.0.0.0:2379
+            - --advertise-client-urls=http://knowledge-core-etcd.knowledge-core-platform.svc.cluster.local:2379
+            - --auto-compaction-mode=periodic
+            - --auto-compaction-retention=1h
+            - --quota-backend-bytes=1073741824
+          env:
+            - name: ETCDCTL_API
+              value: "3"
+            - name: ETCD_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: knowledge-core-etcd-credentials, key: root-password}
+          ports:
+            - {name: client, containerPort: 2379}
+          startupProbe: &etcd-probe
+            exec:
+              command:
+                - /bin/sh
+                - -ec
+                - ETCDCTL_USER="root:${ETCD_ROOT_PASSWORD}" etcdctl --endpoints=http://127.0.0.1:2379 endpoint health
+            periodSeconds: 2
+            failureThreshold: 60
+          readinessProbe:
+            <<: *etcd-probe
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            <<: *etcd-probe
+            periodSeconds: 10
+            failureThreshold: 3
+          resources:
+            requests: {cpu: 100m, memory: 128Mi}
+            limits: {cpu: 500m, memory: 512Mi}
+          securityContext: *etcd-restricted
+          volumeMounts:
+            - {name: data, mountPath: /data}
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: knowledge-core-etcd-data
+        - name: tmp
+          emptyDir: {sizeLimit: 64Mi}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: knowledge-core-minio
+  namespace: knowledge-core-platform
+spec:
+  serviceName: knowledge-core-minio
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: knowledge-core-minio
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: knowledge-core-minio
+    spec:
+      serviceAccountName: knowledge-core-platform
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: minio
+          image: minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
+          args: ["server", "/data", "--console-address", ":9001"]
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef: {name: knowledge-core-minio-credentials, key: root-user}
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: knowledge-core-minio-credentials, key: root-password}
+          ports:
+            - {name: api, containerPort: 9000}
+            - {name: console, containerPort: 9001}
+          startupProbe:
+            httpGet: {path: /minio/health/live, port: api}
+            periodSeconds: 2
+            failureThreshold: 60
+          readinessProbe:
+            httpGet: {path: /minio/health/ready, port: api}
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: {path: /minio/health/live, port: api}
+            periodSeconds: 10
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+            limits: {cpu: "1", memory: 1Gi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+            seccompProfile: {type: RuntimeDefault}
+          volumeMounts:
+            - {name: data, mountPath: /data}
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: knowledge-core-minio-data
+        - name: tmp
+          emptyDir: {sizeLimit: 128Mi}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: knowledge-core-clamav
+  namespace: knowledge-core-platform
+spec:
+  serviceName: knowledge-core-clamav
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: knowledge-core-clamav
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: knowledge-core-clamav
+    spec:
+      serviceAccountName: knowledge-core-platform
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 100
+        runAsGroup: 101
+        fsGroup: 101
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: clamav
+          image: clamav/clamav@sha256:75fb5fd95fcbe1d7e6d240c369c1572b686ee2c95949d1042b5148de8eddebb4
+          ports:
+            - {name: clamd, containerPort: 3310}
+          startupProbe:
+            tcpSocket: {port: clamd}
+            periodSeconds: 5
+            failureThreshold: 120
+          readinessProbe:
+            tcpSocket: {port: clamd}
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket: {port: clamd}
+            periodSeconds: 30
+          resources:
+            requests: {cpu: 100m, memory: 512Mi}
+            limits: {cpu: "1", memory: 2Gi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+            seccompProfile: {type: RuntimeDefault}
+          volumeMounts:
+            - {name: data, mountPath: /var/lib/clamav}
+            - {name: run, mountPath: /run/clamav}
+            - {name: log, mountPath: /var/log/clamav}
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: knowledge-core-clamav-data
+        - name: run
+          emptyDir: {sizeLimit: 64Mi}
+        - name: log
+          emptyDir: {sizeLimit: 128Mi}
+        - name: tmp
+          emptyDir: {sizeLimit: 128Mi}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: knowledge-core-nacos
+  namespace: config-system
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: knowledge-core-nacos
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: knowledge-core-nacos
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/scheme: "https"
+        prometheus.io/path: /nacos/actuator/prometheus
+        prometheus.io/port: "8848"
+    spec:
+      serviceAccountName: knowledge-core-nacos
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: nacos
+          image: nacos/nacos-server@sha256:059ca6313125c9ec43854d87d10b0d52fbbe86e595afad89b04da3ad5e2a3fde
+          command: ["/opt/java/openjdk/bin/java"]
+          args:
+            - -Xms512m
+            - -Xmx1024m
+            - -XX:MaxMetaspaceSize=256m
+            - -Xlog:gc*:file=/home/nacos/logs/nacos_gc.log:time,tags:filecount=10,filesize=102400
+            - --add-opens=java.base/java.lang=ALL-UNNAMED
+            - --add-opens=java.base/java.lang.reflect=ALL-UNNAMED
+            - --add-opens=java.base/java.util=ALL-UNNAMED
+            - -Dnacos.standalone=true
+            - -Dnacos.home=/home/nacos
+            - -Dloader.path=/home/nacos/plugins,/home/nacos/plugins/health,/home/nacos/plugins/cmdb,/home/nacos/plugins/selector
+            - -jar
+            - /home/nacos/target/nacos-server.jar
+            - --spring.config.additional-location=file:/home/nacos/conf/
+            - --spring.config.name=application
+            - --logging.config=/home/nacos/conf/nacos-logback.xml
+            - --server.max-http-request-header-size=524288
+          env:
+            - {name: NACOS_DB_USER, value: nacos}
+            - name: NACOS_DB_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: knowledge-core-nacos-credentials, key: postgres-password}
+            - name: NACOS_AUTH_IDENTITY_KEY
+              valueFrom:
+                secretKeyRef: {name: knowledge-core-nacos-credentials, key: identity-key}
+            - name: NACOS_AUTH_IDENTITY_VALUE
+              valueFrom:
+                secretKeyRef: {name: knowledge-core-nacos-credentials, key: identity-value}
+            - name: NACOS_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef: {name: knowledge-core-nacos-credentials, key: token-secret}
+          ports:
+            - {name: http, containerPort: 8848}
+            - {name: grpc-client, containerPort: 9848}
+            - {name: grpc-cluster, containerPort: 9849}
+          startupProbe:
+            httpGet: {path: /nacos/v3/admin/core/state/liveness, port: http, scheme: HTTPS}
+            periodSeconds: 3
+            failureThreshold: 100
+          readinessProbe:
+            httpGet: {path: /nacos/v3/admin/core/state/readiness, port: http, scheme: HTTPS}
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: {path: /nacos/v3/admin/core/state/liveness, port: http, scheme: HTTPS}
+            periodSeconds: 15
+          resources:
+            requests: {cpu: 200m, memory: 768Mi}
+            limits: {cpu: "1", memory: 1536Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+            seccompProfile: {type: RuntimeDefault}
+          volumeMounts:
+            - {name: config, mountPath: /home/nacos/conf/application.properties, subPath: application.properties, readOnly: true}
+            - {name: tls, mountPath: /etc/knowledge-core/nacos/tls, readOnly: true}
+            - {name: data, mountPath: /home/nacos/data}
+            - {name: logs, mountPath: /home/nacos/logs}
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - name: config
+          configMap:
+            name: knowledge-core-nacos-config
+        - name: tls
+          secret:
+            secretName: knowledge-core-nacos-tls
+            defaultMode: 0440
+        - name: data
+          persistentVolumeClaim:
+            claimName: knowledge-core-nacos-data
+        - name: logs
+          emptyDir: {sizeLimit: 1Gi}
+        - name: tmp
+          emptyDir: {sizeLimit: 256Mi}

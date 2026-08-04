@@ -21,20 +21,24 @@ return value
 `)
 
 type RedisLimiter struct {
-	client redisclient.Scripter
+	client    redisclient.Scripter
+	keyPrefix string
 }
 
-func NewRedisLimiter(client *redisclient.Client) (*RedisLimiter, error) {
+func NewRedisLimiter(client *redisclient.Client, keyPrefix string) (*RedisLimiter, error) {
 	if client == nil {
 		return nil, errors.New("create gateway rate limiter: Redis client is required")
 	}
-	return &RedisLimiter{client: client}, nil
+	if keyPrefix == "" || strings.TrimSpace(keyPrefix) != keyPrefix || strings.HasSuffix(keyPrefix, ":") {
+		return nil, errors.New("create gateway rate limiter: key prefix is invalid")
+	}
+	return &RedisLimiter{client: client, keyPrefix: keyPrefix}, nil
 }
 
 func (l *RedisLimiter) Consume(
 	ctx context.Context,
 	scope string,
-	clientIP string,
+	subject string,
 	now time.Time,
 	window time.Duration,
 	limit int64,
@@ -51,7 +55,11 @@ func (l *RedisLimiter) Consume(
 	bucket := now.UnixMilli() / windowMillis
 	bucketEnd := time.UnixMilli((bucket + 1) * windowMillis)
 	retryAfter := bucketEnd.Sub(now)
-	key := "gateway:rate_limit:" + scope + ":" + strconv.FormatInt(bucket, 10) + ":" + normalizeIP(clientIP)
+	normalizedSubject, err := normalizeSubject(subject)
+	if err != nil {
+		return false, 0, fmt.Errorf("consume gateway rate limit: %w", err)
+	}
+	key := l.keyPrefix + ":" + scope + ":" + strconv.FormatInt(bucket, 10) + ":" + normalizedSubject
 	expiryMillis := retryAfter.Milliseconds()
 	if expiryMillis < 1 {
 		expiryMillis = 1
@@ -61,6 +69,18 @@ func (l *RedisLimiter) Consume(
 		return false, 0, fmt.Errorf("consume gateway rate limit: %w", err)
 	}
 	return count <= limit, retryAfter, nil
+}
+
+func normalizeSubject(raw string) (string, error) {
+	raw = strings.TrimSpace(raw)
+	if value, found := strings.CutPrefix(raw, "user:"); found {
+		id, err := strconv.ParseInt(value, 10, 64)
+		if err != nil || id <= 0 || strconv.FormatInt(id, 10) != value {
+			return "", errors.New("rate-limit user subject is invalid")
+		}
+		return "user:" + value, nil
+	}
+	return normalizeIP(raw), nil
 }
 
 func normalizeIP(raw string) string {

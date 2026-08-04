@@ -24,3 +24,10 @@ scrape_configs:
     static_configs:
       - targets:
           - knowledge:8083
+
+  - job_name: knowledge-core-collaboration
+    metrics_path: /metrics
+    scheme: http
+    static_configs:
+      - targets:
+          - collaboration:8084

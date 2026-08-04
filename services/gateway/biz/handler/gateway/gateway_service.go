@@ -259,3 +259,7 @@ func ListDeletedDocuments(ctx context.Context, request *app.RequestContext) {
 func RestoreDeletedDocument(ctx context.Context, request *app.RequestContext) {
 	handleRestoreDeletedDocument(ctx, request)
 }
+
+func CreateCollaborationSession(ctx context.Context, request *app.RequestContext) {
+	handleCreateCollaborationSession(ctx, request)
+}

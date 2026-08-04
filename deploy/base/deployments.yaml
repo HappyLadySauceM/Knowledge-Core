@@ -1,0 +1,413 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: knowledge-core-gateway
+  labels:
+    app.kubernetes.io/name: knowledge-core-gateway
+    app.kubernetes.io/component: edge
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  minReadySeconds: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: knowledge-core-gateway
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: knowledge-core-gateway
+        app.kubernetes.io/component: edge
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /metrics
+        prometheus.io/port: "8082"
+    spec:
+      serviceAccountName: knowledge-core-gateway
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: 45
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: gateway
+          image: knowledge-core-gateway
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: knowledge-core-common-config
+            - configMapRef:
+                name: knowledge-core-gateway-config
+            - secretRef:
+                name: knowledge-core-gateway-secrets
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: admin
+              containerPort: 8082
+          startupProbe:
+            httpGet:
+              path: /livez
+              port: admin
+            periodSeconds: 2
+            timeoutSeconds: 2
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: admin
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: admin
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 50m
+              memory: 96Mi
+            limits:
+              cpu: 500m
+              memory: 384Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: nacos-runtime
+              mountPath: /var/run/knowledge-core/nacos
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
+        - name: nacos-runtime
+          emptyDir:
+            sizeLimit: 32Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: knowledge-core-identity
+  labels:
+    app.kubernetes.io/name: knowledge-core-identity
+    app.kubernetes.io/component: backend
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  minReadySeconds: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: knowledge-core-identity
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: knowledge-core-identity
+        app.kubernetes.io/component: backend
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /metrics
+        prometheus.io/port: "8081"
+    spec:
+      serviceAccountName: knowledge-core-identity
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: 45
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: identity
+          image: knowledge-core-identity
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: knowledge-core-common-config
+            - configMapRef:
+                name: knowledge-core-identity-config
+            - secretRef:
+                name: knowledge-core-identity-secrets
+          ports:
+            - name: rpc
+              containerPort: 8881
+            - name: admin
+              containerPort: 8081
+          startupProbe:
+            httpGet:
+              path: /livez
+              port: admin
+            periodSeconds: 2
+            timeoutSeconds: 2
+            failureThreshold: 45
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: admin
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: admin
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: nacos-runtime
+              mountPath: /var/run/knowledge-core/nacos
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
+        - name: nacos-runtime
+          emptyDir:
+            sizeLimit: 32Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: knowledge-core-knowledge
+  labels:
+    app.kubernetes.io/name: knowledge-core-knowledge
+    app.kubernetes.io/component: backend
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  minReadySeconds: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: knowledge-core-knowledge
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: knowledge-core-knowledge
+        app.kubernetes.io/component: backend
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /metrics
+        prometheus.io/port: "8083"
+    spec:
+      serviceAccountName: knowledge-core-knowledge
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: knowledge
+          image: knowledge-core-knowledge
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: knowledge-core-common-config
+            - configMapRef:
+                name: knowledge-core-knowledge-config
+            - secretRef:
+                name: knowledge-core-knowledge-secrets
+          ports:
+            - name: rpc
+              containerPort: 8882
+            - name: admin
+              containerPort: 8083
+          startupProbe:
+            httpGet:
+              path: /livez
+              port: admin
+            periodSeconds: 2
+            timeoutSeconds: 2
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: admin
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: admin
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 150m
+              memory: 192Mi
+            limits:
+              cpu: "1"
+              memory: 768Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: nacos-runtime
+              mountPath: /var/run/knowledge-core/nacos
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 128Mi
+        - name: nacos-runtime
+          emptyDir:
+            sizeLimit: 32Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: knowledge-core-collaboration
+  labels:
+    app.kubernetes.io/name: knowledge-core-collaboration
+    app.kubernetes.io/component: realtime
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  minReadySeconds: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: knowledge-core-collaboration
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: knowledge-core-collaboration
+        app.kubernetes.io/component: realtime
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /metrics
+        prometheus.io/port: "8084"
+    spec:
+      serviceAccountName: knowledge-core-collaboration
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: collaboration
+          image: knowledge-core-collaboration
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: COLLABORATION_INSTANCE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          envFrom:
+            - configMapRef:
+                name: knowledge-core-common-config
+            - configMapRef:
+                name: knowledge-core-collaboration-config
+            - secretRef:
+                name: knowledge-core-collaboration-secrets
+          ports:
+            - name: websocket
+              containerPort: 8091
+            - name: rpc
+              containerPort: 8883
+            - name: admin
+              containerPort: 8084
+          startupProbe:
+            httpGet:
+              path: /health/live
+              port: admin
+            periodSeconds: 2
+            timeoutSeconds: 2
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: admin
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: admin
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: "2"
+              memory: 1Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 128Mi

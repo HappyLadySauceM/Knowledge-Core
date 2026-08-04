@@ -1,7 +1,9 @@
 [CmdletBinding()]
 param(
     [switch]$Check,
-    [switch]$IncludeHertz
+    [switch]$IncludeHertz,
+    [ValidateSet("All", "Go", "Rust")]
+    [string]$Scope = "All"
 )
 
 $ErrorActionPreference = "Stop"
@@ -10,7 +12,10 @@ $module = "github.com/HappyLadySauce/Knowledge-Core"
 $kitexVersion = "v0.16.2"
 $hzVersion = "v0.9.7"
 $thriftgoVersion = "0.4.5"
+$rustVersion = "1.97.1"
 $ownedManifest = "scripts/generated-files.txt"
+$generateGo = $Scope -ne "Rust"
+$generateRust = $Scope -ne "Go"
 
 function Assert-NativeSuccess {
     param([Parameter(Mandatory = $true)][string]$Operation)
@@ -78,13 +83,39 @@ function Get-OwnedFiles {
     foreach ($relative in @(
         "services/gateway/biz/model/gateway/gateway.go",
         "services/gateway/biz/router/gateway/gateway.go",
-        "services/gateway/biz/router/register.go"
+        "services/gateway/biz/router/register.go",
+        "services/collaboration/src/generated/mod.rs",
+        "services/collaboration/src/generated/volo_gen.rs"
     )) {
         if (Test-Path -LiteralPath (Join-Path $Root $relative)) {
             $owned += $relative
         }
     }
     return @($owned | Sort-Object -Unique)
+}
+
+function Invoke-RustGeneration {
+    param([Parameter(Mandatory = $true)][string]$Root)
+
+    $previousCargoTarget = $env:CARGO_TARGET_DIR
+    if ([string]::IsNullOrWhiteSpace($previousCargoTarget)) {
+        $env:CARGO_TARGET_DIR = Join-Path $repositoryRoot "services/collaboration/target/codegen"
+    }
+    Push-Location (Join-Path $Root "services/collaboration")
+    try {
+        $versionOutput = (& rustc --version 2>&1 | Out-String).Trim()
+        Assert-NativeSuccess -Operation "read rustc version"
+        if ($versionOutput -notmatch "^rustc $([regex]::Escape($rustVersion)) ") {
+            throw "rustc version does not match required $rustVersion`: $versionOutput"
+        }
+        & cargo run --locked -p knowledge-core-rust-codegen -- --root $Root
+        Assert-NativeSuccess -Operation "Rust Thrift generation"
+        & rustfmt --edition 2024 src/generated/mod.rs src/generated/volo_gen.rs
+        Assert-NativeSuccess -Operation "format Rust generated code"
+    } finally {
+        Pop-Location
+        $env:CARGO_TARGET_DIR = $previousCargoTarget
+    }
 }
 
 function Assert-OwnedManifest {
@@ -199,8 +230,13 @@ function Invoke-HertzGeneration {
 }
 
 if (-not $Check) {
-    Invoke-RPCGeneration -Root $repositoryRoot
-    Invoke-HertzGeneration -Root $repositoryRoot
+    if ($generateGo) {
+        Invoke-RPCGeneration -Root $repositoryRoot
+        Invoke-HertzGeneration -Root $repositoryRoot
+    }
+    if ($generateRust) {
+        Invoke-RustGeneration -Root $repositoryRoot
+    }
     Assert-OwnedManifest -Root $repositoryRoot
     exit 0
 }
@@ -217,14 +253,28 @@ try {
     }
     Copy-Item -LiteralPath (Join-Path $repositoryRoot "idl") -Destination (Join-Path $temporaryRoot "idl") -Recurse
     Copy-Item -LiteralPath (Join-Path $repositoryRoot "scripts") -Destination (Join-Path $temporaryRoot "scripts") -Recurse
+    if (Test-Path -LiteralPath (Join-Path $repositoryRoot "kitex_gen")) {
+        Copy-Item -LiteralPath (Join-Path $repositoryRoot "kitex_gen") -Destination (Join-Path $temporaryRoot "kitex_gen") -Recurse
+    }
+    [System.IO.Directory]::CreateDirectory((Join-Path $temporaryRoot "services/collaboration")) | Out-Null
+    foreach ($file in @("Cargo.toml", "Cargo.lock", "rust-toolchain.toml")) {
+        Copy-Item -LiteralPath (Join-Path $repositoryRoot "services/collaboration/$file") -Destination (Join-Path $temporaryRoot "services/collaboration/$file")
+    }
+    Copy-Item -LiteralPath (Join-Path $repositoryRoot "services/collaboration/tools") -Destination (Join-Path $temporaryRoot "services/collaboration/tools") -Recurse
+    Copy-Item -LiteralPath (Join-Path $repositoryRoot "services/collaboration/src") -Destination (Join-Path $temporaryRoot "services/collaboration/src") -Recurse
     [System.IO.Directory]::CreateDirectory((Join-Path $temporaryRoot "services/gateway")) | Out-Null
     Copy-Item -LiteralPath (Join-Path $repositoryRoot "services/gateway/biz") -Destination (Join-Path $temporaryRoot "services/gateway/biz") -Recurse
     if (Test-Path -LiteralPath (Join-Path $repositoryRoot ".hz")) {
         Copy-Item -LiteralPath (Join-Path $repositoryRoot ".hz") -Destination (Join-Path $temporaryRoot ".hz")
     }
 
-    Invoke-RPCGeneration -Root $temporaryRoot
-    Invoke-HertzGeneration -Root $temporaryRoot
+    if ($generateGo) {
+        Invoke-RPCGeneration -Root $temporaryRoot
+        Invoke-HertzGeneration -Root $temporaryRoot
+    }
+    if ($generateRust) {
+        Invoke-RustGeneration -Root $temporaryRoot
+    }
     Assert-OwnedManifest -Root $temporaryRoot
     Assert-SnapshotsEqual -Expected (Get-GeneratedSnapshot -Root $repositoryRoot) -Actual (Get-GeneratedSnapshot -Root $temporaryRoot)
 } finally {

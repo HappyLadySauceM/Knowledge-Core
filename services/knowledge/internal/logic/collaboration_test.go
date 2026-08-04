@@ -37,18 +37,18 @@ func (s *directoryStub) ResolveUser(context.Context, string) (domain.PublicUser,
 	return domain.PublicUser{}, nil
 }
 
-func TestCollaborationAuthorizeSupportsAnonymousAndChecksAuthenticatedIdentity(t *testing.T) {
+func TestCollaborationAuthorizeRequiresAuthenticatedAndChecksIdentity(t *testing.T) {
 	repository := &collaborationRepositoryStub{document: &domain.Document{ID: "0198a3c0-0000-7000-8000-000000000001", Access: domain.AccessViewer}}
 	directory := &directoryStub{current: domain.PublicUser{ID: 42, Username: "alice"}}
 	logic, err := NewCollaborationLogic(repository, directory)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := logic.Authorize(context.Background(), repository.document.ID, 0); err != nil {
-		t.Fatalf("Authorize(anonymous) error = %v", err)
+	if _, err := logic.Authorize(context.Background(), repository.document.ID, 0); err == nil {
+		t.Fatal("Authorize(anonymous) succeeded")
 	}
-	if directory.calls != 0 {
-		t.Fatalf("anonymous directory calls = %d", directory.calls)
+	if directory.calls != 0 || repository.authorized != 0 {
+		t.Fatalf("anonymous calls = directory %d, repository %d", directory.calls, repository.authorized)
 	}
 	authorization, err := logic.Authorize(context.Background(), repository.document.ID, 42)
 	if err != nil {

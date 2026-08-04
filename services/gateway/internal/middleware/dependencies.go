@@ -7,12 +7,12 @@ import (
 	"net"
 	"time"
 
+	collaborationv1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/collaboration"
 	commonv1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/common"
 	identityv1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/identity"
 	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/knowledge/knowledgeservice"
 	coreauth "github.com/HappyLadySauce/Knowledge-Core/pkg/auth"
 	"github.com/HappyLadySauce/Knowledge-Core/pkg/health"
-	gatewayclient "github.com/HappyLadySauce/Knowledge-Core/services/gateway/internal/client"
 	"github.com/HappyLadySauce/Knowledge-Core/services/gateway/internal/config"
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/kitex/client/callopt"
@@ -57,11 +57,12 @@ type Dependencies struct {
 }
 
 type CollaborationClient interface {
-	Ping(context.Context) error
-	ListVersions(context.Context, string, string, string, int32) (*gatewayclient.VersionPage, error)
-	CreateVersion(context.Context, string, string, string, string) (*gatewayclient.Version, error)
-	GetVersion(context.Context, string, string, string) (*gatewayclient.VersionDetail, error)
-	RestoreVersion(context.Context, string, string, string, int64, string) (*gatewayclient.Version, error)
+	Ping(context.Context, *commonv1.PingRequest, ...callopt.Option) (*commonv1.PingResponse, error)
+	CreateSession(context.Context, *collaborationv1.CreateSessionRequest, ...callopt.Option) (*collaborationv1.CollaborationSession, error)
+	ListVersions(context.Context, *collaborationv1.ListVersionsRequest, ...callopt.Option) (*collaborationv1.VersionPage, error)
+	CreateVersion(context.Context, *collaborationv1.CreateVersionRequest, ...callopt.Option) (*collaborationv1.Version, error)
+	GetVersion(context.Context, *collaborationv1.GetVersionRequest, ...callopt.Option) (*collaborationv1.VersionDetail, error)
+	RestoreVersion(context.Context, *collaborationv1.RestoreVersionRequest, ...callopt.Option) (*collaborationv1.Version, error)
 }
 
 func NewDependencies(

@@ -1,0 +1,326 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: knowledge-core-postgres-bootstrap
+  namespace: postgresql
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 300
+  ttlSecondsAfterFinished: 86400
+  template:
+    spec:
+      serviceAccountName: knowledge-core-postgres-bootstrap
+      automountServiceAccountToken: false
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 70
+        runAsGroup: 70
+        fsGroup: 70
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: bootstrap
+          image: postgres:16-alpine@sha256:4e6e670bb069649261c9c18031f0aded7bb249a5b6664ddec29c013a89310d50
+          command: ["/bin/sh", "/scripts/bootstrap-postgres.sh"]
+          env:
+            - {name: PGHOST, value: postgresql.postgresql.svc.cluster.local}
+            - {name: PGUSER, value: harbor}
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef: {name: postgresql, key: password}
+            - name: KC_TEST_IDENTITY_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: knowledge-core-postgres-roles, key: test-identity-password}
+            - name: KC_TEST_KNOWLEDGE_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: knowledge-core-postgres-roles, key: test-knowledge-password}
+            - name: KC_TEST_COLLABORATION_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: knowledge-core-postgres-roles, key: test-collaboration-password}
+            - name: KC_PROD_IDENTITY_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: knowledge-core-postgres-roles, key: prod-identity-password}
+            - name: KC_PROD_KNOWLEDGE_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: knowledge-core-postgres-roles, key: prod-knowledge-password}
+            - name: KC_PROD_COLLABORATION_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: knowledge-core-postgres-roles, key: prod-collaboration-password}
+            - name: NACOS_POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: knowledge-core-postgres-roles, key: nacos-password}
+          resources:
+            requests: {cpu: 50m, memory: 64Mi}
+            limits: {cpu: 250m, memory: 256Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+            seccompProfile: {type: RuntimeDefault}
+          volumeMounts:
+            - {name: scripts, mountPath: /scripts, readOnly: true}
+            - {name: schema, mountPath: /schema, readOnly: true}
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - name: scripts
+          configMap:
+            name: knowledge-core-postgres-bootstrap
+            defaultMode: 0555
+        - name: schema
+          configMap:
+            name: knowledge-core-nacos-schema
+        - name: tmp
+          emptyDir: {sizeLimit: 64Mi}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: knowledge-core-redis-bootstrap
+  namespace: redis
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 180
+  ttlSecondsAfterFinished: 86400
+  template:
+    spec:
+      serviceAccountName: knowledge-core-redis-bootstrap
+      automountServiceAccountToken: false
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: bootstrap
+          image: redis:7-alpine@sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99
+          command: ["/bin/sh", "/scripts/bootstrap-redis.sh"]
+          env:
+            - name: REDIS_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: redis, key: redis-password}
+            - name: KC_TEST_REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: knowledge-core-redis-users, key: test-password}
+            - name: KC_PROD_REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: knowledge-core-redis-users, key: prod-password}
+          resources:
+            requests: {cpu: 20m, memory: 32Mi}
+            limits: {cpu: 100m, memory: 128Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+            seccompProfile: {type: RuntimeDefault}
+          volumeMounts:
+            - {name: scripts, mountPath: /scripts, readOnly: true}
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - name: scripts
+          configMap:
+            name: knowledge-core-redis-bootstrap
+            defaultMode: 0555
+        - name: tmp
+          emptyDir: {sizeLimit: 32Mi}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: knowledge-core-nacos-auth-bootstrap
+  namespace: config-system
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 240
+  ttlSecondsAfterFinished: 86400
+  template:
+    spec:
+      serviceAccountName: knowledge-core-nacos-bootstrap
+      automountServiceAccountToken: false
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 70
+        runAsGroup: 70
+        fsGroup: 70
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: bootstrap
+          image: postgres:16-alpine@sha256:4e6e670bb069649261c9c18031f0aded7bb249a5b6664ddec29c013a89310d50
+          command: ["/bin/sh", "/scripts/bootstrap-nacos-auth.sh"]
+          env:
+            - {name: PGHOST, value: postgresql.postgresql.svc.cluster.local}
+            - {name: PGUSER, value: nacos}
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef: {name: knowledge-core-nacos-credentials, key: postgres-password}
+            - name: NACOS_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: knowledge-core-nacos-credentials, key: admin-password}
+            - name: NACOS_TEST_GATEWAY_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: knowledge-core-nacos-credentials, key: test-gateway-password}
+            - name: NACOS_TEST_IDENTITY_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: knowledge-core-nacos-credentials, key: test-identity-password}
+            - name: NACOS_TEST_KNOWLEDGE_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: knowledge-core-nacos-credentials, key: test-knowledge-password}
+            - name: NACOS_TEST_COLLABORATION_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: knowledge-core-nacos-credentials, key: test-collaboration-password}
+            - name: NACOS_PROD_GATEWAY_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: knowledge-core-nacos-credentials, key: prod-gateway-password}
+            - name: NACOS_PROD_IDENTITY_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: knowledge-core-nacos-credentials, key: prod-identity-password}
+            - name: NACOS_PROD_KNOWLEDGE_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: knowledge-core-nacos-credentials, key: prod-knowledge-password}
+            - name: NACOS_PROD_COLLABORATION_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: knowledge-core-nacos-credentials, key: prod-collaboration-password}
+          resources:
+            requests: {cpu: 50m, memory: 64Mi}
+            limits: {cpu: 250m, memory: 256Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+            seccompProfile: {type: RuntimeDefault}
+          volumeMounts:
+            - {name: scripts, mountPath: /scripts, readOnly: true}
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - name: scripts
+          configMap:
+            name: knowledge-core-nacos-auth-bootstrap
+            defaultMode: 0555
+        - name: tmp
+          emptyDir: {sizeLimit: 64Mi}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: knowledge-core-etcd-bootstrap
+  namespace: knowledge-core-platform
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 180
+  ttlSecondsAfterFinished: 86400
+  template:
+    spec:
+      serviceAccountName: knowledge-core-platform-bootstrap
+      automountServiceAccountToken: false
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: bootstrap
+          image: quay.io/coreos/etcd@sha256:3f179425019536765a47fecff29221ed4453a4f4e91aa33e21e1a2326079ad9e
+          command: ["/bin/sh", "/scripts/bootstrap-etcd.sh"]
+          env:
+            - name: ETCD_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: knowledge-core-etcd-credentials, key: root-password}
+            - name: KC_TEST_ETCD_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: knowledge-core-etcd-credentials, key: test-password}
+            - name: KC_PROD_ETCD_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: knowledge-core-etcd-credentials, key: prod-password}
+          resources:
+            requests: {cpu: 20m, memory: 32Mi}
+            limits: {cpu: 100m, memory: 128Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+            seccompProfile: {type: RuntimeDefault}
+          volumeMounts:
+            - {name: scripts, mountPath: /scripts, readOnly: true}
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - name: scripts
+          configMap:
+            name: knowledge-core-etcd-bootstrap
+            defaultMode: 0555
+        - name: tmp
+          emptyDir: {sizeLimit: 32Mi}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: knowledge-core-minio-bootstrap
+  namespace: knowledge-core-platform
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 300
+  ttlSecondsAfterFinished: 86400
+  template:
+    spec:
+      serviceAccountName: knowledge-core-platform-bootstrap
+      automountServiceAccountToken: false
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: bootstrap
+          image: minio/mc@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727
+          command: ["/bin/sh", "/scripts/bootstrap-minio.sh"]
+          env:
+            - {name: MC_CONFIG_DIR, value: /tmp/mc}
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef: {name: knowledge-core-minio-credentials, key: root-user}
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: knowledge-core-minio-credentials, key: root-password}
+            - name: KC_TEST_MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef: {name: knowledge-core-minio-credentials, key: test-access-key}
+            - name: KC_TEST_MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef: {name: knowledge-core-minio-credentials, key: test-secret-key}
+            - name: KC_PROD_MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef: {name: knowledge-core-minio-credentials, key: prod-access-key}
+            - name: KC_PROD_MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef: {name: knowledge-core-minio-credentials, key: prod-secret-key}
+          resources:
+            requests: {cpu: 20m, memory: 64Mi}
+            limits: {cpu: 200m, memory: 256Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+            seccompProfile: {type: RuntimeDefault}
+          volumeMounts:
+            - {name: scripts, mountPath: /scripts, readOnly: true}
+            - {name: policies, mountPath: /policies, readOnly: true}
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - name: scripts
+          configMap:
+            name: knowledge-core-minio-bootstrap
+            items:
+              - {key: bootstrap-minio.sh, path: bootstrap-minio.sh, mode: 0555}
+        - name: policies
+          configMap:
+            name: knowledge-core-minio-bootstrap
+            items:
+              - {key: test-minio-policy.json, path: test-minio-policy.json}
+              - {key: prod-minio-policy.json, path: prod-minio-policy.json}
+        - name: tmp
+          emptyDir: {sizeLimit: 64Mi}

@@ -44,6 +44,24 @@ type limiterStub struct {
 	err     error
 }
 
+type recordingLimiterStub struct {
+	scopes   []string
+	subjects []string
+}
+
+func (s *recordingLimiterStub) Consume(
+	_ context.Context,
+	scope string,
+	subject string,
+	_ time.Time,
+	_ time.Duration,
+	_ int64,
+) (bool, time.Duration, error) {
+	s.scopes = append(s.scopes, scope)
+	s.subjects = append(s.subjects, subject)
+	return true, 0, nil
+}
+
 func (s limiterStub) Consume(context.Context, string, string, time.Time, time.Duration, int64) (bool, time.Duration, error) {
 	return s.allowed, s.retry, s.err
 }
@@ -122,6 +140,21 @@ func TestRateLimitFailsClosedAndReportsRetry(t *testing.T) {
 	}
 	if got := string(request.Response.Header.Peek("Retry-After")); got != "2" {
 		t.Fatalf("Retry-After = %q", got)
+	}
+}
+
+func TestCollaborationSessionRateLimitUsesIPAndUserBuckets(t *testing.T) {
+	recorder := &recordingLimiterStub{}
+	request := app.NewContext(0)
+	request.Set("gateway.principal", coreauth.Principal{UserID: 42})
+	request.SetHandlers(app.HandlersChain{
+		Inject(testDependencies(&identityClientStub{}, verifierStub{}, recorder)),
+		CollaborationSessionRateLimit(),
+	})
+	request.Next(context.Background())
+	if len(recorder.scopes) != 2 || recorder.scopes[0] != "collaboration_session_ip" ||
+		recorder.scopes[1] != "collaboration_session_user" || recorder.subjects[1] != "user:42" {
+		t.Fatalf("scopes = %#v, subjects = %#v", recorder.scopes, recorder.subjects)
 	}
 }
 

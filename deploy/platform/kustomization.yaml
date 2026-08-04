@@ -1,0 +1,49 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - namespaces.yaml
+  - serviceaccounts.yaml
+  - certificates.yaml
+  - storage.yaml
+  - services.yaml
+  - workloads.yaml
+  - bootstrap-jobs.yaml
+  - network-policies.yaml
+
+configMapGenerator:
+  - name: knowledge-core-postgres-bootstrap
+    namespace: postgresql
+    files:
+      - bootstrap-postgres.sh=scripts/bootstrap-postgres.sh
+  - name: knowledge-core-nacos-schema
+    namespace: postgresql
+    files:
+      - nacos-postgresql.sql=upstream/nacos-postgresql-3.2.3.sql
+  - name: knowledge-core-redis-bootstrap
+    namespace: redis
+    files:
+      - bootstrap-redis.sh=scripts/bootstrap-redis.sh
+  - name: knowledge-core-nacos-auth-bootstrap
+    namespace: config-system
+    files:
+      - bootstrap-nacos-auth.sh=scripts/bootstrap-nacos-auth.sh
+  - name: knowledge-core-etcd-bootstrap
+    namespace: knowledge-core-platform
+    files:
+      - bootstrap-etcd.sh=scripts/bootstrap-etcd.sh
+  - name: knowledge-core-minio-bootstrap
+    namespace: knowledge-core-platform
+    files:
+      - bootstrap-minio.sh=scripts/bootstrap-minio.sh
+      - test-minio-policy.json=policies/test-minio-policy.json
+      - prod-minio-policy.json=policies/prod-minio-policy.json
+  - name: knowledge-core-nacos-config
+    namespace: config-system
+    files:
+      - application.properties=nacos-application.properties
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: knowledge-core-platform
+    includeTemplates: true

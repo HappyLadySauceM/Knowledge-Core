@@ -2,12 +2,15 @@ package gateway
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"io"
 	"log/slog"
 	"testing"
 	"time"
 
+	collaborationv1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/collaboration"
+	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/collaboration/collaborationservice"
 	commonv1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/common"
 	identityv1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/identity"
 	knowledgev1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/knowledge"
@@ -189,7 +192,7 @@ func TestCreateDocumentUsesTrustedLocationAndStrongETag(t *testing.T) {
 	request.Set("gateway.access_token", "signed-token")
 	dependencies, _ := gatewaymiddleware.FromRequest(request)
 	dependencies.Knowledge = knowledge
-	dependencies.Endpoints = config.EndpointOptions{PublicBaseURL: "https://api.example.com", CollaborationWebSocketURL: "wss://collaboration.example.com/collaboration"}
+	dependencies.Endpoints = config.EndpointOptions{PublicBaseURL: "https://api.example.com", CollaborationWebSocketBaseURL: "wss://collaboration.example.com"}
 
 	CreateDocument(context.Background(), request)
 
@@ -244,6 +247,128 @@ func TestGatewayRejectsAmbiguousDocumentInputs(t *testing.T) {
 type knowledgeStub struct {
 	knowledgeservice.Client
 	createDocument func(context.Context, *knowledgev1.CreateDocumentRequest) (*knowledgev1.Document, error)
+}
+
+type collaborationStub struct {
+	collaborationservice.Client
+	createSession func(context.Context, *collaborationv1.CreateSessionRequest) (*collaborationv1.CollaborationSession, error)
+}
+
+func (s *collaborationStub) CreateSession(
+	ctx context.Context,
+	input *collaborationv1.CreateSessionRequest,
+	_ ...callopt.Option,
+) (*collaborationv1.CollaborationSession, error) {
+	return s.createSession(ctx, input)
+}
+
+func TestCreateCollaborationSessionReturnsOneTimeTicket(t *testing.T) {
+	documentID := "0198f0e0-7b6d-7a11-8e21-1123456789ab"
+	tokenExpiry := time.Date(2026, time.August, 3, 12, 15, 0, 0, time.UTC)
+	ticket := base64.RawURLEncoding.EncodeToString(make([]byte, 32))
+	collaboration := &collaborationStub{createSession: func(ctx context.Context, input *collaborationv1.CreateSessionRequest) (*collaborationv1.CollaborationSession, error) {
+		if input == nil || input.DocumentId != documentID || coreauth.AccessToken(ctx) != "signed-token" {
+			t.Fatalf("CreateSession input = %#v, token = %q", input, coreauth.AccessToken(ctx))
+		}
+		return &collaborationv1.CollaborationSession{
+			Ticket: ticket, Subprotocol: collaborationSubprotocol, Fragment: collaborationFragment, Access: "editor",
+			TicketExpiresAt: "2026-08-03T12:00:30Z", SessionExpiresAt: "2026-08-03T12:15:00Z",
+		}, nil
+	}}
+	request := handlerRequest(&identityStub{}, "")
+	request.Params = param.Params{{Key: "document_id", Value: documentID}}
+	request.Set("gateway.principal", coreauth.Principal{UserID: 7, ExpiresAt: tokenExpiry})
+	request.Set("gateway.access_token", "signed-token")
+	dependencies, _ := gatewaymiddleware.FromRequest(request)
+	dependencies.Collaboration = collaboration
+	dependencies.Endpoints = config.EndpointOptions{CollaborationWebSocketBaseURL: "wss://collaboration.example.com"}
+	dependencies.Now = func() time.Time { return time.Date(2026, time.August, 3, 12, 0, 0, 0, time.UTC) }
+
+	CreateCollaborationSession(context.Background(), request)
+
+	if request.Response.StatusCode() != consts.StatusCreated {
+		t.Fatalf("status = %d, body = %s", request.Response.StatusCode(), request.Response.Body())
+	}
+	if got := string(request.Response.Header.Peek("Cache-Control")); got != "no-store" {
+		t.Fatalf("Cache-Control = %q", got)
+	}
+	var response gatewaymodel.CollaborationSessionData
+	if err := jsoncodec.Unmarshal(request.Response.Body(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if response.WebsocketURL != "wss://collaboration.example.com/v1/documents/"+documentID ||
+		response.Ticket != ticket || response.Access != "editor" {
+		t.Fatalf("response = %#v", response)
+	}
+}
+
+func TestCollaborationSessionAllowsTicketAndSessionToExpireTogether(t *testing.T) {
+	now := time.Date(2026, time.August, 3, 12, 0, 0, 0, time.UTC)
+	expiresAt := now.Add(30 * time.Second)
+	ticket := base64.RawURLEncoding.EncodeToString(make([]byte, 32))
+
+	data, err := toCollaborationSessionData(
+		&collaborationv1.CollaborationSession{
+			Ticket: ticket, Subprotocol: collaborationSubprotocol, Fragment: collaborationFragment, Access: "viewer",
+			TicketExpiresAt: expiresAt.Format(time.RFC3339), SessionExpiresAt: expiresAt.Format(time.RFC3339),
+		},
+		"0198f0e0-7b6d-7a11-8e21-1123456789ab",
+		"wss://collaboration.example.com",
+		expiresAt,
+		now,
+	)
+	if err != nil {
+		t.Fatalf("toCollaborationSessionData() error = %v", err)
+	}
+	if data.TicketExpiresAt != data.SessionExpiresAt {
+		t.Fatalf("expiry mismatch: ticket = %q, session = %q", data.TicketExpiresAt, data.SessionExpiresAt)
+	}
+}
+
+func TestCreateCollaborationSessionRejectsAmbiguousOrInvalidUpstreamInput(t *testing.T) {
+	documentID := "0198f0e0-7b6d-7a11-8e21-1123456789ab"
+	request := app.NewContext(1)
+	request.Params = param.Params{{Key: "document_id", Value: documentID}}
+	request.Request.URI().SetQueryString("unknown=true")
+	CreateCollaborationSession(context.Background(), request)
+	if request.Response.StatusCode() != consts.StatusBadRequest {
+		t.Fatalf("unknown query status = %d", request.Response.StatusCode())
+	}
+
+	request = handlerRequest(&identityStub{}, "")
+	request.Params = param.Params{{Key: "document_id", Value: documentID}}
+	request.Set("gateway.principal", coreauth.Principal{UserID: 7, ExpiresAt: time.Now().Add(time.Minute)})
+	request.Set("gateway.access_token", "signed-token")
+	dependencies, _ := gatewaymiddleware.FromRequest(request)
+	dependencies.Collaboration = &collaborationStub{createSession: func(context.Context, *collaborationv1.CreateSessionRequest) (*collaborationv1.CollaborationSession, error) {
+		return &collaborationv1.CollaborationSession{Ticket: "plaintext", Subprotocol: collaborationSubprotocol, Fragment: collaborationFragment, Access: "owner"}, nil
+	}}
+	dependencies.Endpoints = config.EndpointOptions{CollaborationWebSocketBaseURL: "wss://collaboration.example.com"}
+	CreateCollaborationSession(context.Background(), request)
+	if request.Response.StatusCode() != consts.StatusBadGateway {
+		t.Fatalf("invalid upstream status = %d, body = %s", request.Response.StatusCode(), request.Response.Body())
+	}
+}
+
+func TestCreateCollaborationSessionMapsCollaborationBusinessError(t *testing.T) {
+	documentID := "0198f0e0-7b6d-7a11-8e21-1123456789ab"
+	definition := apperror.MustDefine(
+		collaborationv1.CodeForbidden, "collaboration.forbidden", apperror.KindPermissionDenied, "permission denied",
+	)
+	request := handlerRequest(&identityStub{}, "")
+	request.Params = param.Params{{Key: "document_id", Value: documentID}}
+	request.Set("gateway.principal", coreauth.Principal{UserID: 7, ExpiresAt: time.Now().Add(time.Minute)})
+	request.Set("gateway.access_token", "signed-token")
+	dependencies, _ := gatewaymiddleware.FromRequest(request)
+	dependencies.Collaboration = &collaborationStub{createSession: func(context.Context, *collaborationv1.CreateSessionRequest) (*collaborationv1.CollaborationSession, error) {
+		return nil, apperror.ToKitexBizStatus(context.Background(), definition.New())
+	}}
+
+	CreateCollaborationSession(context.Background(), request)
+
+	if request.Response.StatusCode() != consts.StatusForbidden {
+		t.Fatalf("status = %d, body = %s", request.Response.StatusCode(), request.Response.Body())
+	}
 }
 
 func (s *knowledgeStub) CreateDocument(ctx context.Context, input *knowledgev1.CreateDocumentRequest, _ ...callopt.Option) (*knowledgev1.Document, error) {

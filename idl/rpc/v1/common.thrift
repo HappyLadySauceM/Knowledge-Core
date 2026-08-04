@@ -1,4 +1,5 @@
 namespace go common
+namespace rs common
 
 struct PingRequest {
   1: optional string message

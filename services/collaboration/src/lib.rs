@@ -1,0 +1,19 @@
+pub mod actor;
+pub mod admin;
+pub mod app;
+pub mod config;
+pub mod domain;
+pub mod endpoint;
+pub mod error;
+pub mod generated;
+pub mod ports;
+pub mod remote_config;
+pub mod richtext;
+pub mod rpc;
+pub mod storage;
+pub mod telemetry;
+pub mod ticket;
+pub mod websocket;
+pub mod worker;
+
+pub const SERVICE_NAME: &str = "knowledge-core.collaboration";

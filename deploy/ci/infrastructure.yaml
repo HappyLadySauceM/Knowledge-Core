@@ -1,0 +1,69 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ci
+  labels:
+    istio-injection: disabled
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: knowledge-core-ci
+spec:
+  hard:
+    requests.cpu: "6"
+    requests.memory: 10Gi
+    limits.cpu: "12"
+    limits.memory: 20Gi
+    pods: "24"
+    persistentvolumeclaims: "4"
+    requests.storage: 48Gi
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: knowledge-core-ci
+spec:
+  limits:
+    - type: Container
+      defaultRequest:
+        cpu: 50m
+        memory: 128Mi
+      default:
+        cpu: "1"
+        memory: 1Gi
+      max:
+        cpu: "4"
+        memory: 8Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: knowledge-core-ci-cache
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 16Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: knowledge-core-buildkit-cache
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 16Gi
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: knowledge-core-buildkit
+data:
+  buildkitd.toml: |
+    [worker.oci]
+      gc = true
+      max-parallelism = 2
+    [registry."harbor.happyladysauce.local"]
+      ca = ["/etc/knowledge-core/harbor/ca.crt"]

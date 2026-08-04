@@ -1,4 +1,10 @@
 # Generator-owned Kitex RPC and Hertz model/router files.
+kitex_gen/collaboration/collaboration.go
+kitex_gen/collaboration/collaborationservice/client.go
+kitex_gen/collaboration/collaborationservice/collaborationservice.go
+kitex_gen/collaboration/collaborationservice/server.go
+kitex_gen/collaboration/k-collaboration.go
+kitex_gen/collaboration/k-consts.go
 kitex_gen/common/common.go
 kitex_gen/common/k-common.go
 kitex_gen/common/k-consts.go
@@ -23,3 +29,5 @@ kitex_gen/platform/platformservice/server.go
 services/gateway/biz/model/gateway/gateway.go
 services/gateway/biz/router/gateway/gateway.go
 services/gateway/biz/router/register.go
+services/collaboration/src/generated/mod.rs
+services/collaboration/src/generated/volo_gen.rs

@@ -237,3 +237,7 @@ func _restoredeleteddocumentMw() []app.HandlerFunc {
 	// your code...
 	return nil
 }
+
+func _createcollaborationsessionMw() []app.HandlerFunc {
+	return []app.HandlerFunc{gatewaymiddleware.CollaborationSessionRateLimit()}
+}

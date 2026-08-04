@@ -164,6 +164,33 @@ func AuthRateLimit() app.HandlerFunc {
 	return rateLimit("auth", func(options configRateLimit) int64 { return options.auth })
 }
 
+func CollaborationSessionRateLimit() app.HandlerFunc {
+	return func(ctx context.Context, request *app.RequestContext) {
+		dependencies, ok := FromRequest(request)
+		principal, principalOK := Principal(request)
+		if !ok || !principalOK {
+			WriteError(ctx, request, ErrInternal)
+			return
+		}
+		now := time.Now()
+		if dependencies.Now != nil {
+			now = dependencies.Now()
+		}
+		for _, subject := range []struct {
+			scope string
+			key   string
+		}{
+			{scope: "collaboration_session_ip", key: ClientIP(request, dependencies.TrustedProxies)},
+			{scope: "collaboration_session_user", key: "user:" + strconv.FormatInt(principal.UserID, 10)},
+		} {
+			if !consumeRateLimit(ctx, request, dependencies, subject.scope, subject.key, now, dependencies.RateLimit.AuthLimit) {
+				return
+			}
+		}
+		request.Next(ctx)
+	}
+}
+
 type configRateLimit struct {
 	global int64
 	auth   int64
@@ -180,35 +207,48 @@ func rateLimit(scope string, limit func(configRateLimit) int64) app.HandlerFunc 
 		if dependencies.Now != nil {
 			now = dependencies.Now()
 		}
-		allowed, retryAfter, err := dependencies.Limiter.Consume(
-			ctx,
-			scope,
-			ClientIP(request, dependencies.TrustedProxies),
-			now,
-			dependencies.RateLimit.Window,
+		if !consumeRateLimit(
+			ctx, request, dependencies, scope, ClientIP(request, dependencies.TrustedProxies), now,
 			limit(configRateLimit{global: dependencies.RateLimit.GlobalLimit, auth: dependencies.RateLimit.AuthLimit}),
-		)
-		if err != nil {
-			dependencies.Logger.ErrorContext(ctx, "gateway rate limiter failed",
-				slog.String("component", "gateway.rate_limit"),
-				slog.String("event", "dependency_error"),
-				slog.String("scope", scope),
-				slog.Any("error", err),
-			)
-			WriteError(ctx, request, ErrDependencyUnavailable)
-			return
-		}
-		if !allowed {
-			seconds := int64((retryAfter + time.Second - 1) / time.Second)
-			if seconds < 1 {
-				seconds = 1
-			}
-			request.Header("Retry-After", strconv.FormatInt(seconds, 10))
-			WriteError(ctx, request, ErrRateLimited)
+		) {
 			return
 		}
 		request.Next(ctx)
 	}
+}
+
+func consumeRateLimit(
+	ctx context.Context,
+	request *app.RequestContext,
+	dependencies *Dependencies,
+	scope string,
+	subject string,
+	now time.Time,
+	limit int64,
+) bool {
+	allowed, retryAfter, err := dependencies.Limiter.Consume(
+		ctx, scope, subject, now, dependencies.RateLimit.Window, limit,
+	)
+	if err != nil {
+		dependencies.Logger.ErrorContext(ctx, "gateway rate limiter failed",
+			slog.String("component", "gateway.rate_limit"),
+			slog.String("event", "dependency_error"),
+			slog.String("scope", scope),
+			slog.Any("error", err),
+		)
+		WriteError(ctx, request, ErrDependencyUnavailable)
+		return false
+	}
+	if !allowed {
+		seconds := int64((retryAfter + time.Second - 1) / time.Second)
+		if seconds < 1 {
+			seconds = 1
+		}
+		request.Header("Retry-After", strconv.FormatInt(seconds, 10))
+		WriteError(ctx, request, ErrRateLimited)
+		return false
+	}
+	return true
 }
 
 func ClientIP(request *app.RequestContext, trustedProxies []*net.IPNet) string {

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 
+	collaborationv1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/collaboration"
 	identityv1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/identity"
 	knowledgev1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/knowledge"
 	jsoncodec "github.com/HappyLadySauce/Knowledge-Core/pkg/codec/json"
@@ -12,7 +13,6 @@ import (
 	"github.com/HappyLadySauce/Knowledge-Core/pkg/metadata"
 	coretrace "github.com/HappyLadySauce/Knowledge-Core/pkg/trace"
 	gatewaymodel "github.com/HappyLadySauce/Knowledge-Core/services/gateway/biz/model/gateway"
-	gatewayclient "github.com/HappyLadySauce/Knowledge-Core/services/gateway/internal/client"
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 	"github.com/cloudwego/kitex/pkg/kerrors"
@@ -66,14 +66,15 @@ var knowledgeErrors = []rpcErrorMapping{
 }
 
 var collaborationErrors = []rpcErrorMapping{
-	{40001, "collaboration.invalid_input", responseErrorWithStatus(40001, http.StatusBadRequest, "collaboration.invalid_input", apperror.KindInvalidArgument, "invalid collaboration input")},
-	{40002, "collaboration.unauthenticated", responseErrorWithStatus(40002, http.StatusUnauthorized, "collaboration.unauthenticated", apperror.KindUnauthenticated, "authentication required")},
-	{40003, "collaboration.forbidden", responseErrorWithStatus(40003, http.StatusForbidden, "collaboration.forbidden", apperror.KindPermissionDenied, "permission denied")},
-	{40004, "collaboration.not_found", responseErrorWithStatus(40004, http.StatusNotFound, "collaboration.not_found", apperror.KindNotFound, "version not found")},
-	{40005, "collaboration.conflict", responseErrorWithStatus(40005, http.StatusConflict, "collaboration.conflict", apperror.KindConflict, "resource conflict")},
-	{40006, "collaboration.precondition_failed", responseErrorWithStatus(40006, http.StatusPreconditionFailed, "collaboration.precondition_failed", apperror.KindConflict, "document sequence does not match")},
-	{40007, "collaboration.unavailable", responseErrorWithStatus(40007, http.StatusServiceUnavailable, "collaboration.unavailable", apperror.KindUnavailable, "service unavailable")},
-	{40999, "collaboration.internal", responseErrorWithStatus(40999, http.StatusBadGateway, "collaboration.internal", apperror.KindUnavailable, "collaboration service unavailable")},
+	{collaborationv1.CodeInvalidInput, "collaboration.invalid_input", responseErrorWithStatus(collaborationv1.CodeInvalidInput, http.StatusBadRequest, "collaboration.invalid_input", apperror.KindInvalidArgument, "invalid collaboration input")},
+	{collaborationv1.CodeUnauthenticated, "collaboration.unauthenticated", responseErrorWithStatus(collaborationv1.CodeUnauthenticated, http.StatusUnauthorized, "collaboration.unauthenticated", apperror.KindUnauthenticated, "authentication required")},
+	{collaborationv1.CodeForbidden, "collaboration.forbidden", responseErrorWithStatus(collaborationv1.CodeForbidden, http.StatusForbidden, "collaboration.forbidden", apperror.KindPermissionDenied, "permission denied")},
+	{collaborationv1.CodeNotFound, "collaboration.not_found", responseErrorWithStatus(collaborationv1.CodeNotFound, http.StatusNotFound, "collaboration.not_found", apperror.KindNotFound, "version not found")},
+	{collaborationv1.CodeConflict, "collaboration.conflict", responseErrorWithStatus(collaborationv1.CodeConflict, http.StatusConflict, "collaboration.conflict", apperror.KindConflict, "resource conflict")},
+	{collaborationv1.CodePreconditionFailed, "collaboration.precondition_failed", responseErrorWithStatus(collaborationv1.CodePreconditionFailed, http.StatusPreconditionFailed, "collaboration.precondition_failed", apperror.KindConflict, "document sequence does not match")},
+	{collaborationv1.CodeUnavailable, "collaboration.unavailable", responseErrorWithStatus(collaborationv1.CodeUnavailable, http.StatusServiceUnavailable, "collaboration.unavailable", apperror.KindUnavailable, "service unavailable")},
+	{collaborationv1.CodeUnavailable, "collaboration.deadline_exceeded", ErrUpstreamTimeout},
+	{collaborationv1.CodeInternal, "collaboration.internal", responseErrorWithStatus(collaborationv1.CodeInternal, http.StatusBadGateway, "collaboration.internal", apperror.KindUnavailable, "collaboration service unavailable")},
 }
 
 type rpcErrorMapping struct {
@@ -102,22 +103,7 @@ func WriteKnowledgeError(ctx context.Context, request *app.RequestContext, err e
 }
 
 func WriteCollaborationError(ctx context.Context, request *app.RequestContext, err error) {
-	var upstream *gatewayclient.CollaborationError
-	if errors.As(err, &upstream) {
-		for _, mapping := range collaborationErrors {
-			if mapping.code == upstream.Code && mapping.key == upstream.Key && mapping.response.HTTPStatus == upstream.Status {
-				WriteError(ctx, request, mapping.response)
-				return
-			}
-		}
-		WriteError(ctx, request, ErrInvalidUpstreamResponse)
-		return
-	}
-	if isTimeout(err) {
-		WriteError(ctx, request, ErrUpstreamTimeout)
-		return
-	}
-	WriteError(ctx, request, ErrDependencyUnavailable)
+	writeRPCError(ctx, request, err, collaborationErrors)
 }
 
 func writeRPCError(ctx context.Context, request *app.RequestContext, err error, mappings []rpcErrorMapping) {

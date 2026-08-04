@@ -4,89 +4,76 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
-	"net/url"
 
-	"github.com/HappyLadySauce/Knowledge-Core/services/knowledge/internal/config"
+	collaborationv1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/collaboration"
+	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/collaboration/collaborationservice"
+	commonv1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/common"
+	"github.com/HappyLadySauce/Knowledge-Core/pkg/metrics"
+	"github.com/HappyLadySauce/Knowledge-Core/pkg/option"
+	coretrace "github.com/HappyLadySauce/Knowledge-Core/pkg/trace"
+	transportkitex "github.com/HappyLadySauce/Knowledge-Core/pkg/transport/kitex"
 	"github.com/HappyLadySauce/Knowledge-Core/services/knowledge/internal/domain"
+	kitexclient "github.com/cloudwego/kitex/client"
+	"github.com/cloudwego/kitex/pkg/discovery"
 )
 
 type Collaboration struct {
-	baseURL *url.URL
-	client  *http.Client
+	client collaborationservice.Client
 }
 
-func NewCollaboration(options config.CollaborationOptions) (*Collaboration, error) {
+func NewCollaboration(
+	options option.KitexClientOptions,
+	resolver discovery.Resolver,
+	telemetry *coretrace.Runtime,
+	metricsRegistry *metrics.Registry,
+) (*Collaboration, error) {
 	if err := options.Validate(); err != nil {
-		return nil, fmt.Errorf("create Collaboration client: %w", err)
+		return nil, fmt.Errorf("create Collaboration client: invalid options: %w", err)
 	}
-	baseURL, err := url.Parse(options.BaseURL)
-	if err != nil {
-		return nil, fmt.Errorf("parse Collaboration URL: %w", err)
+	if resolver == nil || telemetry == nil || metricsRegistry == nil {
+		return nil, errors.New("create Collaboration client: resolver, tracing, and metrics are required")
 	}
 	tlsConfig, err := options.TLS.ClientTLSConfig()
 	if err != nil {
 		return nil, fmt.Errorf("create Collaboration client TLS: %w", err)
 	}
-	transport := http.DefaultTransport.(*http.Transport).Clone()
-	transport.TLSClientConfig = tlsConfig
-	return &Collaboration{
-		baseURL: baseURL,
-		client:  &http.Client{Transport: transport, Timeout: options.RequestTimeout},
-	}, nil
+	clientOptions := []kitexclient.Option{
+		kitexclient.WithResolver(resolver),
+		kitexclient.WithConnectTimeout(options.ConnectTimeout),
+		kitexclient.WithRPCTimeout(options.RequestTimeout),
+		kitexclient.WithMiddleware(metrics.KitexClientMiddleware(metricsRegistry)),
+	}
+	clientOptions = append(clientOptions, transportkitex.ClientOptions(telemetry, tlsConfig)...)
+	result, err := collaborationservice.NewClient(options.ServiceName, clientOptions...)
+	if err != nil {
+		return nil, fmt.Errorf("create Collaboration client: %w", err)
+	}
+	return &Collaboration{client: result}, nil
+}
+
+func (c *Collaboration) Ping(ctx context.Context) error {
+	if c == nil || c.client == nil {
+		return errors.New("ping Collaboration: client is nil")
+	}
+	response, err := c.client.Ping(ctx, &commonv1.PingRequest{})
+	if err != nil {
+		return fmt.Errorf("ping Collaboration: %w", err)
+	}
+	if response == nil || response.Service != "collaboration" || response.Status != "ready" {
+		return errors.New("ping Collaboration: service is not ready")
+	}
+	return nil
 }
 
 func (c *Collaboration) PurgeDocument(ctx context.Context, documentID string) error {
-	if c == nil || c.client == nil || c.baseURL == nil {
+	if c == nil || c.client == nil {
 		return errors.New("purge Collaboration document: client is nil")
 	}
 	if err := domain.ValidateID("document_id", documentID); err != nil {
 		return fmt.Errorf("purge Collaboration document: %w", err)
 	}
-	endpoint := *c.baseURL
-	endpoint.Path = "/internal/v1/documents/" + url.PathEscape(documentID)
-	request, err := http.NewRequestWithContext(ctx, http.MethodDelete, endpoint.String(), nil)
-	if err != nil {
-		return fmt.Errorf("create Collaboration purge request: %w", err)
-	}
-	response, err := c.client.Do(request)
-	if err != nil {
-		return fmt.Errorf("request Collaboration purge: %w", err)
-	}
-	defer func() { _ = response.Body.Close() }()
-	if response.StatusCode != http.StatusNoContent {
-		return fmt.Errorf("request Collaboration purge: unexpected status %d", response.StatusCode)
-	}
-	return nil
-}
-
-func (c *Collaboration) Ping(ctx context.Context) error {
-	if c == nil || c.client == nil || c.baseURL == nil {
-		return errors.New("ping Collaboration: client is nil")
-	}
-	endpoint := *c.baseURL
-	endpoint.Path = "/health/ready"
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
-	if err != nil {
-		return fmt.Errorf("create Collaboration readiness request: %w", err)
-	}
-	response, err := c.client.Do(request)
-	if err != nil {
-		return fmt.Errorf("request Collaboration readiness: %w", err)
-	}
-	defer func() { _ = response.Body.Close() }()
-	if response.StatusCode != http.StatusOK {
-		return fmt.Errorf("request Collaboration readiness: unexpected status %d", response.StatusCode)
-	}
-	return nil
-}
-
-func (c *Collaboration) Close() error {
-	if c == nil || c.client == nil {
-		return nil
-	}
-	if transport, ok := c.client.Transport.(*http.Transport); ok {
-		transport.CloseIdleConnections()
+	if err := c.client.PurgeDocument(ctx, &collaborationv1.PurgeDocumentRequest{DocumentId: documentID}); err != nil {
+		return fmt.Errorf("purge Collaboration document: %w", err)
 	}
 	return nil
 }

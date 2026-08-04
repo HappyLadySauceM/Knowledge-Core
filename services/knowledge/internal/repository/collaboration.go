@@ -19,10 +19,6 @@ func (s *Store) AuthorizeCollaboration(ctx context.Context, documentID string, a
 	if domain.CanRead(document.Access) {
 		return document, nil
 	}
-	if document.Published {
-		document.Access = domain.AccessViewer
-		return document, nil
-	}
 	return nil, ErrForbidden
 }
 

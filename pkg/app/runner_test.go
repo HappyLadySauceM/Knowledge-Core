@@ -239,7 +239,7 @@ func newTestRuntime(t *testing.T, timeout time.Duration) *Runtime {
 	if err != nil {
 		t.Fatalf("metrics.NewRegistry() error = %v", err)
 	}
-	return newRuntime(slog.New(slog.NewTextHandler(io.Discard, nil)), nil, registry, timeout)
+	return newRuntime(slog.New(slog.NewTextHandler(io.Discard, nil)), new(slog.LevelVar), nil, registry, timeout)
 }
 
 func metricGaugeValue(t *testing.T, registry *metrics.Registry, name string) float64 {
