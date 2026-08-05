@@ -4,10 +4,10 @@ metadata:
   name: default
 spec:
   jetstreamExotic:
-    url: nats://nats.knowledge-core-platform.svc.cluster.local:4222
+    url: nats://nats.nats.svc.cluster.local:4222
     accessSecret:
       name: knowledge-core-argo-events-nats
-      key: password
+      key: auth.yaml
     streamConfig: |
       maxAge: 24h
       maxBytes: 1GB
@@ -122,7 +122,7 @@ metadata:
 spec:
   ingressClassName: higress
   rules:
-    - host: hooks.happyladysauce.cn
+    - host: hooks.happyladysauce.local
       http:
         paths:
           - path: /events/knowledge-core
