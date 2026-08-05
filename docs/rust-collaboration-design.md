@@ -245,7 +245,7 @@ services/collaboration/
 idl/rpc/v1/collaboration.thrift
 ```
 
-`docker/collaboration/dockerfile` 使用 Rust production multi-stage build，最终以固定无特权 UID/GID `10001:10001` 运行且不包含 Node/npm。Compose 使用 RPC `:8883`、admin `:8084` 和 Etcd discovery，并已移除 `:8092`。
+CI 的 Rust 容器完成唯一一次 release build 并写出受检二进制；`docker/collaboration/dockerfile` 只封装该 artifact，最终以固定无特权 UID/GID `10001:10001` 运行且不包含 Rust toolchain、Node/npm。Compose 使用 RPC `:8883`、admin `:8084` 和 Etcd discovery，并已移除 `:8092`。
 
 `.github/ci/run.sh` 使用独立固定 Rust 容器和 cache volume，不修改 `.github/ci/Dockerfile`。根门禁至少包含：
 

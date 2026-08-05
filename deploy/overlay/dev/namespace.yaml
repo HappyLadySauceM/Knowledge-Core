@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: knowledge-core-dev
+  labels:
+    app.kubernetes.io/part-of: knowledge-core
+    infrastructure.happyladysauce.local/etcd-client: "true"
+    infrastructure.happyladysauce.local/minio-client: "true"
+    infrastructure.happyladysauce.local/clamav-client: "true"
+    istio-injection: disabled

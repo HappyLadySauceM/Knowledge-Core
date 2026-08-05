@@ -208,7 +208,7 @@ Collaboration 完全通过 `COLLABORATION_*` 环境变量配置，数值、URL�
 
 四个服务可通过 `KNOWLEDGE_CORE_NACOS_*` 启用 Nacos `3.2.3` 动态配置。bootstrap 严格要求 HTTPS endpoint、namespace/group/data ID、每服务 reader 凭据、CA 文件、key ID 和 32-byte KEK；Go 与 Rust 使用同一 AES-256-GCM 信封和坐标 AAD。初始配置获取失败会阻断启动，运行中失联保留 last-good 并告警，恢复后继续监听/轮询。当前动态文档只实现原子日志级别更新，依赖池和监听地址仍由静态 YAML/环境变量装配，不得描述为已经支持热换。
 
-k3s 中 Nacos 部署在 `config-system`，HTTP/gRPC 使用现有 `happyladysauce-ca` 签发的 TLS 证书，并复用已有 PostgreSQL 服务中的独立 `nacos` database。test/prod 使用不同 Nacos namespace，每个服务只读自己的 `<service>.dynamic.yaml`。应用 namespace 通过只含公共证书的 ConfigMap 挂载 CA；TLS 私钥不跨 namespace 复制。
+k3s 中 Nacos 部署在 `nacos` namespace，HTTP/gRPC 使用现有 `happyladysauce-ca` 签发的 TLS 证书，并复用已有 PostgreSQL 服务中的独立 `nacos` database。唯一应用环境使用 Nacos namespace `dev`，每个服务只读自己的 `<service>.dynamic.yaml`。应用 namespace 通过只含公共证书的 ConfigMap 挂载 CA；TLS 私钥不跨 namespace 复制。
 
 代码当前强制的生产约束包括：
 
@@ -247,9 +247,9 @@ Collaboration 收到信号后先 not-ready 并撤销 Etcd 注册，再停止 RPC
 
 ## 11. 生成、CI 与交付
 
-集群配置和交付的可执行交接清单位于 [`k3s-cicd-runbook.md`](k3s-cicd-runbook.md)，其中记录当前集群
-快照、共享基础设施与 Secret 契约、Webhook、SOPS/Argo CD 前置条件，以及 Rust 只在 CI 容器内编译
-一次、运行镜像只复制已验证二进制的目标改造。该清单中的目标项在代码和集群验收完成前不属于当前能力。
+集群配置和交付的可执行交接清单位于 [`k3s-cicd-runbook.md`](k3s-cicd-runbook.md)，其中记录共享
+基础设施、dev 资源隔离、Secret、Webhook、SOPS/Argo CD 和验收契约。Rust release binary 由 CI
+容器编译一次，Collaboration production Dockerfile 只封装已验证 artifact，不包含第二个 Cargo build stage。
 
 IDL 源位于 `idl/http/v1` 和 `idl/rpc/v1`。生成工具固定为 Kitex `v0.16.2`、Hertz `v0.9.7`、thriftgo `0.4.5`；生成文件所有权以 `scripts/generated-files.txt` 为准。Gateway handler 和未列入清单的 route middleware 保持手写/混合所有权。
 
@@ -261,11 +261,18 @@ go run ./scripts/idlguard compat-git <merge-base> idl
 
 `make ci` 同时执行 Go/Rust format、vet、golangci-lint、Clippy `-D warnings`、无缓存测试、release build、govulncheck、cargo-deny 和 Go/Rust 生成漂移检查。远端 `.github/ci/run.sh` 还在 rootless Docker 中执行 Go race、真实 PostgreSQL/Redis/NATS/Etcd 测试、双向 Kitex/Volo 与 Yjs 互操作，并构建 Rust production image，验证固定运行 UID/GID `10001:10001`、无 Node/npm 和非法配置 fail-fast。真实依赖阶段设置 `COLLABORATION_TEST_REQUIRE_REAL_DEPENDENCIES=1`；缺少 PostgreSQL、Redis、NATS 或 Etcd 对应连接变量时测试必须失败，不能静默 skip。Node 24 只运行 `services/collaboration/interop` fixture。
 
-`dev` push 只有通过容器化 verify 后才由 GitHub Actions 创建或复用 `dev -> main` PR，并以 merge commit 推进 `main`。
+开发交付只保留 `dev`。手工 Argo Workflow 的 `promotion-enabled` 默认关闭；GitHub source webhook
+触发时才开启 GitOps 推广。dev 和从 main 可达的 SemVer tag 都更新唯一的 `overlay/dev`，只有 dev
+push 会创建或复用 `dev -> main` PR 并启用 merge-commit auto-merge。
 
-Kubernetes 所有权分为三层：`/opt/k3s/knowledge-core-platform` 是共享基础设施声明源；应用仓库 `deploy/base` 是环境无关工作负载真源；私有 `k3s-home-deploy` 保存 CI 同步的 base 快照以及 test/prod overlay、SOPS Secret 和镜像 digest。共享平台复用已有 PostgreSQL 与 Redis，只新增 NATS、业务 Etcd、MinIO、ClamAV 和 Nacos。应用 base 不包含 namespace、Secret 或部署 digest；每个服务自己的 Secret 同时持有其 Nacos reader 凭据和 KEK。
+Kubernetes 所有权分为三层：`k3s-home-deploy/k3s`（服务器 `/opt/k3s`）是公共基础设施真源；应用
+仓库 `deploy/base` 是环境无关工作负载真源；私有 `k3s-home-deploy/Knowledge-Core` 保存 CI 同步的
+base 快照、唯一 dev overlay、SOPS Secret 和镜像 digest。公共 Nacos、NATS、Etcd、MinIO、ClamAV
+位于独立 namespace，PostgreSQL 和 Redis 复用现有服务；应用只使用项目级账号和前缀。
 
-仓库内已经存在 Argo Workflows/Events、rootless BuildKit、Trivy/Syft/Cosign 和 GitOps CAS 推广清单，但它们在 GitHub App、Harbor/Cosign、SOPS/age Secret、固定 CI 镜像 digest 和首个真实 workflow 完成前仍属于未激活交付资产。self-hosted `.github/ci/run.sh` 继续作为回退；Argo CD Application 由管理面板创建。
+仓库内存在 Argo Workflows/Events、rootless BuildKit、持久缓存、Trivy/Syft/Cosign 和 GitOps CAS
+推广清单。self-hosted `.github/ci/run.sh` 继续作为回退；两套重型 CI 在切换完成前不能同时响应 dev
+push。Argo CD Application 由管理面板创建。
 
 ### 当前不兼容基线的迁移记录
 
@@ -280,9 +287,9 @@ Kubernetes 所有权分为三层：`/opt/k3s/knowledge-core-platform` 是共享�
 - Identity repository/migration 没有针对真实 PostgreSQL 的自动化集成测试。
 - Knowledge repository/migration、事务、约束和 SQL cursor 没有针对真实 PostgreSQL 的自动化集成测试。
 - 当前 CI 构建并 smoke Rust Collaboration 镜像，但不启动完整 Compose 执行跨服务 WebSocket E2E。
-- k3s 原生 CI 尚未以真实 GitHub webhook 完成一次从状态上报、构建、签名到 GitOps test digest 更新的端到端运行。
-- SOPS age 私钥尚未生成和离线备份，因此 GitOps Secret 与 Nacos 加密动态文档尚未创建；平台 `apply.sh` 也尚未执行。
-- prod overlay 保持 Collaboration `production` 校验，但现有共享 PostgreSQL/Redis 与新增 NATS/Etcd 尚未形成完整的验证 TLS/mTLS 链路，prod Application 当前不能激活。
+- k3s 原生 CI 尚未以真实 GitHub webhook 完成一次从状态上报、构建、签名到 GitOps dev digest 更新的端到端运行。
+- SOPS age 私钥、应用 Secret、Nacos 加密动态文档和 Argo CD Application 仍需按运行清单配置。
+- 当前只有 development overlay；单节点集群不作为 production 环境。
 - Node/Rust 性能基线、PostgreSQL/NATS stop/start 故障演练、备份恢复、切换/回滚和滚动升级尚未完成。
 - 生产镜像最终 digest 只能在发布构建后记录，仓库内门禁不能替代部署环境证书、容量和网络策略验证。
 

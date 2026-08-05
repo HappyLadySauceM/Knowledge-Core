@@ -7,16 +7,8 @@ set -euo pipefail
 : "${GITHUB_REF:?GITHUB_REF is required}"
 : "${GITOPS_REPOSITORY:?GITOPS_REPOSITORY is required}"
 : "${SOURCE_ROOT:?SOURCE_ROOT is required}"
-: "${TARGET_ENVIRONMENT:?TARGET_ENVIRONMENT is required}"
 : "${IMAGE_MAP_FILE:?IMAGE_MAP_FILE is required}"
 
-case "$TARGET_ENVIRONMENT" in
-    test | prod) ;;
-    *)
-        printf 'unsupported target environment: %s\n' "$TARGET_ENVIRONMENT" >&2
-        exit 2
-        ;;
-esac
 if [[ ! -d "$SOURCE_ROOT/deploy/base" || ! -r "$IMAGE_MAP_FILE" ]]; then
     printf 'source base and image map are required\n' >&2
     exit 2
@@ -43,7 +35,7 @@ for attempt in 1 2 3; do
     mkdir -p "$target_root"
     cp -R "$SOURCE_ROOT/deploy/base" "$target_root/base"
 
-    overlay="$target_root/overlay/$TARGET_ENVIRONMENT"
+    overlay="$target_root/overlay/dev"
     if [[ ! -f "$overlay/kustomization.yaml" ]]; then
         printf 'GitOps overlay does not exist: %s\n' "$overlay" >&2
         exit 1
@@ -97,7 +89,7 @@ for attempt in 1 2 3; do
     git -C "$worktree/repository" \
         -c user.name='knowledge-core-ci[bot]' \
         -c user.email='knowledge-core-ci[bot]@users.noreply.github.com' \
-        commit -m "deploy(${TARGET_ENVIRONMENT}): promote ${GITHUB_SHA}"
+        commit -m "deploy(dev): promote ${GITHUB_SHA}"
     if git -C "$worktree/repository" push origin HEAD:main; then
         exit 0
     fi

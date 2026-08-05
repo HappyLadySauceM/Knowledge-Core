@@ -14,6 +14,19 @@ fi
 
 owner="${GITHUB_REPOSITORY%%/*}"
 repository="${GITHUB_REPOSITORY#*/}"
+main_sha="$(
+    curl --fail --silent --show-error \
+        --header 'Accept: application/vnd.github+json' \
+        --header "Authorization: Bearer ${GITHUB_TOKEN}" \
+        --header 'X-GitHub-Api-Version: 2022-11-28' \
+        "https://api.github.com/repos/${GITHUB_REPOSITORY}/git/ref/heads/main" \
+        | jq -er '.object.sha'
+)"
+if [[ "$main_sha" == "$GITHUB_SHA" ]]; then
+    printf 'dev and main already point to %s\n' "$GITHUB_SHA"
+    exit 0
+fi
+
 pulls="$(
     curl --fail --silent --show-error \
         --get \
