@@ -247,6 +247,10 @@ Collaboration 收到信号后先 not-ready 并撤销 Etcd 注册，再停止 RPC
 
 ## 11. 生成、CI 与交付
 
+集群配置和交付的可执行交接清单位于 [`k3s-cicd-runbook.md`](k3s-cicd-runbook.md)，其中记录当前集群
+快照、共享基础设施与 Secret 契约、Webhook、SOPS/Argo CD 前置条件，以及 Rust 只在 CI 容器内编译
+一次、运行镜像只复制已验证二进制的目标改造。该清单中的目标项在代码和集群验收完成前不属于当前能力。
+
 IDL 源位于 `idl/http/v1` 和 `idl/rpc/v1`。生成工具固定为 Kitex `v0.16.2`、Hertz `v0.9.7`、thriftgo `0.4.5`；生成文件所有权以 `scripts/generated-files.txt` 为准。Gateway handler 和未列入清单的 route middleware 保持手写/混合所有权。
 
 ```text
