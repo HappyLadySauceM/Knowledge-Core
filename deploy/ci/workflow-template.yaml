@@ -649,7 +649,7 @@ spec:
         env:
           - name: COSIGN_PASSWORD
             valueFrom:
-              secretKeyRef: {name: knowledge-core-cosign, key: password}
+              secretKeyRef: {name: knowledge-core-cosign, key: cosign.password}
           - {name: DOCKER_CONFIG, value: /secrets/harbor}
           - {name: SSL_CERT_DIR, value: "/etc/ssl/certs:/etc/knowledge-core/harbor"}
         volumeMounts:
@@ -687,7 +687,7 @@ spec:
         env:
           - name: COSIGN_PASSWORD
             valueFrom:
-              secretKeyRef: {name: knowledge-core-cosign, key: password}
+              secretKeyRef: {name: knowledge-core-cosign, key: cosign.password}
           - {name: DOCKER_CONFIG, value: /secrets/harbor}
           - {name: SSL_CERT_DIR, value: "/etc/ssl/certs:/etc/knowledge-core/harbor"}
         volumeMounts:
