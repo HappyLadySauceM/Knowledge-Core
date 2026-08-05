@@ -4,7 +4,6 @@ kind: Kustomization
 resources:
   - namespaces.yaml
   - serviceaccounts.yaml
-  - certificates.yaml
   - storage.yaml
   - services.yaml
   - workloads.yaml
@@ -16,10 +15,6 @@ configMapGenerator:
     namespace: postgresql
     files:
       - bootstrap-postgres.sh=scripts/bootstrap-postgres.sh
-  - name: knowledge-core-nacos-schema
-    namespace: postgresql
-    files:
-      - nacos-postgresql.sql=upstream/nacos-postgresql-3.2.3.sql
   - name: knowledge-core-redis-bootstrap
     namespace: redis
     files:
@@ -38,10 +33,6 @@ configMapGenerator:
       - bootstrap-minio.sh=scripts/bootstrap-minio.sh
       - test-minio-policy.json=policies/test-minio-policy.json
       - prod-minio-policy.json=policies/prod-minio-policy.json
-  - name: knowledge-core-nacos-config
-    namespace: config-system
-    files:
-      - application.properties=nacos-application.properties
 
 labels:
   - pairs:

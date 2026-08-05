@@ -83,7 +83,6 @@ bootstrap_environment prod \
 ensure_login nacos "$NACOS_POSTGRES_PASSWORD"
 ensure_database nacos nacos
 if [ "$(psql --dbname=nacos --tuples-only --no-align --command="SELECT to_regclass('public.config_info') IS NOT NULL")" != "t" ]; then
-    psql --dbname=nacos --set=ON_ERROR_STOP=1 --file=/schema/nacos-postgresql.sql
 fi
 psql --dbname=nacos --set=ON_ERROR_STOP=1 <<'SQL'
 CREATE EXTENSION IF NOT EXISTS pgcrypto;

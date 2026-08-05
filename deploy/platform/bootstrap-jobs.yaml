@@ -59,16 +59,12 @@ spec:
             seccompProfile: {type: RuntimeDefault}
           volumeMounts:
             - {name: scripts, mountPath: /scripts, readOnly: true}
-            - {name: schema, mountPath: /schema, readOnly: true}
             - {name: tmp, mountPath: /tmp}
       volumes:
         - name: scripts
           configMap:
             name: knowledge-core-postgres-bootstrap
             defaultMode: 0555
-        - name: schema
-          configMap:
-            name: knowledge-core-nacos-schema
         - name: tmp
           emptyDir: {sizeLimit: 64Mi}
 ---

@@ -43,16 +43,3 @@ spec:
     app.kubernetes.io/name: knowledge-core-clamav
   ports:
     - {name: clamd, port: 3310, targetPort: clamd}
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: knowledge-core-nacos
-  namespace: config-system
-spec:
-  selector:
-    app.kubernetes.io/name: knowledge-core-nacos
-  ports:
-    - {name: http, port: 8848, targetPort: http}
-    - {name: grpc-client, port: 9848, targetPort: grpc-client}
-    - {name: grpc-cluster, port: 9849, targetPort: grpc-cluster}

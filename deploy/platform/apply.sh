@@ -50,7 +50,6 @@ for job in \
 done
 kubectl kustomize "${DIR}" | kubectl apply --server-side --force-conflicts -f -
 
-kubectl wait --for=condition=Ready certificate/knowledge-core-nacos -n config-system --timeout=300s
 kubectl rollout status statefulset/knowledge-core-nats -n knowledge-core-platform --timeout=300s
 kubectl rollout status statefulset/knowledge-core-etcd -n knowledge-core-platform --timeout=300s
 kubectl rollout status statefulset/knowledge-core-minio -n knowledge-core-platform --timeout=300s
@@ -60,5 +59,4 @@ kubectl wait --for=condition=complete job/knowledge-core-redis-bootstrap -n redi
 kubectl wait --for=condition=complete job/knowledge-core-nacos-auth-bootstrap -n config-system --timeout=240s
 kubectl wait --for=condition=complete job/knowledge-core-etcd-bootstrap -n knowledge-core-platform --timeout=180s
 kubectl wait --for=condition=complete job/knowledge-core-minio-bootstrap -n knowledge-core-platform --timeout=300s
-kubectl rollout status deployment/knowledge-core-nacos -n config-system --timeout=600s
 echo "Done."
