@@ -65,5 +65,7 @@ data:
     [worker.oci]
       gc = true
       max-parallelism = 2
+    [registry."docker.io"]
+      mirrors = ["docker.m.daocloud.io"]
     [registry."harbor.happyladysauce.local"]
       ca = ["/etc/knowledge-core/harbor/ca.crt"]

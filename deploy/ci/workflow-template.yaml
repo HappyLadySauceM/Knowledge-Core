@@ -27,8 +27,8 @@ spec:
         value: HappyLadySauceM/Knowledge-Core
       - name: revision
       - name: ref
-      - name: target-environment
-        value: test
+      - name: promotion-enabled
+        value: "false"
       - name: gitops-repository
         value: HappyLadySauceM/k3s-home-deploy
       - name: image-registry
@@ -36,11 +36,11 @@ spec:
       - name: image-namespace
         value: knowledge-core
       - name: control-image
-        value: harbor.happyladysauce.local/knowledge-core/ci-control@sha256:3f8ac90f953ca837db7529ebde53bb1628ed5644291f36a07c6977472c85eb02
+        value: harbor.happyladysauce.local/knowledge-core/ci-control@sha256:71d25ee0ecd7d1f62863acd7d3b42ccd2d6b989f0b9211fc1e8140928d2837da
       - name: go-image
         value: harbor.happyladysauce.local/knowledge-core/ci-go@sha256:7f30a4f81017fc3a7257f90d5f8d070a76fb8fe1cb8a9c98e07aa462c4b895d0
       - name: rust-image
-        value: harbor.happyladysauce.local/knowledge-core/ci-rust@sha256:0000000000000000000000000000000000000000000000000000000000000000
+        value: harbor.happyladysauce.local/knowledge-core/ci-rust@sha256:1d7ef2a7cbfec82093b3fb5320f1be6babae2d1c103ed743eb7249eea5655fa8
   volumeClaimTemplates:
     - metadata:
         name: workspace
@@ -162,10 +162,11 @@ spec:
             withParam: "{{tasks.collect.outputs.parameters.images}}"
           - name: promote-gitops
             depends: attest.Succeeded
+            when: "{{workflow.parameters.promotion-enabled}} == true"
             template: promote-gitops
           - name: promote-dev
             depends: promote-gitops.Succeeded
-            when: "{{workflow.parameters.target-environment}} == test"
+            when: "{{workflow.parameters.ref}} == refs/heads/dev"
             template: promote-dev
 
     - name: github-status
@@ -200,8 +201,6 @@ spec:
             value: "{{workflow.parameters.repository}}"
           - name: GITHUB_SHA
             value: "{{workflow.parameters.revision}}"
-          - name: GITHUB_TARGET_URL
-            value: "https://argo.happyladysauce.local/workflows/ci/{{workflow.name}}"
         volumeMounts:
           - name: github-app
             mountPath: /secrets/github
@@ -255,7 +254,7 @@ spec:
 
     - name: node
       container:
-        image: node:24.18.1-bookworm-slim@sha256:235600a8101ab264e117b1768e925532262668dc9b581ef1dd7d96ced463b8e7
+        image: docker.m.daocloud.io/library/node:24.18.1-bookworm-slim@sha256:235600a8101ab264e117b1768e925532262668dc9b581ef1dd7d96ced463b8e7
         imagePullPolicy: IfNotPresent
         command: ["/bin/sh", "-euc"]
         args:
@@ -329,6 +328,9 @@ spec:
             export COLLABORATION_TEST_POSTGRES_URL="postgres://knowledge_core:${POSTGRES_PASSWORD}@127.0.0.1:5432/knowledge_core"
             cd /workspace/source
             make rust-ci
+            install -D -m 0755 \
+              "$CARGO_TARGET_DIR/release/knowledge-core-collaboration" \
+              /workspace/source/.ci-artifacts/knowledge-core-collaboration
             cd services/collaboration
             cargo build --locked --bin volo_interop_fixture
             install -m 0755 "$CARGO_TARGET_DIR/debug/volo_interop_fixture" /workspace/interop/rust-interop
@@ -353,7 +355,7 @@ spec:
         securityContext: *restricted
       sidecars:
         - name: postgres
-          image: postgres:16-alpine@sha256:4e6e670bb069649261c9c18031f0aded7bb249a5b6664ddec29c013a89310d50
+          image: docker.m.daocloud.io/library/postgres:16-alpine@sha256:4e6e670bb069649261c9c18031f0aded7bb249a5b6664ddec29c013a89310d50
           env:
             - {name: POSTGRES_USER, value: knowledge_core}
             - {name: POSTGRES_DB, value: knowledge_core}
@@ -377,7 +379,7 @@ spec:
             seccompProfile:
               type: RuntimeDefault
         - name: redis
-          image: redis:7-alpine@sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99
+          image: docker.m.daocloud.io/library/redis:7-alpine@sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99
           args: ["redis-server", "--save", ""]
           volumeMounts:
             - {name: redis-data, mountPath: /data}
@@ -396,7 +398,7 @@ spec:
             seccompProfile:
               type: RuntimeDefault
         - name: nats
-          image: nats:2.11-alpine@sha256:e4bf19f15fd3218814a4e3c9e0064e1334bd8aa20d5984b9f1a0afd084f8cc00
+          image: docker.m.daocloud.io/library/nats:2.11-alpine@sha256:e4bf19f15fd3218814a4e3c9e0064e1334bd8aa20d5984b9f1a0afd084f8cc00
           args: ["-js", "-sd", "/data", "-m", "8222"]
           volumeMounts:
             - {name: nats-data, mountPath: /data}
@@ -489,7 +491,6 @@ spec:
           - {name: GITHUB_REPOSITORY, value: "{{workflow.parameters.repository}}"}
           - {name: GITHUB_SHA, value: "{{workflow.parameters.revision}}"}
           - {name: GITHUB_REF, value: "{{workflow.parameters.ref}}"}
-          - {name: TARGET_ENVIRONMENT, value: "{{workflow.parameters.target-environment}}"}
         volumeMounts:
           - {name: github-app, mountPath: /secrets/github, readOnly: true}
         resources:
@@ -516,6 +517,9 @@ spec:
           - {name: IMAGE_REGISTRY, value: "{{workflow.parameters.image-registry}}"}
           - {name: IMAGE_NAMESPACE, value: "{{workflow.parameters.image-namespace}}"}
           - {name: DOCKER_CONFIG, value: /home/user/.docker}
+          - {name: XDG_RUNTIME_DIR, value: /run/user/1000}
+          - {name: TMPDIR, value: /tmp}
+          - {name: SSL_CERT_DIR, value: "/etc/ssl/certs:/etc/knowledge-core/harbor"}
           - {name: BUILDKITD_FLAGS, value: "--oci-worker-no-process-sandbox --config=/etc/buildkit/buildkitd.toml"}
         volumeMounts:
           - {name: workspace, mountPath: /workspace}
@@ -523,6 +527,7 @@ spec:
           - {name: harbor-auth, mountPath: /home/user/.docker, readOnly: true}
           - {name: harbor-ca, mountPath: /etc/knowledge-core/harbor, readOnly: true}
           - {name: buildkit-config, mountPath: /etc/buildkit, readOnly: true}
+          - {name: buildkit-runtime, mountPath: /run/user/1000}
           - {name: tmp, mountPath: /tmp}
         resources:
           requests: {cpu: 750m, memory: 1Gi}
@@ -531,15 +536,19 @@ spec:
           runAsNonRoot: true
           runAsUser: 1000
           runAsGroup: 1000
-          allowPrivilegeEscalation: false
+          # rootlesskit needs the newuidmap setuid helper to create its user namespace.
+          allowPrivilegeEscalation: true
           readOnlyRootFilesystem: true
           capabilities:
             drop: ["ALL"]
+            add: ["SETUID", "SETGID"]
           seccompProfile:
             type: Unconfined
           appArmorProfile:
             type: Unconfined
       volumes:
+        - name: buildkit-runtime
+          emptyDir: {sizeLimit: 256Mi}
         - name: tmp
           emptyDir: {sizeLimit: 2Gi}
 
@@ -718,7 +727,6 @@ spec:
           - {name: GITHUB_REF, value: "{{workflow.parameters.ref}}"}
           - {name: GITOPS_REPOSITORY, value: "{{workflow.parameters.gitops-repository}}"}
           - {name: SOURCE_ROOT, value: /workspace/source}
-          - {name: TARGET_ENVIRONMENT, value: "{{workflow.parameters.target-environment}}"}
           - {name: IMAGE_MAP_FILE, value: /workspace/release/images.env}
         volumeMounts:
           - {name: workspace, mountPath: /workspace}
@@ -775,7 +783,6 @@ spec:
           - {name: GITHUB_APP_PRIVATE_KEY_FILE, value: /secrets/github/private-key.pem}
           - {name: GITHUB_REPOSITORY, value: "{{workflow.parameters.repository}}"}
           - {name: GITHUB_SHA, value: "{{workflow.parameters.revision}}"}
-          - {name: GITHUB_TARGET_URL, value: "https://argo.happyladysauce.local/workflows/ci/{{workflow.name}}"}
         volumeMounts:
           - {name: github-app, mountPath: /secrets/github, readOnly: true}
         resources:

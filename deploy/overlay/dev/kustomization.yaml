@@ -1,0 +1,105 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: knowledge-core-dev
+
+resources:
+  - ../../base
+  - namespace.yaml
+
+configMapGenerator:
+  - name: knowledge-core-common-config
+    behavior: merge
+    literals:
+      - KNOWLEDGE_CORE_NACOS_ENABLED=true
+      - KNOWLEDGE_CORE_NACOS_SERVERS=https://nacos.nacos.svc.cluster.local:8848
+      - KNOWLEDGE_CORE_NACOS_NAMESPACE=dev
+      - KNOWLEDGE_CORE_NACOS_GROUP=KNOWLEDGE_CORE
+      - KNOWLEDGE_CORE_NACOS_CA_FILE=/etc/knowledge-core/tls/internal-ca.crt
+      - KNOWLEDGE_CORE_NACOS_KEY_ID=dev-v1
+      - NACOS_CLIENT_TLS_CA_CERT=/etc/knowledge-core/tls/internal-ca.crt
+  - name: knowledge-core-gateway-config
+    behavior: merge
+    literals:
+      - GATEWAY_APP_ENVIRONMENT=development
+      - GATEWAY_REDIS_ADDRESS=redis-master.redis.svc.cluster.local:6379
+      - GATEWAY_REDIS_USERNAME=knowledge-core-dev
+      - GATEWAY_ETCD_ENDPOINTS=etcd.etcd.svc.cluster.local:2379
+      - GATEWAY_ETCD_USERNAME=knowledge-core-dev
+      - GATEWAY_ETCD_PREFIX=/knowledge-core/development/registry
+      - GATEWAY_ETCD_TLS_ENABLED=true
+      - GATEWAY_ETCD_TLS_CA_FILE=/etc/knowledge-core/tls/internal-ca.crt
+      - GATEWAY_ETCD_TLS_SERVER_NAME=etcd.etcd.svc.cluster.local
+      - GATEWAY_RATE_LIMIT_KEY_PREFIX=knowledge-core:development:gateway:rate-limit
+  - name: knowledge-core-identity-config
+    behavior: merge
+    literals:
+      - IDENTITY_APP_ENVIRONMENT=development
+      - IDENTITY_POSTGRES_HOST=postgresql.postgresql.svc.cluster.local
+      - IDENTITY_POSTGRES_DATABASE=knowledge_core_dev
+      - IDENTITY_POSTGRES_USER=knowledge_core_dev_identity
+      - IDENTITY_REDIS_ADDRESS=redis-master.redis.svc.cluster.local:6379
+      - IDENTITY_REDIS_USERNAME=knowledge-core-dev
+      - IDENTITY_ETCD_ENDPOINTS=etcd.etcd.svc.cluster.local:2379
+      - IDENTITY_ETCD_USERNAME=knowledge-core-dev
+      - IDENTITY_ETCD_PREFIX=/knowledge-core/development/registry
+      - IDENTITY_ETCD_TLS_ENABLED=true
+      - IDENTITY_ETCD_TLS_CA_FILE=/etc/knowledge-core/tls/internal-ca.crt
+      - IDENTITY_ETCD_TLS_SERVER_NAME=etcd.etcd.svc.cluster.local
+  - name: knowledge-core-knowledge-config
+    behavior: merge
+    literals:
+      - KNOWLEDGE_APP_ENVIRONMENT=development
+      - KNOWLEDGE_POSTGRES_HOST=postgresql.postgresql.svc.cluster.local
+      - KNOWLEDGE_POSTGRES_DATABASE=knowledge_core_dev
+      - KNOWLEDGE_POSTGRES_USER=knowledge_core_dev_knowledge
+      - KNOWLEDGE_ETCD_ENDPOINTS=etcd.etcd.svc.cluster.local:2379
+      - KNOWLEDGE_ETCD_USERNAME=knowledge-core-dev
+      - KNOWLEDGE_ETCD_PREFIX=/knowledge-core/development/registry
+      - KNOWLEDGE_ETCD_TLS_ENABLED=true
+      - KNOWLEDGE_ETCD_TLS_CA_FILE=/etc/knowledge-core/tls/internal-ca.crt
+      - KNOWLEDGE_ETCD_TLS_SERVER_NAME=etcd.etcd.svc.cluster.local
+      - KNOWLEDGE_NATS_SERVERS=nats://nats.nats.svc.cluster.local:4222
+      - KNOWLEDGE_NATS_USERNAME=knowledge-core-dev
+      - KNOWLEDGE_NATS_TLS_ENABLED=true
+      - KNOWLEDGE_NATS_TLS_CA_FILE=/etc/knowledge-core/tls/nats-ca.crt
+      - KNOWLEDGE_NATS_TLS_SERVER_NAME=nats.nats.svc.cluster.local
+      - KNOWLEDGE_OBJECT_STORAGE_ENDPOINT=minio.minio.svc.cluster.local:9000
+      - KNOWLEDGE_OBJECT_STORAGE_BUCKET=knowledge-core-dev
+      - KNOWLEDGE_OBJECT_STORAGE_SECURE=false
+      - KNOWLEDGE_OBJECT_STORAGE_AUTO_CREATE_BUCKET=false
+      - KNOWLEDGE_SCANNER_ADDRESS=clamav.clamav.svc.cluster.local:3310
+  - name: knowledge-core-collaboration-config
+    behavior: merge
+    literals:
+      - COLLABORATION_ENVIRONMENT=development
+      - COLLABORATION_RPC_ADVERTISED_ADDRESS=knowledge-core-collaboration.knowledge-core-dev.svc.cluster.local:8883
+      - COLLABORATION_REDIS_PREFIX=knowledge-core:development:collaboration
+      - COLLABORATION_NATS_SERVERS=nats://nats.nats.svc.cluster.local:4222
+      - COLLABORATION_NATS_USERNAME=knowledge-core-dev
+      - COLLABORATION_NATS_TLS_ENABLED=true
+      - COLLABORATION_NATS_TLS_CA_FILE=/etc/knowledge-core/tls/nats-ca.crt
+      - COLLABORATION_NATS_TLS_SERVER_NAME=nats.nats.svc.cluster.local
+      - COLLABORATION_ETCD_ENDPOINTS=https://etcd.etcd.svc.cluster.local:2379
+      - COLLABORATION_ETCD_USERNAME=knowledge-core-dev
+      - COLLABORATION_ETCD_PREFIX=/knowledge-core/development/registry
+      - COLLABORATION_ETCD_TLS_ENABLED=true
+      - COLLABORATION_ETCD_TLS_CA_FILE=/etc/knowledge-core/tls/internal-ca.crt
+      - COLLABORATION_ETCD_TLS_SERVER_NAME=etcd.etcd.svc.cluster.local
+
+patches:
+  - target:
+      kind: Deployment
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/volumeMounts/-
+        value:
+          name: trust-bundle
+          mountPath: /etc/knowledge-core/tls
+          readOnly: true
+      - op: add
+        path: /spec/template/spec/volumes/-
+        value:
+          name: trust-bundle
+          configMap:
+            name: knowledge-core-trust-bundle

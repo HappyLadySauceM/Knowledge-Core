@@ -1,31 +1,13 @@
-# syntax=docker/dockerfile:1.7
+FROM docker.m.daocloud.io/library/debian:bookworm-slim@sha256:7b140f374b289a7c2befc338f42ebe6441b7ea838a042bbd5acbfca6ec875818 AS runtime
 
-FROM rust:1.97.1-bookworm@sha256:77fac8b98f9f46062bb680b6d25d5bcaabfc400143952ebc572e924bcbedc3fa AS build
-
-RUN apt-get update \
-    && apt-get install --yes --no-install-recommends protobuf-compiler \
-    && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /workspace/services/collaboration
-COPY services/collaboration/Cargo.toml services/collaboration/Cargo.lock services/collaboration/rust-toolchain.toml ./
-COPY services/collaboration/tools/rust-codegen/Cargo.toml tools/rust-codegen/Cargo.toml
-COPY services/collaboration/tools/rust-codegen/src tools/rust-codegen/src
-COPY services/collaboration/migrations migrations
-COPY services/collaboration/src src
-RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    --mount=type=cache,target=/workspace/services/collaboration/target \
-    cargo build --locked --release -p knowledge-core-collaboration --bin knowledge-core-collaboration \
-    && cp target/release/knowledge-core-collaboration /tmp/knowledge-core-collaboration
-
-FROM debian:bookworm-slim@sha256:7b140f374b289a7c2befc338f42ebe6441b7ea838a042bbd5acbfca6ec875818 AS runtime
-
-RUN apt-get update \
+RUN sed -i 's|deb.debian.org/debian|mirrors.aliyun.com/debian|g' /etc/apt/sources.list.d/debian.sources \
+    && apt-get update \
     && apt-get install --yes --no-install-recommends ca-certificates \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --gid 10001 knowledge-core \
     && useradd --uid 10001 --gid knowledge-core --no-create-home --shell /usr/sbin/nologin knowledge-core
 
-COPY --from=build --chown=10001:10001 /tmp/knowledge-core-collaboration /usr/local/bin/knowledge-core-collaboration
+COPY --chown=10001:10001 .ci-artifacts/knowledge-core-collaboration /usr/local/bin/knowledge-core-collaboration
 
 EXPOSE 8091 8883 8084
 USER 10001:10001

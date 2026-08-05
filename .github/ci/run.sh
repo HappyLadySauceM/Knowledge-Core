@@ -141,6 +141,7 @@ readonly rust_interop_name="knowledge-core-ci-rust-interop-${run_suffix}"
 readonly go_interop_name="knowledge-core-ci-go-interop-${run_suffix}"
 readonly collaboration_image="knowledge-core-collaboration-ci:${run_suffix}"
 readonly interop_root="${cache_root}/interop-${run_suffix}"
+readonly artifact_root="${repository_root}/.ci-artifacts"
 readonly postgres_password="$(printf '%s' "${run_suffix}-${RANDOM}" | sha256sum | awk '{print $1}')"
 
 cleanup_dependencies() {
@@ -151,6 +152,9 @@ cleanup_dependencies() {
     docker image rm --force "$collaboration_image" >/dev/null 2>&1 || true
     case "$interop_root" in
         "$cache_root"/interop-*) rm -rf -- "$interop_root" ;;
+    esac
+    case "$artifact_root" in
+        "$repository_root"/.ci-artifacts) rm -rf -- "$artifact_root" ;;
     esac
 }
 trap cleanup_dependencies EXIT
@@ -382,7 +386,13 @@ docker run --rm \
     --volume "${cache_root}/cargo-target:/cache/cargo-target:rw" \
     --workdir /workspace \
     "$rust_image" \
-    bash -euo pipefail -c 'mkdir -p "$HOME"; make rust-ci'
+    bash -euo pipefail -c '
+        mkdir -p "$HOME"
+        make rust-ci
+        install -D -m 0755 \
+          "$CARGO_TARGET_DIR/release/knowledge-core-collaboration" \
+          /workspace/.ci-artifacts/knowledge-core-collaboration
+    '
 
 docker build \
     "${proxy_build_args[@]}" \

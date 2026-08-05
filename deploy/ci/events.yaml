@@ -92,7 +92,7 @@ spec:
                     - {name: repository, value: HappyLadySauceM/Knowledge-Core}
                     - {name: revision}
                     - {name: ref}
-                    - {name: target-environment}
+                    - {name: promotion-enabled, value: "true"}
           parameters:
             - src:
                 dependencyName: push
@@ -106,10 +106,6 @@ spec:
                 dependencyName: push
                 dataKey: body.ref
               dest: spec.arguments.parameters.2.value
-            - src:
-                dependencyName: push
-                dataTemplate: "{{ if eq .Input.body.ref \"refs/heads/dev\" }}test{{ else }}prod{{ end }}"
-              dest: spec.arguments.parameters.3.value
       retryStrategy:
         steps: 3
 ---
