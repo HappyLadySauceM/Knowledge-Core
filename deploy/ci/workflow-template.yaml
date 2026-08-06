@@ -38,7 +38,7 @@ spec:
       - name: image-namespace
         value: knowledge-core
       - name: control-image
-        value: harbor.happyladysauce.local/knowledge-core/ci-control@sha256:4f2f070077b24dcdd477986af18d9b01326437268705cc570c5e4401c66e018f
+        value: harbor.happyladysauce.local/knowledge-core/ci-control@sha256:643605ee35dcbb28e1072ca940a935722de1db60b8ffb7b1fbf421e463675d29
       - name: go-image
         value: harbor.happyladysauce.local/knowledge-core/ci-go@sha256:7f30a4f81017fc3a7257f90d5f8d070a76fb8fe1cb8a9c98e07aa462c4b895d0
       - name: rust-image
