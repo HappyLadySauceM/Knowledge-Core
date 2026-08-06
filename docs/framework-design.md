@@ -271,8 +271,10 @@ base 快照、唯一 dev overlay、SOPS Secret 和镜像 digest。公共 Nacos�
 位于独立 namespace，PostgreSQL 和 Redis 复用现有服务；应用只使用项目级账号和前缀。
 
 仓库内存在 Argo Workflows/Events、rootless BuildKit、持久缓存、Trivy/Syft/Cosign 和 GitOps CAS
-推广清单。self-hosted `.github/ci/run.sh` 继续作为回退；两套重型 CI 在切换完成前不能同时响应 dev
-push。Argo CD Application 由管理面板创建。
+推广清单。单节点 k3s 的 Workflow 外联通过只绑定 CNI 网关的 host-network 转发容器接入节点既有
+sing-box；代理环境由 ConfigMap 统一注入，loopback、集群网段、Service DNS 和
+`*.happyladysauce.local`/`*.happyladysauce.cn` 必须 bypass。self-hosted `.github/ci/run.sh` 继续作为
+回退；两套重型 CI 在切换完成前不能同时响应 dev push。Argo CD Application 由管理面板创建。
 
 ### 当前不兼容基线的迁移记录
 
