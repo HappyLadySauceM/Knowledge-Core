@@ -144,10 +144,18 @@ Secret 应使用 SOPS/age 管理。age 私钥只进入 `argocd/argocd-sops-age` 
 | Secret `knowledge-core-ci-test-dependencies` | `postgres-password`，只供 Workflow sidecar 测试 |
 | Secret `knowledge-core-argo-events-nats` | `auth.yaml`，内容为 `KC_CI` username/password |
 | ConfigMap `knowledge-core-harbor-ca` | `ca.crt` |
+| ConfigMap `knowledge-core-ci-proxy` | Workflow 的大小写 `HTTP(S)_PROXY`/`NO_PROXY` 环境 |
 
 GitHub App 需安装到 Knowledge-Core 和 `k3s-home-deploy`，最小权限为 source
 contents read、commit statuses write、pull requests write、GitOps contents write。
 不要授予 administration 权限。
+
+当前单节点集群的 GitHub 出口通过 `knowledge-core-ci-proxy` Deployment 桥接：受限
+host-network 容器只监听 CNI 网关 `10.42.0.1:10992`，并转发到节点既有的
+`127.0.0.1:10991` sing-box。它不创建 Service，也不监听节点 LAN 地址；节点代理必须先
+处于监听状态。Workflow 主容器统一从同名 ConfigMap 注入代理变量。`NO_PROXY` 必须同时
+覆盖 loopback、Pod/Service CIDR、`.svc`/`.svc.cluster.local`、节点地址以及
+`*.happyladysauce.local`、`*.happyladysauce.cn`，使 sidecar、NATS 和 Harbor 流量不离开集群。
 
 ## 6. 容器内 Rust 构建和缓存
 
@@ -172,7 +180,8 @@ Rust 容器启动时把基础镜像的 `/usr/local/cargo/config.toml` 安装到�
 占满 Workflow deadline。`cargo-deny` 获取官方 RustSec advisory DB 时，Git 子进程使用
 临时 HTTP/1.1 配置和 60 秒低速窗口；这些参数不写入节点或 runner 的全局 Git 配置。
 advisory DB 在编译前以单次 120 秒、最多 3 次的策略独立获取，成功后供应链检查
-使用 `--offline`，避免 release 编译完成后才因 GitHub 网络抖动失败。
+使用 `--offline`，避免 release 编译完成后才因 GitHub 网络抖动失败。失败尝试会删除
+cargo-deny 留下的半成品数据库目录和锁文件，下一次尝试始终执行干净 clone。
 
 Rust pod 执行 format、Clippy、tests、release build、cargo-deny、生成漂移和真实
 PostgreSQL/Redis/NATS/Etcd 测试。它把已经通过检查的 release binary 写入
@@ -185,6 +194,8 @@ BuildKit 容器保持 non-root，仅为 rootlesskit 的 `newuidmap/newgidmap` �
 `allowPrivilegeEscalation` 和 `SETUID/SETGID`，其他模板继续使用通用 restricted
 security context。`coredns-custom` 把 `harbor.happyladysauce.local` exact rewrite 到
 Higress Gateway Service 名，BuildKit、Trivy 和 Cosign 因而使用同一个受 CA 验证的 TLS host。
+每个镜像的 build+push 最多尝试三次并以 5/10 秒退避；只有成功尝试生成的 metadata
+会进入 digest 收集，镜像站瞬时 5xx 不会留下可被后续步骤消费的半成品记录。
 
 ## 7. 完整 CI 流程
 

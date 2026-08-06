@@ -12,20 +12,44 @@ if [ "$SOURCE_ROOT" != "/workspace/source" ] || [ ! -d "$SOURCE_ROOT/.git" ]; th
 fi
 
 metadata_root=/workspace/image-metadata
+maximum_attempts=3
 mkdir -p "$metadata_root"
 
 build_image() {
     name="$1"
     dockerfile="$2"
     reference="${IMAGE_REGISTRY}/${IMAGE_NAMESPACE}/${name}:${GITHUB_SHA}"
-    buildctl-daemonless.sh build \
-        --frontend dockerfile.v0 \
-        --local "context=${SOURCE_ROOT}" \
-        --local "dockerfile=${SOURCE_ROOT}" \
-        --opt "filename=${dockerfile}" \
-        --opt platform=linux/amd64 \
-        --output "type=image,name=${reference},push=true" \
-        --metadata-file "${metadata_root}/${name}.json"
+    metadata_file="${metadata_root}/${name}.json"
+    temporary_metadata_file="${metadata_file}.tmp"
+    attempt=1
+
+    while [ "$attempt" -le "$maximum_attempts" ]; do
+        rm -f -- "$temporary_metadata_file"
+        if buildctl-daemonless.sh build \
+            --frontend dockerfile.v0 \
+            --local "context=${SOURCE_ROOT}" \
+            --local "dockerfile=${SOURCE_ROOT}" \
+            --opt "filename=${dockerfile}" \
+            --opt platform=linux/amd64 \
+            --output "type=image,name=${reference},push=true" \
+            --metadata-file "$temporary_metadata_file"; then
+            mv -- "$temporary_metadata_file" "$metadata_file"
+            return 0
+        fi
+
+        rm -f -- "$temporary_metadata_file"
+        if [ "$attempt" -eq "$maximum_attempts" ]; then
+            printf 'Build and push for %s failed after %d attempts\n' \
+                "$name" "$maximum_attempts" >&2
+            return 1
+        fi
+
+        next_attempt=$((attempt + 1))
+        printf 'Retrying build and push for %s (%d/%d)\n' \
+            "$name" "$next_attempt" "$maximum_attempts" >&2
+        sleep $((attempt * 5))
+        attempt="$next_attempt"
+    done
 }
 
 build_image gateway docker/gateway/dockerfile

@@ -179,6 +179,9 @@ spec:
       container:
         image: "{{workflow.parameters.control-image}}"
         imagePullPolicy: IfNotPresent
+        envFrom: &proxy-env
+          - configMapRef:
+              name: knowledge-core-ci-proxy
         command: ["/bin/bash", "-euo", "pipefail", "-c"]
         args:
           - |
@@ -225,6 +228,7 @@ spec:
       container:
         image: "{{workflow.parameters.control-image}}"
         imagePullPolicy: IfNotPresent
+        envFrom: *proxy-env
         command: ["/bin/bash", "-euo", "pipefail", "-c"]
         args:
           - |
@@ -258,6 +262,7 @@ spec:
       container:
         image: docker.m.daocloud.io/library/node:24.18.1-bookworm-slim@sha256:235600a8101ab264e117b1768e925532262668dc9b581ef1dd7d96ced463b8e7
         imagePullPolicy: IfNotPresent
+        envFrom: *proxy-env
         command: ["/bin/sh", "-euc"]
         args:
           - |
@@ -284,6 +289,7 @@ spec:
       container:
         image: "{{workflow.parameters.go-image}}"
         imagePullPolicy: IfNotPresent
+        envFrom: *proxy-env
         command: ["/bin/bash", "-euo", "pipefail", "-c"]
         args:
           - |
@@ -315,6 +321,7 @@ spec:
       container:
         image: "{{workflow.parameters.rust-image}}"
         imagePullPolicy: IfNotPresent
+        envFrom: *proxy-env
         command: ["/bin/bash", "-euo", "pipefail", "-c"]
         args:
           - |
@@ -477,6 +484,7 @@ spec:
       container:
         image: "{{workflow.parameters.go-image}}"
         imagePullPolicy: IfNotPresent
+        envFrom: *proxy-env
         command: ["/bin/bash", "/workspace/source/scripts/ci/run-interop.sh"]
         volumeMounts:
           - {name: workspace, mountPath: /workspace}
@@ -493,6 +501,7 @@ spec:
       container:
         image: "{{workflow.parameters.control-image}}"
         imagePullPolicy: IfNotPresent
+        envFrom: *proxy-env
         command: ["/bin/bash", "-euo", "pipefail", "-c"]
         args:
           - |
@@ -528,6 +537,7 @@ spec:
       container:
         image: moby/buildkit@sha256:66e5fe5b25509626c0e628c6e57badbcc2e8a62218ba3e1358f1427e90de6a88
         imagePullPolicy: IfNotPresent
+        envFrom: *proxy-env
         command: ["/bin/sh", "/workspace/source/scripts/ci/build-images.sh"]
         env:
           - {name: HOME, value: /home/user}
@@ -580,6 +590,7 @@ spec:
       container:
         image: "{{workflow.parameters.control-image}}"
         imagePullPolicy: IfNotPresent
+        envFrom: *proxy-env
         command: ["/bin/bash", "/workspace/source/scripts/ci/collect-images.sh"]
         env:
           - {name: GITHUB_SHA, value: "{{workflow.parameters.revision}}"}
@@ -600,6 +611,7 @@ spec:
       container:
         image: aquasec/trivy@sha256:7cced7cae583819fc7806d4cbc0dbbc7cad18b99f7d3e235192e6da8c091045c
         imagePullPolicy: IfNotPresent
+        envFrom: *proxy-env
         command: ["trivy"]
         args:
           - image
@@ -634,6 +646,7 @@ spec:
       container:
         image: anchore/syft@sha256:1288ea4c8b38767b4e620c1e312c8cb26b6e887a99b4f07ab6cd19fc6f225026
         imagePullPolicy: IfNotPresent
+        envFrom: *proxy-env
         command: ["/syft"]
         args:
           - "{{inputs.parameters.ref}}"
@@ -663,6 +676,7 @@ spec:
       container:
         image: ghcr.io/sigstore/cosign/cosign@sha256:d91bc4e7e95e8d2f549c747a72dc174f90579e410a1695f57f686674f84ce849
         imagePullPolicy: IfNotPresent
+        envFrom: *proxy-env
         command: ["/ko-app/cosign"]
         args: ["sign", "--yes", "--key", "/secrets/cosign/cosign.key", "{{inputs.parameters.ref}}"]
         env:
@@ -692,6 +706,7 @@ spec:
       container:
         image: ghcr.io/sigstore/cosign/cosign@sha256:d91bc4e7e95e8d2f549c747a72dc174f90579e410a1695f57f686674f84ce849
         imagePullPolicy: IfNotPresent
+        envFrom: *proxy-env
         command: ["/ko-app/cosign"]
         args:
           - attest
@@ -727,6 +742,7 @@ spec:
       container:
         image: "{{workflow.parameters.control-image}}"
         imagePullPolicy: IfNotPresent
+        envFrom: *proxy-env
         command: ["/bin/bash", "-euo", "pipefail", "-c"]
         args:
           - |
@@ -763,6 +779,7 @@ spec:
       container:
         image: "{{workflow.parameters.control-image}}"
         imagePullPolicy: IfNotPresent
+        envFrom: *proxy-env
         command: ["/bin/bash", "-euo", "pipefail", "-c"]
         args:
           - |
@@ -781,6 +798,7 @@ spec:
       container:
         image: "{{workflow.parameters.control-image}}"
         imagePullPolicy: IfNotPresent
+        envFrom: *proxy-env
         command: ["/bin/bash", "-euo", "pipefail", "-c"]
         args:
           - |

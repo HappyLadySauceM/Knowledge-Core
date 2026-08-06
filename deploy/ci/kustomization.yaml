@@ -6,6 +6,7 @@ namespace: ci
 resources:
   - infrastructure.yaml
   - rbac.yaml
+  - proxy.yaml
   - workflow-template.yaml
   - events.yaml
   - network-policies.yaml
