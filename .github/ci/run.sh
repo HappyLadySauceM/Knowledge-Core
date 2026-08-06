@@ -248,8 +248,12 @@ rust_container_env=(
     --env HOME=/tmp/knowledge-core-rust-ci
     --env CARGO_HOME=/cache/cargo-home
     --env CARGO_TARGET_DIR=/cache/cargo-target
+    --env CARGO_HTTP_MULTIPLEXING=false
+    --env CARGO_HTTP_TIMEOUT=60
+    --env CARGO_NET_RETRY=5
     --env COLLABORATION_TEST_REQUIRE_REAL_DEPENDENCIES=1
-    --env "COLLABORATION_TEST_POSTGRES_URL=postgres://knowledge_core:${postgres_password}@${postgres_name}:5432/knowledge_core"
+    --env "COLLABORATION_TEST_POSTGRES_URL=postgres://knowledge_core@${postgres_name}:5432/knowledge_core"
+    --env "COLLABORATION_TEST_POSTGRES_PASSWORD=${postgres_password}"
     --env "COLLABORATION_TEST_REDIS_URL=redis://${redis_name}:6379/0"
     --env "COLLABORATION_TEST_NATS_URL=nats://${nats_name}:4222"
     --env "COLLABORATION_TEST_ETCD_ENDPOINTS=http://${etcd_name}:2379"
@@ -298,7 +302,7 @@ docker run --rm \
     --volume "${interop_root}:/interop:rw" \
     --workdir /workspace/services/collaboration \
     "$rust_image" \
-    bash -euo pipefail -c 'mkdir -p "$HOME"; cargo build --locked --bin volo_interop_fixture; install -m 0755 "$CARGO_TARGET_DIR/debug/volo_interop_fixture" /interop/rust-interop'
+    bash -euo pipefail -c 'mkdir -p "$HOME"; install -m 0644 /usr/local/cargo/config.toml "$CARGO_HOME/config.toml"; cargo build --locked --bin volo_interop_fixture; install -m 0755 "$CARGO_TARGET_DIR/debug/volo_interop_fixture" /interop/rust-interop'
 
 docker run --rm \
     --cap-drop ALL \
@@ -388,6 +392,7 @@ docker run --rm \
     "$rust_image" \
     bash -euo pipefail -c '
         mkdir -p "$HOME"
+        install -m 0644 /usr/local/cargo/config.toml "$CARGO_HOME/config.toml"
         make rust-ci
         install -D -m 0755 \
           "$CARGO_TARGET_DIR/release/knowledge-core-collaboration" \

@@ -33,14 +33,16 @@ use sqlx::{
     postgres::{PgConnectOptions, PgPoolOptions},
 };
 use tokio::time::timeout;
+use url::Url;
 use uuid::Uuid;
 use yrs::{ReadTxn, Transact, XmlElementPrelim, XmlFragment};
 
 type TestResult<T = ()> = Result<T, Box<dyn Error + Send + Sync>>;
 
 const REQUIRE_REAL_DEPENDENCIES: &str = "COLLABORATION_TEST_REQUIRE_REAL_DEPENDENCIES";
-const REQUIRED_ENVIRONMENT: [&str; 3] = [
+const REQUIRED_ENVIRONMENT: [&str; 4] = [
     "COLLABORATION_TEST_POSTGRES_URL",
+    "COLLABORATION_TEST_POSTGRES_PASSWORD",
     "COLLABORATION_TEST_REDIS_URL",
     "COLLABORATION_TEST_ETCD_ENDPOINTS",
 ];
@@ -54,10 +56,10 @@ struct RealEnvironment {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn repository_contracts_against_real_dependencies() -> TestResult {
     let required = real_dependencies_required()?;
-    let Some(environment) = real_environment() else {
+    let Some(environment) = real_environment()? else {
         if required {
             return Err(test_error(
-                "COLLABORATION_TEST_POSTGRES_URL, COLLABORATION_TEST_REDIS_URL, and COLLABORATION_TEST_ETCD_ENDPOINTS are required when COLLABORATION_TEST_REQUIRE_REAL_DEPENDENCIES=1",
+                "COLLABORATION_TEST_POSTGRES_URL, COLLABORATION_TEST_POSTGRES_PASSWORD, COLLABORATION_TEST_REDIS_URL, and COLLABORATION_TEST_ETCD_ENDPOINTS are required when COLLABORATION_TEST_REQUIRE_REAL_DEPENDENCIES=1",
             ));
         }
         eprintln!(
@@ -659,11 +661,17 @@ fn append_paragraph_update(state: &[u8]) -> TestResult<Vec<u8>> {
     Ok(document.transact().encode_state_as_update_v1(&before))
 }
 
-fn real_environment() -> Option<RealEnvironment> {
+fn real_environment() -> TestResult<Option<RealEnvironment>> {
     let values = REQUIRED_ENVIRONMENT
         .map(|name| env::var(name).ok().filter(|value| !value.trim().is_empty()));
-    let [Some(postgres_url), Some(redis_url), Some(etcd)] = values else {
-        return None;
+    let [
+        Some(postgres_url),
+        Some(postgres_password),
+        Some(redis_url),
+        Some(etcd),
+    ] = values
+    else {
+        return Ok(None);
     };
     let etcd_endpoints = etcd
         .split(',')
@@ -672,13 +680,30 @@ fn real_environment() -> Option<RealEnvironment> {
         .map(ToOwned::to_owned)
         .collect::<Vec<_>>();
     if etcd_endpoints.is_empty() {
-        return None;
+        return Ok(None);
     }
-    Some(RealEnvironment {
-        postgres_url,
+    Ok(Some(RealEnvironment {
+        postgres_url: postgres_url_with_password(&postgres_url, &postgres_password)?,
         redis_url,
         etcd_endpoints,
-    })
+    }))
+}
+
+fn postgres_url_with_password(base_url: &str, password: &str) -> TestResult<String> {
+    let mut url = Url::parse(base_url)?;
+    url.set_password(Some(password))
+        .map_err(|()| test_error("COLLABORATION_TEST_POSTGRES_URL cannot contain credentials"))?;
+    Ok(url.into())
+}
+
+#[test]
+fn postgres_password_is_encoded_before_sqlx_parses_the_url() -> TestResult {
+    let url = postgres_url_with_password(
+        "postgres://knowledge_core@127.0.0.1:5432/knowledge_core",
+        "reserved:@/?#[]",
+    )?;
+    PgConnectOptions::from_str(&url)?;
+    Ok(())
 }
 
 fn real_dependencies_required() -> TestResult<bool> {

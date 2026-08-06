@@ -166,10 +166,17 @@ Docker Hub mirror，成功后始终由 Harbor digest 拉取。只有 Rust toolch
 - PVC `knowledge-core-ci-cache` 保存 `cargo-home`、`cargo-target`、Go 和扫描缓存。
 - PVC `knowledge-core-buildkit-cache` 保存 OCI layer/cache metadata。
 
+Rust 容器启动时把基础镜像的 `/usr/local/cargo/config.toml` 安装到持久化
+`CARGO_HOME`，确保挂载缓存后仍使用镜像固定的 sparse registry 配置。Cargo HTTP
+请求关闭 multiplexing，单次请求超时 60 秒并最多重试 5 次，避免 registry 连接抖动
+占满 Workflow deadline。
+
 Rust pod 执行 format、Clippy、tests、release build、cargo-deny、生成漂移和真实
 PostgreSQL/Redis/NATS/Etcd 测试。它把已经通过检查的 release binary 写入
 `.ci-artifacts/knowledge-core-collaboration`；`docker/collaboration/dockerfile` 只封装
 该二进制，不再运行 Cargo。这样一个 Workflow 只进行一次 production release 编译。
+PostgreSQL 测试 URL 不包含密码；`postgres-password` 通过独立环境变量注入，并由
+Rust URL API 编码后再传给 SQLx，Secret 中的 URL 保留字符不会破坏连接字符串。
 
 BuildKit 容器保持 non-root，仅为 rootlesskit 的 `newuidmap/newgidmap` 开启
 `allowPrivilegeEscalation` 和 `SETUID/SETGID`，其他模板继续使用通用 restricted
