@@ -14,11 +14,17 @@ if [[ ! -d "$SOURCE_ROOT/deploy/base" || ! -r "$IMAGE_MAP_FILE" ]]; then
     exit 2
 fi
 
-export GIT_CONFIG_COUNT=2
+basic_auth="$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | openssl base64 -A)"
+export GIT_TERMINAL_PROMPT=0
+export GIT_CONFIG_COUNT=4
 export GIT_CONFIG_KEY_0=http.https://github.com/.extraheader
-export GIT_CONFIG_VALUE_0="Authorization: Bearer ${GITHUB_TOKEN}"
+export GIT_CONFIG_VALUE_0="Authorization: Basic ${basic_auth}"
 export GIT_CONFIG_KEY_1=http.version
 export GIT_CONFIG_VALUE_1=HTTP/1.1
+export GIT_CONFIG_KEY_2=http.lowSpeedLimit
+export GIT_CONFIG_VALUE_2=1
+export GIT_CONFIG_KEY_3=http.lowSpeedTime
+export GIT_CONFIG_VALUE_3=30
 
 for attempt in 1 2 3; do
     /usr/local/lib/knowledge-core-ci/verify-ref.sh
@@ -30,8 +36,17 @@ for attempt in 1 2 3; do
     }
     trap cleanup EXIT
 
-    git clone --depth=1 --branch=main \
-        "https://github.com/${GITOPS_REPOSITORY}.git" "$worktree/repository"
+    if ! timeout 120 git clone --depth=1 --branch=main \
+        "https://github.com/${GITOPS_REPOSITORY}.git" "$worktree/repository"; then
+        cleanup
+        trap - EXIT
+        if [[ "$attempt" -lt 3 ]]; then
+            sleep "$attempt"
+            continue
+        fi
+        printf 'GitOps clone failed after three attempts\n' >&2
+        exit 1
+    fi
     target_root="$worktree/repository/Knowledge-Core"
     rm -rf -- "$target_root/base"
     mkdir -p "$target_root"
@@ -92,7 +107,7 @@ for attempt in 1 2 3; do
         -c user.name='knowledge-core-ci[bot]' \
         -c user.email='knowledge-core-ci[bot]@users.noreply.github.com' \
         commit -m "deploy(dev): promote ${GITHUB_SHA}"
-    if git -C "$worktree/repository" push origin HEAD:main; then
+    if timeout 120 git -C "$worktree/repository" push origin HEAD:main; then
         exit 0
     fi
 

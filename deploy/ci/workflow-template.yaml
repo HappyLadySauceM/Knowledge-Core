@@ -19,6 +19,8 @@ spec:
   podGC:
     strategy: OnWorkflowCompletion
     deleteDelayDuration: 5m
+  volumeClaimGC:
+    strategy: OnWorkflowCompletion
   ttlStrategy:
     secondsAfterCompletion: 86400
   arguments:
