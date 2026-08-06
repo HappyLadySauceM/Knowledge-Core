@@ -139,7 +139,7 @@ Secret 应使用 SOPS/age 管理。age 私钥只进入 `argocd/argocd-sops-age` 
 | Secret `knowledge-core-github-webhook` | `secret`，Knowledge-Core source webhook HMAC |
 | Secret `knowledge-core-github-app` | `app-id`, `installation-id`, `private-key` |
 | Secret `knowledge-core-harbor-push` | `.dockerconfigjson`，project push robot |
-| Secret `knowledge-core-harbor-pull` | `.dockerconfigjson`，project pull robot |
+| Secret `knowledge-core-harbor-pull` | `.dockerconfigjson`，project pull robot；绑定到 `knowledge-core-workflow` ServiceAccount |
 | Secret `knowledge-core-cosign` | `cosign.key`, `cosign.password`（由 Cosign Kubernetes keystore 生成） |
 | Secret `knowledge-core-ci-test-dependencies` | `postgres-password`，只供 Workflow sidecar 测试 |
 | Secret `knowledge-core-argo-events-nats` | `auth.yaml`，内容为 `KC_CI` username/password |
