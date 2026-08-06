@@ -201,6 +201,8 @@ BuildKit 同时把 CI ConfigMap 中的大小写 HTTP(S)/NO_PROXY 作为 Docker b
 因此不会绕过代理直连 `proxy.golang.org`。
 每个镜像的 build+push 最多尝试三次并以 5/10 秒退避；只有成功尝试生成的 metadata
 会进入 digest 收集，镜像站瞬时 5xx 不会留下可被后续步骤消费的半成品记录。
+Trivy 扫描通过 template-level mutex 串行访问共享 `/cache/trivy`；首次运行只下载一次漏洞库，
+后续镜像复用缓存，避免并发初始化 BoltDB 导致锁超时或 mmap 崩溃。
 
 ## 7. 完整 CI 流程
 
