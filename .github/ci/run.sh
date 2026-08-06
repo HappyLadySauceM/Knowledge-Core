@@ -251,6 +251,14 @@ rust_container_env=(
     --env CARGO_HTTP_MULTIPLEXING=false
     --env CARGO_HTTP_TIMEOUT=60
     --env CARGO_NET_RETRY=5
+    --env GIT_TERMINAL_PROMPT=0
+    --env GIT_CONFIG_COUNT=3
+    --env GIT_CONFIG_KEY_0=http.version
+    --env GIT_CONFIG_VALUE_0=HTTP/1.1
+    --env GIT_CONFIG_KEY_1=http.lowSpeedLimit
+    --env GIT_CONFIG_VALUE_1=1
+    --env GIT_CONFIG_KEY_2=http.lowSpeedTime
+    --env GIT_CONFIG_VALUE_2=60
     --env COLLABORATION_TEST_REQUIRE_REAL_DEPENDENCIES=1
     --env "COLLABORATION_TEST_POSTGRES_URL=postgres://knowledge_core@${postgres_name}:5432/knowledge_core"
     --env "COLLABORATION_TEST_POSTGRES_PASSWORD=${postgres_password}"
@@ -393,7 +401,8 @@ docker run --rm \
     bash -euo pipefail -c '
         mkdir -p "$HOME"
         install -m 0644 /usr/local/cargo/config.toml "$CARGO_HOME/config.toml"
-        make rust-ci
+        bash scripts/ci/fetch-rustsec.sh
+        CARGO_DENY="cargo deny --offline" make rust-ci
         install -D -m 0755 \
           "$CARGO_TARGET_DIR/release/knowledge-core-collaboration" \
           /workspace/.ci-artifacts/knowledge-core-collaboration
