@@ -327,7 +327,7 @@ spec:
               if [[ "$ready" != true ]]; then echo "dependency port $port is not ready" >&2; exit 1; fi
             done
             mkdir -p "$HOME" "$CARGO_HOME" "$CARGO_TARGET_DIR" /workspace/interop
-            export COLLABORATION_TEST_POSTGRES_URL="postgres://knowledge_core:${POSTGRES_PASSWORD}@127.0.0.1:5432/knowledge_core"
+            install -m 0644 /usr/local/cargo/config.toml "$CARGO_HOME/config.toml"
             cd /workspace/source
             make rust-ci
             install -D -m 0755 \
@@ -340,11 +340,15 @@ spec:
           - {name: HOME, value: /tmp/knowledge-core-rust-ci}
           - {name: CARGO_HOME, value: /cache/cargo-home}
           - {name: CARGO_TARGET_DIR, value: /cache/cargo-target}
+          - {name: CARGO_HTTP_MULTIPLEXING, value: "false"}
+          - {name: CARGO_HTTP_TIMEOUT, value: "60"}
+          - {name: CARGO_NET_RETRY, value: "5"}
           - {name: COLLABORATION_TEST_REQUIRE_REAL_DEPENDENCIES, value: "1"}
+          - {name: COLLABORATION_TEST_POSTGRES_URL, value: "postgres://knowledge_core@127.0.0.1:5432/knowledge_core"}
           - {name: COLLABORATION_TEST_REDIS_URL, value: "redis://127.0.0.1:6379/0"}
           - {name: COLLABORATION_TEST_NATS_URL, value: "nats://127.0.0.1:4222"}
           - {name: COLLABORATION_TEST_ETCD_ENDPOINTS, value: "http://127.0.0.1:2379"}
-          - name: POSTGRES_PASSWORD
+          - name: COLLABORATION_TEST_POSTGRES_PASSWORD
             valueFrom:
               secretKeyRef: {name: knowledge-core-ci-test-dependencies, key: postgres-password}
         volumeMounts:
