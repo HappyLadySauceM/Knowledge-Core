@@ -3,6 +3,8 @@ kind: ServiceAccount
 metadata:
   name: knowledge-core-workflow
 automountServiceAccountToken: true
+imagePullSecrets:
+  - name: knowledge-core-harbor-pull
 ---
 apiVersion: v1
 kind: ServiceAccount

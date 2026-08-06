@@ -19,9 +19,11 @@ if [[ -e "$WORKSPACE" ]]; then
     exit 2
 fi
 
-export GIT_CONFIG_COUNT=1
+export GIT_CONFIG_COUNT=2
 export GIT_CONFIG_KEY_0=http.https://github.com/.extraheader
 export GIT_CONFIG_VALUE_0="Authorization: Bearer ${GITHUB_TOKEN}"
+export GIT_CONFIG_KEY_1=http.version
+export GIT_CONFIG_VALUE_1=HTTP/1.1
 git clone --filter=blob:none --no-checkout \
     "https://github.com/${GITHUB_REPOSITORY}.git" "$WORKSPACE"
 git -C "$WORKSPACE" fetch --no-tags origin "$GITHUB_SHA"

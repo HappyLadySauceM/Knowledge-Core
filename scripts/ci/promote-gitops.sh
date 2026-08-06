@@ -14,9 +14,11 @@ if [[ ! -d "$SOURCE_ROOT/deploy/base" || ! -r "$IMAGE_MAP_FILE" ]]; then
     exit 2
 fi
 
-export GIT_CONFIG_COUNT=1
+export GIT_CONFIG_COUNT=2
 export GIT_CONFIG_KEY_0=http.https://github.com/.extraheader
 export GIT_CONFIG_VALUE_0="Authorization: Bearer ${GITHUB_TOKEN}"
+export GIT_CONFIG_KEY_1=http.version
+export GIT_CONFIG_VALUE_1=HTTP/1.1
 
 for attempt in 1 2 3; do
     /usr/local/lib/knowledge-core-ci/verify-ref.sh
