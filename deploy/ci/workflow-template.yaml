@@ -352,7 +352,7 @@ spec:
           - {name: cache, mountPath: /cache}
           - {name: tmp, mountPath: /tmp}
         resources:
-          requests: {cpu: 750m, memory: 2Gi}
+          requests: {cpu: 500m, memory: 2Gi}
           limits: {cpu: "4", memory: 8Gi}
         securityContext: *restricted
       sidecars:
