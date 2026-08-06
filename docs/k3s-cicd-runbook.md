@@ -196,6 +196,9 @@ security context。`coredns-custom` 把 `harbor.happyladysauce.local` exact rewr
 Higress Gateway Service 名，BuildKit、Trivy 和 Cosign 因而使用同一个受 CA 验证的 TLS host。
 Go runtime 镜像直接引用官方 `gcr.io/distroless` 固定 digest，并通过 CI 出口代理拉取；不依赖
 可能持续返回 5xx 的第三方 GCR 镜像站。
+BuildKit 同时把 CI ConfigMap 中的大小写 HTTP(S)/NO_PROXY 作为 Docker build args 传入构建阶段，
+并显式设置 `GOPROXY=https://goproxy.cn,direct`；Dockerfile 内的 `go mod download` 与 `go build`
+因此不会绕过代理直连 `proxy.golang.org`。
 每个镜像的 build+push 最多尝试三次并以 5/10 秒退避；只有成功尝试生成的 metadata
 会进入 digest 收集，镜像站瞬时 5xx 不会留下可被后续步骤消费的半成品记录。
 
