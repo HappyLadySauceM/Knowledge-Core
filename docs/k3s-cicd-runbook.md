@@ -211,6 +211,7 @@ push dev 或 push vX.Y.Z
 - 只有 `refs/heads/dev` 创建或复用 `dev -> main` PR，并启用 merge-commit auto-merge。
 - `dev == main` 时 source promotion 成功退出，不创建空 PR。
 - 构建开始和结束写 GitHub status context `knowledge-core/ci`，不写不可访问的 Argo UI URL。
+- RustSec 数据库拉取有三次、每次 120 秒的硬上限；失败重试前清理 cargo-deny 留下的半成品数据库目录，成功后 `cargo deny` 只离线读取该缓存。
 - GitOps push 使用三次 compare-and-swap 重试；失败时不直接修改集群 Deployment。
 
 五个构建产物为 `gateway`、`identity`、`knowledge`、`collaboration` 和
