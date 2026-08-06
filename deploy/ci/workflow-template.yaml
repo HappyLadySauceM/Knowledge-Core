@@ -361,11 +361,13 @@ spec:
           env:
             - {name: POSTGRES_USER, value: knowledge_core}
             - {name: POSTGRES_DB, value: knowledge_core}
+            - {name: PGDATA, value: /var/lib/postgresql/data/pgdata}
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef: {name: knowledge-core-ci-test-dependencies, key: postgres-password}
           volumeMounts:
             - {name: postgres-data, mountPath: /var/lib/postgresql/data}
+            - {name: postgres-run, mountPath: /var/run/postgresql}
             - {name: sidecar-tmp, mountPath: /tmp}
           resources:
             requests: {cpu: 100m, memory: 128Mi}
@@ -449,6 +451,8 @@ spec:
           emptyDir: {sizeLimit: 128Mi}
         - name: postgres-data
           emptyDir: {sizeLimit: 1Gi}
+        - name: postgres-run
+          emptyDir: {sizeLimit: 16Mi}
         - name: redis-data
           emptyDir: {sizeLimit: 256Mi}
         - name: nats-data
