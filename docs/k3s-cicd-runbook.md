@@ -203,6 +203,10 @@ BuildKit 同时把 CI ConfigMap 中的大小写 HTTP(S)/NO_PROXY 作为 Docker b
 会进入 digest 收集，镜像站瞬时 5xx 不会留下可被后续步骤消费的半成品记录。
 Trivy 扫描通过 template-level mutex 串行访问共享 `/cache/trivy`；首次运行只下载一次漏洞库，
 后续镜像复用缓存，避免并发初始化 BoltDB 导致锁超时或 mmap 崩溃。
+仓库只允许在 `.trivyignore.yaml` 中记录可审计的 VEX 例外，并同时限定镜像路径、package URL、
+原因和到期日。当前 `CVE-2026-41602` 只影响未被 Gateway 调用的 `TFramedTransport`；
+`govulncheck ./services/gateway/...` 已验证漏洞符号不可达，而固定的 Hertz/thriftgo 生成链仍依赖
+pre-context Thrift API。该例外在 `2026-11-06` 到期，CI 使用 `--show-suppressed` 保留扫描证据。
 
 ## 7. 完整 CI 流程
 
