@@ -623,6 +623,8 @@ spec:
           - --ignore-unfixed
           - --severity=HIGH,CRITICAL
           - --scanners=vuln
+          - --ignorefile=/workspace/source/.trivyignore.yaml
+          - --show-suppressed
           - "{{inputs.parameters.ref}}"
         env:
           - {name: HOME, value: /tmp}
@@ -630,6 +632,7 @@ spec:
           - {name: TRIVY_CACHE_DIR, value: /cache/trivy}
           - {name: SSL_CERT_DIR, value: "/etc/ssl/certs:/etc/knowledge-core/harbor"}
         volumeMounts:
+          - {name: workspace, mountPath: /workspace, readOnly: true}
           - {name: cache, mountPath: /cache}
           - {name: harbor-auth, mountPath: /secrets/harbor, readOnly: true}
           - {name: harbor-ca, mountPath: /etc/knowledge-core/harbor, readOnly: true}
