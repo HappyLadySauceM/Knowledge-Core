@@ -169,7 +169,10 @@ Docker Hub mirror，成功后始终由 Harbor digest 拉取。只有 Rust toolch
 Rust 容器启动时把基础镜像的 `/usr/local/cargo/config.toml` 安装到持久化
 `CARGO_HOME`，确保挂载缓存后仍使用镜像固定的 sparse registry 配置。Cargo HTTP
 请求关闭 multiplexing，单次请求超时 60 秒并最多重试 5 次，避免 registry 连接抖动
-占满 Workflow deadline。
+占满 Workflow deadline。`cargo-deny` 获取官方 RustSec advisory DB 时，Git 子进程使用
+临时 HTTP/1.1 配置和 60 秒低速窗口；这些参数不写入节点或 runner 的全局 Git 配置。
+advisory DB 在编译前以单次 120 秒、最多 3 次的策略独立获取，成功后供应链检查
+使用 `--offline`，避免 release 编译完成后才因 GitHub 网络抖动失败。
 
 Rust pod 执行 format、Clippy、tests、release build、cargo-deny、生成漂移和真实
 PostgreSQL/Redis/NATS/Etcd 测试。它把已经通过检查的 release binary 写入
