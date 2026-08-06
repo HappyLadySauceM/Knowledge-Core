@@ -6,6 +6,15 @@ set -euo pipefail
 : "${GITHUB_SHA:?GITHUB_SHA is required}"
 : "${WORKSPACE:?WORKSPACE is required}"
 
+if [[ "$GITHUB_REPOSITORY" != "HappyLadySauceM/Knowledge-Core" ]]; then
+    printf 'unsupported checkout repository: %s\n' "$GITHUB_REPOSITORY" >&2
+    exit 2
+fi
+if [[ ! "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+    printf 'invalid checkout revision\n' >&2
+    exit 2
+fi
+
 case "$WORKSPACE" in
     /workspace/source) ;;
     *)
@@ -31,9 +40,15 @@ export GIT_CONFIG_VALUE_2=1
 export GIT_CONFIG_KEY_3=http.lowSpeedTime
 export GIT_CONFIG_VALUE_3=30
 
+initialize_checkout() {
+    git init --quiet "$WORKSPACE"
+    git -C "$WORKSPACE" remote add origin \
+        "https://github.com/${GITHUB_REPOSITORY}.git"
+}
+
+initialize_checkout
 for attempt in 1 2 3; do
-    if timeout 120 git clone --filter=blob:none --no-checkout \
-        "https://github.com/${GITHUB_REPOSITORY}.git" "$WORKSPACE"; then
+    if timeout 120 git -C "$WORKSPACE" fetch --depth=1 --no-tags origin "$GITHUB_SHA"; then
         break
     else
         status="$?"
@@ -43,20 +58,9 @@ for attempt in 1 2 3; do
         exit "$status"
     fi
     sleep "$attempt"
+    initialize_checkout
 done
-
-for attempt in 1 2 3; do
-    if timeout 120 git -C "$WORKSPACE" fetch --no-tags origin "$GITHUB_SHA"; then
-        break
-    else
-        status="$?"
-    fi
-    if [[ "$attempt" -eq 3 ]]; then
-        exit "$status"
-    fi
-    sleep "$attempt"
-done
-git -C "$WORKSPACE" checkout --detach "$GITHUB_SHA"
+git -C "$WORKSPACE" checkout --detach FETCH_HEAD
 
 checked_out="$(git -C "$WORKSPACE" rev-parse HEAD)"
 if [[ "$checked_out" != "$GITHUB_SHA" ]]; then
