@@ -605,6 +605,9 @@ spec:
         securityContext: *restricted
 
     - name: scan-image
+      synchronization:
+        mutexes:
+          - name: knowledge-core-trivy-cache
       inputs:
         parameters:
           - name: name
