@@ -5,6 +5,10 @@ set -eu
 : "${GITHUB_SHA:?GITHUB_SHA is required}"
 : "${IMAGE_REGISTRY:?IMAGE_REGISTRY is required}"
 : "${IMAGE_NAMESPACE:?IMAGE_NAMESPACE is required}"
+: "${HTTP_PROXY:?HTTP_PROXY is required}"
+: "${HTTPS_PROXY:?HTTPS_PROXY is required}"
+: "${NO_PROXY:?NO_PROXY is required}"
+: "${GOPROXY:?GOPROXY is required}"
 
 if [ "$SOURCE_ROOT" != "/workspace/source" ] || [ ! -d "$SOURCE_ROOT/.git" ]; then
     printf 'validated source checkout is required at /workspace/source\n' >&2
@@ -31,6 +35,13 @@ build_image() {
             --local "dockerfile=${SOURCE_ROOT}" \
             --opt "filename=${dockerfile}" \
             --opt platform=linux/amd64 \
+            --opt "build-arg:HTTP_PROXY=${HTTP_PROXY}" \
+            --opt "build-arg:HTTPS_PROXY=${HTTPS_PROXY}" \
+            --opt "build-arg:NO_PROXY=${NO_PROXY}" \
+            --opt "build-arg:http_proxy=${HTTP_PROXY}" \
+            --opt "build-arg:https_proxy=${HTTPS_PROXY}" \
+            --opt "build-arg:no_proxy=${NO_PROXY}" \
+            --opt "build-arg:GOPROXY=${GOPROXY}" \
             --output "type=image,name=${reference},push=true" \
             --metadata-file "$temporary_metadata_file"; then
             mv -- "$temporary_metadata_file" "$metadata_file"

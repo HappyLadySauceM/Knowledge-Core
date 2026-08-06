@@ -545,6 +545,7 @@ spec:
           - {name: GITHUB_SHA, value: "{{workflow.parameters.revision}}"}
           - {name: IMAGE_REGISTRY, value: "{{workflow.parameters.image-registry}}"}
           - {name: IMAGE_NAMESPACE, value: "{{workflow.parameters.image-namespace}}"}
+          - {name: GOPROXY, value: "https://goproxy.cn,direct"}
           - {name: DOCKER_CONFIG, value: /home/user/.docker}
           - {name: XDG_RUNTIME_DIR, value: /run/user/1000}
           - {name: TMPDIR, value: /tmp}
