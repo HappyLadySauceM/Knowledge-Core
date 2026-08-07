@@ -207,6 +207,8 @@ Trivy 扫描通过 template-level mutex 串行访问共享 `/cache/trivy`；首�
 原因和到期日。当前 `CVE-2026-41602` 只影响未被 Gateway 调用的 `TFramedTransport`；
 `govulncheck ./services/gateway/...` 已验证漏洞符号不可达，而固定的 Hertz/thriftgo 生成链仍依赖
 pre-context Thrift API。该例外在 `2026-11-06` 到期，CI 使用 `--show-suppressed` 保留扫描证据。
+Cosign sign/attest 容器继续使用只读 root filesystem，并把 `HOME` 指向独立的 `/tmp` emptyDir；
+Cosign v3 因而可以写入 Sigstore TUF 元数据，而不会要求可写镜像层或扩大容器权限。
 
 ## 7. 完整 CI 流程
 
