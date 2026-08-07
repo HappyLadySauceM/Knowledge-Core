@@ -171,7 +171,7 @@ TTHeader 必须贯穿：
 
 Rust middleware 必须显式提取并向 Knowledge Volo client 转发这些字段，且永不记录 token。业务失败使用 TTHeader BizStatus 和 `40001..40999` Collaboration code/key；Knowledge 的 `300xx` 错误先映射为 Collaboration 的稳定公开语义，未知 cause 不得穿透到 Gateway。
 
-Rust 服务以 `knowledge-core.collaboration` 注册到现有 Etcd prefix。注册 value、lease、weight、tags 和 key 路径与 `pkg/etcd` 当前 Kitex 格式一致；Volo Knowledge client 实现同格式的 `Discover` 和 watch。实例地址严格使用非零端口的 `host:port`，IP literal 直接使用，hostname 在 Etcd snapshot 的总 deadline 内并发解析为排序去重后的 IP 集合；非法地址、DNS 失败、空结果或超时均 fail closed。注册 keepalive 每轮还校验 key、value 与 lease 仍属于本实例；外部删除、覆盖、keepalive 失败或 resolver watch 中止都会使 readiness 失败。
+Rust 服务以 `knowledge-core.collaboration` 注册到现有 Etcd prefix。连接与 readiness 只对已授权 registry prefix 执行 `limit=1`、keys-only 的有界 range read，不调用仅管理员可用的 Maintenance/Status。注册 value、lease、weight、tags 和 key 路径与 `pkg/etcd` 当前 Kitex 格式一致；Volo Knowledge client 实现同格式的 `Discover` 和 watch。实例地址严格使用非零端口的 `host:port`，IP literal 直接使用，hostname 在 Etcd snapshot 的总 deadline 内并发解析为排序去重后的 IP 集合；非法地址、DNS 失败、空结果或超时均 fail closed。注册 keepalive 每轮还校验 key、value 与 lease 仍属于本实例；外部删除、覆盖、keepalive 失败或 resolver watch 中止都会使 readiness 失败。
 
 ## 6. 文档 actor 与持久化
 

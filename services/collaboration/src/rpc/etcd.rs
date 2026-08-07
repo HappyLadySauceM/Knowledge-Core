@@ -31,7 +31,7 @@ pub struct EtcdClient {
 }
 
 impl EtcdClient {
-    /// Connects to Etcd and verifies a bounded status request.
+    /// Connects to Etcd and verifies a bounded read within the configured registry prefix.
     ///
     /// # Errors
     ///
@@ -72,10 +72,19 @@ impl EtcdClient {
     /// Returns an error when Etcd cannot answer before the deadline.
     pub async fn ping(&self) -> Result<()> {
         let mut client = self.client.clone();
+        let prefix = format!("{}/", self.config.prefix.trim_end_matches('/'));
         request(
             self.config.request_timeout,
-            client.status(),
-            "query Etcd status",
+            client.get(
+                prefix,
+                Some(
+                    GetOptions::new()
+                        .with_prefix()
+                        .with_limit(1)
+                        .with_keys_only(),
+                ),
+            ),
+            "probe Etcd registry prefix",
         )
         .await?;
         Ok(())
