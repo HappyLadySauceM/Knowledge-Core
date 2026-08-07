@@ -94,7 +94,7 @@ Knowledge 不保存 Yjs update、快照或版本；这些数据属于 Collaborat
 
 - Go `1.26.5`
 - Rust `1.97.1`（由 `services/collaboration/rust-toolchain.toml` 固定）
-- cargo-deny `0.20.2`（本地执行供应链门禁；远端 Rust CI 镜像已固定）
+- cargo-deny `0.20.2`（本地执行供应链门禁）
 - Node.js `24.18.1`（仅 `services/collaboration/interop` 互操作 fixture）
 - Docker Engine/Desktop 与 Compose v2
 - GNU Make
@@ -212,32 +212,26 @@ npm ci
 npm run ci
 ```
 
-`.github/ci/run.sh` 保留为 self-hosted runner 回退入口：Go 和 Rust 检查运行在各自固定镜像中，Node 24 容器只执行互操作 fixture；它以 `COLLABORATION_TEST_REQUIRE_REAL_DEPENDENCIES=1` 强制运行真实 PostgreSQL/Redis/NATS/Etcd 测试，任一对应连接变量缺失都会失败而不是静默跳过。回退流水线还运行 Go race、生成漂移、供应链检查和 Rust production image smoke。
+当前没有远端自动 CI。提交前必须显式运行上述本地门禁；需要真实依赖测试时设置 `COLLABORATION_TEST_REQUIRE_REAL_DEPENDENCIES=1`，缺少 PostgreSQL、Redis、NATS 或 Etcd 连接变量必须失败，不能把 skip 当作通过。
 
 ## k3s 与 GitOps
-
-完整的集群现状、基础设施/Secret 契约、k3s 原生 CI、容器内单次 Rust release 编译、GitOps、
-Argo CD 和两个 GitHub webhook 的执行清单见 [`docs/k3s-cicd-runbook.md`](docs/k3s-cicd-runbook.md)。
 
 共享基础设施的声明源是 `k3s-home-deploy/k3s`，服务器路径为 `/opt/k3s`。它复用已有
 PostgreSQL 和 Redis，并在独立 namespace 提供 Nacos、NATS、Etcd、MinIO 与 ClamAV；Nacos
 使用共享 PostgreSQL。项目 namespace 只接收项目级账号，平台 root/admin Secret 不进入应用。
 
 `deploy/base` 只定义四个服务的环境无关工作负载、ServiceAccount、Service 和 NetworkPolicy。
-唯一支持的环境是 `deploy/overlay/dev`；CI 把 base 快照复制到私有
-`k3s-home-deploy/Knowledge-Core/base`，并只更新 `Knowledge-Core/overlay/dev` 的不可变镜像
+唯一支持的环境是 `deploy/overlay/dev`；私有 GitOps 仓库保存
+`k3s-home-deploy/Knowledge-Core/base` 快照和 `Knowledge-Core/overlay/dev` 的不可变镜像
 digest。每个服务使用独立 `knowledge-core-<service>-secrets` 保存业务凭据、Nacos reader 和 KEK。
 
-仓库提供单一 Argo Workflows/Events 发布流水线、rootless BuildKit、持久缓存、Trivy、Cosign
-和 GitOps CAS 推广。手工 Workflow 默认 `mode=verify`，只执行门禁、构建和扫描；只有 dev push
-webhook 使用 `mode=release`，在 Argo CD dev 同步与冒烟成功后签名镜像，通过自动
-`dev -> main` PR 生成 merge commit，再创建版本镜像 tag、merge SHA 上的 Git tag 和 GitHub
-Release；发布全部成功后以非 force fast-forward 把 `dev` 对齐到 `main`。GitHub Actions 只保留
-手工回退入口，不响应 push。
+当前未配置 GitHub Actions、自动镜像构建、dev 冒烟、`main` promotion 或版本发布。k3s 不运行
+BuildKit、Argo Workflows 或 Argo Events，也不保存项目 CI 凭据；Argo CD 只负责按 GitOps 仓库
+已有声明部署应用。恢复自动发布前必须重新建立完整质量、签名、冒烟和 compare-and-swap 门禁。
 
 Argo CD repository Secret、AppProject 和 Application 由私有 GitOps 仓库声明。Application 使用
 `sops-v1.0` CMP、Automated/Prune/Self Heal；真实 Secret 和 CA 由 SOPS 管理，部署始终引用不可变
-Harbor digest。完整配置和首次启用顺序见运行手册。
+Harbor digest。
 
 当前测试覆盖领域、逻辑、transport、严格输入、错误映射、Collaboration commit-before-broadcast、恢复、投影、outbox、生命周期、双向 Kitex/Volo、Yjs 和多实例 JetStream 行为。按照当前范围，Identity 与 Knowledge repository 尚未包含真实 PostgreSQL 集成测试；不要把现有 mock/单元测试等同于数据库兼容性验证。Rust Collaboration 的性能对比、完整 Compose WebSocket E2E、依赖 stop/start、备份及切换/回滚演练仍需在发布前完成。
 

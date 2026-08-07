@@ -35,7 +35,7 @@ Identity 与 Knowledge 当前缺少真实 PostgreSQL 集成测试的问题不由
 - 内部 RPC 使用 Volo Thrift。基线版本为 `volo 0.12.3`、`volo-thrift 0.12.5`、`volo-build 0.12.3`；其默认 `TTHeader<Framed<Binary>>` 与 Kitex 互通。
 - PostgreSQL 使用 SQLx 和显式 SQL migration；Redis 使用异步 client；NATS 使用 `async-nats`；Etcd 使用 `etcd-client`。
 - 日志和 trace 使用 `tracing`、OpenTelemetry 与 OTLP；指标使用 Prometheus registry。
-- 生产镜像只包含 Rust 二进制和必要 CA/运行库。Node 24 仅保留在最小 Yjs 互操作测试目录及 CI 容器中。
+- 生产镜像只包含 Rust 二进制和必要 CA/运行库。Node 24 仅用于最小 Yjs 互操作测试目录，不进入生产镜像。
 
 引入依赖时必须固定精确版本、审查默认 feature、禁用不需要的 feature，并通过 RustSec、license、来源和重复版本门禁。禁止为了方便引入另一套配置、日志、HTTP error 或 secret 管理语义。
 
@@ -246,9 +246,9 @@ services/collaboration/
 idl/rpc/v1/collaboration.thrift
 ```
 
-CI 的 Rust 容器完成唯一一次 release build 并写出受检二进制；`docker/collaboration/dockerfile` 只封装该 artifact，最终以固定无特权 UID/GID `10001:10001` 运行且不包含 Rust toolchain、Node/npm。Compose 使用 RPC `:8883`、admin `:8084` 和 Etcd discovery，并已移除 `:8092`。
+`docker/collaboration/dockerfile` 只封装调用方提供的 release artifact，最终以固定无特权 UID/GID `10001:10001` 运行且不包含 Rust toolchain、Node/npm。Compose 使用 RPC `:8883`、admin `:8084` 和 Etcd discovery，并已移除 `:8092`。
 
-`.github/ci/run.sh` 使用独立固定 Rust 容器和 cache volume，不修改 `.github/ci/Dockerfile`。根门禁至少包含：
+当前没有远端自动 CI；提交前至少显式执行：
 
 ```text
 cd services/collaboration
@@ -259,7 +259,7 @@ cargo build --workspace --release --locked
 cargo deny check advisories bans licenses sources
 ```
 
-Node 24 容器只运行 `services/collaboration/interop` 的 `npm ci` 与互操作测试。生成脚本、`make generate`、`make ci` 和 generated drift check 同时覆盖 Go 与 Rust Thrift 输出。远端真实依赖阶段设置 `COLLABORATION_TEST_REQUIRE_REAL_DEPENDENCIES=1`；PostgreSQL、Redis、NATS 或 Etcd 的对应连接变量缺失时测试直接失败，不允许把 skip 当成通过。
+Node 24 只运行 `services/collaboration/interop` 的 `npm ci && npm run ci`。生成脚本、`make generate`、`make ci` 和 generated drift check 同时覆盖 Go 与 Rust Thrift 输出。真实依赖测试设置 `COLLABORATION_TEST_REQUIRE_REAL_DEPENDENCIES=1`；PostgreSQL、Redis、NATS 或 Etcd 的对应连接变量缺失时测试直接失败，不允许把 skip 当成通过。
 
 ## 9. 测试与验收门禁
 
@@ -316,7 +316,7 @@ Rust 在相同负载下必须同时满足：
 - Node production service 与 internal HTTP 已删除，生产镜像纯 Rust。
 - 新 public/Thrift/WebSocket 契约、生成物、调用方和部署配置一致。
 - 正确性、真实依赖、互操作、故障、生命周期、供应链、完整链路和性能门禁全部通过。
-- `.github/ci/Dockerfile` 未修改，CI 与本地 `make ci` 可重复通过。
+- 本地 `make ci`、真实依赖、互操作和 production image smoke 可重复通过。
 - breaking IDL/API、数据重置、同窗口客户端升级和回滚限制已经记录并演练。
 
 ## 12. 主要风险

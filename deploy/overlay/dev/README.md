@@ -9,6 +9,7 @@ Before Argo CD sync, GitOps must provide:
 - `harbor-pull-secrets` and immutable digests for all four application images.
 - `knowledge-core-trust-bundle` with keys `internal-ca.crt` and `nats-ca.crt`.
 - `knowledge-core-{gateway,identity,knowledge,collaboration}-secrets` with the
-  service-specific credentials documented in `docs/k3s-cicd-runbook.md`.
+  service-specific credentials required by the base deployments and
+  `docs/framework-design.md`.
 
 No Secret value or environment-specific CA is stored in this source overlay.

@@ -247,11 +247,9 @@ Collaboration 探测 Knowledge `Live`，而 Knowledge 使用 Collaboration `Ping
 
 Collaboration 收到信号后先 not-ready 并撤销 Etcd 注册，再停止 RPC 与 WebSocket 接入、关闭连接和 actor、停止 worker/subscription，最后关闭 Knowledge client、Etcd、NATS、Redis、PostgreSQL 并 flush telemetry；进程级 timeout 限制整个 shutdown。NATS subscription 意外结束会 fail closed，由外部编排重启进程。
 
-## 11. 生成、CI 与交付
+## 11. 生成、验证与交付
 
-集群配置和交付的可执行交接清单位于 [`k3s-cicd-runbook.md`](k3s-cicd-runbook.md)，其中记录共享
-基础设施、dev 资源隔离、Secret、Webhook、SOPS/Argo CD 和验收契约。Rust release binary 由 CI
-容器编译一次，Collaboration production Dockerfile 只封装已验证 artifact，不包含第二个 Cargo build stage。
+Collaboration production Dockerfile 只封装调用方提供的 release artifact，不包含第二个 Cargo build stage。
 
 IDL 源位于 `idl/http/v1` 和 `idl/rpc/v1`。生成工具固定为 Kitex `v0.16.2`、Hertz `v0.9.7`、thriftgo `0.4.5`；生成文件所有权以 `scripts/generated-files.txt` 为准。Gateway handler 和未列入清单的 route middleware 保持手写/混合所有权。
 
@@ -261,28 +259,18 @@ make generate-check
 go run ./scripts/idlguard compat-git <merge-base> idl
 ```
 
-`make ci` 同时执行 Go/Rust format、vet、golangci-lint、Clippy `-D warnings`、无缓存测试、release build、govulncheck、cargo-deny 和 Go/Rust 生成漂移检查。远端 `.github/ci/run.sh` 还在 rootless Docker 中执行 Go race、真实 PostgreSQL/Redis/NATS/Etcd 测试、双向 Kitex/Volo 与 Yjs 互操作，并构建 Rust production image，验证固定运行 UID/GID `10001:10001`、无 Node/npm 和非法配置 fail-fast。真实依赖阶段设置 `COLLABORATION_TEST_REQUIRE_REAL_DEPENDENCIES=1`；缺少 PostgreSQL、Redis、NATS 或 Etcd 对应连接变量时测试必须失败，不能静默 skip。Node 24 只运行 `services/collaboration/interop` fixture。
+`make ci` 同时执行 Go/Rust format、vet、golangci-lint、Clippy `-D warnings`、无缓存测试、release build、govulncheck、cargo-deny 和 Go/Rust 生成漂移检查。`make race`、`services/collaboration/interop` 的 `npm ci && npm run ci`、真实 PostgreSQL/Redis/NATS/Etcd 测试以及 production image smoke 仍需按改动范围显式执行。真实依赖测试设置 `COLLABORATION_TEST_REQUIRE_REAL_DEPENDENCIES=1`；缺少任一连接变量时必须失败，不能静默 skip。
 
-开发交付只保留 `dev`。Argo Workflow 参数为 `mode=verify|release`：手工回退默认只验证，
-GitHub source webhook 只接受 `refs/heads/dev` 并触发 release。Node、Go 和 Rust 门禁并行后执行
-interop，rootless BuildKit 只构建四个服务的 SHA tag 镜像，单节点 Trivy 扫描通过才以 CAS 更新
-GitOps digest。CI 等待 Argo CD 到达精确 GitOps revision 且四个 Deployment 使用预期 digest，
-完成 dev readiness/API 冒烟；失败时仅在 GitOps main 未继续推进时创建 revert。成功后依次签名
-digest、创建或复用唯一的 `dev -> main` PR，并以测试 SHA 作 CAS 执行 merge commit。CI 校验
-merge commit 的两个 parent 与 tree 后，按根 `VERSION` 的 major.minor 生成下一个 patch 版本，
-创建 Harbor 版本 tag、merge SHA 上的 Git tag 与 GitHub Release；全部成功后才以 `force=false`
-把 `dev` fast-forward 到 merge SHA。该 App 产生的 dev 对齐 push 被 Sensor 丢弃，不形成重复发布。
+开发交付只保留 `dev`，`main` 对开发者保持只读。当前没有 GitHub Actions、自动镜像构建/扫描、
+GitOps 更新、dev 冒烟、镜像签名、`main` promotion、版本 tag 或 GitHub Release 流程；恢复自动发布前
+必须重新实现并验证这些门禁，不能把 Argo CD 自动同步等同于源代码发布验证。
 
 Kubernetes 所有权分为三层：`k3s-home-deploy/k3s`（服务器 `/opt/k3s`）是公共基础设施真源；应用
-仓库 `deploy/base` 是环境无关工作负载真源；私有 `k3s-home-deploy/Knowledge-Core` 保存 CI 同步的
+仓库 `deploy/base` 是环境无关工作负载真源；私有 `k3s-home-deploy/Knowledge-Core` 保存
 base 快照、唯一 dev overlay、SOPS Secret 和镜像 digest。公共 Nacos、NATS、Etcd、MinIO、ClamAV
 位于独立 namespace，PostgreSQL 和 Redis 复用现有服务；应用只使用项目级账号和前缀。
 
-仓库内存在 Argo Workflows/Events、rootless BuildKit、持久缓存、Trivy/Cosign 和 GitOps CAS
-推广清单。单节点 k3s 的 Workflow 外联通过只绑定 CNI 网关的 host-network 转发容器接入节点既有
-sing-box；代理环境由 ConfigMap 统一注入，loopback、集群网段、Service DNS 和
-`*.happyladysauce.local`/`*.happyladysauce.cn` 必须 bypass。self-hosted `.github/ci/run.sh` 继续作为
-手工回退；`.github/workflows/dev-to-main.yml` 不响应 push。Argo CD 的只读 repository Secret、
+k3s 不保存 CI cache/PVC、构建镜像或发布 ServiceAccount，只保留 Argo CD；其只读 repository Secret、
 AppProject 和 Application 由 GitOps 仓库声明，Application 使用 `sops-v1.0` CMP、自动同步、prune
 和 self-heal。
 
@@ -298,10 +286,8 @@ AppProject 和 Application 由 GitOps 仓库声明，Application 使用 `sops-v1
 
 - Identity repository/migration 没有针对真实 PostgreSQL 的自动化集成测试。
 - Knowledge repository/migration、事务、约束和 SQL cursor 没有针对真实 PostgreSQL 的自动化集成测试。
-- 当前 CI 构建并 smoke Rust Collaboration 镜像，但不启动完整 Compose 执行跨服务 WebSocket E2E。
-- 单一 release Workflow 已在真实 dev push 中验证状态上报、四镜像构建/扫描、GitOps 精确
-  revision 等待、dev smoke 和签名；PR merge commit、版本发布与 dev 对齐的新尾段仍需完成
-  首次端到端验收。
+- 当前没有远端 CI；production image smoke 与完整 Compose 跨服务 WebSocket E2E 都不是自动门禁。
+- 当前没有自动 GitOps 更新、dev smoke、签名、`main` fast-forward、版本 tag 或 GitHub Release。
 - 应用 Secret、trust bundle、四份 Nacos 加密动态文档以及 Argo CD repository Secret、
   AppProject/Application 已配置，并已验证首次同步。
 - 当前只有 development overlay；单节点集群不作为 production 环境。

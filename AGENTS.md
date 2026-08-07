@@ -6,8 +6,8 @@
 
 - `dev` 是唯一开发分支。开始修改前先确认当前分支是 `dev`；若不是，应切换到已有的 `dev`，切换可能覆盖未提交改动时立即停止并报告。
 - 所有代码、测试、文档和修复都直接在 `dev` 上完成。禁止创建任何其他本地或远端开发分支，包括 `feature/*`、`fix/*`、`chore/*` 和 `release/*`。
-- `main` 对开发者只读：禁止在 `main` 上修改、提交或手工 push，也禁止绕过质量门禁。只有 Argo CI 使用专用 GitHub App，在 dev 部署冒烟和镜像签名成功后，才可用 compare-and-swap 将 `main` fast-forward 到已经验证的 `dev` SHA。
-- 禁止 force-push、改写或 rebase 共享的 `dev`、`main` 历史。CI 只允许 fast-forward `main`，随后为同一 SHA 创建版本 tag 与 GitHub Release；发生分叉或 ref 已推进时必须停止，不得自行丢弃提交。
+- `main` 对开发者只读：禁止在 `main` 上修改、提交或手工 push，也禁止绕过质量门禁。当前未配置自动 promotion；在重新建立 dev 部署冒烟、镜像签名和 compare-and-swap 门禁前，任何主体都不得推进 `main`。
+- 禁止 force-push、改写或 rebase 共享的 `dev`、`main` 历史。未来的发布自动化只允许 fast-forward `main`，随后为同一 SHA 创建版本 tag 与 GitHub Release；发生分叉或 ref 已推进时必须停止，不得自行丢弃提交。
 - 已存在的历史 feature 分支不再使用，也不得删除、重命名或改写。
 - 提交只能落到 `dev`；是否执行 commit、push 或 GitHub 操作，仍须以当前任务的明确授权为准。
 
@@ -87,7 +87,7 @@
 - 测试与实现同包就近放置，覆盖成功路径、输入边界、依赖失败、错误映射、回滚/关闭和并发语义。优先使用可控同步原语，避免依赖任意 sleep 的脆弱测试。
 - 每次改动完成后运行 `make ci`（= check + generate-check）；它包含 Go 与 Rust 的格式、vet/clippy、lint、无缓存测试、build、漏洞/供应链检查（govulncheck、cargo deny）以及 Go/Rust 生成漂移检查。
 - 修改 Go 并发、goroutine、组件编排或资源生命周期时额外运行 `make race`（仅覆盖 Go 包）。
-- `services/collaboration/interop/` 的 Node fixture 由 CI 的 node 容器执行 `npm ci && npm run ci`（format:check、`node --test`、audit）；仓库不提供本地 make 目标，且 engines 要求 Node >= 24.18.1。
+- `services/collaboration/interop/` 的 Node fixture 需在 Node >= 24.18.1 环境显式执行 `npm ci && npm run ci`（format:check、`node --test`、audit）；仓库不提供对应的根 Make 目标。
 - IDL 变更除 `make ci` 外还必须运行上一节的 `compat-git` 检查。
 - 修复格式差异应运行仓库格式命令并审查实际语义差异，不得接受整文件无语义的行尾重写。
 

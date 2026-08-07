@@ -41,11 +41,10 @@
 - 权限竞态：permission revision 只关闭旧 session；三个固定 subject 分属 document 与 permission stream。permission stream 没有 size eviction，只按 24 小时 max age 清理；新 durable 回放全部时间保留历史，并等待 ACK floor 的 stream sequence 越过 consumer 创建后的 permission stream `last_sequence` 快照。retention 收缩时只有 pending 与 ack-pending 同时为零才接受空集合追平；有界 registry watermark 继续防止旧 ticket 在事件后重新建立权限。
 - Readiness：Knowledge `Ping` 保持 readiness 语义，`Live` 只返回 `knowledge/live` 且解除冷启动环；Collaboration `Ping` 读取与 admin 相同的完整应用 readiness，而不是只检查 Etcd 注册。RPC serve task 的任何非计划退出以及 Etcd registration key/value/lease 所有权丢失都会立即 fail closed；RPC exit 与最终 ready commit 由同一 gate 原子协调，commit 前再次验证 listener。其余六个 RPC 在 not-ready 时先返回 `40007 / collaboration.unavailable`，不触发 Knowledge、ticket、store 或 actor 副作用。
 - 镜像门禁：本地重建 production binary，校验运行 UID/GID `10001:10001`、runtime 无 Node/npm、OpenSSL 3 动态链接完整、只读根文件系统和非法配置 fail-fast，并清理本轮临时镜像。
-- `.github/ci/Dockerfile` 必须保持与基线完全一致；它是远端 runner 镜像，不是 Rust Collaboration production image。
 
 ## 尚待发布验证
 
-- 最终本地工作区的 `make ci`、`make race`、生成漂移、`git diff --check`、govulncheck 和 cargo-deny 已通过。远端 rootless builder 的功能阶段已有通过记录，但尚无单次完整 `.github/ci/run.sh` 结果：GitHub RustSec、Docker Hub token 和 Debian mirror 的外部网络失败先后阻塞执行，最后一次停在 production image 的 `apt-get`。2026-08-03 已决定暂停远端环境操作；生产发布前仍须在网络稳定时重新取得完整结果。
+- 最终本地工作区的 `make ci`、`make race`、生成漂移、`git diff --check`、govulncheck 和 cargo-deny 已通过。当前没有远端自动 CI；生产发布前仍须重新建立可重复的远端门禁并取得完整结果。
 - Node/Rust 的 p95 延迟、单连接内存和连接密度基线。
 - PostgreSQL/NATS stop/start、完整 Compose/跨服务 WebSocket E2E、备份恢复以及切换/回滚演练。
 - 发布构建产生的 production image 最终 digest。
