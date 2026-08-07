@@ -307,7 +307,7 @@ spec:
           - {name: cache, mountPath: /cache}
           - {name: tmp, mountPath: /tmp}
         resources:
-          requests: {cpu: 100m, memory: 256Mi}
+          requests: {cpu: 10m, memory: 256Mi}
           limits: {cpu: "1", memory: 1Gi}
         securityContext: *restricted
       volumes:
@@ -339,7 +339,7 @@ spec:
           - {name: cache, mountPath: /cache}
           - {name: tmp, mountPath: /tmp}
         resources:
-          requests: {cpu: 100m, memory: 1Gi}
+          requests: {cpu: 10m, memory: 1Gi}
           limits: {cpu: "2", memory: 6Gi}
         securityContext: *restricted
       volumes:
@@ -401,7 +401,7 @@ spec:
           - {name: cache, mountPath: /cache}
           - {name: tmp, mountPath: /tmp}
         resources:
-          requests: {cpu: 100m, memory: 2Gi}
+          requests: {cpu: 10m, memory: 2Gi}
           limits: {cpu: "2", memory: 8Gi}
         securityContext: *restricted
       sidecars:
@@ -419,7 +419,7 @@ spec:
             - {name: postgres-run, mountPath: /var/run/postgresql}
             - {name: sidecar-tmp, mountPath: /tmp}
           resources:
-            requests: {cpu: 25m, memory: 128Mi}
+            requests: {cpu: 5m, memory: 128Mi}
             limits: {cpu: 500m, memory: 512Mi}
           securityContext:
             runAsNonRoot: true
@@ -438,7 +438,7 @@ spec:
             - {name: redis-data, mountPath: /data}
             - {name: sidecar-tmp, mountPath: /tmp}
           resources:
-            requests: {cpu: 10m, memory: 64Mi}
+            requests: {cpu: 1m, memory: 64Mi}
             limits: {cpu: 250m, memory: 256Mi}
           securityContext:
             runAsNonRoot: true
@@ -457,7 +457,7 @@ spec:
             - {name: nats-data, mountPath: /data}
             - {name: sidecar-tmp, mountPath: /tmp}
           resources:
-            requests: {cpu: 10m, memory: 64Mi}
+            requests: {cpu: 1m, memory: 64Mi}
             limits: {cpu: 250m, memory: 256Mi}
           securityContext:
             runAsNonRoot: true
@@ -481,7 +481,7 @@ spec:
             - {name: etcd-data, mountPath: /data}
             - {name: sidecar-tmp, mountPath: /tmp}
           resources:
-            requests: {cpu: 10m, memory: 96Mi}
+            requests: {cpu: 1m, memory: 96Mi}
             limits: {cpu: 250m, memory: 256Mi}
           securityContext:
             runAsNonRoot: true
@@ -519,7 +519,7 @@ spec:
           - {name: workspace, mountPath: /workspace}
           - {name: tmp, mountPath: /tmp}
         resources:
-          requests: {cpu: 100m, memory: 128Mi}
+          requests: {cpu: 10m, memory: 128Mi}
           limits: {cpu: "1", memory: 512Mi}
         securityContext: *restricted
       volumes:
@@ -589,7 +589,7 @@ spec:
           - {name: buildkit-runtime, mountPath: /run/user/1000}
           - {name: tmp, mountPath: /tmp}
         resources:
-          requests: {cpu: 250m, memory: 1Gi}
+          requests: {cpu: 10m, memory: 1Gi}
           limits: {cpu: "4", memory: 8Gi}
         securityContext:
           runAsNonRoot: true
@@ -655,7 +655,7 @@ spec:
           - {name: harbor-ca, mountPath: /etc/knowledge-core/harbor, readOnly: true}
           - {name: tmp, mountPath: /tmp}
         resources:
-          requests: {cpu: 100m, memory: 256Mi}
+          requests: {cpu: 10m, memory: 256Mi}
           limits: {cpu: "1", memory: 1Gi}
         securityContext: *restricted
       volumes:
