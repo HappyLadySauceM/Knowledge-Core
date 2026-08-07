@@ -148,7 +148,7 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 		return nil, err
 	}
 
-	if err := addReadinessChecks(runtime.Health, cfg, db, registry, resolver, events, identity, objects, malwareScanner); err != nil {
+	if err := addReadinessChecks(runtime.Health, cfg, db, registry, resolver, events, identity, objects, malwareScanner, collaboration); err != nil {
 		return nil, err
 	}
 	rpcHandler, err := knowledgerpc.NewHandler(
@@ -224,6 +224,7 @@ func addReadinessChecks(
 	identity identityservice.Client,
 	objects *storage.S3,
 	malwareScanner *scanner.ClamAV,
+	collaboration *knowledgeclient.Collaboration,
 ) error {
 	return errors.Join(
 		registry.AddReadiness("postgres", withTimeout(cfg.PostgreSQL.ConnectTimeout, func(ctx stdcontext.Context) error {
@@ -244,6 +245,7 @@ func addReadinessChecks(
 		})),
 		registry.AddReadiness("object-storage", withTimeout(cfg.ObjectStorage.DownloadTTL, objects.Ping)),
 		registry.AddReadiness("clamav", withTimeout(cfg.Scanner.DialTimeout+cfg.Scanner.ScanTimeout, malwareScanner.Ping)),
+		registry.AddReadiness("collaboration", withTimeout(cfg.CollaborationRPC.RequestTimeout, collaboration.Ping)),
 	)
 }
 

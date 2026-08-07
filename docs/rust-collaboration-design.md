@@ -212,6 +212,7 @@ Rust 实现受限 `XmlFragment("default") -> ProseMirror JSON` codec，覆盖当
 ## 7. 安全、观测与生命周期
 
 - Production 必须使用 `wss`、精确非空 Origin、RPC mTLS、PostgreSQL 验证 TLS、`rediss`、NATS TLS 和 Etcd TLS/认证。
+- Nacos SDK 的 HTTPS 登录与 gRPC 使用同一显式 CA，但分别受 `SSL_CERT_FILE` 与 `NACOS_CLIENT_TLS_CA_CERT` 控制；`HOME/nacos` 对齐 `KNOWLEDGE_CORE_NACOS_RUNTIME_DIR` 的有界 `emptyDir`。启动在创建 SDK 前校验 CA、路径并预建 cache 目录，SDK auth 日志被强制关闭且其余 SDK 日志不高于 warn，动态 debug 级别不能放开凭据或配置 payload。
 - Secret 只从环境变量或 Secret manager 注入；配置文件只保存非敏感默认值。ticket、JWT、TLS key、DSN、Redis key、payload 和 SQL 参数禁止进入日志与 telemetry。
 - Gateway 对 session route 使用认证、按用户/IP 限流和请求体空校验；Rust 对握手、连接、document、update 和 awareness 再执行独立边界。
 - Prometheus label 只使用稳定 route/RPC method、status/code、dependency 和 access；禁止 document/user/session/request ID 与原始错误。

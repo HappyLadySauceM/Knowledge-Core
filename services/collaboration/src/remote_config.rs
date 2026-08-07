@@ -1,6 +1,6 @@
 use std::{
-    env,
-    path::Path,
+    env, fs,
+    path::{Path, PathBuf},
     sync::{Arc, Mutex},
     time::Duration,
 };
@@ -32,6 +32,8 @@ const DYNAMIC_KIND: &str = "DynamicConfig";
 const KEY_SIZE: usize = 32;
 const MAXIMUM_CONTENT: usize = 1 << 20;
 const ENV_PREFIX: &str = "KNOWLEDGE_CORE_NACOS_";
+const SDK_CA_ENV: &str = "NACOS_CLIENT_TLS_CA_CERT";
+const NATIVE_TLS_CA_ENV: &str = "SSL_CERT_FILE";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct DynamicDocument {
@@ -534,12 +536,18 @@ impl Bootstrap {
         let username = required(&format!("{ENV_PREFIX}USERNAME"))?;
         let password = required(&format!("{ENV_PREFIX}PASSWORD"))?;
         let ca_file = required(&format!("{ENV_PREFIX}CA_FILE"))?;
-        let sdk_ca_file = required("NACOS_CLIENT_TLS_CA_CERT")?;
-        if !Path::new(&ca_file).is_absolute() || Path::new(&ca_file) != Path::new(&sdk_ca_file) {
-            return Err(invalid(
-                "Nacos CA file must be absolute and match NACOS_CLIENT_TLS_CA_CERT",
-            ));
-        }
+        let sdk_ca_file = required(SDK_CA_ENV)?;
+        let native_tls_ca_file = required(NATIVE_TLS_CA_ENV)?;
+        let runtime_dir = required(&format!("{ENV_PREFIX}RUNTIME_DIR"))?;
+        let home_dir = required("HOME")?;
+        prepare_sdk_environment(
+            Path::new(&ca_file),
+            Path::new(&sdk_ca_file),
+            Path::new(&native_tls_ca_file),
+            Path::new(&runtime_dir),
+            Path::new(&home_dir),
+            &binding.namespace,
+        )?;
         let key_id = required(&format!("{ENV_PREFIX}KEY_ID"))?;
         if key_id.contains(['\r', '\n', '|']) {
             return Err(invalid(
@@ -587,7 +595,7 @@ impl Binding {
                     "Nacos {name} must be non-empty and trimmed"
                 )));
             }
-            if value.contains(['\r', '\n', '|']) {
+            if value.contains(['\r', '\n', '|', '/', '\\']) || value == "." || value == ".." {
                 return Err(invalid(format!(
                     "Nacos {name} contains unsupported characters"
                 )));
@@ -595,6 +603,56 @@ impl Binding {
         }
         Ok(())
     }
+}
+
+fn prepare_sdk_environment(
+    ca_file: &Path,
+    sdk_ca_file: &Path,
+    native_tls_ca_file: &Path,
+    runtime_dir: &Path,
+    home_dir: &Path,
+    namespace: &str,
+) -> Result<()> {
+    let cache_directory = sdk_cache_directory(
+        ca_file,
+        sdk_ca_file,
+        native_tls_ca_file,
+        runtime_dir,
+        home_dir,
+        namespace,
+    )?;
+    let metadata =
+        fs::metadata(ca_file).map_err(|error| invalid_with("inspect Nacos CA file", error))?;
+    if !metadata.is_file() {
+        return Err(invalid("Nacos CA path must identify a regular file"));
+    }
+    fs::File::open(ca_file).map_err(|error| invalid_with("open Nacos CA file", error))?;
+    fs::create_dir_all(cache_directory)
+        .map_err(|error| invalid_with("prepare Nacos client cache directory", error))
+}
+
+fn sdk_cache_directory(
+    ca_file: &Path,
+    sdk_ca_file: &Path,
+    native_tls_ca_file: &Path,
+    runtime_dir: &Path,
+    home_dir: &Path,
+    namespace: &str,
+) -> Result<PathBuf> {
+    if !ca_file.is_absolute() || ca_file != sdk_ca_file || ca_file != native_tls_ca_file {
+        return Err(invalid(
+            "Nacos CA file must be absolute and match NACOS_CLIENT_TLS_CA_CERT and SSL_CERT_FILE",
+        ));
+    }
+    if !runtime_dir.is_absolute()
+        || !home_dir.is_absolute()
+        || runtime_dir != home_dir.join("nacos")
+    {
+        return Err(invalid(
+            "Nacos runtime directory must be absolute and equal HOME/nacos",
+        ));
+    }
+    Ok(runtime_dir.join("config").join(namespace))
 }
 
 fn parse_servers(raw: &str) -> Result<String> {
@@ -725,10 +783,10 @@ fn unavailable_with(detail: &'static str, error: impl std::fmt::Display) -> Serv
 mod tests {
     use super::{
         Binding, decode_dynamic_document, decrypt, parse_duration, parse_servers, payload_aad,
-        validate_log_level,
+        sdk_cache_directory, validate_log_level,
     };
 
-    use std::time::Duration;
+    use std::{path::PathBuf, time::Duration};
 
     #[test]
     fn dynamic_document_is_strict_and_versioned() {
@@ -761,6 +819,57 @@ mod tests {
             "http://nacos:8848/path",
         ] {
             assert!(parse_servers(invalid).is_err(), "{invalid}");
+        }
+    }
+
+    #[test]
+    fn sdk_transport_and_cache_paths_share_one_explicit_contract() {
+        let root = std::env::temp_dir().join("knowledge-core-nacos-sdk-paths");
+        let ca_file = root.join("internal-ca.crt");
+        let home_dir = root.join("home");
+        let runtime_dir = home_dir.join("nacos");
+        assert_eq!(
+            sdk_cache_directory(&ca_file, &ca_file, &ca_file, &runtime_dir, &home_dir, "dev",)
+                .expect("valid SDK paths"),
+            runtime_dir.join("config").join("dev")
+        );
+        assert!(
+            sdk_cache_directory(
+                &ca_file,
+                &root.join("other-ca.crt"),
+                &ca_file,
+                &runtime_dir,
+                &home_dir,
+                "dev",
+            )
+            .is_err()
+        );
+        assert!(
+            sdk_cache_directory(
+                &ca_file,
+                &ca_file,
+                &ca_file,
+                &PathBuf::from("relative"),
+                &home_dir,
+                "dev",
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn binding_rejects_values_that_can_escape_the_sdk_cache_path() {
+        for namespace in [".", "..", "dev/other", "dev\\other"] {
+            assert!(
+                Binding {
+                    namespace: namespace.to_owned(),
+                    group: "KNOWLEDGE_CORE".to_owned(),
+                    data_id: "collaboration.dynamic.yaml".to_owned(),
+                }
+                .validate()
+                .is_err(),
+                "{namespace}"
+            );
         }
     }
 

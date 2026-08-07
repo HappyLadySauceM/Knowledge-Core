@@ -22,6 +22,8 @@ use crate::{
     error::{Result, ServiceError},
 };
 
+const NACOS_SDK_LOG_GUARD: &str = "nacos_sdk=warn,nacos_sdk::api::plugin::auth::auth_by_http=off";
+
 #[derive(Clone)]
 pub struct Metrics {
     inner: Arc<MetricSet>,
@@ -330,8 +332,12 @@ impl Telemetry {
 fn log_filter(environment: Environment, level: &str) -> Result<EnvFilter> {
     crate::remote_config::validate_log_level(level)?;
     let directive = match environment {
-        Environment::Development | Environment::Test => format!("{level},nacos_sdk=info"),
-        Environment::Production => format!("{level},nacos_sdk=info,sqlx=warn,hyper=warn"),
+        Environment::Development | Environment::Test => {
+            format!("{level},{NACOS_SDK_LOG_GUARD}")
+        }
+        Environment::Production => {
+            format!("{level},{NACOS_SDK_LOG_GUARD},sqlx=warn,hyper=warn")
+        }
     };
     EnvFilter::try_new(directive).map_err(|error| {
         ServiceError::invalid_input("log level produced an invalid tracing filter")
@@ -357,4 +363,18 @@ fn build_provider(endpoint: &str, export_timeout: Duration) -> Result<SdkTracerP
 
 fn metric_error(error: prometheus::Error) -> ServiceError {
     ServiceError::internal(anyhow::anyhow!(error).context("initialize Prometheus metric"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::log_filter;
+    use crate::config::Environment;
+
+    #[test]
+    fn nacos_dependency_cannot_emit_credentials_or_configuration_at_debug_level() {
+        let filter = log_filter(Environment::Development, "debug").expect("valid filter");
+        let rendered = filter.to_string();
+        assert!(rendered.contains("nacos_sdk=warn"));
+        assert!(rendered.contains("nacos_sdk::api::plugin::auth::auth_by_http=off"));
+    }
 }

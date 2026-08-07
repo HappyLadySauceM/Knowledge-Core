@@ -17,7 +17,6 @@ configMapGenerator:
       - KNOWLEDGE_CORE_NACOS_GROUP=KNOWLEDGE_CORE
       - KNOWLEDGE_CORE_NACOS_CA_FILE=/etc/knowledge-core/tls/internal-ca.crt
       - KNOWLEDGE_CORE_NACOS_KEY_ID=dev-v1
-      - NACOS_CLIENT_TLS_CA_CERT=/etc/knowledge-core/tls/internal-ca.crt
   - name: knowledge-core-gateway-config
     behavior: merge
     literals:
@@ -72,6 +71,9 @@ configMapGenerator:
   - name: knowledge-core-collaboration-config
     behavior: merge
     literals:
+      - HOME=/var/run/knowledge-core
+      - SSL_CERT_FILE=/etc/knowledge-core/tls/internal-ca.crt
+      - NACOS_CLIENT_TLS_CA_CERT=/etc/knowledge-core/tls/internal-ca.crt
       - COLLABORATION_ENVIRONMENT=development
       - COLLABORATION_RPC_ADVERTISED_ADDRESS=knowledge-core-collaboration.knowledge-core-dev.svc.cluster.local:8883
       - COLLABORATION_REDIS_PREFIX=knowledge-core:development:collaboration

@@ -407,7 +407,12 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp
+            - name: nacos-runtime
+              mountPath: /var/run/knowledge-core/nacos
       volumes:
         - name: tmp
           emptyDir:
             sizeLimit: 128Mi
+        - name: nacos-runtime
+          emptyDir:
+            sizeLimit: 32Mi

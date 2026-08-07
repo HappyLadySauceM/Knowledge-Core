@@ -206,7 +206,7 @@ Go 服务分别使用 `IDENTITY_`、`KNOWLEDGE_`、`GATEWAY_` 环境变量前缀
 
 Collaboration 完全通过 `COLLABORATION_*` 环境变量配置，数值、URL、Origin、认证组合和 TLS 文件在启动前严格校验。
 
-四个服务可通过 `KNOWLEDGE_CORE_NACOS_*` 启用 Nacos `3.2.3` 动态配置。bootstrap 严格要求 HTTPS endpoint、namespace/group/data ID、每服务 reader 凭据、CA 文件、key ID 和 32-byte KEK；Go 与 Rust 使用同一 AES-256-GCM 信封和坐标 AAD。初始配置获取失败会阻断启动，运行中失联保留 last-good 并告警，恢复后继续监听/轮询。当前动态文档只实现原子日志级别更新，依赖池和监听地址仍由静态 YAML/环境变量装配，不得描述为已经支持热换。
+四个服务可通过 `KNOWLEDGE_CORE_NACOS_*` 启用 Nacos `3.2.3` 动态配置。bootstrap 严格要求 HTTPS endpoint、namespace/group/data ID、每服务 reader 凭据、CA 文件、key ID 和 32-byte KEK；Go 与 Rust 使用同一 AES-256-GCM 信封和坐标 AAD。Rust SDK 的 gRPC 与 native-tls HTTP 路径必须分别通过 `NACOS_CLIENT_TLS_CA_CERT` 和 `SSL_CERT_FILE` 指向同一 CA，且 `HOME/nacos` 必须等于挂载的 `KNOWLEDGE_CORE_NACOS_RUNTIME_DIR`，启动会在连接前校验并创建 SDK cache 目录。初始配置获取失败会阻断启动，运行中失联保留 last-good 并告警，恢复后继续监听/轮询。当前动态文档只实现原子日志级别更新，依赖池和监听地址仍由静态 YAML/环境变量装配，不得描述为已经支持热换。
 
 k3s 中 Nacos 部署在 `nacos` namespace，HTTP/gRPC 使用现有 `happyladysauce-ca` 签发的 TLS 证书，并复用已有 PostgreSQL 服务中的独立 `nacos` database。唯一应用环境使用 Nacos namespace `dev`，每个服务只读自己的 `<service>.dynamic.yaml`。应用 namespace 通过只含公共证书的 ConfigMap 挂载 CA；TLS 私钥不跨 namespace 复制。
 
