@@ -126,3 +126,13 @@ spec:
                 name: knowledge-core-eventsource-svc
                 port:
                   number: 12000
+    - host: hooks.happyladysauce.cn
+      http:
+        paths:
+          - path: /events/knowledge-core
+            pathType: Exact
+            backend:
+              service:
+                name: knowledge-core-eventsource-svc
+                port:
+                  number: 12000
