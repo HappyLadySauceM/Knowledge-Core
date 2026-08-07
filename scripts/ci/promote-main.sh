@@ -28,7 +28,7 @@ resolve_object() {
     fi
 }
 
-"$SOURCE_ROOT/scripts/ci/verify-ref.sh"
+bash "$SOURCE_ROOT/scripts/ci/verify-ref.sh"
 main_sha="$(github "${api}/repos/${GITHUB_REPOSITORY}/git/ref/heads/main" | jq -er '.object.sha')"
 if [[ "$main_sha" != "$GITHUB_SHA" ]]; then
     comparison="$(github "${api}/repos/${GITHUB_REPOSITORY}/compare/${main_sha}...${GITHUB_SHA}" | jq -er '.status')"

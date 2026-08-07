@@ -713,7 +713,7 @@ spec:
           - |
             token="$(/usr/local/lib/knowledge-core-ci/github-app-token.sh)"
             export GITHUB_TOKEN="$token"
-            /workspace/source/scripts/ci/promote-gitops.sh
+            bash /workspace/source/scripts/ci/promote-gitops.sh
         env:
           - name: GITHUB_APP_ID
             valueFrom:
@@ -755,7 +755,7 @@ spec:
           - |
             token="$(/usr/local/lib/knowledge-core-ci/github-app-token.sh)"
             export GITHUB_TOKEN="$token"
-            /workspace/source/scripts/ci/github-status.sh \
+            bash /workspace/source/scripts/ci/github-status.sh \
               "{{inputs.parameters.state}}" \
               "{{inputs.parameters.description}}" \
               knowledge-core/smoke
@@ -776,7 +776,7 @@ spec:
         image: "{{workflow.parameters.control-image}}"
         imagePullPolicy: IfNotPresent
         envFrom: *proxy-env
-        command: ["/workspace/source/scripts/ci/wait-gitops.sh"]
+        command: ["/bin/bash", "/workspace/source/scripts/ci/wait-gitops.sh"]
         env:
           - {name: GITOPS_REVISION, value: "{{inputs.parameters.revision}}"}
           - {name: IMAGE_MAP_FILE, value: /workspace/release/images.env}
@@ -797,7 +797,7 @@ spec:
           - |
             token="$(/usr/local/lib/knowledge-core-ci/github-app-token.sh)"
             export GITHUB_TOKEN="$token"
-            /workspace/source/scripts/ci/smoke-dev.sh
+            bash /workspace/source/scripts/ci/smoke-dev.sh
         env: *github-env
         volumeMounts:
           - {name: workspace, mountPath: /workspace}
@@ -826,7 +826,7 @@ spec:
           - |
             token="$(/usr/local/lib/knowledge-core-ci/github-app-token.sh)"
             export GITHUB_TOKEN="$token"
-            /workspace/source/scripts/ci/rollback-gitops.sh
+            bash /workspace/source/scripts/ci/rollback-gitops.sh
         env:
           - name: GITHUB_APP_ID
             valueFrom:
@@ -866,7 +866,7 @@ spec:
           - |
             token="$(/usr/local/lib/knowledge-core-ci/github-app-token.sh)"
             export GITHUB_TOKEN="$token"
-            /workspace/source/scripts/ci/promote-main.sh
+            bash /workspace/source/scripts/ci/promote-main.sh
         env:
           - name: GITHUB_APP_ID
             valueFrom:
@@ -893,7 +893,7 @@ spec:
         image: "{{workflow.parameters.control-image}}"
         imagePullPolicy: IfNotPresent
         envFrom: *proxy-env
-        command: ["/workspace/source/scripts/ci/tag-release-images.sh"]
+        command: ["/bin/bash", "/workspace/source/scripts/ci/tag-release-images.sh"]
         env:
           - {name: IMAGE_MAP_FILE, value: /workspace/release/images.env}
           - {name: VERSION_FILE, value: /workspace/release/version}
@@ -924,7 +924,7 @@ spec:
             token="$(/usr/local/lib/knowledge-core-ci/github-app-token.sh)"
             export GITHUB_TOKEN="$token"
             VERSION_FILE=/workspace/release/version \
-              /workspace/source/scripts/ci/publish-release.sh
+              bash /workspace/source/scripts/ci/publish-release.sh
         env: *github-env
         volumeMounts:
           - {name: workspace, mountPath: /workspace}
@@ -957,8 +957,8 @@ spec:
             if [[ "{{workflow.parameters.mode}}" == release && \
                   "$state" != success && \
                   ! -f /workspace/release/smoke-passed && \
-                  -x /workspace/source/scripts/ci/github-status.sh ]]; then
-              /workspace/source/scripts/ci/github-status.sh \
+                  -r /workspace/source/scripts/ci/github-status.sh ]]; then
+              bash /workspace/source/scripts/ci/github-status.sh \
                 failure 'Knowledge Core dev smoke did not pass' knowledge-core/smoke
             fi
         env:

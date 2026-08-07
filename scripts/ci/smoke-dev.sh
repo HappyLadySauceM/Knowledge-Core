@@ -31,6 +31,6 @@ trap 'rm -f -- "$response"' EXIT
 retry_get 'http://knowledge-core-gateway.knowledge-core-dev.svc.cluster.local:8080/api/v1/documents?limit=1' "$response"
 jq -e . "$response" >/dev/null
 
-/workspace/source/scripts/ci/github-status.sh \
+bash /workspace/source/scripts/ci/github-status.sh \
     success 'Knowledge Core dev smoke passed' knowledge-core/smoke
 touch /workspace/release/smoke-passed

@@ -43,4 +43,4 @@ rollback_revision="$(git -C "$worktree/repository" rev-parse HEAD)"
 timeout 120 git -C "$worktree/repository" push origin HEAD:main
 
 GITOPS_REVISION="$rollback_revision" IMAGE_MAP_FILE= \
-    /workspace/source/scripts/ci/wait-gitops.sh
+    bash /workspace/source/scripts/ci/wait-gitops.sh

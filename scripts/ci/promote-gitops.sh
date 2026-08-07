@@ -29,7 +29,7 @@ export GIT_CONFIG_KEY_3=http.lowSpeedTime
 export GIT_CONFIG_VALUE_3=30
 
 for attempt in 1 2 3; do
-    "$SOURCE_ROOT/scripts/ci/verify-ref.sh"
+    bash "$SOURCE_ROOT/scripts/ci/verify-ref.sh"
     worktree="$(mktemp -d)"
     cleanup() {
         case "$worktree" in
