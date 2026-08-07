@@ -339,8 +339,8 @@ spec:
           - {name: cache, mountPath: /cache}
           - {name: tmp, mountPath: /tmp}
         resources:
-          requests: {cpu: 500m, memory: 1Gi}
-          limits: {cpu: "4", memory: 6Gi}
+          requests: {cpu: 100m, memory: 1Gi}
+          limits: {cpu: "2", memory: 6Gi}
         securityContext: *restricted
       volumes:
         - name: tmp
@@ -401,8 +401,8 @@ spec:
           - {name: cache, mountPath: /cache}
           - {name: tmp, mountPath: /tmp}
         resources:
-          requests: {cpu: 500m, memory: 2Gi}
-          limits: {cpu: "4", memory: 8Gi}
+          requests: {cpu: 100m, memory: 2Gi}
+          limits: {cpu: "2", memory: 8Gi}
         securityContext: *restricted
       sidecars:
         - name: postgres
@@ -419,7 +419,7 @@ spec:
             - {name: postgres-run, mountPath: /var/run/postgresql}
             - {name: sidecar-tmp, mountPath: /tmp}
           resources:
-            requests: {cpu: 100m, memory: 128Mi}
+            requests: {cpu: 25m, memory: 128Mi}
             limits: {cpu: 500m, memory: 512Mi}
           securityContext:
             runAsNonRoot: true
@@ -438,7 +438,7 @@ spec:
             - {name: redis-data, mountPath: /data}
             - {name: sidecar-tmp, mountPath: /tmp}
           resources:
-            requests: {cpu: 50m, memory: 64Mi}
+            requests: {cpu: 10m, memory: 64Mi}
             limits: {cpu: 250m, memory: 256Mi}
           securityContext:
             runAsNonRoot: true
@@ -457,7 +457,7 @@ spec:
             - {name: nats-data, mountPath: /data}
             - {name: sidecar-tmp, mountPath: /tmp}
           resources:
-            requests: {cpu: 50m, memory: 64Mi}
+            requests: {cpu: 10m, memory: 64Mi}
             limits: {cpu: 250m, memory: 256Mi}
           securityContext:
             runAsNonRoot: true
@@ -481,7 +481,7 @@ spec:
             - {name: etcd-data, mountPath: /data}
             - {name: sidecar-tmp, mountPath: /tmp}
           resources:
-            requests: {cpu: 50m, memory: 96Mi}
+            requests: {cpu: 10m, memory: 96Mi}
             limits: {cpu: 250m, memory: 256Mi}
           securityContext:
             runAsNonRoot: true
@@ -589,7 +589,7 @@ spec:
           - {name: buildkit-runtime, mountPath: /run/user/1000}
           - {name: tmp, mountPath: /tmp}
         resources:
-          requests: {cpu: 750m, memory: 1Gi}
+          requests: {cpu: 250m, memory: 1Gi}
           limits: {cpu: "4", memory: 8Gi}
         securityContext:
           runAsNonRoot: true
