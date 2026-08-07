@@ -10,8 +10,14 @@ set -euo pipefail
 : "${IMAGE_MAP_FILE:?IMAGE_MAP_FILE is required}"
 : "${OUTPUT_ROOT:?OUTPUT_ROOT is required}"
 
+script_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+
 if [[ ! -d "$SOURCE_ROOT/deploy/base" || ! -r "$IMAGE_MAP_FILE" ]]; then
     printf 'source base and image map are required\n' >&2
+    exit 2
+fi
+if find "$SOURCE_ROOT/deploy/base" -type l -print -quit | grep -q .; then
+    printf 'candidate deploy/base must not contain symbolic links\n' >&2
     exit 2
 fi
 
@@ -29,7 +35,7 @@ export GIT_CONFIG_KEY_3=http.lowSpeedTime
 export GIT_CONFIG_VALUE_3=30
 
 for attempt in 1 2 3; do
-    bash "$SOURCE_ROOT/scripts/ci/verify-ref.sh"
+    bash "$script_root/verify-ref.sh"
     worktree="$(mktemp -d)"
     cleanup() {
         case "$worktree" in

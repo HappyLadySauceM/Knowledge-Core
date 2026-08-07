@@ -34,9 +34,12 @@ if [[ "$main_sha" != "$release_sha" ]]; then
 fi
 dev_sha="$(github "${api}/repos/${GITHUB_REPOSITORY}/git/ref/heads/dev" | jq -er '.object.sha')"
 if [[ "$dev_sha" != "$GITHUB_SHA" && "$dev_sha" != "$release_sha" ]]; then
-    printf 'dev is at %s, expected tested commit %s or release commit %s\n' \
-        "$dev_sha" "$GITHUB_SHA" "$release_sha" >&2
-    exit 1
+    dev_status="$(github "${api}/repos/${GITHUB_REPOSITORY}/compare/${release_sha}...${dev_sha}" | jq -er '.status')"
+    if [[ "$dev_status" != ahead ]]; then
+        printf 'dev is at %s and is not a descendant of release commit %s\n' \
+            "$dev_sha" "$release_sha" >&2
+        exit 1
+    fi
 fi
 
 status="$(curl --silent --show-error --output /tmp/tag.json --write-out '%{http_code}' \
@@ -85,4 +88,4 @@ case "$status" in
         ;;
 esac
 
-printf 'Published %s for merge commit %s\n' "$version" "$release_sha"
+printf 'Published %s for tested commit %s\n' "$version" "$release_sha"

@@ -9,7 +9,17 @@ readonly rust_dockerfile="${ci_root}/RustDockerfile"
 readonly node_image="node:24.18.1-bookworm-slim"
 readonly goproxy="${GOPROXY:-$default_goproxy}"
 readonly container_proxy="${KC_CONTAINER_PROXY:-}"
+readonly container_no_proxy="${KC_CONTAINER_NO_PROXY:-127.0.0.1,localhost,::1}"
 readonly cache_root="${KC_CI_CACHE_ROOT:-${XDG_CACHE_HOME:-$HOME/.cache}/knowledge-core-ci}"
+readonly keep_artifacts="${KC_CI_KEEP_ARTIFACTS:-false}"
+
+case "$keep_artifacts" in
+    true | false) ;;
+    *)
+        printf 'KC_CI_KEEP_ARTIFACTS must be true or false\n' >&2
+        exit 2
+        ;;
+esac
 
 missing=()
 for command_name in docker sha256sum; do
@@ -46,20 +56,20 @@ if [[ -n "$container_proxy" ]]; then
     build_args+=(
         --build-arg "HTTP_PROXY=${container_proxy}"
         --build-arg "HTTPS_PROXY=${container_proxy}"
-        --build-arg "NO_PROXY=127.0.0.1,localhost,::1"
+        --build-arg "NO_PROXY=${container_no_proxy}"
     )
     proxy_build_args+=(
         --build-arg "HTTP_PROXY=${container_proxy}"
         --build-arg "HTTPS_PROXY=${container_proxy}"
-        --build-arg "NO_PROXY=127.0.0.1,localhost,::1"
+        --build-arg "NO_PROXY=${container_no_proxy}"
     )
     container_env+=(
         --env "http_proxy=${container_proxy}"
         --env "https_proxy=${container_proxy}"
         --env "HTTP_PROXY=${container_proxy}"
         --env "HTTPS_PROXY=${container_proxy}"
-        --env "no_proxy=127.0.0.1,localhost,::1"
-        --env "NO_PROXY=127.0.0.1,localhost,::1"
+        --env "no_proxy=${container_no_proxy}"
+        --env "NO_PROXY=${container_no_proxy}"
     )
 fi
 
@@ -95,8 +105,8 @@ if [[ -n "$container_proxy" ]]; then
         --env "https_proxy=${container_proxy}"
         --env "HTTP_PROXY=${container_proxy}"
         --env "HTTPS_PROXY=${container_proxy}"
-        --env "no_proxy=127.0.0.1,localhost,::1"
-        --env "NO_PROXY=127.0.0.1,localhost,::1"
+        --env "no_proxy=${container_no_proxy}"
+        --env "NO_PROXY=${container_no_proxy}"
     )
 fi
 
@@ -153,9 +163,11 @@ cleanup_dependencies() {
     case "$interop_root" in
         "$cache_root"/interop-*) rm -rf -- "$interop_root" ;;
     esac
-    case "$artifact_root" in
-        "$repository_root"/.ci-artifacts) rm -rf -- "$artifact_root" ;;
-    esac
+    if [[ "$keep_artifacts" != true ]]; then
+        case "$artifact_root" in
+            "$repository_root"/.ci-artifacts) rm -rf -- "$artifact_root" ;;
+        esac
+    fi
 }
 trap cleanup_dependencies EXIT
 

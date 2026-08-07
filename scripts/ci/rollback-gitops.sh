@@ -7,6 +7,8 @@ set -euo pipefail
 : "${PREVIOUS_REVISION:?PREVIOUS_REVISION is required}"
 : "${GITOPS_CHANGED:?GITOPS_CHANGED is required}"
 
+script_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+
 if [[ "$GITOPS_CHANGED" != true ]]; then
     printf 'GitOps promotion created no commit; rollback is unnecessary\n'
     exit 0
@@ -42,5 +44,5 @@ git -C "$worktree/repository" \
 rollback_revision="$(git -C "$worktree/repository" rev-parse HEAD)"
 timeout 120 git -C "$worktree/repository" push origin HEAD:main
 
-GITOPS_REVISION="$rollback_revision" IMAGE_MAP_FILE= \
-    bash /workspace/source/scripts/ci/wait-gitops.sh
+GITOPS_REVISION="$rollback_revision" IMAGE_MAP_FILE='' \
+    bash "$script_root/wait-gitops.sh"
