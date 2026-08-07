@@ -56,3 +56,34 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: knowledge-core-events
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: knowledge-core-workflow-promotion
+rules:
+  - apiGroups: ["argoproj.io"]
+    resources: ["applications"]
+    resourceNames: ["knowledge-core-dev"]
+    verbs: ["get", "patch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    resourceNames:
+      - knowledge-core-gateway
+      - knowledge-core-identity
+      - knowledge-core-knowledge
+      - knowledge-core-collaboration
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: knowledge-core-workflow-promotion
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: knowledge-core-workflow-promotion
+subjects:
+  - kind: ServiceAccount
+    name: knowledge-core-workflow
+    namespace: ci

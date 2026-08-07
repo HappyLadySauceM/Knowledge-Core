@@ -42,7 +42,7 @@ spec:
         name: knowledge-core-github-webhook
         key: secret
       insecure: false
-      active: false
+      active: true
       contentType: json
 ---
 apiVersion: argoproj.io/v1alpha1
@@ -70,9 +70,7 @@ spec:
             value: ["false"]
           - path: body.ref
             type: string
-            value:
-              - refs/heads/dev
-              - refs/tags/v[0-9]+\.[0-9]+\.[0-9]+
+            value: ["refs/heads/dev"]
   triggers:
     - template:
         name: knowledge-core-ci
@@ -92,7 +90,7 @@ spec:
                     - {name: repository, value: HappyLadySauceM/Knowledge-Core}
                     - {name: revision}
                     - {name: ref}
-                    - {name: promotion-enabled, value: "true"}
+                    - {name: mode, value: release}
           parameters:
             - src:
                 dependencyName: push

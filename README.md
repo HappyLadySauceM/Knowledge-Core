@@ -228,10 +228,15 @@ PostgreSQL 和 Redis，并在独立 namespace 提供 Nacos、NATS、Etcd、MinIO
 `k3s-home-deploy/Knowledge-Core/base`，并只更新 `Knowledge-Core/overlay/dev` 的不可变镜像
 digest。每个服务使用独立 `knowledge-core-<service>-secrets` 保存业务凭据、Nacos reader 和 KEK。
 
-仓库提供 Argo Workflows/Events、rootless BuildKit、持久缓存、Trivy/Syft/Cosign 和 GitOps CAS
-推广。手工 Workflow 默认不推广；source webhook 触发才允许写 GitOps，且只有 dev push 会维护
-`dev -> main` PR。Argo CD Application 由管理面板创建，真实 Secret/CA 继续由 SOPS 或集群 Secret
-管理，零 digest 或缺失 Secret 时保持 fail closed。
+仓库提供单一 Argo Workflows/Events 发布流水线、rootless BuildKit、持久缓存、Trivy、Cosign
+和 GitOps CAS 推广。手工 Workflow 默认 `mode=verify`，只执行门禁、构建和扫描；只有 dev push
+webhook 使用 `mode=release`，在 Argo CD dev 同步与冒烟成功后签名镜像，以非 force
+fast-forward 推进 `main`，再创建版本镜像 tag、Git tag 和 GitHub Release。GitHub Actions 只保留
+手工回退入口，不响应 push。
+
+Argo CD repository Secret、AppProject 和 Application 由私有 GitOps 仓库声明。Application 使用
+`sops-v1.0` CMP、Automated/Prune/Self Heal；真实 Secret 和 CA 由 SOPS 管理，部署始终引用不可变
+Harbor digest。完整配置和首次启用顺序见运行手册。
 
 当前测试覆盖领域、逻辑、transport、严格输入、错误映射、Collaboration commit-before-broadcast、恢复、投影、outbox、生命周期、双向 Kitex/Volo、Yjs 和多实例 JetStream 行为。按照当前范围，Identity 与 Knowledge repository 尚未包含真实 PostgreSQL 集成测试；不要把现有 mock/单元测试等同于数据库兼容性验证。Rust Collaboration 的性能对比、完整 Compose WebSocket E2E、依赖 stop/start、备份及切换/回滚演练仍需在发布前完成。
 

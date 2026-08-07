@@ -210,6 +210,8 @@ Collaboration 完全通过 `COLLABORATION_*` 环境变量配置，数值、URL�
 
 k3s 中 Nacos 部署在 `nacos` namespace，HTTP/gRPC 使用现有 `happyladysauce-ca` 签发的 TLS 证书，并复用已有 PostgreSQL 服务中的独立 `nacos` database。唯一应用环境使用 Nacos namespace `dev`，每个服务只读自己的 `<service>.dynamic.yaml`。应用 namespace 通过只含公共证书的 ConfigMap 挂载 CA；TLS 私钥不跨 namespace 复制。
 
+k3s 的项目 PostgreSQL database 为 `knowledge_core_dev`。Identity、Knowledge、Collaboration 使用独立 role 和各自拥有的 schema；由于当前启动 migration 会幂等执行 `CREATE SCHEMA IF NOT EXISTS`，三个 role 需要该 database 的 `CONNECT,CREATE`，但不获得其他 schema 的对象权限。Etcd readiness 使用项目已授权 registry prefix 的有界 range read 验证 TLS、认证与权限，不调用只允许 root 的 Maintenance/Status。
+
 代码当前强制的生产约束包括：
 
 - Gateway 的公开 base URL 必须与 public listener TLS 一致；production 的 Collaboration RPC client 必须使用验证开启的双向 mTLS，公开协作地址必须为 `wss`。
@@ -261,20 +263,26 @@ go run ./scripts/idlguard compat-git <merge-base> idl
 
 `make ci` 同时执行 Go/Rust format、vet、golangci-lint、Clippy `-D warnings`、无缓存测试、release build、govulncheck、cargo-deny 和 Go/Rust 生成漂移检查。远端 `.github/ci/run.sh` 还在 rootless Docker 中执行 Go race、真实 PostgreSQL/Redis/NATS/Etcd 测试、双向 Kitex/Volo 与 Yjs 互操作，并构建 Rust production image，验证固定运行 UID/GID `10001:10001`、无 Node/npm 和非法配置 fail-fast。真实依赖阶段设置 `COLLABORATION_TEST_REQUIRE_REAL_DEPENDENCIES=1`；缺少 PostgreSQL、Redis、NATS 或 Etcd 对应连接变量时测试必须失败，不能静默 skip。Node 24 只运行 `services/collaboration/interop` fixture。
 
-开发交付只保留 `dev`。手工 Argo Workflow 的 `promotion-enabled` 默认关闭；GitHub source webhook
-触发时才开启 GitOps 推广。dev 和从 main 可达的 SemVer tag 都更新唯一的 `overlay/dev`，只有 dev
-push 会创建或复用 `dev -> main` PR 并启用 merge-commit auto-merge。
+开发交付只保留 `dev`。Argo Workflow 参数为 `mode=verify|release`：手工回退默认只验证，
+GitHub source webhook 只接受 `refs/heads/dev` 并触发 release。Node、Go 和 Rust 门禁并行后执行
+interop，rootless BuildKit 只构建四个服务的 SHA tag 镜像，单节点 Trivy 扫描通过才以 CAS 更新
+GitOps digest。CI 等待 Argo CD 到达精确 GitOps revision 且四个 Deployment 使用预期 digest，
+完成 dev readiness/API 冒烟；失败时仅在 GitOps main 未继续推进时创建 revert。成功后依次签名
+digest、以 `force=false` fast-forward `main`、按根 `VERSION` 的 major.minor 生成下一个 patch
+版本，并创建 Harbor 版本 tag、Git tag 与 GitHub Release。整个发布不创建临时分支或 PR。
 
 Kubernetes 所有权分为三层：`k3s-home-deploy/k3s`（服务器 `/opt/k3s`）是公共基础设施真源；应用
 仓库 `deploy/base` 是环境无关工作负载真源；私有 `k3s-home-deploy/Knowledge-Core` 保存 CI 同步的
 base 快照、唯一 dev overlay、SOPS Secret 和镜像 digest。公共 Nacos、NATS、Etcd、MinIO、ClamAV
 位于独立 namespace，PostgreSQL 和 Redis 复用现有服务；应用只使用项目级账号和前缀。
 
-仓库内存在 Argo Workflows/Events、rootless BuildKit、持久缓存、Trivy/Syft/Cosign 和 GitOps CAS
+仓库内存在 Argo Workflows/Events、rootless BuildKit、持久缓存、Trivy/Cosign 和 GitOps CAS
 推广清单。单节点 k3s 的 Workflow 外联通过只绑定 CNI 网关的 host-network 转发容器接入节点既有
 sing-box；代理环境由 ConfigMap 统一注入，loopback、集群网段、Service DNS 和
 `*.happyladysauce.local`/`*.happyladysauce.cn` 必须 bypass。self-hosted `.github/ci/run.sh` 继续作为
-回退；两套重型 CI 在切换完成前不能同时响应 dev push。Argo CD Application 由管理面板创建。
+手工回退；`.github/workflows/dev-to-main.yml` 不响应 push。Argo CD 的只读 repository Secret、
+AppProject 和 Application 由 GitOps 仓库声明，Application 使用 `sops-v1.0` CMP、自动同步、prune
+和 self-heal。
 
 ### 当前不兼容基线的迁移记录
 
@@ -289,8 +297,10 @@ sing-box；代理环境由 ConfigMap 统一注入，loopback、集群网段、Se
 - Identity repository/migration 没有针对真实 PostgreSQL 的自动化集成测试。
 - Knowledge repository/migration、事务、约束和 SQL cursor 没有针对真实 PostgreSQL 的自动化集成测试。
 - 当前 CI 构建并 smoke Rust Collaboration 镜像，但不启动完整 Compose 执行跨服务 WebSocket E2E。
-- k3s 原生 CI 尚未以真实 GitHub webhook 完成一次从状态上报、构建、签名到 GitOps dev digest 更新的端到端运行。
-- SOPS age 私钥、应用 Secret、Nacos 加密动态文档和 Argo CD Application 仍需按运行清单配置。
+- 新的单一 release Workflow 尚未以真实 dev push 完成从状态上报、四镜像构建、GitOps 精确
+  revision 等待、dev smoke、main fast-forward 到版本发布的端到端运行。
+- 应用 Secret、trust bundle、四份 Nacos 加密动态文档以及 Argo CD repository Secret、
+  AppProject/Application 已配置，并已验证首次同步。
 - 当前只有 development overlay；单节点集群不作为 production 环境。
 - Node/Rust 性能基线、PostgreSQL/NATS stop/start 故障演练、备份恢复、切换/回滚和滚动升级尚未完成。
 - 生产镜像最终 digest 只能在发布构建后记录，仓库内门禁不能替代部署环境证书、容量和网络策略验证。

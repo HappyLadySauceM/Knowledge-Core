@@ -13,10 +13,23 @@ import (
 type resolverClientStub struct {
 	response *clientv3.GetResponse
 	err      error
+	key      string
 }
 
-func (s resolverClientStub) Get(context.Context, string, ...clientv3.OpOption) (*clientv3.GetResponse, error) {
+func (s *resolverClientStub) Get(_ context.Context, key string, _ ...clientv3.OpOption) (*clientv3.GetResponse, error) {
+	s.key = key
 	return s.response, s.err
+}
+
+func TestPingRegistryPrefixUsesAuthorizedPrefix(t *testing.T) {
+	t.Parallel()
+	client := &resolverClientStub{response: &clientv3.GetResponse{}}
+	if err := pingRegistryPrefix(context.Background(), client, "/registry/", time.Second); err != nil {
+		t.Fatalf("pingRegistryPrefix() error = %v", err)
+	}
+	if client.key != "/registry/" {
+		t.Fatalf("health key = %q, want /registry/", client.key)
+	}
 }
 
 func TestEtcdResolverDecodesRegisteredInstance(t *testing.T) {
@@ -28,7 +41,7 @@ func TestEtcdResolverDecodesRegisteredInstance(t *testing.T) {
 		t.Fatal(err)
 	}
 	resolver := &etcdResolver{
-		client: resolverClientStub{response: &clientv3.GetResponse{Kvs: []*mvccpb.KeyValue{{Value: encoded}}}},
+		client: &resolverClientStub{response: &clientv3.GetResponse{Kvs: []*mvccpb.KeyValue{{Value: encoded}}}},
 		prefix: "/registry", timeout: time.Second,
 	}
 	result, err := resolver.Resolve(context.Background(), "knowledge-core.identity")
@@ -45,7 +58,7 @@ func TestEtcdResolverDecodesRegisteredInstance(t *testing.T) {
 
 func TestEtcdResolverRejectsEmptyResult(t *testing.T) {
 	resolver := &etcdResolver{
-		client: resolverClientStub{response: &clientv3.GetResponse{}}, prefix: "/registry", timeout: time.Second,
+		client: &resolverClientStub{response: &clientv3.GetResponse{}}, prefix: "/registry", timeout: time.Second,
 	}
 	if _, err := resolver.Resolve(context.Background(), "knowledge-core.identity"); err == nil {
 		t.Fatal("Resolve() accepted an empty result")

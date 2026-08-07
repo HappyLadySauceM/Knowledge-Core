@@ -79,7 +79,7 @@ infrastructure.happyladysauce.local/clamav-client: "true"
 
 | 依赖 | dev 契约 |
 | --- | --- |
-| PostgreSQL | database `knowledge_core_dev`；roles `knowledge_core_dev_identity`、`knowledge_core_dev_knowledge`、`knowledge_core_dev_collaboration` |
+| PostgreSQL | database `knowledge_core_dev`；roles `knowledge_core_dev_identity`、`knowledge_core_dev_knowledge`、`knowledge_core_dev_collaboration`；三个 role 对该 database 有 `CONNECT,CREATE`，并分别拥有且只访问自己的同名 schema |
 | Redis | 项目 ACL 用户；key 前缀 `knowledge-core:development:*` |
 | Nacos | namespace ID `dev`；group `KNOWLEDGE_CORE`；四个只读 service user |
 | NATS | account `KC_DEV`；user `knowledge-core-dev`；密码来自平台生成文件，不复制 admin 密码 |
@@ -101,7 +101,12 @@ collaboration.dynamic.yaml
 ```
 
 每个服务使用独立 Nacos reader、`KNOWLEDGE_CORE_NACOS_KEY_ID` 和 32-byte
-AES-256 KEK。动态文档通过 `configctl` 验证、加密和发布，明文文档与 KEK 均不入库。
+AES-256 KEK。动态文档通过 `configctl encrypt` 验证并加密，明文文档与 KEK 均不入库。
+Nacos `3.2.3` 的管理发布接口是 `POST /nacos/v3/admin/cs/config`；表单字段必须使用
+`dataId`、`groupName`、`namespaceId`、`content` 和 `type=json`。其中 `groupName` 是 v3
+对旧 `group` 字段的替代。请求必须同时携带管理员登录得到的 Bearer token 和
+`accessToken`，并严格校验响应为 `{"code":0,"data":true}`。运行时四个 reader 只保留
+读取权限，不能使用平台管理员账号。
 
 ## 5. 外部 Secret 和信任链
 
@@ -146,9 +151,11 @@ Secret 应使用 SOPS/age 管理。age 私钥只进入 `argocd/argocd-sops-age` 
 | ConfigMap `knowledge-core-harbor-ca` | `ca.crt` |
 | ConfigMap `knowledge-core-ci-proxy` | Workflow 的大小写 `HTTP(S)_PROXY`/`NO_PROXY` 环境 |
 
-GitHub App 需安装到 Knowledge-Core 和 `k3s-home-deploy`，最小权限为 source
-contents read、commit statuses write、pull requests write、GitOps contents write。
-不要授予 administration 权限。
+GitHub App 需安装到 Knowledge-Core 和 `k3s-home-deploy`。Knowledge-Core 需要
+contents read/write 与 commit statuses read/write，GitOps 仓库需要 contents
+read/write；不再需要 pull requests 权限，也不要授予 administration 权限。`main`
+保护规则只允许该 App 在 `knowledge-core/smoke` 成功后执行非 force fast-forward，
+同时禁止开发者直接 push、force-push 和删除。
 
 当前单节点集群的 GitHub 出口通过 `knowledge-core-ci-proxy` Deployment 桥接：受限
 host-network 容器只监听 CNI 网关 `10.42.0.1:10992`，并转发到节点既有的
@@ -207,39 +214,51 @@ Trivy 扫描通过 template-level mutex 串行访问共享 `/cache/trivy`；首�
 原因和到期日。当前 `CVE-2026-41602` 只影响未被 Gateway 调用的 `TFramedTransport`；
 `govulncheck ./services/gateway/...` 已验证漏洞符号不可达，而固定的 Hertz/thriftgo 生成链仍依赖
 pre-context Thrift API。该例外在 `2026-11-06` 到期，CI 使用 `--show-suppressed` 保留扫描证据。
-Cosign sign/attest 容器继续使用只读 root filesystem，并把 `HOME` 指向独立的 `/tmp` emptyDir；
+Cosign sign 容器继续使用只读 root filesystem，并把 `HOME` 指向独立的 `/tmp` emptyDir；
 Cosign v3 因而可以写入 Sigstore TUF 元数据，而不会要求可写镜像层或扩大容器权限。
 
-## 7. 完整 CI 流程
+## 7. 完整 CI/CD 流程
 
 ```text
-push dev 或 push vX.Y.Z
+push dev
   -> GitHub source webhook
   -> hooks.happyladysauce.cn/events/knowledge-core
   -> Higress -> Argo Events EventSource -> NATS KC_CI EventBus
-  -> Sensor 校验 repository/ref 并创建 Workflow
-  -> Node interop -> Go CI/race -> Rust CI/真实依赖 -> 双向 interop
+  -> Sensor 只接受 refs/heads/dev，并以 mode=release 创建 Workflow
+  -> Node、Go CI/race、Rust CI/真实依赖并行
+  -> Go/Rust 双向 interop
   -> ref CAS 校验
-  -> rootless BuildKit 构建并推送五个镜像
-  -> 收集 digest -> Trivy -> SPDX SBOM -> Cosign sign/attest
-  -> GitOps base + overlay/dev digest commit
-  -> Argo CD refresh/sync knowledge-core-dev
+  -> rootless BuildKit 构建并推送四个 SHA tag 镜像
+  -> 收集 digest -> 单 Pod 顺序 Trivy 扫描
+  -> GitOps base + overlay/dev digest CAS commit
+  -> 强制 Argo CD refresh，等待精确 GitOps revision Synced/Healthy
+  -> 校验四个 Deployment 使用预期 digest
+  -> dev readiness + public documents 冒烟
+  -> 冒烟失败时仅在 GitOps main 仍指向本次提交时创建 revert
+  -> 冒烟成功后 Cosign 对四个 digest 签名
+  -> compare-and-swap fast-forward Knowledge-Core main 到同一 dev SHA
+  -> 从 VERSION 的 major.minor 自动选择下一个 patch 版本
+  -> 为四个 Harbor digest 创建 vX.Y.Z tag
+  -> 创建同一 SHA 的 Git tag 和 GitHub Release
 ```
 
 关键规则：
 
-- 手工 Workflow 的 `promotion-enabled` 默认是 `"false"`，只验证不改 GitOps/PR。
-- Sensor 触发时显式设置 `promotion-enabled="true"`。
-- 只接受 `refs/heads/dev` 和 `refs/tags/vX.Y.Z`；tag commit 必须可从 `main` 到达。
-- dev 与 SemVer tag 都更新唯一的 `Knowledge-Core/overlay/dev`。
-- 只有 `refs/heads/dev` 创建或复用 `dev -> main` PR，并启用 merge-commit auto-merge。
-- `dev == main` 时 source promotion 成功退出，不创建空 PR。
-- 构建开始和结束写 GitHub status context `knowledge-core/ci`，不写不可访问的 Argo UI URL。
+- Workflow 参数只有 `mode=verify|release`。手工回退默认 `verify`，执行全部质量门禁、构建和
+  扫描，但不修改 GitOps、`main` 或 release；Sensor 固定使用 `release`。
+- source ref 只接受 `refs/heads/dev`，每次写操作前重新校验 ref 仍指向目标 SHA。
+- `VERSION` 只保存 `major.minor`，例如 `0.1`；CI 在已存在 `v0.1.*` 中选择下一个 patch。
+- 构建开始和结束写 `knowledge-core/ci`；部署阶段独立写
+  `knowledge-core/smoke`。两者都不写集群内不可访问的 Argo UI URL。
 - RustSec 数据库拉取有三次、每次 120 秒的硬上限；失败重试前清理 cargo-deny 留下的半成品数据库目录，成功后 `cargo deny` 只离线读取该缓存。
-- GitOps push 使用三次 compare-and-swap 重试；失败时不直接修改集群 Deployment。
+- GitOps push 使用三次 compare-and-swap 重试；失败时不直接修改集群 Deployment。回滚同样
+  检查当前 GitOps revision 和父提交，其他提交已经推进时拒绝覆盖。
+- `main` 更新使用 GitHub refs API 且 `force=false`，只允许 `main..dev` 为 `ahead`；发生分叉、
+  dev 已推进或版本 tag 冲突时立即失败。
 
-五个构建产物为 `gateway`、`identity`、`knowledge`、`collaboration` 和
-`configctl`。只有前四个写入 Argo CD overlay；所有引用均使用 digest，不使用 mutable tag。
+构建产物只有 `gateway`、`identity`、`knowledge` 和 `collaboration`。部署清单始终使用
+digest；SHA tag 用于构建追踪，成功发布后额外创建版本 tag。`configctl` 是运维工具，不发布
+为服务镜像；精简流水线不再生成 SBOM 或 attestation。
 
 ## 8. GitHub source webhook
 
@@ -258,27 +277,30 @@ push dev 或 push vX.Y.Z
 `/events/knowledge-core`。Secret 创建后把 EventSource `active` 改为 `true`，重新
 apply `deploy/ci`；先用 GitHub redelivery 验证 2xx 和 HMAC 拒绝路径。
 
-切换期间 `.github/workflows/dev-to-main.yml` 仍是回退 gate。只有 k3s 端到端通过后，
-才能移除它的 dev push 重型 CI 触发，保留 `workflow_dispatch` 和 main 后安全
-fast-forward；不能让两套流水线同时推广同一个 dev SHA。
+`.github/workflows/dev-to-main.yml` 只保留 `workflow_dispatch` 手工回退，不响应 push，
+不会与 k3s 流水线重复推广同一个 dev SHA。手工回退始终等价于 `mode=verify`。
 
 ## 9. Argo CD Application
 
-首次 CI 已把四个零 digest 替换为真实 digest、外部 Secret 已就绪后，在 UI 创建：
+四个真实 digest、外部 Secret 和 SOPS age key 就绪后，应用仓库中已经提供
+`Knowledge-Core/argocd/project.yaml` 与 `application.yaml`；可以在 UI 使用等价参数，
+也可以直接 apply 这两个对象：
 
 | 字段 | 值 |
 | --- | --- |
 | Name | `knowledge-core-dev` |
-| Project | 建议独立 `knowledge-core` AppProject |
-| Repository URL | `https://github.com/HappyLadySauceM/k3s-home-deploy.git` |
+| Project | `knowledge-core` |
+| Repository URL | `git@github.com:HappyLadySauceM/k3s-home-deploy.git` |
 | Revision | `main` |
-| Path | `Knowledge-Core/overlay/dev` |
+| Path | `Knowledge-Core` |
 | Cluster | in-cluster |
 | Namespace | `knowledge-core-dev` |
 | Sync policy | Automated + Prune + Self Heal |
 
-overlay 自己创建 Namespace，不依赖 `CreateNamespace`。如果 overlay 引用 SOPS 文件，
-source 必须选择已安装的 `sops-v1.0` CMP；Argo CD 仓库凭据只需 read-only。
+根 Kustomization 只包含 `overlay/dev`，overlay 自己创建 Namespace，不依赖
+`CreateNamespace`。source 必须选择已安装的 `sops-v1.0` CMP；
+`Knowledge-Core/argocd/repository.sops.yaml` 保存只读 SSH deploy key，必须先由有 age
+私钥的受控环境解密并 apply，禁止在仓库留下 `repository.yaml`。
 
 ## 10. Argo CD webhook
 
@@ -313,12 +335,13 @@ https://hooks.happyladysauce.cn/api/webhook
 3. 创建 `knowledge-core-dev` 外部 Secret、trust bundle 和 Harbor pull Secret。
 4. 在 k3s BuildKit 构建 `ci-control`、`ci-go`、`ci-rust`，把真实 digest 写入 WorkflowTemplate。
 5. 创建 CI GitHub App/webhook、Cosign、test dependency Secret 和 Harbor robots。
-6. `kubectl apply -k deploy/ci`，保持 EventSource inactive，先手工运行无推广 Workflow。
-7. 验证 build、scan、SBOM、sign、attest 和单次 Rust release 编译。
-8. 初始化 GitOps `Knowledge-Core/base`、`overlay/dev`，完成首个真实 digest promotion。
-9. 创建 Argo CD Application，先人工 sync 验证，之后开启 automated/prune/self-heal。
-10. 配置两个 GitHub webhook，激活 EventSource，完成 dev push 端到端验收。
-11. k3s CI 稳定后关闭旧 GitHub Actions 的 dev push 重型入口。
+6. `kubectl apply -k deploy/ci`，先手工运行 `mode=verify` Workflow。
+7. 验证四镜像 build/push、单节点 scan、签名容器写目录和单次 Rust release 编译。
+8. 初始化 GitOps `Knowledge-Core/base`、`overlay/dev`，写入首组真实 digest，并提交推送。
+9. 应用只读 repository Secret、AppProject 和 Application，确认 automated/prune/self-heal。
+10. 配置两个 GitHub webhook，确认 EventSource `active: true`，完成一次 dev push release 验收。
+11. 验证 `knowledge-core/smoke` 后 `main` fast-forward、版本镜像 tag、Git tag 和 Release 均指向
+    同一 SHA；GitHub Actions 继续仅作为手工 `verify` 回退。
 
 ## 12. 验收命令
 
@@ -351,7 +374,7 @@ curl -fsSI https://minio.happyladysauce.local/
 端到端还必须核对：
 
 - Workflow 日志只有一次 project `cargo build --release`。
-- Harbor 五个 image、signature、attestation 和 SPDX SBOM 指向同一组 digest。
+- Harbor 四个 SHA tag、版本 tag 和 Cosign signature 指向同一组 digest。
 - GitOps commit 只包含 base 快照和 `overlay/dev` digest，没有 Secret 明文。
 - Argo CD sync 后四个 Pod ready，readiness 能证明外部依赖可用。
 - 错误 webhook HMAC 被拒绝，两个 GitHub delivery 都返回预期状态。
@@ -359,9 +382,10 @@ curl -fsSI https://minio.happyladysauce.local/
 
 ## 13. 回滚和边界
 
-- CI 任一步失败时不更新 GitOps、不创建 promotion PR。
-- 应用回滚只 revert GitOps 中上一组已签名 digest，禁止直接改 Deployment image。
-- webhook 故障时 Argo CD 可暂时轮询；source CI 使用手工无推广 Workflow，不得跳过 scan/sign/ref CAS。
+- build/scan 前失败时不更新 GitOps；GitOps 更新后的 wait 或 smoke 失败会执行受 CAS 保护的 revert。
+- 应用回滚只 revert 本次 GitOps promotion，禁止直接改 Deployment image；签名、main 或 release
+  失败发生在 smoke 之后，不回滚已经验证通过的 dev 部署，可幂等重跑同一 SHA。
+- webhook 故障时 Argo CD 可暂时轮询；source CI 使用手工 `mode=verify`，不得跳过 scan 或 ref CAS。
 - cache 损坏时只删除明确命名的 CI cache PVC，不得删除应用数据 PVC。
 - Secret、CA 或 SOPS age key 泄露后必须轮换凭据和受影响的历史密文。
 

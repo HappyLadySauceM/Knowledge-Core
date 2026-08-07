@@ -29,8 +29,9 @@ spec:
         value: HappyLadySauceM/Knowledge-Core
       - name: revision
       - name: ref
-      - name: promotion-enabled
-        value: "false"
+      - name: mode
+        value: verify
+        enum: [verify, release]
       - name: gitops-repository
         value: HappyLadySauceM/k3s-home-deploy
       - name: image-registry
@@ -92,7 +93,10 @@ spec:
     - name: ci
       dag:
         tasks:
+          - name: validate-mode
+            template: validate-mode
           - name: pending
+            depends: validate-mode.Succeeded
             template: github-status
             arguments:
               parameters:
@@ -107,16 +111,16 @@ spec:
             depends: checkout.Succeeded
             template: node
           - name: go
-            depends: node.Succeeded
+            depends: checkout.Succeeded
             template: go
           - name: rust
-            depends: go.Succeeded
+            depends: checkout.Succeeded
             template: rust
           - name: interoperability
-            depends: rust.Succeeded
+            depends: go.Succeeded && rust.Succeeded
             template: interoperability
           - name: current-ref
-            depends: interoperability.Succeeded
+            depends: node.Succeeded && interoperability.Succeeded
             template: verify-ref
           - name: build
             depends: current-ref.Succeeded
@@ -126,50 +130,84 @@ spec:
             template: collect
           - name: scan
             depends: collect.Succeeded
-            template: scan-image
-            arguments:
-              parameters:
-                - name: name
-                  value: "{{item.name}}"
-                - name: ref
-                  value: "{{item.ref}}"
-            withParam: "{{tasks.collect.outputs.parameters.images}}"
-          - name: sbom
+            template: scan-images
+          - name: smoke-pending
             depends: scan.Succeeded
-            template: sbom-image
+            when: "{{workflow.parameters.mode}} == release"
+            template: smoke-status
             arguments:
               parameters:
-                - name: name
-                  value: "{{item.name}}"
-                - name: ref
-                  value: "{{item.ref}}"
-            withParam: "{{tasks.collect.outputs.parameters.images}}"
+                - name: state
+                  value: pending
+                - name: description
+                  value: Knowledge Core dev deployment started
+          - name: promote-gitops
+            depends: smoke-pending.Succeeded
+            when: "{{workflow.parameters.mode}} == release"
+            template: promote-gitops
+          - name: wait-gitops
+            depends: promote-gitops.Succeeded
+            template: wait-gitops
+            arguments:
+              parameters:
+                - name: revision
+                  value: "{{tasks.promote-gitops.outputs.parameters.revision}}"
+          - name: smoke
+            depends: wait-gitops.Succeeded
+            template: smoke-dev
+          - name: rollback
+            depends: wait-gitops.Failed || wait-gitops.Errored || smoke.Failed || smoke.Errored
+            template: rollback-gitops
+            arguments:
+              parameters:
+                - name: previous-revision
+                  value: "{{tasks.promote-gitops.outputs.parameters.previous-revision}}"
+                - name: promoted-revision
+                  value: "{{tasks.promote-gitops.outputs.parameters.revision}}"
+                - name: changed
+                  value: "{{tasks.promote-gitops.outputs.parameters.changed}}"
           - name: sign
-            depends: sbom.Succeeded
+            depends: smoke.Succeeded
             template: sign-image
             arguments:
               parameters:
                 - name: ref
                   value: "{{item.ref}}"
             withParam: "{{tasks.collect.outputs.parameters.images}}"
-          - name: attest
+          - name: promote-main
             depends: sign.Succeeded
-            template: attest-image
-            arguments:
-              parameters:
-                - name: name
-                  value: "{{item.name}}"
-                - name: ref
-                  value: "{{item.ref}}"
-            withParam: "{{tasks.collect.outputs.parameters.images}}"
-          - name: promote-gitops
-            depends: attest.Succeeded
-            when: "{{workflow.parameters.promotion-enabled}} == true"
-            template: promote-gitops
-          - name: promote-dev
-            depends: promote-gitops.Succeeded
-            when: "{{workflow.parameters.ref}} == refs/heads/dev"
-            template: promote-dev
+            template: promote-main
+          - name: tag-images
+            depends: promote-main.Succeeded
+            template: tag-release-images
+          - name: publish-release
+            depends: tag-images.Succeeded
+            template: publish-release
+
+    - name: validate-mode
+      container:
+        image: "{{workflow.parameters.control-image}}"
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/sh", "-euc"]
+        args:
+          - |
+            case "{{workflow.parameters.mode}}" in
+              verify|release) ;;
+              *) printf 'unsupported workflow mode\n' >&2; exit 2 ;;
+            esac
+        resources:
+          requests: {cpu: 10m, memory: 16Mi}
+          limits: {cpu: 100m, memory: 64Mi}
+        securityContext: &restricted
+          runAsNonRoot: true
+          runAsUser: 65532
+          runAsGroup: 65532
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: ["ALL"]
+          seccompProfile:
+            type: RuntimeDefault
 
     - name: github-status
       inputs:
@@ -213,16 +251,7 @@ spec:
         resources:
           requests: {cpu: 20m, memory: 32Mi}
           limits: {cpu: 200m, memory: 128Mi}
-        securityContext: &restricted
-          runAsNonRoot: true
-          runAsUser: 65532
-          runAsGroup: 65532
-          allowPrivilegeEscalation: false
-          readOnlyRootFilesystem: true
-          capabilities:
-            drop: ["ALL"]
-          seccompProfile:
-            type: RuntimeDefault
+        securityContext: *restricted
 
     - name: checkout
       container:
@@ -604,32 +633,20 @@ spec:
           limits: {cpu: 200m, memory: 128Mi}
         securityContext: *restricted
 
-    - name: scan-image
+    - name: scan-images
       synchronization:
         mutexes:
           - name: knowledge-core-trivy-cache
-      inputs:
-        parameters:
-          - name: name
-          - name: ref
       container:
         image: aquasec/trivy@sha256:7cced7cae583819fc7806d4cbc0dbbc7cad18b99f7d3e235192e6da8c091045c
         imagePullPolicy: IfNotPresent
         envFrom: *proxy-env
-        command: ["trivy"]
-        args:
-          - image
-          - --exit-code=1
-          - --ignore-unfixed
-          - --severity=HIGH,CRITICAL
-          - --scanners=vuln
-          - --ignorefile=/workspace/source/.trivyignore.yaml
-          - --show-suppressed
-          - "{{inputs.parameters.ref}}"
+        command: ["/bin/sh", "/workspace/source/scripts/ci/scan-images.sh"]
         env:
           - {name: HOME, value: /tmp}
           - {name: DOCKER_CONFIG, value: /secrets/harbor}
           - {name: TRIVY_CACHE_DIR, value: /cache/trivy}
+          - {name: IMAGE_MAP_FILE, value: /workspace/release/images.env}
           - {name: SSL_CERT_DIR, value: "/etc/ssl/certs:/etc/knowledge-core/harbor"}
         volumeMounts:
           - {name: workspace, mountPath: /workspace, readOnly: true}
@@ -644,37 +661,6 @@ spec:
       volumes:
         - name: tmp
           emptyDir: {sizeLimit: 512Mi}
-
-    - name: sbom-image
-      inputs:
-        parameters:
-          - name: name
-          - name: ref
-      container:
-        image: anchore/syft@sha256:1288ea4c8b38767b4e620c1e312c8cb26b6e887a99b4f07ab6cd19fc6f225026
-        imagePullPolicy: IfNotPresent
-        envFrom: *proxy-env
-        command: ["/syft"]
-        args:
-          - "{{inputs.parameters.ref}}"
-          - -o
-          - "spdx-json=/workspace/release/{{inputs.parameters.name}}.spdx.json"
-        env:
-          - {name: HOME, value: /tmp}
-          - {name: DOCKER_CONFIG, value: /secrets/harbor}
-          - {name: SSL_CERT_DIR, value: "/etc/ssl/certs:/etc/knowledge-core/harbor"}
-        volumeMounts:
-          - {name: workspace, mountPath: /workspace}
-          - {name: harbor-auth, mountPath: /secrets/harbor, readOnly: true}
-          - {name: harbor-ca, mountPath: /etc/knowledge-core/harbor, readOnly: true}
-          - {name: tmp, mountPath: /tmp}
-        resources:
-          requests: {cpu: 50m, memory: 128Mi}
-          limits: {cpu: 500m, memory: 512Mi}
-        securityContext: *restricted
-      volumes:
-        - name: tmp
-          emptyDir: {sizeLimit: 128Mi}
 
     - name: sign-image
       inputs:
@@ -706,48 +692,18 @@ spec:
         - name: tmp
           emptyDir: {sizeLimit: 64Mi}
 
-    - name: attest-image
-      inputs:
-        parameters:
-          - name: name
-          - name: ref
-      container:
-        image: ghcr.io/sigstore/cosign/cosign@sha256:d91bc4e7e95e8d2f549c747a72dc174f90579e410a1695f57f686674f84ce849
-        imagePullPolicy: IfNotPresent
-        envFrom: *proxy-env
-        command: ["/ko-app/cosign"]
-        args:
-          - attest
-          - --yes
-          - --key
-          - /secrets/cosign/cosign.key
-          - --type
-          - spdxjson
-          - --predicate
-          - "/workspace/release/{{inputs.parameters.name}}.spdx.json"
-          - "{{inputs.parameters.ref}}"
-        env:
-          - {name: HOME, value: /tmp}
-          - name: COSIGN_PASSWORD
-            valueFrom:
-              secretKeyRef: {name: knowledge-core-cosign, key: cosign.password}
-          - {name: DOCKER_CONFIG, value: /secrets/harbor}
-          - {name: SSL_CERT_DIR, value: "/etc/ssl/certs:/etc/knowledge-core/harbor"}
-        volumeMounts:
-          - {name: workspace, mountPath: /workspace}
-          - {name: harbor-auth, mountPath: /secrets/harbor, readOnly: true}
-          - {name: harbor-ca, mountPath: /etc/knowledge-core/harbor, readOnly: true}
-          - {name: cosign, mountPath: /secrets/cosign, readOnly: true}
-          - {name: tmp, mountPath: /tmp}
-        resources:
-          requests: {cpu: 20m, memory: 64Mi}
-          limits: {cpu: 250m, memory: 256Mi}
-        securityContext: *restricted
-      volumes:
-        - name: tmp
-          emptyDir: {sizeLimit: 64Mi}
-
     - name: promote-gitops
+      outputs:
+        parameters:
+          - name: previous-revision
+            valueFrom:
+              path: /workspace/release/gitops-previous-revision
+          - name: revision
+            valueFrom:
+              path: /workspace/release/gitops-revision
+          - name: changed
+            valueFrom:
+              path: /workspace/release/gitops-changed
       container:
         image: "{{workflow.parameters.control-image}}"
         imagePullPolicy: IfNotPresent
@@ -757,7 +713,7 @@ spec:
           - |
             token="$(/usr/local/lib/knowledge-core-ci/github-app-token.sh)"
             export GITHUB_TOKEN="$token"
-            /usr/local/lib/knowledge-core-ci/promote-gitops.sh
+            /workspace/source/scripts/ci/promote-gitops.sh
         env:
           - name: GITHUB_APP_ID
             valueFrom:
@@ -772,6 +728,7 @@ spec:
           - {name: GITOPS_REPOSITORY, value: "{{workflow.parameters.gitops-repository}}"}
           - {name: SOURCE_ROOT, value: /workspace/source}
           - {name: IMAGE_MAP_FILE, value: /workspace/release/images.env}
+          - {name: OUTPUT_ROOT, value: /workspace/release}
         volumeMounts:
           - {name: workspace, mountPath: /workspace}
           - {name: github-app, mountPath: /secrets/github, readOnly: true}
@@ -784,7 +741,11 @@ spec:
         - name: tmp
           emptyDir: {sizeLimit: 128Mi}
 
-    - name: promote-dev
+    - name: smoke-status
+      inputs:
+        parameters:
+          - name: state
+          - name: description
       container:
         image: "{{workflow.parameters.control-image}}"
         imagePullPolicy: IfNotPresent
@@ -794,14 +755,188 @@ spec:
           - |
             token="$(/usr/local/lib/knowledge-core-ci/github-app-token.sh)"
             export GITHUB_TOKEN="$token"
-            /usr/local/lib/knowledge-core-ci/promote-dev.sh
+            /workspace/source/scripts/ci/github-status.sh \
+              "{{inputs.parameters.state}}" \
+              "{{inputs.parameters.description}}" \
+              knowledge-core/smoke
         env: *github-env
         volumeMounts:
+          - {name: workspace, mountPath: /workspace}
           - {name: github-app, mountPath: /secrets/github, readOnly: true}
         resources:
           requests: {cpu: 20m, memory: 32Mi}
           limits: {cpu: 200m, memory: 128Mi}
         securityContext: *restricted
+
+    - name: wait-gitops
+      inputs:
+        parameters:
+          - name: revision
+      container:
+        image: "{{workflow.parameters.control-image}}"
+        imagePullPolicy: IfNotPresent
+        envFrom: *proxy-env
+        command: ["/workspace/source/scripts/ci/wait-gitops.sh"]
+        env:
+          - {name: GITOPS_REVISION, value: "{{inputs.parameters.revision}}"}
+          - {name: IMAGE_MAP_FILE, value: /workspace/release/images.env}
+        volumeMounts:
+          - {name: workspace, mountPath: /workspace}
+        resources:
+          requests: {cpu: 20m, memory: 32Mi}
+          limits: {cpu: 200m, memory: 128Mi}
+        securityContext: *restricted
+
+    - name: smoke-dev
+      container:
+        image: "{{workflow.parameters.control-image}}"
+        imagePullPolicy: IfNotPresent
+        envFrom: *proxy-env
+        command: ["/bin/bash", "-euo", "pipefail", "-c"]
+        args:
+          - |
+            token="$(/usr/local/lib/knowledge-core-ci/github-app-token.sh)"
+            export GITHUB_TOKEN="$token"
+            /workspace/source/scripts/ci/smoke-dev.sh
+        env: *github-env
+        volumeMounts:
+          - {name: workspace, mountPath: /workspace}
+          - {name: github-app, mountPath: /secrets/github, readOnly: true}
+          - {name: tmp, mountPath: /tmp}
+        resources:
+          requests: {cpu: 20m, memory: 32Mi}
+          limits: {cpu: 200m, memory: 128Mi}
+        securityContext: *restricted
+      volumes:
+        - name: tmp
+          emptyDir: {sizeLimit: 16Mi}
+
+    - name: rollback-gitops
+      inputs:
+        parameters:
+          - name: previous-revision
+          - name: promoted-revision
+          - name: changed
+      container:
+        image: "{{workflow.parameters.control-image}}"
+        imagePullPolicy: IfNotPresent
+        envFrom: *proxy-env
+        command: ["/bin/bash", "-euo", "pipefail", "-c"]
+        args:
+          - |
+            token="$(/usr/local/lib/knowledge-core-ci/github-app-token.sh)"
+            export GITHUB_TOKEN="$token"
+            /workspace/source/scripts/ci/rollback-gitops.sh
+        env:
+          - name: GITHUB_APP_ID
+            valueFrom:
+              secretKeyRef: {name: knowledge-core-github-app, key: app-id}
+          - name: GITHUB_APP_INSTALLATION_ID
+            valueFrom:
+              secretKeyRef: {name: knowledge-core-github-app, key: installation-id}
+          - {name: GITHUB_APP_PRIVATE_KEY_FILE, value: /secrets/github/private-key.pem}
+          - {name: GITOPS_REPOSITORY, value: "{{workflow.parameters.gitops-repository}}"}
+          - {name: PREVIOUS_REVISION, value: "{{inputs.parameters.previous-revision}}"}
+          - {name: PROMOTED_REVISION, value: "{{inputs.parameters.promoted-revision}}"}
+          - {name: GITOPS_CHANGED, value: "{{inputs.parameters.changed}}"}
+        volumeMounts:
+          - {name: workspace, mountPath: /workspace}
+          - {name: github-app, mountPath: /secrets/github, readOnly: true}
+          - {name: tmp, mountPath: /tmp}
+        resources:
+          requests: {cpu: 50m, memory: 64Mi}
+          limits: {cpu: 500m, memory: 256Mi}
+        securityContext: *restricted
+      volumes:
+        - name: tmp
+          emptyDir: {sizeLimit: 128Mi}
+
+    - name: promote-main
+      outputs:
+        parameters:
+          - name: version
+            valueFrom:
+              path: /workspace/release/version
+      container:
+        image: "{{workflow.parameters.control-image}}"
+        imagePullPolicy: IfNotPresent
+        envFrom: *proxy-env
+        command: ["/bin/bash", "-euo", "pipefail", "-c"]
+        args:
+          - |
+            token="$(/usr/local/lib/knowledge-core-ci/github-app-token.sh)"
+            export GITHUB_TOKEN="$token"
+            /workspace/source/scripts/ci/promote-main.sh
+        env:
+          - name: GITHUB_APP_ID
+            valueFrom:
+              secretKeyRef: {name: knowledge-core-github-app, key: app-id}
+          - name: GITHUB_APP_INSTALLATION_ID
+            valueFrom:
+              secretKeyRef: {name: knowledge-core-github-app, key: installation-id}
+          - {name: GITHUB_APP_PRIVATE_KEY_FILE, value: /secrets/github/private-key.pem}
+          - {name: GITHUB_REPOSITORY, value: "{{workflow.parameters.repository}}"}
+          - {name: GITHUB_SHA, value: "{{workflow.parameters.revision}}"}
+          - {name: GITHUB_REF, value: "{{workflow.parameters.ref}}"}
+          - {name: SOURCE_ROOT, value: /workspace/source}
+          - {name: OUTPUT_ROOT, value: /workspace/release}
+        volumeMounts:
+          - {name: workspace, mountPath: /workspace}
+          - {name: github-app, mountPath: /secrets/github, readOnly: true}
+        resources:
+          requests: {cpu: 20m, memory: 32Mi}
+          limits: {cpu: 200m, memory: 128Mi}
+        securityContext: *restricted
+
+    - name: tag-release-images
+      container:
+        image: "{{workflow.parameters.control-image}}"
+        imagePullPolicy: IfNotPresent
+        envFrom: *proxy-env
+        command: ["/workspace/source/scripts/ci/tag-release-images.sh"]
+        env:
+          - {name: IMAGE_MAP_FILE, value: /workspace/release/images.env}
+          - {name: VERSION_FILE, value: /workspace/release/version}
+          - {name: IMAGE_REGISTRY, value: "{{workflow.parameters.image-registry}}"}
+          - {name: DOCKER_CONFIG, value: /secrets/harbor}
+          - {name: SSL_CERT_DIR, value: "/etc/ssl/certs:/etc/knowledge-core/harbor"}
+        volumeMounts:
+          - {name: workspace, mountPath: /workspace}
+          - {name: harbor-auth, mountPath: /secrets/harbor, readOnly: true}
+          - {name: harbor-ca, mountPath: /etc/knowledge-core/harbor, readOnly: true}
+          - {name: tmp, mountPath: /tmp}
+        resources:
+          requests: {cpu: 20m, memory: 32Mi}
+          limits: {cpu: 200m, memory: 128Mi}
+        securityContext: *restricted
+      volumes:
+        - name: tmp
+          emptyDir: {sizeLimit: 64Mi}
+
+    - name: publish-release
+      container:
+        image: "{{workflow.parameters.control-image}}"
+        imagePullPolicy: IfNotPresent
+        envFrom: *proxy-env
+        command: ["/bin/bash", "-euo", "pipefail", "-c"]
+        args:
+          - |
+            token="$(/usr/local/lib/knowledge-core-ci/github-app-token.sh)"
+            export GITHUB_TOKEN="$token"
+            VERSION_FILE=/workspace/release/version \
+              /workspace/source/scripts/ci/publish-release.sh
+        env: *github-env
+        volumeMounts:
+          - {name: workspace, mountPath: /workspace}
+          - {name: github-app, mountPath: /secrets/github, readOnly: true}
+          - {name: tmp, mountPath: /tmp}
+        resources:
+          requests: {cpu: 20m, memory: 32Mi}
+          limits: {cpu: 200m, memory: 128Mi}
+        securityContext: *restricted
+      volumes:
+        - name: tmp
+          emptyDir: {sizeLimit: 16Mi}
 
     - name: final-status
       container:
@@ -819,6 +954,13 @@ spec:
             token="$(/usr/local/lib/knowledge-core-ci/github-app-token.sh)"
             export GITHUB_TOKEN="$token"
             /usr/local/lib/knowledge-core-ci/github-status.sh "$state" "$description"
+            if [[ "{{workflow.parameters.mode}}" == release && \
+                  "$state" != success && \
+                  ! -f /workspace/release/smoke-passed && \
+                  -x /workspace/source/scripts/ci/github-status.sh ]]; then
+              /workspace/source/scripts/ci/github-status.sh \
+                failure 'Knowledge Core dev smoke did not pass' knowledge-core/smoke
+            fi
         env:
           - name: GITHUB_APP_ID
             valueFrom:
@@ -830,6 +972,7 @@ spec:
           - {name: GITHUB_REPOSITORY, value: "{{workflow.parameters.repository}}"}
           - {name: GITHUB_SHA, value: "{{workflow.parameters.revision}}"}
         volumeMounts:
+          - {name: workspace, mountPath: /workspace}
           - {name: github-app, mountPath: /secrets/github, readOnly: true}
         resources:
           requests: {cpu: 20m, memory: 32Mi}

@@ -25,7 +25,7 @@ type ResolverResources struct {
 	Resolver discovery.Resolver
 
 	client    *clientv3.Client
-	endpoints []string
+	prefix    string
 	timeout   time.Duration
 	closeOnce sync.Once
 	closeErr  error
@@ -52,10 +52,10 @@ func OpenResolver(
 		timeout: opts.RequestTimeout,
 	}
 	resources := &ResolverResources{
-		Resolver:  resolver,
-		client:    client,
-		endpoints: append([]string(nil), opts.Endpoints...),
-		timeout:   opts.RequestTimeout,
+		Resolver: resolver,
+		client:   client,
+		prefix:   resolver.prefix,
+		timeout:  opts.RequestTimeout,
 	}
 	if err := resources.Ping(ctx); err != nil {
 		return nil, errors.Join(err, resources.Close())
@@ -76,20 +76,20 @@ func (r *ResolverResources) Ping(ctx context.Context) error {
 	if ctx == nil {
 		return errors.New("ping etcd resolver: context is required")
 	}
-	var joined error
-	for _, endpoint := range r.endpoints {
-		checkCtx, cancel := context.WithTimeout(ctx, r.timeout)
-		_, err := r.client.Status(checkCtx, endpoint)
-		cancel()
-		if err == nil {
-			return nil
-		}
-		joined = errors.Join(joined, fmt.Errorf("endpoint %q: %w", endpoint, err))
-		if ctx.Err() != nil {
-			break
-		}
+	if err := pingRegistryPrefix(ctx, r.client, r.prefix, r.timeout); err != nil {
+		return fmt.Errorf("ping etcd resolver: %w", err)
 	}
-	return fmt.Errorf("ping etcd resolver: %w", joined)
+	return nil
+}
+
+func pingRegistryPrefix(ctx context.Context, client resolverClient, prefix string, timeout time.Duration) error {
+	checkCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	key := strings.TrimRight(prefix, "/") + "/"
+	if _, err := client.Get(checkCtx, key, clientv3.WithPrefix(), clientv3.WithLimit(1)); err != nil {
+		return fmt.Errorf("read registry prefix: %w", err)
+	}
+	return nil
 }
 
 func (r *ResolverResources) Close() error {

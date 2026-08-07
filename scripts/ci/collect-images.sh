@@ -11,7 +11,7 @@ mkdir -p "$output_root"
 images='[]'
 : >"$output_root/images.env"
 
-for name in gateway identity knowledge collaboration configctl; do
+for name in gateway identity knowledge collaboration; do
     metadata="$metadata_root/$name.json"
     digest="$(jq -er '.["containerimage.digest"]' "$metadata")"
     if [[ ! "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then

@@ -67,4 +67,3 @@ build_image gateway docker/gateway/dockerfile
 build_image identity docker/identity/dockerfile
 build_image knowledge docker/knowledge/dockerfile
 build_image collaboration docker/collaboration/dockerfile
-build_image configctl docker/configctl/dockerfile

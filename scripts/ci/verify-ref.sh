@@ -8,13 +8,6 @@ set -euo pipefail
 
 case "$GITHUB_REF" in
     refs/heads/dev) reference=heads/dev ;;
-    refs/tags/*)
-        if [[ ! "$GITHUB_REF" =~ ^refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            printf 'release promotion requires a v-prefixed SemVer tag\n' >&2
-            exit 2
-        fi
-        reference="${GITHUB_REF#refs/}"
-        ;;
     *)
         printf 'unsupported GitHub ref: %s\n' "$GITHUB_REF" >&2
         exit 2
@@ -34,25 +27,3 @@ if [[ "$current" != "$GITHUB_SHA" ]]; then
     printf 'source ref is superseded: expected %s, found %s\n' "$GITHUB_SHA" "$current" >&2
     exit 75
 fi
-
-case "$GITHUB_REF" in
-    refs/heads/dev) ;;
-    refs/tags/*)
-        comparison="$(
-            curl --fail --silent --show-error \
-                --header 'Accept: application/vnd.github+json' \
-                --header "Authorization: Bearer ${GITHUB_TOKEN}" \
-                --header 'X-GitHub-Api-Version: 2022-11-28' \
-                "https://api.github.com/repos/${GITHUB_REPOSITORY}/compare/${GITHUB_SHA}...main" \
-                | jq -er '.status'
-        )"
-        if [[ "$comparison" != ahead && "$comparison" != identical ]]; then
-            printf 'release tag is not reachable from main\n' >&2
-            exit 75
-        fi
-        ;;
-    *)
-        printf 'unsupported GitHub ref: %s\n' "$GITHUB_REF" >&2
-        exit 2
-        ;;
-esac

@@ -68,6 +68,25 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
+  name: knowledge-core-ci-dev-smoke
+spec:
+  podSelector: {}
+  policyTypes: ["Egress"]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: knowledge-core-dev
+      ports:
+        - {protocol: TCP, port: 8080}
+        - {protocol: TCP, port: 8081}
+        - {protocol: TCP, port: 8082}
+        - {protocol: TCP, port: 8083}
+        - {protocol: TCP, port: 8084}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
   name: knowledge-core-ci-webhook
 spec:
   podSelector:

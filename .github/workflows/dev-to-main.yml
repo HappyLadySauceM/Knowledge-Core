@@ -1,40 +1,40 @@
-name: Dev to Main
+name: Manual CI Fallback
 
 on:
-  push:
-    branches:
-      - dev
-      - main
   workflow_dispatch:
+    inputs:
+      revision:
+        description: Git revision to verify without promotion
+        required: true
+        default: dev
+        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref == 'refs/heads/dev' }}
+  group: manual-ci-${{ inputs.revision }}
+  cancel-in-progress: false
 
 jobs:
   verify:
     name: verify
-    if: github.ref == 'refs/heads/dev'
     runs-on:
       group: Knowledge-Core CI
       labels: [self-hosted, Linux, X64]
     timeout-minutes: 45
-    permissions:
-      contents: read
     env:
       DOCKER_HOST: unix:///run/user/997/docker.sock
       GOPROXY: https://goproxy.cn,direct
     steps:
-      - name: Check out dev
+      - name: Check out requested revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ inputs.revision }}
           clean: true
           persist-credentials: false
 
-      - name: Run containerized CI
+      - name: Run containerized verification
         shell: bash
         env:
           KC_CI_CACHE_ROOT: ${{ runner.tool_cache }}/knowledge-core/container-cache
@@ -59,220 +59,3 @@ jobs:
           fi
           git reset --hard HEAD
           git clean -ffdx
-
-  promote:
-    name: Promote dev to main
-    if: github.ref == 'refs/heads/dev' && needs.verify.result == 'success'
-    needs: verify
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: write
-      pull-requests: write
-    env:
-      GH_TOKEN: ${{ github.token }}
-    steps:
-      - name: Create or reuse the promotion pull request
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          repository_owner="${GITHUB_REPOSITORY%%/*}"
-          promotion_head_oid="$GITHUB_SHA"
-          open_prs="$(
-            gh api --method GET "repos/${GITHUB_REPOSITORY}/pulls" \
-              -f state=open \
-              -f base=main \
-              -f head="${repository_owner}:dev"
-          )"
-          pr_count="$(jq 'length' <<< "$open_prs")"
-
-          if (( pr_count > 1 )); then
-            echo "::error title=Ambiguous promotion PRs::Found ${pr_count} open dev-to-main pull requests."
-            exit 1
-          fi
-
-          if (( pr_count == 0 )); then
-            current_dev_oid="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/dev" --jq '.object.sha')"
-            if [[ "$current_dev_oid" != "$promotion_head_oid" ]]; then
-              echo "::warning title=Promotion superseded::dev advanced after this workflow started; a newer workflow will promote it."
-              exit 0
-            fi
-
-            closed_prs="$(
-              gh api --method GET "repos/${GITHUB_REPOSITORY}/pulls" \
-                -f state=closed \
-                -f base=main \
-                -f head="${repository_owner}:dev" \
-                -f sort=updated \
-                -f direction=desc \
-                -F per_page=20
-            )"
-            pr_number="$(
-              jq -r --arg head "$promotion_head_oid" \
-                '[.[] | select(.merged_at != null and .head.sha == $head)][0].number // empty' \
-                <<< "$closed_prs"
-            )"
-
-            if [[ -z "$pr_number" ]]; then
-              ahead_by="$(gh api "repos/${GITHUB_REPOSITORY}/compare/main...dev" --jq '.ahead_by')"
-              if (( ahead_by == 0 )); then
-                echo "dev has no commits to promote to main."
-                exit 0
-              fi
-
-              gh pr create \
-                --repo "$GITHUB_REPOSITORY" \
-                --base main \
-                --head dev \
-                --title "chore: promote dev to main" \
-                --body "Automated promotion of the verified dev branch to main."
-              open_prs="$(
-                gh api --method GET "repos/${GITHUB_REPOSITORY}/pulls" \
-                  -f state=open \
-                  -f base=main \
-                  -f head="${repository_owner}:dev"
-              )"
-            fi
-          fi
-
-          if [[ -z "${pr_number:-}" ]]; then
-            pr_number="$(jq -r '.[0].number' <<< "$open_prs")"
-          fi
-
-          pr_head_oid="$(
-            gh api "repos/${GITHUB_REPOSITORY}/pulls/${pr_number}" --jq '.head.sha'
-          )"
-          if [[ "$pr_head_oid" != "$promotion_head_oid" ]]; then
-            echo "::warning title=Promotion superseded::Pull request #${pr_number} now points to a newer dev commit; a newer workflow will handle it."
-            exit 0
-          fi
-
-          pr_state="$(
-            gh pr view "$pr_number" \
-              --repo "$GITHUB_REPOSITORY" \
-              --json state \
-              --jq '.state'
-          )"
-          if [[ "$pr_state" != "MERGED" ]]; then
-            auto_merge_method="$(
-              gh pr view "$pr_number" \
-                --repo "$GITHUB_REPOSITORY" \
-                --json autoMergeRequest \
-                --jq '.autoMergeRequest.mergeMethod // empty'
-            )"
-            if [[ "$auto_merge_method" == "MERGE" ]]; then
-              echo "Pull request #${pr_number} already has merge-commit auto-merge enabled."
-            else
-              if ! merge_output="$(
-                gh pr merge "$pr_number" \
-                  --repo "$GITHUB_REPOSITORY" \
-                  --auto \
-                  --merge 2>&1
-              )"; then
-                pr_state="$(
-                  gh pr view "$pr_number" \
-                    --repo "$GITHUB_REPOSITORY" \
-                    --json state \
-                    --jq '.state'
-                )"
-                if [[ "$pr_state" != "MERGED" ]]; then
-                  echo "$merge_output" >&2
-                  exit 1
-                fi
-              fi
-            fi
-          fi
-
-          merge_oid=""
-          poll_deadline=$((SECONDS + 210))
-          while (( SECONDS < poll_deadline )); do
-            pr_snapshot="$(
-              gh pr view "$pr_number" \
-                --repo "$GITHUB_REPOSITORY" \
-                --json state,mergeCommit
-            )"
-            pr_state="$(jq -r '.state' <<< "$pr_snapshot")"
-            if [[ "$pr_state" == "MERGED" ]]; then
-              merge_oid="$(jq -r '.mergeCommit.oid // empty' <<< "$pr_snapshot")"
-              break
-            fi
-            if [[ "$pr_state" == "CLOSED" ]]; then
-              echo "::error title=Promotion closed::Pull request #${pr_number} closed without merging."
-              exit 1
-            fi
-            sleep 5
-          done
-
-          if [[ -z "$merge_oid" ]]; then
-            echo "::error title=Promotion timed out::Pull request #${pr_number} did not merge within 210 seconds."
-            exit 1
-          fi
-
-          current_dev_oid="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/dev" --jq '.object.sha')"
-          if [[ "$current_dev_oid" == "$merge_oid" ]]; then
-            echo "dev is already synchronized with merge commit ${merge_oid}."
-            exit 0
-          fi
-          if [[ "$current_dev_oid" != "$promotion_head_oid" ]]; then
-            echo "::warning title=dev synchronization skipped::dev gained commits while pull request #${pr_number} was merging; refusing to overwrite them."
-            exit 0
-          fi
-
-          comparison_status="$(
-            gh api "repos/${GITHUB_REPOSITORY}/compare/${current_dev_oid}...${merge_oid}" --jq '.status'
-          )"
-          if [[ "$comparison_status" != "ahead" && "$comparison_status" != "identical" ]]; then
-            echo "::warning title=dev synchronization skipped::dev is not an ancestor of merge commit ${merge_oid}; refusing a non-fast-forward update."
-            exit 0
-          fi
-
-          if ! update_output="$(
-            gh api --method PATCH "repos/${GITHUB_REPOSITORY}/git/refs/heads/dev" \
-              -f sha="$merge_oid" \
-              -F force=false 2>&1
-          )"; then
-            latest_dev_oid="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/dev" --jq '.object.sha')"
-            if [[ "$latest_dev_oid" != "$current_dev_oid" ]]; then
-              echo "::warning title=dev synchronization skipped::dev changed during the fast-forward attempt; no commits were overwritten."
-              exit 0
-            fi
-            echo "$update_output" >&2
-            exit 1
-          fi
-
-          echo "Fast-forwarded dev to merge commit ${merge_oid}."
-
-  sync-dev:
-    name: Fast-forward dev after main updates
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: write
-    steps:
-      - name: Check out main
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: main
-          fetch-depth: 0
-
-      - name: Fast-forward dev when safe
-        shell: bash
-        run: |
-          set -euo pipefail
-          git fetch --no-tags origin \
-            refs/heads/main:refs/remotes/origin/main \
-            refs/heads/dev:refs/remotes/origin/dev
-
-          if ! git merge-base --is-ancestor origin/dev origin/main; then
-            echo "::warning title=dev synchronization skipped::origin/dev is not an ancestor of origin/main; refusing to overwrite a diverged dev branch."
-            exit 0
-          fi
-
-          if [[ "$(git rev-parse origin/dev)" == "$(git rev-parse origin/main)" ]]; then
-            echo "dev is already synchronized with main."
-            exit 0
-          fi
-
-          git push origin refs/remotes/origin/main:refs/heads/dev

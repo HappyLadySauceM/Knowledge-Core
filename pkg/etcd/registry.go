@@ -21,7 +21,6 @@ type Resources struct {
 	HealthClient *clientv3.Client
 
 	registry  *etcdRegistry
-	endpoints []string
 	timeout   time.Duration
 	closeOnce sync.Once
 	closeErr  error
@@ -67,7 +66,6 @@ func newResources(client *clientv3.Client, opts option.EtcdOptions) (*Resources,
 		Registry:     guarded,
 		HealthClient: client,
 		registry:     delegate,
-		endpoints:    append([]string(nil), opts.Endpoints...),
 		timeout:      opts.RequestTimeout,
 	}, nil
 }
@@ -106,24 +104,13 @@ func (r *Resources) Ping(ctx context.Context) error {
 	if r.HealthClient == nil {
 		return errors.New("ping etcd: health client is nil")
 	}
-	var pingErrors error
-	for _, endpoint := range r.endpoints {
-		pingCtx, cancel := context.WithTimeout(ctx, r.timeout)
-		if _, err := r.HealthClient.Status(pingCtx, endpoint); err == nil {
-			cancel()
-			if err := r.registry.healthError(); err != nil {
-				return fmt.Errorf("ping etcd: registry is unhealthy: %w", err)
-			}
-			return nil
-		} else {
-			pingErrors = errors.Join(pingErrors, fmt.Errorf("endpoint %q: %w", endpoint, err))
-		}
-		cancel()
-		if ctx.Err() != nil {
-			break
-		}
+	if err := pingRegistryPrefix(ctx, r.HealthClient, r.registry.prefix, r.timeout); err != nil {
+		return fmt.Errorf("ping etcd: %w", err)
 	}
-	return fmt.Errorf("ping etcd: %w", pingErrors)
+	if err := r.registry.healthError(); err != nil {
+		return fmt.Errorf("ping etcd: registry is unhealthy: %w", err)
+	}
+	return nil
 }
 
 func (r *Resources) Close() error {

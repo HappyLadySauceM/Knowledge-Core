@@ -7,6 +7,7 @@ set -euo pipefail
 
 state="${1:?status state is required}"
 description="${2:-Knowledge Core CI ${state}}"
+context="${3:-knowledge-core/ci}"
 case "$state" in
     error | failure | pending | success) ;;
     *)
@@ -14,11 +15,18 @@ case "$state" in
         exit 2
         ;;
 esac
+case "$context" in
+    knowledge-core/ci | knowledge-core/smoke) ;;
+    *)
+        printf 'unsupported GitHub commit status context: %s\n' "$context" >&2
+        exit 2
+        ;;
+esac
 
 payload="$(
     jq -cn \
         --arg state "$state" \
-        --arg context 'knowledge-core/ci' \
+        --arg context "$context" \
         --arg description "$description" \
         --arg target_url "${GITHUB_TARGET_URL:-}" \
         '{state:$state,context:$context,description:$description}

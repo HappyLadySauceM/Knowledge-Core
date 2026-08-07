@@ -8,12 +8,14 @@ set -euo pipefail
 : "${GITOPS_REPOSITORY:?GITOPS_REPOSITORY is required}"
 : "${SOURCE_ROOT:?SOURCE_ROOT is required}"
 : "${IMAGE_MAP_FILE:?IMAGE_MAP_FILE is required}"
+: "${OUTPUT_ROOT:?OUTPUT_ROOT is required}"
 
 if [[ ! -d "$SOURCE_ROOT/deploy/base" || ! -r "$IMAGE_MAP_FILE" ]]; then
     printf 'source base and image map are required\n' >&2
     exit 2
 fi
 
+mkdir -p "$OUTPUT_ROOT"
 basic_auth="$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | openssl base64 -A)"
 export GIT_TERMINAL_PROMPT=0
 export GIT_CONFIG_COUNT=4
@@ -27,7 +29,7 @@ export GIT_CONFIG_KEY_3=http.lowSpeedTime
 export GIT_CONFIG_VALUE_3=30
 
 for attempt in 1 2 3; do
-    /usr/local/lib/knowledge-core-ci/verify-ref.sh
+    "$SOURCE_ROOT/scripts/ci/verify-ref.sh"
     worktree="$(mktemp -d)"
     cleanup() {
         case "$worktree" in
@@ -47,6 +49,8 @@ for attempt in 1 2 3; do
         printf 'GitOps clone failed after three attempts\n' >&2
         exit 1
     fi
+
+    previous_revision="$(git -C "$worktree/repository" rev-parse HEAD)"
     target_root="$worktree/repository/Knowledge-Core"
     rm -rf -- "$target_root/base"
     mkdir -p "$target_root"
@@ -68,9 +72,6 @@ for attempt in 1 2 3; do
         if [[ ! "$reference" =~ /${image_name}@sha256:[0-9a-f]{64}$ ]]; then
             printf 'image mapping name does not match its reference: %s\n' "$name" >&2
             exit 2
-        fi
-        if [[ "$name" == knowledge-core-configctl ]]; then
-            continue
         fi
         case "$name" in
             knowledge-core-gateway | knowledge-core-identity | knowledge-core-knowledge | knowledge-core-collaboration) ;;
@@ -100,14 +101,22 @@ for attempt in 1 2 3; do
 
     git -C "$worktree/repository" add Knowledge-Core
     if git -C "$worktree/repository" diff --cached --quiet; then
+        printf '%s\n' "$previous_revision" >"$OUTPUT_ROOT/gitops-previous-revision"
+        printf '%s\n' "$previous_revision" >"$OUTPUT_ROOT/gitops-revision"
+        printf 'false\n' >"$OUTPUT_ROOT/gitops-changed"
         printf 'GitOps is already current for %s\n' "$GITHUB_SHA"
         exit 0
     fi
+
     git -C "$worktree/repository" \
         -c user.name='knowledge-core-ci[bot]' \
         -c user.email='knowledge-core-ci[bot]@users.noreply.github.com' \
         commit -m "deploy(dev): promote ${GITHUB_SHA}"
+    promoted_revision="$(git -C "$worktree/repository" rev-parse HEAD)"
     if timeout 120 git -C "$worktree/repository" push origin HEAD:main; then
+        printf '%s\n' "$previous_revision" >"$OUTPUT_ROOT/gitops-previous-revision"
+        printf '%s\n' "$promoted_revision" >"$OUTPUT_ROOT/gitops-revision"
+        printf 'true\n' >"$OUTPUT_ROOT/gitops-changed"
         exit 0
     fi
 
