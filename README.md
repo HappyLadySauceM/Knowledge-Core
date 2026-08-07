@@ -230,8 +230,9 @@ digest。每个服务使用独立 `knowledge-core-<service>-secrets` 保存业�
 
 仓库提供单一 Argo Workflows/Events 发布流水线、rootless BuildKit、持久缓存、Trivy、Cosign
 和 GitOps CAS 推广。手工 Workflow 默认 `mode=verify`，只执行门禁、构建和扫描；只有 dev push
-webhook 使用 `mode=release`，在 Argo CD dev 同步与冒烟成功后签名镜像，以非 force
-fast-forward 推进 `main`，再创建版本镜像 tag、Git tag 和 GitHub Release。GitHub Actions 只保留
+webhook 使用 `mode=release`，在 Argo CD dev 同步与冒烟成功后签名镜像，通过自动
+`dev -> main` PR 生成 merge commit，再创建版本镜像 tag、merge SHA 上的 Git tag 和 GitHub
+Release；发布全部成功后以非 force fast-forward 把 `dev` 对齐到 `main`。GitHub Actions 只保留
 手工回退入口，不响应 push。
 
 Argo CD repository Secret、AppProject 和 Application 由私有 GitOps 仓库声明。Application 使用
