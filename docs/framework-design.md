@@ -232,7 +232,7 @@ Go 服务日志统一使用 `log/slog` JSON 和 `pkg/log` 脱敏，trace 使用 
 
 ## 10. 生命周期与 readiness
 
-Go 长运行组件实现 `Name`、`Serve`、`Ready(context.Context)` 和 `Shutdown(context.Context)`。Runtime 并发启动组件，只有 listener、Kitex Etcd 注册和 worker readiness 均完成后才把进程设为 serving。
+Go 长运行组件实现 `Name`、`Serve`、`Ready(context.Context)` 和 `Shutdown(context.Context)`。Runtime 并发启动组件，只有 listener、Kitex Etcd 注册和 worker readiness 均完成后才把进程设为 serving。组件的长期运行 context 由组件自身持有并通过 `Shutdown` 取消，不继承只用于装配和 readiness 的 startup deadline。
 
 服务 readiness 证明必要依赖可用：
 

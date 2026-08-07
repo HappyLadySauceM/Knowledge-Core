@@ -12,8 +12,8 @@ spec:
   strategy:
     type: RollingUpdate
     rollingUpdate:
-      maxUnavailable: 0
-      maxSurge: 1
+      maxUnavailable: 1
+      maxSurge: 0
   selector:
     matchLabels:
       app.kubernetes.io/name: knowledge-core-gateway
@@ -115,8 +115,8 @@ spec:
   strategy:
     type: RollingUpdate
     rollingUpdate:
-      maxUnavailable: 0
-      maxSurge: 1
+      maxUnavailable: 1
+      maxSurge: 0
   selector:
     matchLabels:
       app.kubernetes.io/name: knowledge-core-identity
@@ -218,8 +218,8 @@ spec:
   strategy:
     type: RollingUpdate
     rollingUpdate:
-      maxUnavailable: 0
-      maxSurge: 1
+      maxUnavailable: 1
+      maxSurge: 0
   selector:
     matchLabels:
       app.kubernetes.io/name: knowledge-core-knowledge
@@ -321,8 +321,8 @@ spec:
   strategy:
     type: RollingUpdate
     rollingUpdate:
-      maxUnavailable: 0
-      maxSurge: 1
+      maxUnavailable: 1
+      maxSurge: 0
   selector:
     matchLabels:
       app.kubernetes.io/name: knowledge-core-collaboration

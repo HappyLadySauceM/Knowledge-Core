@@ -83,7 +83,9 @@ func New(
 	if err := options.Validate(); err != nil {
 		return nil, fmt.Errorf("create knowledge workers: %w", err)
 	}
-	runContext, cancel := context.WithCancel(ctx)
+	// Register is bounded by the application startup deadline. The worker owns
+	// its longer lifetime and is stopped explicitly through Shutdown.
+	runContext, cancel := context.WithCancel(context.WithoutCancel(ctx))
 	return &Worker{
 		options: options, repository: repository, objects: objects, scanner: scanner,
 		publisher: publisher, collaboration: collaboration, logger: logger, runContext: runContext,

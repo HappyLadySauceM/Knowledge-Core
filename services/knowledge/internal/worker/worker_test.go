@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
+	"log/slog"
 	"testing"
 	"time"
 
@@ -100,6 +102,68 @@ type publisherStub struct {
 	operationOrder *[]string
 }
 
+type lifecycleRepositoryStub struct {
+	claims      int
+	secondClaim chan struct{}
+}
+
+func (s *lifecycleRepositoryStub) ClaimOutbox(context.Context, int, time.Duration) ([]domain.OutboxMessage, error) {
+	s.claims++
+	if s.claims == 2 {
+		close(s.secondClaim)
+	}
+	return nil, nil
+}
+
+func (*lifecycleRepositoryStub) MarkOutboxPublished(context.Context, string) error { return nil }
+func (*lifecycleRepositoryStub) RetryOutbox(context.Context, string, time.Duration) error {
+	return nil
+}
+func (*lifecycleRepositoryStub) QueueExpiredUploads(context.Context, int) error { return nil }
+func (*lifecycleRepositoryStub) ClaimAttachmentJobs(context.Context, int, time.Duration) ([]domain.ScanJob, error) {
+	return nil, nil
+}
+func (*lifecycleRepositoryStub) MarkAttachmentReady(context.Context, string, string) error {
+	return nil
+}
+func (*lifecycleRepositoryStub) MarkAttachmentRejected(context.Context, string, string) error {
+	return nil
+}
+func (*lifecycleRepositoryStub) FinishAttachmentCleanup(context.Context, string, bool) error {
+	return nil
+}
+func (*lifecycleRepositoryStub) RetryAttachmentJob(context.Context, string, string, int) error {
+	return nil
+}
+func (*lifecycleRepositoryStub) ListPurgeCandidates(context.Context, int) ([]repository.PurgeCandidate, error) {
+	return nil, nil
+}
+func (*lifecycleRepositoryStub) PurgeDocument(context.Context, string) error { return nil }
+func (*lifecycleRepositoryStub) PurgeMaintenanceData(context.Context) error  { return nil }
+
+type lifecycleObjectStoreStub struct{}
+
+func (*lifecycleObjectStoreStub) OpenObject(context.Context, string) (io.ReadCloser, error) {
+	return nil, errors.New("unexpected OpenObject call")
+}
+func (*lifecycleObjectStoreStub) RemoveObject(context.Context, string) error { return nil }
+
+type lifecycleScannerStub struct{}
+
+func (*lifecycleScannerStub) Scan(context.Context, io.Reader) (domain.ScanResult, error) {
+	return domain.ScanResult{}, nil
+}
+
+type lifecyclePublisherStub struct{}
+
+func (*lifecyclePublisherStub) Publish(context.Context, natsresource.Message, natsresource.PublishOptions) error {
+	return nil
+}
+
+type lifecyclePurgerStub struct{}
+
+func (*lifecyclePurgerStub) PurgeDocument(context.Context, string) error { return nil }
+
 func (s *publisherStub) Publish(ctx context.Context, message natsresource.Message, options natsresource.PublishOptions) error {
 	message.Body = append([]byte(nil), message.Body...)
 	s.calls = append(s.calls, publishCall{ctx: ctx, message: message, options: options})
@@ -108,6 +172,53 @@ func (s *publisherStub) Publish(ctx context.Context, message natsresource.Messag
 }
 
 type outboxContextKey struct{}
+
+func TestWorkerLifetimeIsOwnedByShutdown(t *testing.T) {
+	startupCtx, cancelStartup := context.WithCancel(context.Background())
+	repository := &lifecycleRepositoryStub{secondClaim: make(chan struct{})}
+	worker, err := New(
+		startupCtx,
+		config.WorkerOptions{PollInterval: time.Millisecond, OperationTimeout: time.Second},
+		repository,
+		&lifecycleObjectStoreStub{},
+		&lifecycleScannerStub{},
+		&lifecyclePublisherStub{},
+		&lifecyclePurgerStub{},
+		slog.New(slog.NewTextHandler(io.Discard, nil)),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cancelStartup()
+
+	serveDone := make(chan error, 1)
+	go func() { serveDone <- worker.Serve() }()
+
+	waitCtx, cancelWait := context.WithTimeout(context.Background(), time.Second)
+	defer cancelWait()
+	if err := worker.Ready(waitCtx); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-repository.secondClaim:
+	case err := <-serveDone:
+		t.Fatalf("Serve() stopped with startup context: %v", err)
+	case <-waitCtx.Done():
+		t.Fatalf("worker did not continue polling: %v", waitCtx.Err())
+	}
+
+	if err := worker.Shutdown(waitCtx); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case err := <-serveDone:
+		if err != nil {
+			t.Fatalf("Serve() error = %v", err)
+		}
+	case <-waitCtx.Done():
+		t.Fatalf("Serve() did not stop: %v", waitCtx.Err())
+	}
+}
 
 func TestProcessOutboxMarksExactlyOnceAfterAcknowledgedPublish(t *testing.T) {
 	operationTimeout := 9 * time.Second
