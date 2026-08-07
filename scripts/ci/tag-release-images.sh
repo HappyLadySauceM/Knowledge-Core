@@ -4,6 +4,12 @@ set -euo pipefail
 : "${IMAGE_MAP_FILE:?IMAGE_MAP_FILE is required}"
 : "${VERSION_FILE:?VERSION_FILE is required}"
 : "${DOCKER_CONFIG:?DOCKER_CONFIG is required}"
+: "${HARBOR_CA_FILE:?HARBOR_CA_FILE is required}"
+
+if [[ "$HARBOR_CA_FILE" != /* || ! -f "$HARBOR_CA_FILE" || ! -r "$HARBOR_CA_FILE" ]]; then
+    printf 'HARBOR_CA_FILE must identify an absolute, readable regular file\n' >&2
+    exit 1
+fi
 
 version="$(<"$VERSION_FILE")"
 registry="${IMAGE_REGISTRY:-harbor.happyladysauce.local}"
@@ -21,6 +27,7 @@ for service in gateway identity knowledge collaboration; do
     source_headers="$work/${service}-source.headers"
     manifest="$work/${service}.manifest"
     curl --fail --silent --show-error \
+        --cacert "$HARBOR_CA_FILE" \
         --user "$auth" \
         --dump-header "$source_headers" \
         --output "$manifest" \
@@ -35,6 +42,7 @@ for service in gateway identity knowledge collaboration; do
 
     tag_headers="$work/${service}-tag.headers"
     status="$(curl --silent --show-error \
+        --cacert "$HARBOR_CA_FILE" \
         --user "$auth" \
         --dump-header "$tag_headers" \
         --output /dev/null \
@@ -56,6 +64,7 @@ for service in gateway identity knowledge collaboration; do
     fi
 
     curl --fail --silent --show-error \
+        --cacert "$HARBOR_CA_FILE" \
         --user "$auth" \
         --request PUT \
         --header "Content-Type: ${media_type}" \

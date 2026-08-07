@@ -268,8 +268,10 @@ GitHub source webhook 只接受 `refs/heads/dev` 并触发 release。Node、Go �
 interop，rootless BuildKit 只构建四个服务的 SHA tag 镜像，单节点 Trivy 扫描通过才以 CAS 更新
 GitOps digest。CI 等待 Argo CD 到达精确 GitOps revision 且四个 Deployment 使用预期 digest，
 完成 dev readiness/API 冒烟；失败时仅在 GitOps main 未继续推进时创建 revert。成功后依次签名
-digest、以 `force=false` fast-forward `main`、按根 `VERSION` 的 major.minor 生成下一个 patch
-版本，并创建 Harbor 版本 tag、Git tag 与 GitHub Release。整个发布不创建临时分支或 PR。
+digest、创建或复用唯一的 `dev -> main` PR，并以测试 SHA 作 CAS 执行 merge commit。CI 校验
+merge commit 的两个 parent 与 tree 后，按根 `VERSION` 的 major.minor 生成下一个 patch 版本，
+创建 Harbor 版本 tag、merge SHA 上的 Git tag 与 GitHub Release；全部成功后才以 `force=false`
+把 `dev` fast-forward 到 merge SHA。该 App 产生的 dev 对齐 push 被 Sensor 丢弃，不形成重复发布。
 
 Kubernetes 所有权分为三层：`k3s-home-deploy/k3s`（服务器 `/opt/k3s`）是公共基础设施真源；应用
 仓库 `deploy/base` 是环境无关工作负载真源；私有 `k3s-home-deploy/Knowledge-Core` 保存 CI 同步的
@@ -297,8 +299,9 @@ AppProject 和 Application 由 GitOps 仓库声明，Application 使用 `sops-v1
 - Identity repository/migration 没有针对真实 PostgreSQL 的自动化集成测试。
 - Knowledge repository/migration、事务、约束和 SQL cursor 没有针对真实 PostgreSQL 的自动化集成测试。
 - 当前 CI 构建并 smoke Rust Collaboration 镜像，但不启动完整 Compose 执行跨服务 WebSocket E2E。
-- 新的单一 release Workflow 尚未以真实 dev push 完成从状态上报、四镜像构建、GitOps 精确
-  revision 等待、dev smoke、main fast-forward 到版本发布的端到端运行。
+- 单一 release Workflow 已在真实 dev push 中验证状态上报、四镜像构建/扫描、GitOps 精确
+  revision 等待、dev smoke 和签名；PR merge commit、版本发布与 dev 对齐的新尾段仍需完成
+  首次端到端验收。
 - 应用 Secret、trust bundle、四份 Nacos 加密动态文档以及 Argo CD repository Secret、
   AppProject/Application 已配置，并已验证首次同步。
 - 当前只有 development overlay；单节点集群不作为 production 环境。

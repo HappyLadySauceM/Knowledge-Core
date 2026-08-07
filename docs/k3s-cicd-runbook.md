@@ -148,14 +148,15 @@ Secret 应使用 SOPS/age 管理。age 私钥只进入 `argocd/argocd-sops-age` 
 | Secret `knowledge-core-cosign` | `cosign.key`, `cosign.password`（由 Cosign Kubernetes keystore 生成） |
 | Secret `knowledge-core-ci-test-dependencies` | `postgres-password`，只供 Workflow sidecar 测试 |
 | Secret `knowledge-core-argo-events-nats` | `auth.yaml`，内容为 `KC_CI` username/password |
-| ConfigMap `knowledge-core-harbor-ca` | `ca.crt` |
+| ConfigMap `knowledge-core-harbor-ca` | `ca.crt`；release tag 步骤通过 `HARBOR_CA_FILE` 显式传给 curl，不依赖 OpenSSL hashed CA directory |
 | ConfigMap `knowledge-core-ci-proxy` | Workflow 的大小写 `HTTP(S)_PROXY`/`NO_PROXY` 环境 |
 
 GitHub App 需安装到 Knowledge-Core 和 `k3s-home-deploy`。Knowledge-Core 需要
-contents read/write 与 commit statuses read/write，GitOps 仓库需要 contents
-read/write；不再需要 pull requests 权限，也不要授予 administration 权限。`main`
-保护规则只允许该 App 在 `knowledge-core/smoke` 成功后执行非 force fast-forward，
-同时禁止开发者直接 push、force-push 和删除。
+contents read/write、pull requests read/write 与 commit statuses read/write，GitOps
+仓库需要 contents read/write；不要授予 administration 权限。`main` 保护规则要求
+`knowledge-core/smoke` 且只允许该 App 推进，禁止直接 push、force-push 和删除；仓库只
+启用 merge commit，禁用 squash/rebase 与 linear history，确保自动 `dev -> main` PR
+始终生成双父 merge commit。
 
 当前单节点集群的 GitHub 出口通过 `knowledge-core-ci-proxy` Deployment 桥接：受限
 host-network 容器只监听 CNI 网关 `10.42.0.1:10992`，并转发到节点既有的
@@ -236,10 +237,12 @@ push dev
   -> dev readiness + public documents 冒烟
   -> 冒烟失败时仅在 GitOps main 仍指向本次提交时创建 revert
   -> 冒烟成功后 Cosign 对四个 digest 签名
-  -> compare-and-swap fast-forward Knowledge-Core main 到同一 dev SHA
+  -> 创建或复用唯一的 dev -> main PR，以测试 SHA 作 CAS 执行 merge commit
+  -> 校验 merge commit 的 base/head/tree
   -> 从 VERSION 的 major.minor 自动选择下一个 patch 版本
   -> 为四个 Harbor digest 创建 vX.Y.Z tag
-  -> 创建同一 SHA 的 Git tag 和 GitHub Release
+  -> 在 merge SHA 创建 Git tag 和 GitHub Release
+  -> 发布全部成功后，非 force fast-forward dev 到 merge SHA
 ```
 
 关键规则：
@@ -253,8 +256,11 @@ push dev
 - RustSec 数据库拉取有三次、每次 120 秒的硬上限；失败重试前清理 cargo-deny 留下的半成品数据库目录，成功后 `cargo deny` 只离线读取该缓存。
 - GitOps push 使用三次 compare-and-swap 重试；失败时不直接修改集群 Deployment。回滚同样
   检查当前 GitOps revision 和父提交，其他提交已经推进时拒绝覆盖。
-- `main` 更新使用 GitHub refs API 且 `force=false`，只允许 `main..dev` 为 `ahead`；发生分叉、
-  dev 已推进或版本 tag 冲突时立即失败。
+- `main` 只能通过自动 PR 的 `merge` 方法推进；合并前后校验 head SHA、两个 parent、tree 和
+  `main`/`dev` ref。版本发布成功后才用 `force=false` 把 `dev` 对齐到 merge SHA，使 release
+  尾段失败时仍能幂等重跑同一 tested SHA。Sensor 丢弃该 GitHub
+  App 产生的 dev 对齐 push，避免同一发布形成第二条 Workflow；发生分叉、ref 漂移或版本
+  tag 冲突时立即失败。
 
 构建产物只有 `gateway`、`identity`、`knowledge` 和 `collaboration`。部署清单始终使用
 digest；SHA tag 用于构建追踪，成功发布后额外创建版本 tag。`configctl` 是运维工具，不发布
@@ -340,8 +346,9 @@ https://hooks.happyladysauce.cn/api/webhook
 8. 初始化 GitOps `Knowledge-Core/base`、`overlay/dev`，写入首组真实 digest，并提交推送。
 9. 应用只读 repository Secret、AppProject 和 Application，确认 automated/prune/self-heal。
 10. 配置两个 GitHub webhook，确认 EventSource `active: true`，完成一次 dev push release 验收。
-11. 验证 `knowledge-core/smoke` 后 `main` fast-forward、版本镜像 tag、Git tag 和 Release 均指向
-    同一 SHA；GitHub Actions 继续仅作为手工 `verify` 回退。
+11. 验证 `knowledge-core/smoke` 后自动 PR 生成双父 merge commit，版本镜像 tag、Git tag 和
+    Release 对应该 merge SHA，最后 `dev` 非 force fast-forward 到 `main`；GitHub Actions
+    继续仅作为手工 `verify` 回退。
 
 ## 12. 验收命令
 

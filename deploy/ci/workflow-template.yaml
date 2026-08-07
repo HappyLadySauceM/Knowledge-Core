@@ -183,6 +183,9 @@ spec:
           - name: publish-release
             depends: tag-images.Succeeded
             template: publish-release
+          - name: sync-dev
+            depends: publish-release.Succeeded
+            template: sync-dev
 
     - name: validate-mode
       container:
@@ -857,6 +860,9 @@ spec:
           - name: version
             valueFrom:
               path: /workspace/release/version
+          - name: release-sha
+            valueFrom:
+              path: /workspace/release/release-sha
       container:
         image: "{{workflow.parameters.control-image}}"
         imagePullPolicy: IfNotPresent
@@ -899,7 +905,7 @@ spec:
           - {name: VERSION_FILE, value: /workspace/release/version}
           - {name: IMAGE_REGISTRY, value: "{{workflow.parameters.image-registry}}"}
           - {name: DOCKER_CONFIG, value: /secrets/harbor}
-          - {name: SSL_CERT_DIR, value: "/etc/ssl/certs:/etc/knowledge-core/harbor"}
+          - {name: HARBOR_CA_FILE, value: /etc/knowledge-core/harbor/ca.crt}
         volumeMounts:
           - {name: workspace, mountPath: /workspace}
           - {name: harbor-auth, mountPath: /secrets/harbor, readOnly: true}
@@ -923,7 +929,8 @@ spec:
           - |
             token="$(/usr/local/lib/knowledge-core-ci/github-app-token.sh)"
             export GITHUB_TOKEN="$token"
-            VERSION_FILE=/workspace/release/version \
+            RELEASE_SHA_FILE=/workspace/release/release-sha \
+              VERSION_FILE=/workspace/release/version \
               bash /workspace/source/scripts/ci/publish-release.sh
         env: *github-env
         volumeMounts:
@@ -937,6 +944,27 @@ spec:
       volumes:
         - name: tmp
           emptyDir: {sizeLimit: 16Mi}
+
+    - name: sync-dev
+      container:
+        image: "{{workflow.parameters.control-image}}"
+        imagePullPolicy: IfNotPresent
+        envFrom: *proxy-env
+        command: ["/bin/bash", "-euo", "pipefail", "-c"]
+        args:
+          - |
+            token="$(/usr/local/lib/knowledge-core-ci/github-app-token.sh)"
+            export GITHUB_TOKEN="$token"
+            RELEASE_SHA_FILE=/workspace/release/release-sha \
+              bash /workspace/source/scripts/ci/sync-dev.sh
+        env: *github-env
+        volumeMounts:
+          - {name: workspace, mountPath: /workspace}
+          - {name: github-app, mountPath: /secrets/github, readOnly: true}
+        resources:
+          requests: {cpu: 20m, memory: 32Mi}
+          limits: {cpu: 200m, memory: 128Mi}
+        securityContext: *restricted
 
     - name: final-status
       container:

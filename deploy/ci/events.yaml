@@ -71,6 +71,10 @@ spec:
           - path: body.ref
             type: string
             value: ["refs/heads/dev"]
+          - path: body.sender.login
+            type: string
+            comparator: "!="
+            value: ['^knowledge-core-ci-happyladysaucem\[bot\]$']
   triggers:
     - template:
         name: knowledge-core-ci
