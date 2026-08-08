@@ -75,7 +75,7 @@ jobs:
           echo "KUBECONFIG=$RUNNER_TEMP/knowledge-core-release/kubeconfig" >> "$GITHUB_ENV"
       - name: Mint GitHub App token
         id: app-token
-        uses: actions/create-github-app-token@v1
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
           app-id: ${{ secrets.GH_APP_ID }}
           private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
@@ -106,7 +106,8 @@ jobs:
             if echo "$changes" | jq -e --arg service "$service" '.services | index($service)' >/dev/null; then
               result=$(docker run --rm --network host -v "$GITHUB_WORKSPACE:/workspace" -v "$socket:/var/run/docker.sock" \
                 -v "$DOCKER_CONFIG:/root/.docker:ro" -v "$HARBOR_CA_FILE:/etc/harbor-ca/ca.crt:ro" \
-                -e CI_PROJECT_CONFIG_JSON -e DOCKER_HOST=unix:///var/run/docker.sock -e DOCKER_CONFIG=/root/.docker -e SSL_CERT_FILE=/etc/harbor-ca/ca.crt -w /workspace "$CI_IMAGE" build --service "$service"
+                -e CI_PROJECT_CONFIG_JSON -e DOCKER_HOST=unix:///var/run/docker.sock -e DOCKER_CONFIG=/root/.docker \
+                -e BUILDX_CONFIG=/tmp/buildx -e SSL_CERT_FILE=/etc/harbor-ca/ca.crt -w /workspace "$CI_IMAGE" build --service "$service"
               )
               image_name=$(echo "$result" | jq -r '.kustomize_name')
               image_repo=$(echo "$result" | jq -r '.image' | cut -d: -f1)
