@@ -6,7 +6,7 @@
 
 - `dev` 是唯一开发分支。开始修改前先确认当前分支是 `dev`；若不是，应切换到已有的 `dev`，切换可能覆盖未提交改动时立即停止并报告。
 - 所有代码、测试、文档和修复都直接在 `dev` 上完成。禁止创建任何其他本地或远端开发分支，包括 `feature/*`、`fix/*`、`chore/*` 和 `release/*`。
-- `main` 对开发者只读：禁止在 `main` 上修改、提交或手工 push，也禁止绕过质量门禁。当前未配置自动 promotion；在重新建立 dev 部署冒烟、镜像签名和 compare-and-swap 门禁前，任何主体都不得推进 `main`。
+- `main` 对开发者只读：禁止在 `main` 上修改、提交或手工 push，也禁止绕过质量门禁。自动 promotion 只能由 `.github/workflows/pipeline.yml` 在 dev 部署冒烟、DeepSeek 摘要和 compare-and-swap 门禁全部通过后执行；本项目明确不启用镜像扫描和签名。
 - 禁止 force-push、改写或 rebase 共享的 `dev`、`main` 历史。未来的发布自动化只允许 fast-forward `main`，随后为同一 SHA 创建版本 tag 与 GitHub Release；发生分叉或 ref 已推进时必须停止，不得自行丢弃提交。
 - 已存在的历史 feature 分支不再使用，也不得删除、重命名或改写。
 - 提交只能落到 `dev`；是否执行 commit、push 或 GitHub 操作，仍须以当前任务的明确授权为准。

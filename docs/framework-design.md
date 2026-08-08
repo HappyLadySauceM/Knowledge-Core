@@ -268,9 +268,12 @@ go run ./scripts/idlguard compat-git <merge-base> idl
 
 `make ci` 同时执行 Go/Rust format、vet、golangci-lint、Clippy `-D warnings`、无缓存测试、release build、govulncheck、cargo-deny 和 Go/Rust 生成漂移检查。`make race`、`services/collaboration/interop` 的 `npm ci && npm run ci`、真实 PostgreSQL/Redis/NATS/Etcd 测试以及 production image smoke 仍需按改动范围显式执行。真实依赖测试设置 `COLLABORATION_TEST_REQUIRE_REAL_DEPENDENCIES=1`；缺少任一连接变量时必须失败，不能静默 skip。
 
-开发交付只保留 `dev`，`main` 对开发者保持只读。当前没有 GitHub Actions、自动镜像构建/扫描、
-GitOps 更新、dev 冒烟、镜像签名、`main` promotion、版本 tag 或 GitHub Release 流程；恢复自动发布前
-必须重新实现并验证这些门禁，不能把 Argo CD 自动同步等同于源代码发布验证。
+开发交付只保留 `dev`，`main` 对开发者保持只读。`.github/workflows/pipeline.yml` 调用通用
+Python CI 控制镜像，依次执行质量门禁、变更服务镜像构建、GitOps deploy 快照提交、Argo CD
+健康检查和 dev 冒烟；镜像使用 Harbor registry cache，只维护 `dev`/`previous` 临时 tag，
+不执行镜像扫描或签名。冒烟后由 DeepSeek 生成摘要，调用失败即停止；成功后仅 fast-forward
+`main`，再按服务创建独立版本 tag 与 GitHub Release。GitOps 与源码仓库均使用普通 fast-forward
+compare-and-swap push，检测到远端分支变化即停止。
 
 Kubernetes 所有权分为三层：`k3s-home-deploy/k3s`（服务器 `/opt/k3s`）是公共基础设施真源；
 应用仓库的 `deploy/<service>/base` 和 `deploy/<service>/overlay/dev` 由各服务自主
@@ -297,8 +300,10 @@ AppProject 和 Application 由 GitOps 仓库声明，Application 使用普通 Ku
 
 - Identity repository/migration 没有针对真实 PostgreSQL 的自动化集成测试。
 - Knowledge repository/migration、事务、约束和 SQL cursor 没有针对真实 PostgreSQL 的自动化集成测试。
-- 当前没有远端 CI；production image smoke 与完整 Compose 跨服务 WebSocket E2E 都不是自动门禁。
-- 当前没有自动 GitOps 更新、dev smoke、签名、`main` fast-forward、版本 tag 或 GitHub Release。
+- 远端 CI 已配置；production image smoke 与完整 Compose 跨服务 WebSocket E2E 仍不是自动门禁。
+- CI/CD workflow 已定义上述自动 GitOps 更新、dev smoke、`main` fast-forward、独立服务版本 tag
+  和 GitHub Release；首次启用前仍需在目标 GitHub、Harbor、Argo 和 runner 环境配置凭据并完成
+  端到端演练。
 - 应用 Secret、trust bundle、四份 Nacos 加密动态文档以及 Argo CD repository Secret、
   AppProject/Application 已配置，并已验证首次同步。
 - 当前只有 development overlay；单节点集群不作为 production 环境。

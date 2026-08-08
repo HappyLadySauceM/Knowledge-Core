@@ -248,7 +248,7 @@ services/collaboration/
 idl/rpc/v1/collaboration.thrift
 ```
 
-`docker/collaboration/dockerfile` 只封装调用方提供的 release artifact，最终以固定无特权 UID/GID `10001:10001` 运行且不包含 Rust toolchain、Node/npm。Compose 使用 RPC `:8883`、admin `:8084` 和 Etcd discovery，并已移除 `:8092`。
+`docker/collaboration/Dockerfile` 使用锁定 Rust 基础镜像构建 release artifact，最终以固定无特权 UID/GID `10001:10001` 运行且不包含 Rust toolchain、Node/npm。Compose 使用 RPC `:8883`、admin `:8084` 和 Etcd discovery，并已移除 `:8092`。
 
 当前没有远端自动 CI；提交前至少显式执行：
 

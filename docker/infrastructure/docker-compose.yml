@@ -87,7 +87,7 @@ services:
   identity:
     build:
       context: ../..
-      dockerfile: docker/identity/dockerfile
+      dockerfile: docker/identity/Dockerfile
     container_name: knowledge-core-identity
     environment:
       IDENTITY_POSTGRES_HOST: postgres
@@ -111,7 +111,7 @@ services:
   knowledge:
     build:
       context: ../..
-      dockerfile: docker/knowledge/dockerfile
+      dockerfile: docker/knowledge/Dockerfile
     container_name: knowledge-core-knowledge
     environment:
       KNOWLEDGE_POSTGRES_HOST: postgres
@@ -144,7 +144,7 @@ services:
   collaboration:
     build:
       context: ../..
-      dockerfile: docker/collaboration/dockerfile
+      dockerfile: docker/collaboration/Dockerfile
     container_name: knowledge-core-collaboration
     environment:
       COLLABORATION_ENVIRONMENT: development
@@ -182,7 +182,7 @@ services:
   gateway:
     build:
       context: ../..
-      dockerfile: docker/gateway/dockerfile
+      dockerfile: docker/gateway/Dockerfile
     container_name: knowledge-core-gateway
     environment:
       GATEWAY_REDIS_ADDRESS: redis:6379

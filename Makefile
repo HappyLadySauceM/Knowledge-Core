@@ -30,7 +30,7 @@ endif
 
 .DEFAULT_GOAL := help
 
-.PHONY: help fmt fmt-check vet lint line test race build vuln supply-chain tidy generate generate-check generate-go-check generate-rust-check check go-ci rust-ci ci
+.PHONY: help fmt fmt-check vet lint line test race build vuln supply-chain tidy generate generate-check generate-go-check generate-rust-check check go-ci rust-ci ci smoke-ci
 
 help:
 	@echo Knowledge Core development targets:
@@ -120,3 +120,7 @@ rust-ci:
 	$(CODEGEN_RUST_CHECK)
 
 ci: check generate-check
+
+smoke-ci:
+	@test -n "$(KC_SMOKE_BASE_URL)" || (echo "KC_SMOKE_BASE_URL is required" >&2; exit 1)
+	curl --fail --silent --show-error "$(KC_SMOKE_BASE_URL)/health/ready"

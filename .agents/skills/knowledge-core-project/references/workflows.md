@@ -6,9 +6,9 @@
 
 Status: `verified`
 
-dev is the sole development branch and main is read-only. Do not create other development branches, force-push, rebase shared history, or bypass gates. Automatic promotion is currently absent; main must not advance until dev deployment smoke tests, image signing, and compare-and-swap gates are restored. Future release automation may only fast-forward main and then create a version tag and GitHub Release for the same SHA, stopping on divergence or ref movement. Commit, push, and GitHub actions require explicit task authorization.
+A push to dev triggers the reusable Python CI control image from ci-templates. The pipeline runs make ci and the Collaboration Node interop checks under Node 24.18.1, detects affected services, prewarms pinned base images into Harbor, builds only affected images with Harbor registry cache, and publishes the dev tag without image scanning or signing. Before replacement it preserves the current dev image as previous. Knowledge-Core/deploy is the editable deployment source; CI copies it into the Knowledge-Core/deploy snapshot in k3s-home-deploy, updates the root image digests, and pushes with a fast-forward compare-and-swap check while Argo CD watches the k3s repository. Argo health and deployment smoke must pass before release. On Argo or smoke failure, CI reverts the exact GitOps snapshot commit as a normal fast-forward commit and restores each affected Harbor previous tag to dev; if the remote branch moved, rollback refuses to overwrite it. On success previous tags are removed for later Harbor garbage collection. DeepSeek release-summary failure blocks main promotion. On success dev is fast-forwarded to main and each affected service receives an independent service-v<MAJOR>.<MINOR>.<PATCH> Git tag and GitHub Release for the same commit. Shared history is never force-pushed or rebased.
 
-Sources: `user-confirmed`
+Sources: `filesystem:ci-config`, `user-confirmed`
 
 ## `validation.definition-of-done`
 
@@ -70,6 +70,7 @@ Status: `verified`
 - **make:lint**: `{"command":"make lint","source":"Makefile"}`
 - **make:race**: `{"command":"make race","source":"Makefile"}`
 - **make:rust-ci**: `{"command":"make rust-ci","source":"Makefile"}`
+- **make:smoke-ci**: `{"command":"make smoke-ci","source":"Makefile"}`
 - **make:supply-chain**: `{"command":"make supply-chain","source":"Makefile"}`
 - **make:test**: `{"command":"make test","source":"Makefile"}`
 - **make:tidy**: `{"command":"make tidy","source":"Makefile"}`

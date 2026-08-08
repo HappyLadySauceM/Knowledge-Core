@@ -214,7 +214,14 @@ npm ci
 npm run ci
 ```
 
-当前没有远端自动 CI。提交前必须显式运行上述本地门禁；需要真实依赖测试时设置 `COLLABORATION_TEST_REQUIRE_REAL_DEPENDENCIES=1`，缺少 PostgreSQL、Redis、NATS 或 Etcd 连接变量必须失败，不能把 skip 当作通过。
+`.github/workflows/pipeline.yml` 是唯一项目 workflow；它调用 `/opt/HappyLadySauceM/ci-templates`
+发布的 Python 控制镜像。`dev` push 先运行 `make ci` 与 Collaboration Node 互操作门禁，再按
+变更服务从 Harbor 缓存构建并覆盖 `dev` 镜像 tag。镜像不扫描、不签名；当前 `dev` tag 构建前会
+保留为 `previous`，Argo CD 同步和冒烟成功后删除 `previous`，由 Harbor 垃圾回收回收旧层。
+
+仓库 Actions Secret 只提供 `HARBOR_DOCKER_CONFIG_JSON` 与 `HARBOR_CA_PEM`。`release` environment
+只允许 `dev`，并提供 `GH_APP_ID`、`GH_APP_PRIVATE_KEY`、`K3S_RELEASE_KUBECONFIG` 与
+`DEEPSEEK_API_KEY`；Secret 不得写入 workflow、项目配置或日志。
 
 ## k3s 与 GitOps
 
@@ -230,9 +237,10 @@ Redis、Etcd、NATS、Nacos、MinIO 与 ClamAV 的 endpoint、账号、TLS、数
 GitOps 仓库同时保存 SOPS Secret、trust bundle 和不可变镜像 digest；应用仓库不记录具体
 集群拓扑或凭据。
 
-当前未配置 GitHub Actions、自动镜像构建、dev 冒烟、`main` promotion 或版本发布。k3s 不运行
-BuildKit、Argo Workflows 或 Argo Events，也不保存项目 CI 凭据；Argo CD 只负责按 GitOps 仓库
-已有声明部署应用。恢复自动发布前必须重新建立完整质量、签名、冒烟和 compare-and-swap 门禁。
+质量、镜像构建、GitOps 快照、Argo 健康和 dev 冒烟均在同一 workflow 中顺序执行。冒烟成功后，
+DeepSeek 使用受限的提交元数据生成 release 摘要；DeepSeek 失败会阻止 `main` promotion。成功时
+只允许 fast-forward `main`，并为受影响服务分别创建 `service-vMAJOR.MINOR.PATCH` tag 和
+GitHub Release。GitOps 快照推送同样要求远端分支未发生变化，禁止 force-push。
 
 Argo CD repository Secret、AppProject 和 Application 由私有 GitOps 仓库声明。Application 使用
 普通 Kustomize source 组合服务与基础设施配置，并用独立 `ksops-v1.0` source 解密 Secret；
