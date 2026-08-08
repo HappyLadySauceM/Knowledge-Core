@@ -29,13 +29,30 @@ use crate::{
     richtext,
 };
 
-const MIGRATION: &str = include_str!("../../migrations/001_initial.sql");
-const MIGRATION_VERSION: i64 = 1;
-const MIGRATION_NAME: &str = "001_initial";
 const MIGRATION_LOCK_KEY: i64 = 0x4b43_434f_4c4c_4142;
 const IDEMPOTENCY_TTL: Duration = Duration::from_hours(24);
 const MAX_PAGE_SIZE: i64 = 100;
 const MAX_UPDATE_PAGE_SIZE: i64 = 10_000;
+
+#[derive(Clone, Copy)]
+struct Migration {
+    version: i64,
+    name: &'static str,
+    sql: &'static str,
+}
+
+const MIGRATIONS: [Migration; 2] = [
+    Migration {
+        version: 1,
+        name: "001_initial",
+        sql: include_str!("../../migrations/001_initial.sql"),
+    },
+    Migration {
+        version: 2,
+        name: "002_worker_indexes",
+        sql: include_str!("../../migrations/002_worker_indexes.sql"),
+    },
+];
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct OperationBudget {
@@ -202,42 +219,8 @@ impl PostgresStore {
                 .map_err(|error| storage_error(error, "create migration ledger"))?;
             }
 
-            let checksum = migration_checksum();
-            let applied = sqlx::query(
-                "SELECT name, checksum FROM collaboration.schema_migrations WHERE version = $1",
-            )
-            .bind(MIGRATION_VERSION)
-            .fetch_optional(&mut *transaction)
-            .await
-            .map_err(|error| storage_error(error, "read migration ledger"))?;
-            if let Some(row) = applied {
-                let name: String = row
-                    .try_get("name")
-                    .map_err(|error| storage_error(error, "decode migration name"))?;
-                let stored: String = row
-                    .try_get("checksum")
-                    .map_err(|error| storage_error(error, "decode migration checksum"))?;
-                if name != MIGRATION_NAME || stored.trim_end() != checksum {
-                    return Err(ServiceError::conflict(
-                        "Collaboration database migration checksum does not match",
-                    ));
-                }
-            } else {
-                reject_unmanaged_schema(&mut transaction).await?;
-                sqlx::raw_sql(MIGRATION)
-                    .execute(&mut *transaction)
-                    .await
-                    .map_err(|error| storage_error(error, "apply Collaboration migration"))?;
-                sqlx::query(
-                    "INSERT INTO collaboration.schema_migrations(version, name, checksum)
-                     VALUES ($1, $2, $3)",
-                )
-                .bind(MIGRATION_VERSION)
-                .bind(MIGRATION_NAME)
-                .bind(checksum)
-                .execute(&mut *transaction)
-                .await
-                .map_err(|error| storage_error(error, "record Collaboration migration"))?;
+            for migration in MIGRATIONS {
+                apply_migration(&mut transaction, migration).await?;
             }
             transaction
                 .commit()
@@ -1182,20 +1165,18 @@ impl WorkerStore for PostgresStore {
         }
         self.timed_request(context, "compact document snapshot", async {
             let candidate = sqlx::query(
-                "SELECT document_id FROM collaboration.documents AS document
-                 WHERE (
-                   SELECT count(*) FROM collaboration.updates AS update
-                   WHERE update.document_id = document.document_id
-                     AND update.generation = document.generation
-                     AND update.sequence > document.last_snapshot_sequence
-                 ) >= $1 OR (
-                   SELECT COALESCE(sum(octet_length(update)), 0)
-                   FROM collaboration.updates AS update
-                   WHERE update.document_id = document.document_id
-                     AND update.generation = document.generation
-                     AND update.sequence > document.last_snapshot_sequence
-                 ) >= $2
-                 ORDER BY updated_at, document_id LIMIT 1",
+                "SELECT document.document_id
+                 FROM collaboration.documents AS document
+                 CROSS JOIN LATERAL (
+                   SELECT count(*) AS update_count,
+                          COALESCE(sum(octet_length(stored_update.update)), 0)::bigint AS update_bytes
+                   FROM collaboration.updates AS stored_update
+                   WHERE stored_update.document_id = document.document_id
+                     AND stored_update.generation = document.generation
+                     AND stored_update.sequence > document.last_snapshot_sequence
+                 ) AS pending
+                 WHERE pending.update_count >= $1 OR pending.update_bytes >= $2
+                 ORDER BY document.updated_at, document.document_id LIMIT 1",
             )
             .bind(update_threshold)
             .bind(byte_threshold)
@@ -1542,6 +1523,49 @@ async fn reject_unmanaged_schema(connection: &mut PgConnection) -> Result<()> {
             "Collaboration schema contains unmanaged relations",
         ));
     }
+    Ok(())
+}
+
+async fn apply_migration(connection: &mut PgConnection, migration: Migration) -> Result<()> {
+    let checksum = migration_checksum(migration.sql);
+    let applied = sqlx::query(
+        "SELECT name, checksum FROM collaboration.schema_migrations WHERE version = $1",
+    )
+    .bind(migration.version)
+    .fetch_optional(&mut *connection)
+    .await
+    .map_err(|error| storage_error(error, "read migration ledger"))?;
+    if let Some(row) = applied {
+        let name: String = row
+            .try_get("name")
+            .map_err(|error| storage_error(error, "decode migration name"))?;
+        let stored: String = row
+            .try_get("checksum")
+            .map_err(|error| storage_error(error, "decode migration checksum"))?;
+        if name != migration.name || stored.trim_end() != checksum {
+            return Err(ServiceError::conflict(
+                "Collaboration database migration checksum does not match",
+            ));
+        }
+        return Ok(());
+    }
+    if migration.version == 1 {
+        reject_unmanaged_schema(connection).await?;
+    }
+    sqlx::raw_sql(migration.sql)
+        .execute(&mut *connection)
+        .await
+        .map_err(|error| storage_error(error, "apply Collaboration migration"))?;
+    sqlx::query(
+        "INSERT INTO collaboration.schema_migrations(version, name, checksum)
+         VALUES ($1, $2, $3)",
+    )
+    .bind(migration.version)
+    .bind(migration.name)
+    .bind(checksum)
+    .execute(&mut *connection)
+    .await
+    .map_err(|error| storage_error(error, "record Collaboration migration"))?;
     Ok(())
 }
 
@@ -2003,8 +2027,8 @@ async fn insert_event(
     Ok(())
 }
 
-fn migration_checksum() -> String {
-    sha256_hex(MIGRATION.as_bytes())
+fn migration_checksum(sql: &str) -> String {
+    sha256_hex(sql.as_bytes())
 }
 
 fn sha256_hex(value: &[u8]) -> String {
@@ -2075,11 +2099,25 @@ fn storage_error(error: sqlx::Error, operation: &'static str) -> ServiceError {
 mod tests {
     use std::{error::Error as _, time::Duration};
 
-    use super::{operation_budget, request_deadline_error};
+    use super::{MIGRATIONS, migration_checksum, operation_budget, request_deadline_error};
     use crate::{
         domain::RequestContext,
         error::{ErrorCode, ServiceError},
     };
+
+    #[test]
+    fn migrations_are_strictly_ordered_and_nonempty() {
+        assert!(
+            MIGRATIONS
+                .windows(2)
+                .all(|pair| pair[0].version < pair[1].version)
+        );
+        assert!(MIGRATIONS.iter().all(|migration| {
+            !migration.name.is_empty()
+                && !migration.sql.trim().is_empty()
+                && migration_checksum(migration.sql).len() == 64
+        }));
+    }
 
     #[test]
     fn request_budget_rejects_an_expired_deadline_with_a_stable_cause() {

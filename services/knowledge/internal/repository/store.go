@@ -198,11 +198,42 @@ func (s *Store) ListDocuments(ctx context.Context, options ListOptions) ([]*doma
 		Access      string     `gorm:"column:access"`
 		ProjectedAt *time.Time `gorm:"column:projected_at"`
 	}
+	selectSQL, args := buildListDocumentsQuery(options, limit)
+	var rows []row
+	if err := s.db.WithContext(ctx).Raw(selectSQL, args...).Scan(&rows).Error; err != nil {
+		return nil, fmt.Errorf("list knowledge documents: %w", err)
+	}
+	result := make([]*domain.Document, 0, len(rows))
+	for index := range rows {
+		projection := &model.Projection{DocumentID: rows[index].ID, Sequence: rows[index].ContentRevision}
+		if rows[index].ProjectedAt != nil {
+			projection.ProjectedAt = *rows[index].ProjectedAt
+		}
+		result = append(result, documentFromModel(&rows[index].Document, rows[index].Access, projection))
+	}
+	return result, nil
+}
+
+func buildListDocumentsQuery(options ListOptions, limit int) (string, []any) {
 	selectSQL := `SELECT d.*, p.projected_at, CASE WHEN d.owner_id = ? THEN 'owner' ELSE COALESCE(m.role, 'none') END AS access
 FROM knowledge.documents d
 LEFT JOIN knowledge.document_members m ON m.document_id = d.id AND m.user_id = ?
 LEFT JOIN knowledge.document_projections p ON p.document_id = d.id`
 	args := []any{options.ActorID, options.ActorID}
+	if options.Query != "" {
+		selectSQL += `
+JOIN (
+  SELECT id AS document_id
+  FROM knowledge.documents
+  WHERE title ILIKE ? ESCAPE '\' OR summary ILIKE ? ESCAPE '\'
+  UNION
+  SELECT document_id
+  FROM knowledge.document_projections
+  WHERE plain_text ILIKE ? ESCAPE '\'
+) matched ON matched.document_id = d.id`
+		pattern := "%" + escapeLike(options.Query) + "%"
+		args = append(args, pattern, pattern, pattern)
+	}
 	conditions := make([]string, 0, 8)
 	switch {
 	case options.Published:
@@ -213,11 +244,6 @@ LEFT JOIN knowledge.document_projections p ON p.document_id = d.id`
 	default:
 		conditions = append(conditions, "d.deleted_at IS NULL", "(d.owner_id = ? OR m.user_id IS NOT NULL)")
 		args = append(args, options.ActorID)
-	}
-	if options.Query != "" {
-		conditions = append(conditions, "(d.title ILIKE ? ESCAPE '\\' OR d.summary ILIKE ? ESCAPE '\\' OR COALESCE(p.plain_text, '') ILIKE ? ESCAPE '\\')")
-		pattern := "%" + escapeLike(options.Query) + "%"
-		args = append(args, pattern, pattern, pattern)
 	}
 	switch options.Access {
 	case domain.AccessOwner:
@@ -247,19 +273,7 @@ LEFT JOIN knowledge.document_projections p ON p.document_id = d.id`
 	}
 	selectSQL += fmt.Sprintf(" ORDER BY %s DESC, d.id DESC LIMIT ?", orderColumn)
 	args = append(args, limit+1)
-	var rows []row
-	if err := s.db.WithContext(ctx).Raw(selectSQL, args...).Scan(&rows).Error; err != nil {
-		return nil, fmt.Errorf("list knowledge documents: %w", err)
-	}
-	result := make([]*domain.Document, 0, len(rows))
-	for index := range rows {
-		projection := &model.Projection{DocumentID: rows[index].ID, Sequence: rows[index].ContentRevision}
-		if rows[index].ProjectedAt != nil {
-			projection.ProjectedAt = *rows[index].ProjectedAt
-		}
-		result = append(result, documentFromModel(&rows[index].Document, rows[index].Access, projection))
-	}
-	return result, nil
+	return selectSQL, args
 }
 
 func (s *Store) UpdateDocument(ctx context.Context, id string, actorID, expected int64, title, summary, slug *string) (*domain.Document, error) {

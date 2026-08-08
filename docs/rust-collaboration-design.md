@@ -201,13 +201,15 @@ commit 前禁止更新共享内存状态或广播。commit 失败时关闭来源
 | `idempotency_keys` | 版本/恢复命令的请求 hash 与过期时间 |
 | `outbox` | update、失效和投影事件的 at-least-once 发布 |
 
-migration 在 PostgreSQL advisory lock 下执行，失败则进程不 ready。所有 SQL 必须由 SQLx 显式 transaction 和 deadline 执行；禁止无界 query、连接池等待或 retry。
+migration 按 version 递增顺序在 PostgreSQL advisory lock 下执行，每个已应用版本都校验稳定 name 与 SQL checksum；`001_initial` 保持不可变，后续 schema 变化只能追加新文件。首次 migration 仍拒绝接管未受 ledger 管理的旧 schema，任何执行或漂移校验失败都会使进程不 ready。所有 SQL 必须由 SQLx 显式 transaction 和 deadline 执行；禁止无界 query、连接池等待或 retry。
 
 ### 6.1 富文本投影与版本
 
 Rust 实现受限 `XmlFragment("default") -> ProseMirror JSON` codec，覆盖当前允许的 node、mark 和 attribute 集合，并生成 plain text。生产服务不调用 Node；Node/Yjs fixture 仅作为互操作真值。
 
 版本继续保存完整 Yrs state。恢复要求 expected sequence，在 actor 内生成从当前 state 到目标内容的 Yjs update，以普通持久化流程提交，推进 generation/sequence、创建 restoration version、发布失效事件并断开旧连接。恢复不得直接覆盖数据库 head 或绕过 update log。
+
+snapshot worker 用单个 lateral aggregate 同时计算每个 document 自水位后的 update 数量与字节数，避免候选阶段重复扫描同一 update 范围；选中候选后仍必须在锁定 document head 的事务中重新检查阈值，再写 snapshot、推进水位并删除已压缩 update。
 
 ## 7. 安全、观测与生命周期
 

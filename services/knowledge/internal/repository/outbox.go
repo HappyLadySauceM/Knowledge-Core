@@ -50,7 +50,7 @@ func (s *Store) ClaimOutbox(ctx context.Context, limit int, lease time.Duration)
 		now := s.now().UTC()
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
 			Where("published_at IS NULL AND next_attempt_at <= ?", now).
-			Order("created_at ASC").Limit(limit).Find(&records).Error; err != nil {
+			Order("next_attempt_at ASC, created_at ASC, id ASC").Limit(limit).Find(&records).Error; err != nil {
 			return fmt.Errorf("claim outbox messages: %w", err)
 		}
 		for index := range records {

@@ -126,6 +126,13 @@ async fn postgres_contract(url: &str) -> TestResult {
         ),
     )
     .await?;
+    let migration_inspection = PgPoolOptions::new().max_connections(1).connect(url).await?;
+    let migration_versions: Vec<i64> =
+        sqlx::query_scalar("SELECT version FROM collaboration.schema_migrations ORDER BY version")
+            .fetch_all(&migration_inspection)
+            .await?;
+    migration_inspection.close().await;
+    assert_eq!(migration_versions, vec![1_i64, 2_i64]);
     let context = postgres_request_context("real-postgres-contract");
     store.initialize_document(&context, document_id).await?;
     let initial = store.load_document(&context, document_id).await?;

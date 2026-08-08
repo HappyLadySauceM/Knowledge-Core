@@ -21,7 +21,7 @@ func (s *Store) ListPurgeCandidates(ctx context.Context, limit int) ([]PurgeCand
 	}
 	var documents []model.Document
 	if err := s.db.WithContext(ctx).Where("purge_after IS NOT NULL AND purge_after <= ?", s.now().UTC()).
-		Order("purge_after ASC").Limit(limit).Find(&documents).Error; err != nil {
+		Order("purge_after ASC, id ASC").Limit(limit).Find(&documents).Error; err != nil {
 		return nil, fmt.Errorf("list documents due for purge: %w", err)
 	}
 	result := make([]PurgeCandidate, 0, len(documents))

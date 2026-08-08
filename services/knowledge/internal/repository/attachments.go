@@ -45,6 +45,9 @@ func (s *Store) CreateAttachment(ctx context.Context, attachment *domain.Attachm
 		if !domain.CanEdit(access) {
 			return ErrForbidden
 		}
+		if err := lockAttachmentQuota(tx, actorID); err != nil {
+			return err
+		}
 		existingID, found, err := s.idempotentResource(tx, idempotency)
 		if err != nil {
 			return err
@@ -221,7 +224,8 @@ func (s *Store) ClaimAttachmentJobs(ctx context.Context, limit int, lease time.D
 		var records []model.AttachmentScanJob
 		now := s.now().UTC()
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
-			Where("next_attempt_at <= ?", now).Order("created_at ASC").Limit(limit).Find(&records).Error; err != nil {
+			Where("next_attempt_at <= ?", now).
+			Order("next_attempt_at ASC, created_at ASC, attachment_id ASC").Limit(limit).Find(&records).Error; err != nil {
 			return fmt.Errorf("claim attachment jobs: %w", err)
 		}
 		for index := range records {
@@ -318,7 +322,7 @@ func (s *Store) QueueExpiredUploads(ctx context.Context, limit int) error {
 		now := s.now().UTC()
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
 			Where("status = ? AND upload_expires <= ?", domain.AttachmentPendingUpload, now).
-			Limit(limit).Find(&records).Error; err != nil {
+			Order("upload_expires ASC, id ASC").Limit(limit).Find(&records).Error; err != nil {
 			return fmt.Errorf("find expired attachment uploads: %w", err)
 		}
 		for index := range records {
@@ -335,6 +339,14 @@ func (s *Store) QueueExpiredUploads(ctx context.Context, limit int) error {
 		}
 		return nil
 	})
+}
+
+func lockAttachmentQuota(tx *gorm.DB, uploaderID int64) error {
+	lockKey := fmt.Sprintf("knowledge:attachment-quota:%d", uploaderID)
+	if err := tx.Exec("SELECT pg_advisory_xact_lock(hashtextextended(?, 0))", lockKey).Error; err != nil {
+		return fmt.Errorf("lock attachment uploader quota: %w", err)
+	}
+	return nil
 }
 
 func attachmentToModel(value *domain.Attachment) *model.Attachment {

@@ -180,15 +180,17 @@ Knowledge 使用带版本记录的显式 SQL migration。`knowledge` schema 包�
 
 - metadata、content 和 permission 使用独立 revision。
 - 写操作通过 revision/`If-Match` 提供乐观并发控制。
+- 文档子串搜索先用 `UNION` 从 metadata 与 projection trigram GIN 索引生成去重 document ID，再应用权限、状态、稳定游标排序和最终宽行读取。
 - 文档软删除后进入保留期；worker 依次清理 Collaboration 数据、S3 对象和 Knowledge 记录。
 - 领域变更与 outbox 在同一数据库事务内落地。worker 使用 JetStream server PubAck 后才标记 published，并以 outbox message ID 作为 deduplication ID；stream 缺失或发布失败会记录 retry，不能把 Core NATS 接收当成持久化成功。消费者仍必须按事件 ID/业务 revision 幂等处理。
-- 附件完成上传后进入扫描队列；ClamAV 不可用时有界退避，污染或类型不匹配对象进入 rejected 并异步删除，只有 ready 对象可下载。
+- 附件创建在文档 row lock 之外还按 uploader 获取 transaction advisory lock，使跨文档的用户配额检查与插入串行化；完成上传后进入按 next-attempt 稳定排序的扫描队列。ClamAV 不可用时有界退避，污染或类型不匹配对象进入 rejected 并异步删除，只有 ready 对象可下载。
 
 ### 7.3 Collaboration
 
-Collaboration 使用显式 SQLx schema migration，保存 document heads、updates、snapshots、versions、projection jobs、idempotency keys 和 outbox。首次 migration 遇到未受本 migration 历史管理的旧 Node schema 时拒绝启动，不能误记为成功。
+Collaboration 使用按版本有序执行并逐项校验 checksum 的显式 SQLx schema migration，保存 document heads、updates、snapshots、versions、projection jobs、idempotency keys 和 outbox。首次 migration 遇到未受本 migration 历史管理的旧 Node schema 时拒绝启动，不能误记为成功；已有 schema 只追加尚未记录的新版本，已应用 migration 的名称或内容漂移会拒绝启动。
 
 - update sequence 单调递增，快照与 compaction 不改变可恢复语义。
+- compaction 候选通过单个 lateral aggregate 同时计算待压缩 update 数量和字节数，选中后仍在 document row lock 下重新检查阈值。
 - 手工/自动版本保存不可变 Yjs state；恢复要求 expected sequence，在 actor 内生成恢复 update，并在单一事务中提交 baseline/update/version/head/projection/idempotency/outbox，避免覆盖并发更新或产生部分状态。
 - 投影 worker 把当前 Yjs 文档转换为受限 rich-text JSON 和 plain text，再调用 Knowledge；失败按有界重试处理。
 - `knowledge.permissions.changed` 和 `collaboration.documents.invalidated` 只用于失效通知，不替代 PostgreSQL 持久化。
