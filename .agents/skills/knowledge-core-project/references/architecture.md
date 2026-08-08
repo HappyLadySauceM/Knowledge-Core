@@ -6,9 +6,9 @@
 
 Status: `verified`
 
-pkg contains only business-neutral cross-service capabilities and must not import services. Service-private configuration, domain, use cases, repositories, and transports remain under services/<service>. idl is the contract source, kitex_gen and services/collaboration/src/generated are generator-owned, scripts contains repository automation, deploy and docker contain deployment and infrastructure definitions, config contains non-secret configuration structure, docs records verified design, and tools contains supporting executables.
+pkg contains only business-neutral cross-service capabilities and must not import services. Service-private configuration, domain, use cases, repositories, and transports remain under services/<service>. idl is the contract source, kitex_gen and services/collaboration/src/generated are generator-owned, and scripts contains repository automation. Deployment templates are owned per service under deploy/<service>/base and deploy/<service>/overlay/dev; the repository has no shared top-level config directory or centralized deploy/base and deploy/overlay/dev. docker contains local infrastructure definitions, docs records verified design, and tools contains supporting executables.
 
-Sources: `filesystem:top-level-directories`, `user-confirmed`
+Sources: `filesystem:top-level-directories`, `filesystem:top-level-directories`, `user-confirmed`
 
 ## `architecture.summary`
 
@@ -16,4 +16,4 @@ Status: `verified`
 
 Knowledge Core contains four explicitly composed services: Go Gateway, Identity, and Knowledge services plus a Rust Collaboration service. Go assembly flows main/spec -> internal/config -> internal/context -> domain/logic/repository/transport. ServiceContext owns service dependencies, while pkg/app.Runtime is limited to process-level observability, health, metrics, and lifecycle orchestration. Business logic depends on service-local small interfaces; repositories own persistence and storage error mapping; transports validate and adapt protocols without domain rules.
 
-Sources: `README.md#knowledge-core`, `deploy/overlay/dev/README.md#development-overlay`, `docs/framework-design.md#knowledge-core`, `docs/rust-collaboration-design.md#rust-collaboration`, `user-confirmed`
+Sources: `README.md#knowledge-core`, `README.md#knowledge-core`, `deploy/overlay/dev/README.md#development-overlay`, `docs/framework-design.md#knowledge-core`, `docs/framework-design.md#knowledge-core`, `docs/rust-collaboration-design.md#rust-collaboration`, `docs/rust-collaboration-design.md#rust-collaboration`, `user-confirmed`

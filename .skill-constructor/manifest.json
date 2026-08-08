@@ -3,11 +3,16 @@
   "facts": [
     {
       "id": "architecture.modules",
-      "revision": 2,
+      "revision": 14,
       "section": "architecture",
       "sources": [
         {
           "detail": "evidence-sha256:248817b1174f6e497c59142efba965fda4c761ad6bf4c198fdf3faf85432b785",
+          "kind": "detected",
+          "reference": "filesystem:top-level-directories"
+        },
+        {
+          "detail": "evidence-sha256:fb49439604caa33dc85772806bbaf1c661444c36fa63031490372ba995970e25",
           "kind": "detected",
           "reference": "filesystem:top-level-directories"
         },
@@ -17,16 +22,21 @@
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-08-08T01:14:27Z",
-      "value": "pkg contains only business-neutral cross-service capabilities and must not import services. Service-private configuration, domain, use cases, repositories, and transports remain under services/<service>. idl is the contract source, kitex_gen and services/collaboration/src/generated are generator-owned, scripts contains repository automation, deploy and docker contain deployment and infrastructure definitions, config contains non-secret configuration structure, docs records verified design, and tools contains supporting executables."
+      "updatedAt": "2026-08-08T02:16:36Z",
+      "value": "pkg contains only business-neutral cross-service capabilities and must not import services. Service-private configuration, domain, use cases, repositories, and transports remain under services/<service>. idl is the contract source, kitex_gen and services/collaboration/src/generated are generator-owned, and scripts contains repository automation. Deployment templates are owned per service under deploy/<service>/base and deploy/<service>/overlay/dev; the repository has no shared top-level config directory or centralized deploy/base and deploy/overlay/dev. docker contains local infrastructure definitions, docs records verified design, and tools contains supporting executables."
     },
     {
       "id": "architecture.summary",
-      "revision": 2,
+      "revision": 6,
       "section": "architecture",
       "sources": [
         {
           "detail": "evidence-sha256:6cc08ddcf5525a7adc55f189cd2dadddf88fab06ae4e47bfeb47c2e58a779255",
+          "kind": "documented",
+          "reference": "README.md#knowledge-core"
+        },
+        {
+          "detail": "evidence-sha256:c25874112f127fd8ff9232e99638a03236428db91d951b92c68f4278991737f1",
           "kind": "documented",
           "reference": "README.md#knowledge-core"
         },
@@ -41,7 +51,17 @@
           "reference": "docs/framework-design.md#knowledge-core"
         },
         {
+          "detail": "evidence-sha256:c25874112f127fd8ff9232e99638a03236428db91d951b92c68f4278991737f1",
+          "kind": "documented",
+          "reference": "docs/framework-design.md#knowledge-core"
+        },
+        {
           "detail": "evidence-sha256:6cc08ddcf5525a7adc55f189cd2dadddf88fab06ae4e47bfeb47c2e58a779255",
+          "kind": "documented",
+          "reference": "docs/rust-collaboration-design.md#rust-collaboration"
+        },
+        {
+          "detail": "evidence-sha256:c25874112f127fd8ff9232e99638a03236428db91d951b92c68f4278991737f1",
           "kind": "documented",
           "reference": "docs/rust-collaboration-design.md#rust-collaboration"
         },
@@ -51,7 +71,7 @@
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-08-08T01:14:27Z",
+      "updatedAt": "2026-08-08T01:54:03Z",
       "value": "Knowledge Core contains four explicitly composed services: Go Gateway, Identity, and Knowledge services plus a Rust Collaboration service. Go assembly flows main/spec -> internal/config -> internal/context -> domain/logic/repository/transport. ServiceContext owns service dependencies, while pkg/app.Runtime is limited to process-level observability, health, metrics, and lifecycle orchestration. Business logic depends on service-local small interfaces; repositories own persistence and storage error mapping; transports validate and adapt protocols without domain rules."
     },
     {
@@ -194,16 +214,56 @@
     },
     {
       "id": "security.secrets-and-config",
-      "revision": 2,
+      "revision": 16,
       "section": "conventions",
       "sources": [
+        {
+          "detail": "evidence-sha256:169cb3579a7f13e97489407e05a1e625c65d48efdff5f844fd0f2f07daea027e",
+          "kind": "documented",
+          "reference": "README.md#compose"
+        },
+        {
+          "detail": "evidence-sha256:2024c362e384645cce0fadb79c1ffad1fc41ec89f4691aabc6e393f2fa6b3e5d",
+          "kind": "documented",
+          "reference": "README.md#compose"
+        },
         {
           "detail": "evidence-sha256:2b07231c2b6c7eb0272df6c01752e385fde7019c6a06c9ebd45a751fa8315b17",
           "kind": "documented",
           "reference": "README.md#compose"
         },
         {
+          "detail": "evidence-sha256:3f77cc944fbf3ecb65ded3b5c02fb37dfe49326b6577ad32a38d887c1446c4b1",
+          "kind": "documented",
+          "reference": "README.md#compose"
+        },
+        {
+          "detail": "evidence-sha256:4cc991c8785e0118decd7d11538028062864b27bc12085669c23712cc64db2cf",
+          "kind": "documented",
+          "reference": "README.md#compose"
+        },
+        {
+          "detail": "evidence-sha256:169cb3579a7f13e97489407e05a1e625c65d48efdff5f844fd0f2f07daea027e",
+          "kind": "documented",
+          "reference": "README.md#k3s-gitops"
+        },
+        {
+          "detail": "evidence-sha256:2024c362e384645cce0fadb79c1ffad1fc41ec89f4691aabc6e393f2fa6b3e5d",
+          "kind": "documented",
+          "reference": "README.md#k3s-gitops"
+        },
+        {
           "detail": "evidence-sha256:2b07231c2b6c7eb0272df6c01752e385fde7019c6a06c9ebd45a751fa8315b17",
+          "kind": "documented",
+          "reference": "README.md#k3s-gitops"
+        },
+        {
+          "detail": "evidence-sha256:3f77cc944fbf3ecb65ded3b5c02fb37dfe49326b6577ad32a38d887c1446c4b1",
+          "kind": "documented",
+          "reference": "README.md#k3s-gitops"
+        },
+        {
+          "detail": "evidence-sha256:4cc991c8785e0118decd7d11538028062864b27bc12085669c23712cc64db2cf",
           "kind": "documented",
           "reference": "README.md#k3s-gitops"
         },
@@ -218,9 +278,39 @@
           "reference": "deploy/overlay/dev/README.md#development-overlay"
         },
         {
+          "detail": "evidence-sha256:169cb3579a7f13e97489407e05a1e625c65d48efdff5f844fd0f2f07daea027e",
+          "kind": "documented",
+          "reference": "docs/framework-design.md#11"
+        },
+        {
+          "detail": "evidence-sha256:2024c362e384645cce0fadb79c1ffad1fc41ec89f4691aabc6e393f2fa6b3e5d",
+          "kind": "documented",
+          "reference": "docs/framework-design.md#11"
+        },
+        {
           "detail": "evidence-sha256:2b07231c2b6c7eb0272df6c01752e385fde7019c6a06c9ebd45a751fa8315b17",
           "kind": "documented",
           "reference": "docs/framework-design.md#11"
+        },
+        {
+          "detail": "evidence-sha256:3f77cc944fbf3ecb65ded3b5c02fb37dfe49326b6577ad32a38d887c1446c4b1",
+          "kind": "documented",
+          "reference": "docs/framework-design.md#11"
+        },
+        {
+          "detail": "evidence-sha256:4cc991c8785e0118decd7d11538028062864b27bc12085669c23712cc64db2cf",
+          "kind": "documented",
+          "reference": "docs/framework-design.md#11"
+        },
+        {
+          "detail": "evidence-sha256:169cb3579a7f13e97489407e05a1e625c65d48efdff5f844fd0f2f07daea027e",
+          "kind": "documented",
+          "reference": "docs/framework-design.md#12"
+        },
+        {
+          "detail": "evidence-sha256:2024c362e384645cce0fadb79c1ffad1fc41ec89f4691aabc6e393f2fa6b3e5d",
+          "kind": "documented",
+          "reference": "docs/framework-design.md#12"
         },
         {
           "detail": "evidence-sha256:2b07231c2b6c7eb0272df6c01752e385fde7019c6a06c9ebd45a751fa8315b17",
@@ -228,9 +318,49 @@
           "reference": "docs/framework-design.md#12"
         },
         {
+          "detail": "evidence-sha256:3f77cc944fbf3ecb65ded3b5c02fb37dfe49326b6577ad32a38d887c1446c4b1",
+          "kind": "documented",
+          "reference": "docs/framework-design.md#12"
+        },
+        {
+          "detail": "evidence-sha256:4cc991c8785e0118decd7d11538028062864b27bc12085669c23712cc64db2cf",
+          "kind": "documented",
+          "reference": "docs/framework-design.md#12"
+        },
+        {
+          "detail": "evidence-sha256:169cb3579a7f13e97489407e05a1e625c65d48efdff5f844fd0f2f07daea027e",
+          "kind": "documented",
+          "reference": "docs/framework-design.md#8-secret-tls"
+        },
+        {
+          "detail": "evidence-sha256:2024c362e384645cce0fadb79c1ffad1fc41ec89f4691aabc6e393f2fa6b3e5d",
+          "kind": "documented",
+          "reference": "docs/framework-design.md#8-secret-tls"
+        },
+        {
           "detail": "evidence-sha256:2b07231c2b6c7eb0272df6c01752e385fde7019c6a06c9ebd45a751fa8315b17",
           "kind": "documented",
           "reference": "docs/framework-design.md#8-secret-tls"
+        },
+        {
+          "detail": "evidence-sha256:3f77cc944fbf3ecb65ded3b5c02fb37dfe49326b6577ad32a38d887c1446c4b1",
+          "kind": "documented",
+          "reference": "docs/framework-design.md#8-secret-tls"
+        },
+        {
+          "detail": "evidence-sha256:4cc991c8785e0118decd7d11538028062864b27bc12085669c23712cc64db2cf",
+          "kind": "documented",
+          "reference": "docs/framework-design.md#8-secret-tls"
+        },
+        {
+          "detail": "evidence-sha256:169cb3579a7f13e97489407e05a1e625c65d48efdff5f844fd0f2f07daea027e",
+          "kind": "documented",
+          "reference": "docs/rust-collaboration-design.md#2-1"
+        },
+        {
+          "detail": "evidence-sha256:2024c362e384645cce0fadb79c1ffad1fc41ec89f4691aabc6e393f2fa6b3e5d",
+          "kind": "documented",
+          "reference": "docs/rust-collaboration-design.md#2-1"
         },
         {
           "detail": "evidence-sha256:2b07231c2b6c7eb0272df6c01752e385fde7019c6a06c9ebd45a751fa8315b17",
@@ -238,7 +368,37 @@
           "reference": "docs/rust-collaboration-design.md#2-1"
         },
         {
+          "detail": "evidence-sha256:3f77cc944fbf3ecb65ded3b5c02fb37dfe49326b6577ad32a38d887c1446c4b1",
+          "kind": "documented",
+          "reference": "docs/rust-collaboration-design.md#2-1"
+        },
+        {
+          "detail": "evidence-sha256:4cc991c8785e0118decd7d11538028062864b27bc12085669c23712cc64db2cf",
+          "kind": "documented",
+          "reference": "docs/rust-collaboration-design.md#2-1"
+        },
+        {
+          "detail": "evidence-sha256:169cb3579a7f13e97489407e05a1e625c65d48efdff5f844fd0f2f07daea027e",
+          "kind": "documented",
+          "reference": "docs/rust-collaboration-design.md#7"
+        },
+        {
+          "detail": "evidence-sha256:2024c362e384645cce0fadb79c1ffad1fc41ec89f4691aabc6e393f2fa6b3e5d",
+          "kind": "documented",
+          "reference": "docs/rust-collaboration-design.md#7"
+        },
+        {
           "detail": "evidence-sha256:2b07231c2b6c7eb0272df6c01752e385fde7019c6a06c9ebd45a751fa8315b17",
+          "kind": "documented",
+          "reference": "docs/rust-collaboration-design.md#7"
+        },
+        {
+          "detail": "evidence-sha256:3f77cc944fbf3ecb65ded3b5c02fb37dfe49326b6577ad32a38d887c1446c4b1",
+          "kind": "documented",
+          "reference": "docs/rust-collaboration-design.md#7"
+        },
+        {
+          "detail": "evidence-sha256:4cc991c8785e0118decd7d11538028062864b27bc12085669c23712cc64db2cf",
           "kind": "documented",
           "reference": "docs/rust-collaboration-design.md#7"
         },
@@ -248,8 +408,8 @@
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-08-08T01:14:27Z",
-      "value": "Secrets are injected only through environment variables or deployment-platform secret managers. Never place passwords, DSNs, JWTs, private keys, authorization/cookies, or API keys in YAML, source, snapshots, logs, metric labels, or span attributes. Logs use pkg/log and slog with context and stable low-cardinality fields; metrics use bounded route/RPC/status/code/dependency labels. External request IDs and W3C trace context follow shared middleware rules, and authentication, identity recheck, trusted-proxy, and rate-limit decisions fail closed on dependency errors."
+      "updatedAt": "2026-08-08T03:55:12Z",
+      "value": "Sensitive values are never stored in plaintext in source. Services receive secrets through environment variables or Kubernetes Secrets. The k3s-home-deploy GitOps repository may store only SOPS-encrypted Secret manifests, decrypted by Argo CD KSOPS with the fixed age key injected as a Kubernetes Secret. Existing credentials, private keys, and the age key are not rotated unless rotation is explicitly authorized. Passwords, DSNs, JWTs, private keys, authorization or cookie values, API keys, full DTOs, SQL parameters, Redis keys, and message payloads must not be emitted to logs, metric labels, or span attributes; security decisions fail closed on dependency errors."
     },
     {
       "id": "services.catalog",
@@ -539,11 +699,11 @@
     "profile": "generic",
     "slug": "knowledge-core"
   },
-  "revision": 4,
+  "revision": 16,
   "scan": {
-    "fingerprint": "b155ec964c15faa68a6a58d86d9bf326a75dbdbbac53bb2ec62a3d910f24b2eb",
-    "inventoryCount": 304
+    "fingerprint": "6b756aaeb100c13d291be992ab80971001af2f2cdad92f7555477f47b7a2ca73",
+    "inventoryCount": 311
   },
   "schemaVersion": 1,
-  "updatedAt": "2026-08-08T01:31:35Z"
+  "updatedAt": "2026-08-08T03:55:12Z"
 }
