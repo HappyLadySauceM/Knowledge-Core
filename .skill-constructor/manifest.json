@@ -94,7 +94,7 @@
     },
     {
       "id": "cicd.pipeline",
-      "revision": 47,
+      "revision": 49,
       "section": "workflows",
       "sources": [
         {
@@ -107,7 +107,7 @@
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-08-08T20:17:07Z",
+      "updatedAt": "2026-08-08T20:59:18Z",
       "value": "A push to dev triggers the reusable Python CI control image from ci-templates. The pipeline runs make ci and the Collaboration Node interop checks under Node 24.18.1, detects affected services, prewarms pinned base images into Harbor, builds only affected images with Harbor registry cache, and publishes the dev tag without image scanning or signing. Before replacement it preserves the current dev image as previous. Knowledge-Core/deploy is the editable deployment source; CI copies it into the Knowledge-Core/deploy snapshot in k3s-home-deploy, updates the root image digests, and pushes with a fast-forward compare-and-swap check while Argo CD watches the k3s repository. Argo health and deployment smoke must pass before release. On Argo or smoke failure, CI reverts the exact GitOps snapshot commit as a normal fast-forward commit and restores each affected Harbor previous tag to dev; if the remote branch moved, rollback refuses to overwrite it. On success previous tags are removed for later Harbor garbage collection. DeepSeek release-summary failure blocks main promotion. On success dev is fast-forwarded to main and each affected service receives an independent service-v<MAJOR>.<MINOR>.<PATCH> Git tag and GitHub Release for the same commit. Shared history is never force-pushed or rebased."
     },
     {
@@ -822,11 +822,11 @@
     "profile": "generic",
     "slug": "knowledge-core"
   },
-  "revision": 47,
+  "revision": 49,
   "scan": {
-    "fingerprint": "d821079e21b8bf312cd75379e7731f37ad7a6aedf5bb82f0407f620e2c087722",
+    "fingerprint": "e7d869e307661329c27b8c5a9d5a74d3a1b30787069fcc0ca69a31f52530d96f",
     "inventoryCount": 319
   },
   "schemaVersion": 1,
-  "updatedAt": "2026-08-08T20:17:07Z"
+  "updatedAt": "2026-08-08T20:59:18Z"
 }

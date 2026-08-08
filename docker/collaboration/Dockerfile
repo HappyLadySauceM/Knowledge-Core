@@ -7,6 +7,7 @@ RUN apt-get update && apt-get install --yes --no-install-recommends ca-certifica
 WORKDIR /src
 COPY services/collaboration/Cargo.toml services/collaboration/Cargo.lock services/collaboration/deny.toml services/collaboration/rust-toolchain.toml ./services/collaboration/
 COPY services/collaboration/tools ./services/collaboration/tools
+COPY services/collaboration/migrations ./services/collaboration/migrations
 COPY services/collaboration/src ./services/collaboration/src
 RUN cargo build --locked --release --manifest-path services/collaboration/Cargo.toml --bin knowledge-core-collaboration
 FROM ${RUNTIME_BASE_IMAGE}
