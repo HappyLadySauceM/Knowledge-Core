@@ -3,6 +3,7 @@
 .cursor/
 .codex/
 .cluade/
+.reasonix/
 
 .env
 .env.*

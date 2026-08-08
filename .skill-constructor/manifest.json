@@ -1,0 +1,549 @@
+{
+  "createdAt": "2026-08-08T01:12:53Z",
+  "facts": [
+    {
+      "id": "architecture.modules",
+      "revision": 2,
+      "section": "architecture",
+      "sources": [
+        {
+          "detail": "evidence-sha256:248817b1174f6e497c59142efba965fda4c761ad6bf4c198fdf3faf85432b785",
+          "kind": "detected",
+          "reference": "filesystem:top-level-directories"
+        },
+        {
+          "kind": "user",
+          "reference": "user-confirmed"
+        }
+      ],
+      "status": "verified",
+      "updatedAt": "2026-08-08T01:14:27Z",
+      "value": "pkg contains only business-neutral cross-service capabilities and must not import services. Service-private configuration, domain, use cases, repositories, and transports remain under services/<service>. idl is the contract source, kitex_gen and services/collaboration/src/generated are generator-owned, scripts contains repository automation, deploy and docker contain deployment and infrastructure definitions, config contains non-secret configuration structure, docs records verified design, and tools contains supporting executables."
+    },
+    {
+      "id": "architecture.summary",
+      "revision": 2,
+      "section": "architecture",
+      "sources": [
+        {
+          "detail": "evidence-sha256:6cc08ddcf5525a7adc55f189cd2dadddf88fab06ae4e47bfeb47c2e58a779255",
+          "kind": "documented",
+          "reference": "README.md#knowledge-core"
+        },
+        {
+          "detail": "evidence-sha256:6cc08ddcf5525a7adc55f189cd2dadddf88fab06ae4e47bfeb47c2e58a779255",
+          "kind": "documented",
+          "reference": "deploy/overlay/dev/README.md#development-overlay"
+        },
+        {
+          "detail": "evidence-sha256:6cc08ddcf5525a7adc55f189cd2dadddf88fab06ae4e47bfeb47c2e58a779255",
+          "kind": "documented",
+          "reference": "docs/framework-design.md#knowledge-core"
+        },
+        {
+          "detail": "evidence-sha256:6cc08ddcf5525a7adc55f189cd2dadddf88fab06ae4e47bfeb47c2e58a779255",
+          "kind": "documented",
+          "reference": "docs/rust-collaboration-design.md#rust-collaboration"
+        },
+        {
+          "kind": "user",
+          "reference": "user-confirmed"
+        }
+      ],
+      "status": "verified",
+      "updatedAt": "2026-08-08T01:14:27Z",
+      "value": "Knowledge Core contains four explicitly composed services: Go Gateway, Identity, and Knowledge services plus a Rust Collaboration service. Go assembly flows main/spec -> internal/config -> internal/context -> domain/logic/repository/transport. ServiceContext owns service dependencies, while pkg/app.Runtime is limited to process-level observability, health, metrics, and lifecycle orchestration. Business logic depends on service-local small interfaces; repositories own persistence and storage error mapping; transports validate and adapt protocols without domain rules."
+    },
+    {
+      "id": "boundaries.repository",
+      "revision": 1,
+      "section": "environment",
+      "sources": [
+        {
+          "kind": "detected",
+          "reference": "filesystem:repository-boundary"
+        }
+      ],
+      "status": "verified",
+      "updatedAt": "2026-08-08T01:12:53Z",
+      "value": {
+        "kind": "git",
+        "nestedRepositories": [],
+        "root": "."
+      }
+    },
+    {
+      "id": "cicd.pipeline",
+      "revision": 2,
+      "section": "workflows",
+      "sources": [
+        {
+          "kind": "user",
+          "reference": "user-confirmed"
+        }
+      ],
+      "status": "verified",
+      "updatedAt": "2026-08-08T01:14:27Z",
+      "value": "dev is the sole development branch and main is read-only. Do not create other development branches, force-push, rebase shared history, or bypass gates. Automatic promotion is currently absent; main must not advance until dev deployment smoke tests, image signing, and compare-and-swap gates are restored. Future release automation may only fast-forward main and then create a version tag and GitHub Release for the same SHA, stopping on divergence or ref movement. Commit, push, and GitHub actions require explicit task authorization."
+    },
+    {
+      "id": "constraints.project",
+      "revision": 2,
+      "section": "constraints",
+      "sources": [
+        {
+          "kind": "user",
+          "reference": "user-confirmed"
+        }
+      ],
+      "status": "verified",
+      "updatedAt": "2026-08-08T01:14:27Z",
+      "value": "Preserve service ownership and explicit dependency injection; prohibit global mutable configuration or clients, service locators, unowned goroutines, unbounded retries, panic or os.Exit outside process entrypoints, and internal error leakage. scripts/generated-files.txt is the sole generated-ownership manifest; never hand-edit listed files, kitex_gen, or services/collaboration/src/generated. IDL sources are under idl/http/v1 and idl/rpc/v1 and generation must use repository scripts. Resource creation, readiness, shutdown, and cleanup follow bounded, reverse-order lifecycle rules. Documentation must describe only implemented and verified behavior and be updated when public runtime, contracts, boundaries, lifecycle, startup, or APIs change."
+    },
+    {
+      "id": "conventions.code-style",
+      "revision": 2,
+      "section": "conventions",
+      "sources": [
+        {
+          "kind": "user",
+          "reference": "user-confirmed"
+        }
+      ],
+      "status": "verified",
+      "updatedAt": "2026-08-08T01:14:27Z",
+      "value": "Go constructors validate required dependencies and return (T, error); errors add operation context, preserve causes with %w, and use errors.Is/As. Context, deadlines, request IDs, and traces propagate end to end. Use pkg/codec/json for strict HTTP JSON and reuse shared auth, error, log, metadata, trace, and metrics contracts. Rust must pass rustfmt, clippy -D warnings, and cargo deny. Tests stay near implementations and cover success, boundaries, dependency failures, error mapping, cleanup/rollback, and concurrency with deterministic synchronization. Repository text uses LF except .bat and .cmd."
+    },
+    {
+      "id": "entrypoints.catalog",
+      "revision": 2,
+      "section": "services",
+      "sources": [
+        {
+          "detail": "evidence-sha256:0f227a4dc8cecdf021566a02b5ca6fbbf05b21bec287a80f8b951c3f74d51096",
+          "kind": "detected",
+          "reference": "filesystem:entrypoint-candidates"
+        },
+        {
+          "kind": "user",
+          "reference": "user-confirmed"
+        }
+      ],
+      "status": "verified",
+      "updatedAt": "2026-08-08T01:14:27Z",
+      "value": "Service process entrypoints are services/gateway/main.go, services/identity/main.go, services/knowledge/main.go, and services/collaboration/src/main.rs. Service main files only create and execute application commands; Go spec files only declare application specifications. Supporting executable entrypoints include scripts/idlguard, collaboration Rust code generation, and tools/authkeys, tools/configctl, and tools/interop. Deployment definitions live under deploy and docker."
+    },
+    {
+      "id": "environment.setup",
+      "revision": 2,
+      "section": "environment",
+      "sources": [
+        {
+          "kind": "user",
+          "reference": "user-confirmed"
+        }
+      ],
+      "status": "verified",
+      "updatedAt": "2026-08-08T01:14:27Z",
+      "value": "Go module plus a Rust workspace under services/collaboration. Use repository-pinned generators (Kitex 0.16.2, hz 0.9.7 via hz update only, thriftgo 0.4.5) and rustc 1.97.1 from rust-toolchain.toml. The collaboration interop fixture requires Node.js >= 24.18.1 and npm ci. Inject all non-public configuration through environment variables or deployment-platform secret management; never store secret values in repository configuration."
+    },
+    {
+      "id": "environment.toolchains",
+      "revision": 1,
+      "section": "environment",
+      "sources": [
+        {
+          "kind": "detected",
+          "reference": "detected:toolchain-manifests"
+        }
+      ],
+      "status": "verified",
+      "updatedAt": "2026-08-08T01:12:53Z",
+      "value": [
+        {
+          "manifest": "go.mod",
+          "toolchain": "go"
+        },
+        {
+          "manifest": "services/collaboration/interop/package.json",
+          "toolchain": "node"
+        },
+        {
+          "manifest": "services/collaboration/Cargo.toml",
+          "toolchain": "rust"
+        },
+        {
+          "manifest": "services/collaboration/tools/rust-codegen/Cargo.toml",
+          "toolchain": "rust"
+        }
+      ]
+    },
+    {
+      "id": "identity.project-name",
+      "revision": 1,
+      "section": "environment",
+      "sources": [
+        {
+          "kind": "detected",
+          "reference": "filesystem:project-root"
+        }
+      ],
+      "status": "verified",
+      "updatedAt": "2026-08-08T01:12:53Z",
+      "value": "Knowledge-Core"
+    },
+    {
+      "id": "security.secrets-and-config",
+      "revision": 2,
+      "section": "conventions",
+      "sources": [
+        {
+          "detail": "evidence-sha256:2b07231c2b6c7eb0272df6c01752e385fde7019c6a06c9ebd45a751fa8315b17",
+          "kind": "documented",
+          "reference": "README.md#compose"
+        },
+        {
+          "detail": "evidence-sha256:2b07231c2b6c7eb0272df6c01752e385fde7019c6a06c9ebd45a751fa8315b17",
+          "kind": "documented",
+          "reference": "README.md#k3s-gitops"
+        },
+        {
+          "detail": "evidence-sha256:2b07231c2b6c7eb0272df6c01752e385fde7019c6a06c9ebd45a751fa8315b17",
+          "kind": "documented",
+          "reference": "deploy/base/README.md#application-deployment-base"
+        },
+        {
+          "detail": "evidence-sha256:2b07231c2b6c7eb0272df6c01752e385fde7019c6a06c9ebd45a751fa8315b17",
+          "kind": "documented",
+          "reference": "deploy/overlay/dev/README.md#development-overlay"
+        },
+        {
+          "detail": "evidence-sha256:2b07231c2b6c7eb0272df6c01752e385fde7019c6a06c9ebd45a751fa8315b17",
+          "kind": "documented",
+          "reference": "docs/framework-design.md#11"
+        },
+        {
+          "detail": "evidence-sha256:2b07231c2b6c7eb0272df6c01752e385fde7019c6a06c9ebd45a751fa8315b17",
+          "kind": "documented",
+          "reference": "docs/framework-design.md#12"
+        },
+        {
+          "detail": "evidence-sha256:2b07231c2b6c7eb0272df6c01752e385fde7019c6a06c9ebd45a751fa8315b17",
+          "kind": "documented",
+          "reference": "docs/framework-design.md#8-secret-tls"
+        },
+        {
+          "detail": "evidence-sha256:2b07231c2b6c7eb0272df6c01752e385fde7019c6a06c9ebd45a751fa8315b17",
+          "kind": "documented",
+          "reference": "docs/rust-collaboration-design.md#2-1"
+        },
+        {
+          "detail": "evidence-sha256:2b07231c2b6c7eb0272df6c01752e385fde7019c6a06c9ebd45a751fa8315b17",
+          "kind": "documented",
+          "reference": "docs/rust-collaboration-design.md#7"
+        },
+        {
+          "kind": "user",
+          "reference": "user-confirmed"
+        }
+      ],
+      "status": "verified",
+      "updatedAt": "2026-08-08T01:14:27Z",
+      "value": "Secrets are injected only through environment variables or deployment-platform secret managers. Never place passwords, DSNs, JWTs, private keys, authorization/cookies, or API keys in YAML, source, snapshots, logs, metric labels, or span attributes. Logs use pkg/log and slog with context and stable low-cardinality fields; metrics use bounded route/RPC/status/code/dependency labels. External request IDs and W3C trace context follow shared middleware rules, and authentication, identity recheck, trusted-proxy, and rate-limit decisions fail closed on dependency errors."
+    },
+    {
+      "id": "services.catalog",
+      "revision": 2,
+      "section": "services",
+      "sources": [
+        {
+          "detail": "evidence-sha256:4861a558e13e8261cad5522bcd050aeb7c528bee7c7ce522497d57fee6c27f8e",
+          "kind": "detected",
+          "reference": "filesystem:service-definitions"
+        },
+        {
+          "kind": "user",
+          "reference": "user-confirmed"
+        }
+      ],
+      "status": "verified",
+      "updatedAt": "2026-08-08T01:14:27Z",
+      "value": "Gateway is the HTTP edge and calls typed upstream clients without accessing Identity storage. Identity owns identity domain behavior and persistence. Knowledge owns document metadata, permissions, publication/public projections, attachments, trash, quotas, and outbox in the PostgreSQL knowledge schema, but not Yjs binary state. Collaboration is the Rust Volo Thrift and WebSocket/Yrs service; it owns collaboration state in its PostgreSQL schema and rechecks document access through Knowledge RPC."
+    },
+    {
+      "id": "validation.definition-of-done",
+      "revision": 2,
+      "section": "workflows",
+      "sources": [
+        {
+          "detail": "evidence-sha256:2e0efd24cb83ee79466c0dc4958a72836f898287d959fd4aa9498964a4dd1081",
+          "kind": "documented",
+          "reference": "docs/migrations/2026-08-rust-collaboration.md#section"
+        },
+        {
+          "detail": "evidence-sha256:2e0efd24cb83ee79466c0dc4958a72836f898287d959fd4aa9498964a4dd1081",
+          "kind": "documented",
+          "reference": "docs/rust-collaboration-design.md#7"
+        },
+        {
+          "kind": "user",
+          "reference": "user-confirmed"
+        }
+      ],
+      "status": "verified",
+      "updatedAt": "2026-08-08T01:14:27Z",
+      "value": "Run make ci after each change; it covers check plus generate-check, including Go and Rust formatting, vet/clippy, lint, uncached tests, build, vulnerability/supply-chain checks, and generated drift. Add make race for Go concurrency, goroutine, orchestration, or lifecycle work. Run npm ci && npm run ci under services/collaboration/interop for Node fixture changes. For IDL changes, also regenerate, review wire/API compatibility, and run go run ./scripts/idlguard compat-git <merge-base> idl."
+    },
+    {
+      "id": "workflows.build",
+      "revision": 1,
+      "section": "workflows",
+      "sources": [
+        {
+          "kind": "detected",
+          "reference": "detected:project-scripts"
+        }
+      ],
+      "status": "verified",
+      "updatedAt": "2026-08-08T01:12:53Z",
+      "value": {
+        "make:build": {
+          "command": "make build",
+          "source": "Makefile"
+        }
+      }
+    },
+    {
+      "id": "workflows.development",
+      "revision": 2,
+      "section": "workflows",
+      "sources": [
+        {
+          "kind": "user",
+          "reference": "user-confirmed"
+        }
+      ],
+      "status": "verified",
+      "updatedAt": "2026-08-08T01:14:27Z",
+      "value": "Work directly on the existing dev branch only. Use repository scripts or make generate for generation; use make tidy after Go dependency changes. Run make ci after every change, add make race for Go concurrency or lifecycle changes, and run npm ci followed by npm run ci in services/collaboration/interop when that fixture changes. IDL changes also require go run ./scripts/idlguard compat-git <merge-base> idl."
+    },
+    {
+      "id": "workflows.quality",
+      "revision": 1,
+      "section": "workflows",
+      "sources": [
+        {
+          "kind": "detected",
+          "reference": "detected:project-scripts"
+        }
+      ],
+      "status": "verified",
+      "updatedAt": "2026-08-08T01:12:53Z",
+      "value": {
+        "make:fmt": {
+          "command": "make fmt",
+          "source": "Makefile"
+        },
+        "make:fmt-check": {
+          "command": "make fmt-check",
+          "source": "Makefile"
+        },
+        "make:generate": {
+          "command": "make generate",
+          "source": "Makefile"
+        },
+        "make:generate-check": {
+          "command": "make generate-check",
+          "source": "Makefile"
+        },
+        "make:generate-go-check": {
+          "command": "make generate-go-check",
+          "source": "Makefile"
+        },
+        "make:generate-rust-check": {
+          "command": "make generate-rust-check",
+          "source": "Makefile"
+        },
+        "make:lint": {
+          "command": "make lint",
+          "source": "Makefile"
+        },
+        "npm:format": {
+          "command": "prettier --write .",
+          "source": "services/collaboration/interop/package.json"
+        },
+        "npm:format:check": {
+          "command": "prettier --check .",
+          "source": "services/collaboration/interop/package.json"
+        },
+        "npm:generate:fixtures": {
+          "command": "node ./generate-fixtures.mjs",
+          "source": "services/collaboration/interop/package.json"
+        }
+      }
+    },
+    {
+      "id": "workflows.scripts",
+      "revision": 1,
+      "section": "workflows",
+      "sources": [
+        {
+          "kind": "detected",
+          "reference": "detected:project-scripts"
+        }
+      ],
+      "status": "verified",
+      "updatedAt": "2026-08-08T01:12:53Z",
+      "value": {
+        "make:build": {
+          "command": "make build",
+          "source": "Makefile"
+        },
+        "make:check": {
+          "command": "make check",
+          "source": "Makefile"
+        },
+        "make:ci": {
+          "command": "make ci",
+          "source": "Makefile"
+        },
+        "make:fmt": {
+          "command": "make fmt",
+          "source": "Makefile"
+        },
+        "make:fmt-check": {
+          "command": "make fmt-check",
+          "source": "Makefile"
+        },
+        "make:generate": {
+          "command": "make generate",
+          "source": "Makefile"
+        },
+        "make:generate-check": {
+          "command": "make generate-check",
+          "source": "Makefile"
+        },
+        "make:generate-go-check": {
+          "command": "make generate-go-check",
+          "source": "Makefile"
+        },
+        "make:generate-rust-check": {
+          "command": "make generate-rust-check",
+          "source": "Makefile"
+        },
+        "make:go-ci": {
+          "command": "make go-ci",
+          "source": "Makefile"
+        },
+        "make:help": {
+          "command": "make help",
+          "source": "Makefile"
+        },
+        "make:line": {
+          "command": "make line",
+          "source": "Makefile"
+        },
+        "make:lint": {
+          "command": "make lint",
+          "source": "Makefile"
+        },
+        "make:race": {
+          "command": "make race",
+          "source": "Makefile"
+        },
+        "make:rust-ci": {
+          "command": "make rust-ci",
+          "source": "Makefile"
+        },
+        "make:supply-chain": {
+          "command": "make supply-chain",
+          "source": "Makefile"
+        },
+        "make:test": {
+          "command": "make test",
+          "source": "Makefile"
+        },
+        "make:tidy": {
+          "command": "make tidy",
+          "source": "Makefile"
+        },
+        "make:vet": {
+          "command": "make vet",
+          "source": "Makefile"
+        },
+        "make:vuln": {
+          "command": "make vuln",
+          "source": "Makefile"
+        },
+        "npm:audit": {
+          "command": "npm audit --audit-level=high",
+          "source": "services/collaboration/interop/package.json"
+        },
+        "npm:ci": {
+          "command": "npm run format:check && npm test && npm run audit",
+          "source": "services/collaboration/interop/package.json"
+        },
+        "npm:format": {
+          "command": "prettier --write .",
+          "source": "services/collaboration/interop/package.json"
+        },
+        "npm:format:check": {
+          "command": "prettier --check .",
+          "source": "services/collaboration/interop/package.json"
+        },
+        "npm:generate:fixtures": {
+          "command": "node ./generate-fixtures.mjs",
+          "source": "services/collaboration/interop/package.json"
+        },
+        "npm:test": {
+          "command": "node --test",
+          "source": "services/collaboration/interop/package.json"
+        }
+      }
+    },
+    {
+      "id": "workflows.test",
+      "revision": 1,
+      "section": "workflows",
+      "sources": [
+        {
+          "kind": "detected",
+          "reference": "detected:project-scripts"
+        }
+      ],
+      "status": "verified",
+      "updatedAt": "2026-08-08T01:12:53Z",
+      "value": {
+        "make:check": {
+          "command": "make check",
+          "source": "Makefile"
+        },
+        "make:test": {
+          "command": "make test",
+          "source": "Makefile"
+        },
+        "npm:test": {
+          "command": "node --test",
+          "source": "services/collaboration/interop/package.json"
+        }
+      }
+    }
+  ],
+  "generator": {
+    "name": "skill-constructor",
+    "version": "0.4.0"
+  },
+  "project": {
+    "language": "en",
+    "name": "Knowledge-Core",
+    "profile": "generic",
+    "slug": "knowledge-core"
+  },
+  "revision": 4,
+  "scan": {
+    "fingerprint": "b155ec964c15faa68a6a58d86d9bf326a75dbdbbac53bb2ec62a3d910f24b2eb",
+    "inventoryCount": 304
+  },
+  "schemaVersion": 1,
+  "updatedAt": "2026-08-08T01:31:35Z"
+}

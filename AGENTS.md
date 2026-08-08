@@ -104,3 +104,16 @@
 - panic/os.Exit 代替错误、丢弃 error/cause、向客户端返回内部错误细节。
 - 手改生成文件、绕过公共 JSON/error/log/trace 契约、在指标中使用高基数或敏感标签。
 - 在 `dev` 之外开发、直接修改 `main`、创建额外开发分支或改写共享历史。
+
+<!-- skill-constructor:start -->
+## Project Skill Harness
+
+- Invoke `$maintain-project-skill` at the start and end of every task in this repository.
+- Do not begin requested work while required manifest facts are unknown, candidate, or conflict.
+- Ask the user to resolve every onboarding question; never infer constraints without evidence.
+- Read the generated project skill under `.agents/skills/` before planning or editing.
+- Invoke `$design-distributed-transactions` for cross-service state changes, MQ publishing or
+  consumption, compensation, or MQ selection, and do not complete while its reliability gates fail.
+- Continue until the post-task status is `ready`, even when the host's Stop hook is advisory.
+- Never edit generated project-skill files, or stage or commit harness updates automatically.
+<!-- skill-constructor:end -->
