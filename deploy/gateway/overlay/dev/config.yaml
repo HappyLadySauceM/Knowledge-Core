@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: knowledge-core-gateway-config
+  labels:
+    app.kubernetes.io/name: knowledge-core-gateway
+    app.kubernetes.io/component: edge
+    app.kubernetes.io/part-of: knowledge-core
+    app.kubernetes.io/managed-by: kustomize
+data:
+  GATEWAY_LOG_LEVEL: info
+  GATEWAY_APP_ENVIRONMENT: development

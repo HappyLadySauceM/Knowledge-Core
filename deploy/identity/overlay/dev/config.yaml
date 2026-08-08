@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: knowledge-core-identity-config
+  labels:
+    app.kubernetes.io/name: knowledge-core-identity
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/part-of: knowledge-core
+    app.kubernetes.io/managed-by: kustomize
+data:
+  IDENTITY_LOG_LEVEL: info
+  IDENTITY_APP_ENVIRONMENT: development

@@ -1,5 +1,0 @@
-api_version: knowledge-core.io/v1alpha1
-kind: DynamicConfig
-revision: 1
-log:
-  level: info

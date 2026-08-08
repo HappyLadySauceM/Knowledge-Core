@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: knowledge-core-knowledge-config
+  labels:
+    app.kubernetes.io/name: knowledge-core-knowledge
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/part-of: knowledge-core
+    app.kubernetes.io/managed-by: kustomize
+data:
+  KNOWLEDGE_LOG_LEVEL: info
+  KNOWLEDGE_APP_ENVIRONMENT: development
+  KNOWLEDGE_OBJECT_STORAGE_AUTO_CREATE_BUCKET: "false"

@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: knowledge-core-collaboration-config
+  labels:
+    app.kubernetes.io/name: knowledge-core-collaboration
+    app.kubernetes.io/component: realtime
+    app.kubernetes.io/part-of: knowledge-core
+    app.kubernetes.io/managed-by: kustomize
+data:
+  COLLABORATION_ENVIRONMENT: development
+  COLLABORATION_LOG_LEVEL: info

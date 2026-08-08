@@ -56,6 +56,7 @@ pkg/
 services/<go-service>/
   main.go       只创建并执行应用命令
   spec.go       只声明应用规格
+  etc/config.yaml  服务私有的非敏感静态配置
   internal/config/
   internal/context/
   internal/domain|logic|repository|transport/
@@ -70,6 +71,10 @@ services/collaboration/
   src/worker.rs       投影、快照、自动版本、outbox 与失效订阅
   interop/            最小 Node/Yjs/y-prosemirror 互操作 fixture
   tools/rust-codegen/ Collaboration Thrift/Volo 生成工具
+
+deploy/<service>/
+  base/               服务私有 Deployment、Service 与 Kustomization
+  overlay/dev/        仅含服务行为 ConfigMap 与 dev Kustomization
 ```
 
 ## 3. 依赖装配
@@ -267,14 +272,18 @@ go run ./scripts/idlguard compat-git <merge-base> idl
 GitOps 更新、dev 冒烟、镜像签名、`main` promotion、版本 tag 或 GitHub Release 流程；恢复自动发布前
 必须重新实现并验证这些门禁，不能把 Argo CD 自动同步等同于源代码发布验证。
 
-Kubernetes 所有权分为三层：`k3s-home-deploy/k3s`（服务器 `/opt/k3s`）是公共基础设施真源；应用
-仓库 `deploy/base` 是环境无关工作负载真源；私有 `k3s-home-deploy/Knowledge-Core` 保存
-base 快照、唯一 dev overlay、SOPS Secret 和镜像 digest。公共 Nacos、NATS、Etcd、MinIO、ClamAV
-位于独立 namespace，PostgreSQL 和 Redis 复用现有服务；应用只使用项目级账号和前缀。
+Kubernetes 所有权分为三层：`k3s-home-deploy/k3s`（服务器 `/opt/k3s`）是公共基础设施真源；
+应用仓库的 `deploy/<service>/base` 和 `deploy/<service>/overlay/dev` 由各服务自主
+维护工作负载与日志、运行环境、超时等服务行为配置；私有
+`k3s-home-deploy/Knowledge-Core` 保存基础设施连接配置、SOPS Secret、trust bundle 和镜像
+digest，并通过根 Kustomization 引用服务 overlay、再用 Component 合入连接配置。不再使用
+集中式 `deploy/base` 与 `deploy/overlay/dev`。公共
+Nacos、NATS、Etcd、MinIO、ClamAV 位于独立 namespace，PostgreSQL 和 Redis 复用现有服务；
+应用只使用项目级账号和前缀。
 
 k3s 不保存 CI cache/PVC、构建镜像或发布 ServiceAccount，只保留 Argo CD；其只读 repository Secret、
-AppProject 和 Application 由 GitOps 仓库声明，Application 使用 `sops-v1.0` CMP、自动同步、prune
-和 self-heal。
+AppProject 和 Application 由 GitOps 仓库声明，Application 使用普通 Kustomize source 与独立
+`ksops-v1.0` Secret source，自动同步、prune 和 self-heal。
 
 ### 当前不兼容基线的迁移记录
 

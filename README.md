@@ -164,7 +164,8 @@ $keys.Clear()
 
 ## 本地开发
 
-单独运行 Go 服务时显式指定各自 YAML：
+顶层不再保留共享 `config/`；Go 服务的非敏感静态配置由各自的
+`services/<service>/etc/config.yaml` 管理。单独运行 Go 服务时显式指定对应 YAML：
 
 ```powershell
 go run ./services/identity --config services/identity/etc/config.yaml
@@ -172,7 +173,8 @@ go run ./services/knowledge --config services/knowledge/etc/config.yaml
 go run ./services/gateway --config services/gateway/etc/config.yaml
 ```
 
-Rust Collaboration 使用服务内独立 workspace；先启动 PostgreSQL、Redis、NATS、Etcd 和 Knowledge，并设置至少数据库连接后运行：
+Rust Collaboration 的配置加载器位于服务内，通过环境变量接收静态配置；先启动
+PostgreSQL、Redis、NATS、Etcd 和 Knowledge，并设置至少数据库连接后运行：
 
 ```powershell
 Set-Location services/collaboration
@@ -220,18 +222,21 @@ npm run ci
 PostgreSQL 和 Redis，并在独立 namespace 提供 Nacos、NATS、Etcd、MinIO 与 ClamAV；Nacos
 使用共享 PostgreSQL。项目 namespace 只接收项目级账号，平台 root/admin Secret 不进入应用。
 
-`deploy/base` 只定义四个服务的环境无关工作负载、ServiceAccount、Service 和 NetworkPolicy。
-唯一支持的环境是 `deploy/overlay/dev`；私有 GitOps 仓库保存
-`k3s-home-deploy/Knowledge-Core/base` 快照和 `Knowledge-Core/overlay/dev` 的不可变镜像
-digest。每个服务使用独立 `knowledge-core-<service>-secrets` 保存业务凭据、Nacos reader 和 KEK。
+应用部署模板按服务放在 `deploy/<service>/`。每个服务自主维护 `base/`
+中的 Deployment、Service 与 Kustomization，以及 `overlay/dev/` 中的日志、运行环境、
+超时等服务行为配置；不再使用共享的 `deploy/base` 或 `deploy/overlay/dev`。PostgreSQL、
+Redis、Etcd、NATS、Nacos、MinIO 与 ClamAV 的 endpoint、账号、TLS、数据库名和前缀由私有
+`k3s-home-deploy` 维护，并在 Argo CD 渲染时通过 Kustomize Component 合入服务 ConfigMap。
+GitOps 仓库同时保存 SOPS Secret、trust bundle 和不可变镜像 digest；应用仓库不记录具体
+集群拓扑或凭据。
 
 当前未配置 GitHub Actions、自动镜像构建、dev 冒烟、`main` promotion 或版本发布。k3s 不运行
 BuildKit、Argo Workflows 或 Argo Events，也不保存项目 CI 凭据；Argo CD 只负责按 GitOps 仓库
 已有声明部署应用。恢复自动发布前必须重新建立完整质量、签名、冒烟和 compare-and-swap 门禁。
 
 Argo CD repository Secret、AppProject 和 Application 由私有 GitOps 仓库声明。Application 使用
-`sops-v1.0` CMP、Automated/Prune/Self Heal；真实 Secret 和 CA 由 SOPS 管理，部署始终引用不可变
-Harbor digest。
+普通 Kustomize source 组合服务与基础设施配置，并用独立 `ksops-v1.0` source 解密 Secret；
+同步策略为 Automated/Prune/Self Heal，镜像始终引用不可变 Harbor digest。
 
 当前测试覆盖领域、逻辑、transport、严格输入、错误映射、Collaboration commit-before-broadcast、恢复、投影、outbox、生命周期、双向 Kitex/Volo、Yjs 和多实例 JetStream 行为。按照当前范围，Identity 与 Knowledge repository 尚未包含真实 PostgreSQL 集成测试；不要把现有 mock/单元测试等同于数据库兼容性验证。Rust Collaboration 的性能对比、完整 Compose WebSocket E2E、依赖 stop/start、备份及切换/回滚演练仍需在发布前完成。
 
