@@ -7,7 +7,7 @@ description: "Project-specific engineering guidance for Knowledge-Core. Use for 
 
 # Knowledge-Core Project Guide
 
-Manifest revision: `65`. Manifest digest: `7513d5570572227b`.
+Manifest revision: `66`. Manifest digest: `bb43b07016d0d863`.
 
 ## Required Workflow
 
@@ -16,6 +16,9 @@ Manifest revision: `65`. Manifest digest: `7513d5570572227b`.
 - Stop and use `$maintain-project-skill` when required facts are unresolved or evidence conflicts.
 - Run the recorded validation commands before finishing and report any unavailable checks.
 - Let the task-end harness update this skill; do not edit generated files directly.
+- Keep `.skill-constructor/manifest.json` and this generated Skill directory under version control, and
+  include synchronized updates with the related engineering commit unless the manifest records a
+  verified exception.
 
 ## References
 

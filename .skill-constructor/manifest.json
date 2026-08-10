@@ -814,7 +814,7 @@
   ],
   "generator": {
     "name": "skill-constructor",
-    "version": "0.4.0"
+    "version": "0.4.2"
   },
   "project": {
     "language": "en",
@@ -822,11 +822,11 @@
     "profile": "generic",
     "slug": "knowledge-core"
   },
-  "revision": 65,
+  "revision": 66,
   "scan": {
     "fingerprint": "3036d5c2b5f223c5e53ee3a067dd1dea4c5ab3312226e22af867094f155ef979",
     "inventoryCount": 322
   },
   "schemaVersion": 1,
-  "updatedAt": "2026-08-10T07:33:09Z"
+  "updatedAt": "2026-08-10T07:43:23Z"
 }
