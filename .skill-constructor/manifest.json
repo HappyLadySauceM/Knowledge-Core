@@ -878,11 +878,11 @@
     "profile": "generic",
     "slug": "knowledge-core"
   },
-  "revision": 70,
+  "revision": 72,
   "scan": {
-    "fingerprint": "706681f96e520897c95184d33b54d3c1f147d3a8da8c7745271682b1711ff8be",
+    "fingerprint": "247fc8e8fd02ee8d846f14695a4c34e083bc200e7d641507c6a29b11b8318232",
     "inventoryCount": 320
   },
   "schemaVersion": 1,
-  "updatedAt": "2026-08-10T09:28:22Z"
+  "updatedAt": "2026-08-10T10:37:12Z"
 }

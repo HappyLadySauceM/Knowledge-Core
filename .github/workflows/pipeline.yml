@@ -67,7 +67,6 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            services/collaboration/target
           key: ${{ runner.os }}-knowledge-core-rust-${{ hashFiles('services/collaboration/Cargo.lock', 'services/collaboration/rust-toolchain.toml') }}
           restore-keys: |
             ${{ runner.os }}-knowledge-core-rust-
