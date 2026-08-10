@@ -93,6 +93,22 @@
       }
     },
     {
+      "id": "cicd.config-files",
+      "revision": 67,
+      "section": "workflows",
+      "sources": [
+        {
+          "kind": "detected",
+          "reference": "filesystem:ci-config"
+        }
+      ],
+      "status": "verified",
+      "updatedAt": "2026-08-10T08:14:50Z",
+      "value": [
+        ".github/workflows/pipeline.yml"
+      ]
+    },
+    {
       "id": "cicd.pipeline",
       "revision": 65,
       "section": "workflows",
@@ -218,7 +234,7 @@
     },
     {
       "id": "security.secrets-and-config",
-      "revision": 37,
+      "revision": 69,
       "section": "conventions",
       "sources": [
         {
@@ -262,6 +278,11 @@
           "reference": "README.md#compose"
         },
         {
+          "detail": "evidence-sha256:a1e211923e6b4c911452e65bfccb33c98578fe9db1315ddbcb48d0c0b052f250",
+          "kind": "documented",
+          "reference": "README.md#compose"
+        },
+        {
           "detail": "evidence-sha256:169cb3579a7f13e97489407e05a1e625c65d48efdff5f844fd0f2f07daea027e",
           "kind": "documented",
           "reference": "README.md#k3s-gitops"
@@ -302,12 +323,22 @@
           "reference": "README.md#k3s-gitops"
         },
         {
+          "detail": "evidence-sha256:a1e211923e6b4c911452e65bfccb33c98578fe9db1315ddbcb48d0c0b052f250",
+          "kind": "documented",
+          "reference": "README.md#k3s-gitops"
+        },
+        {
           "detail": "evidence-sha256:22d8b15c6a4937a5f3816e1e74b4a3c20306a462ea6a88f948cecb7093c892d4",
           "kind": "documented",
           "reference": "README.md#section"
         },
         {
           "detail": "evidence-sha256:3a5b9decd3a7cd80ccf8598e58807a4fa2d95bc471e6f015c80b275a349ae17b",
+          "kind": "documented",
+          "reference": "README.md#section"
+        },
+        {
+          "detail": "evidence-sha256:a1e211923e6b4c911452e65bfccb33c98578fe9db1315ddbcb48d0c0b052f250",
           "kind": "documented",
           "reference": "README.md#section"
         },
@@ -362,6 +393,11 @@
           "reference": "docs/framework-design.md#11"
         },
         {
+          "detail": "evidence-sha256:a1e211923e6b4c911452e65bfccb33c98578fe9db1315ddbcb48d0c0b052f250",
+          "kind": "documented",
+          "reference": "docs/framework-design.md#11"
+        },
+        {
           "detail": "evidence-sha256:169cb3579a7f13e97489407e05a1e625c65d48efdff5f844fd0f2f07daea027e",
           "kind": "documented",
           "reference": "docs/framework-design.md#12"
@@ -402,6 +438,11 @@
           "reference": "docs/framework-design.md#12"
         },
         {
+          "detail": "evidence-sha256:a1e211923e6b4c911452e65bfccb33c98578fe9db1315ddbcb48d0c0b052f250",
+          "kind": "documented",
+          "reference": "docs/framework-design.md#12"
+        },
+        {
           "detail": "evidence-sha256:169cb3579a7f13e97489407e05a1e625c65d48efdff5f844fd0f2f07daea027e",
           "kind": "documented",
           "reference": "docs/framework-design.md#8-secret-tls"
@@ -442,6 +483,11 @@
           "reference": "docs/framework-design.md#8-secret-tls"
         },
         {
+          "detail": "evidence-sha256:a1e211923e6b4c911452e65bfccb33c98578fe9db1315ddbcb48d0c0b052f250",
+          "kind": "documented",
+          "reference": "docs/framework-design.md#8-secret-tls"
+        },
+        {
           "detail": "evidence-sha256:169cb3579a7f13e97489407e05a1e625c65d48efdff5f844fd0f2f07daea027e",
           "kind": "documented",
           "reference": "docs/rust-collaboration-design.md#2-1"
@@ -482,6 +528,11 @@
           "reference": "docs/rust-collaboration-design.md#2-1"
         },
         {
+          "detail": "evidence-sha256:a1e211923e6b4c911452e65bfccb33c98578fe9db1315ddbcb48d0c0b052f250",
+          "kind": "documented",
+          "reference": "docs/rust-collaboration-design.md#2-1"
+        },
+        {
           "detail": "evidence-sha256:169cb3579a7f13e97489407e05a1e625c65d48efdff5f844fd0f2f07daea027e",
           "kind": "documented",
           "reference": "docs/rust-collaboration-design.md#7"
@@ -518,6 +569,11 @@
         },
         {
           "detail": "evidence-sha256:4cc991c8785e0118decd7d11538028062864b27bc12085669c23712cc64db2cf",
+          "kind": "documented",
+          "reference": "docs/rust-collaboration-design.md#7"
+        },
+        {
+          "detail": "evidence-sha256:a1e211923e6b4c911452e65bfccb33c98578fe9db1315ddbcb48d0c0b052f250",
           "kind": "documented",
           "reference": "docs/rust-collaboration-design.md#7"
         },
@@ -527,8 +583,8 @@
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-08-08T17:35:43Z",
-      "value": "Sensitive values are never stored in plaintext in source. Services receive secrets through environment variables or Kubernetes Secrets. The k3s-home-deploy GitOps repository may store only SOPS-encrypted Secret manifests; existing credentials, private keys, and the age key are not rotated unless rotation is explicitly authorized. Passwords, DSNs, JWTs, private keys, authorization or cookie values, API keys, full DTOs, SQL parameters, Redis keys, and message payloads must not be emitted to logs, metric labels, or span attributes; security decisions fail closed on dependency errors."
+      "updatedAt": "2026-08-10T09:20:36Z",
+      "value": "Secrets are injected only through environment variables, Kubernetes Secrets, or SOPS-encrypted GitOps manifests. This workflow does not automatically rotate keys; rotation requires explicit authorization. Sensitive values must not be stored in plaintext source, configuration, logs, metrics, spans, or release metadata."
     },
     {
       "id": "services.catalog",
@@ -822,11 +878,11 @@
     "profile": "generic",
     "slug": "knowledge-core"
   },
-  "revision": 66,
+  "revision": 70,
   "scan": {
-    "fingerprint": "3036d5c2b5f223c5e53ee3a067dd1dea4c5ab3312226e22af867094f155ef979",
-    "inventoryCount": 322
+    "fingerprint": "706681f96e520897c95184d33b54d3c1f147d3a8da8c7745271682b1711ff8be",
+    "inventoryCount": 320
   },
   "schemaVersion": 1,
-  "updatedAt": "2026-08-10T07:43:23Z"
+  "updatedAt": "2026-08-10T09:28:22Z"
 }

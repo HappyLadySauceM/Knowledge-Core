@@ -2,6 +2,14 @@
 
 # Knowledge-Core: Workflows
 
+## `cicd.config-files`
+
+Status: `verified`
+
+- `.github/workflows/pipeline.yml`
+
+Sources: `filesystem:ci-config`
+
 ## `cicd.pipeline`
 
 Status: `verified`

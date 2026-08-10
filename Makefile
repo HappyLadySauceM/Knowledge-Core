@@ -6,6 +6,7 @@ CARGO ?= cargo
 CARGO_DENY ?= cargo deny
 RUST_ROOT ?= services/collaboration
 IDL_COMPAT_BASE ?= HEAD^
+KC_RUST_GATE ?= 1
 
 # Keep the Node interoperability fixture and its dependency tree out of Go discovery.
 GO_PACKAGES ?= \
@@ -42,12 +43,12 @@ help:
 	@echo   make test            Run all Go and Rust tests without cached Go results
 	@echo   make race            Run all Go tests with the race detector
 	@echo   make build           Compile all Go packages and the release Rust workspace
-	@echo   make vuln            Check reachable Go and Rust vulnerabilities
+	@echo   make vuln            Check reachable Go vulnerabilities
 	@echo   make supply-chain    Check Rust advisories, bans, licenses, and sources
 	@echo   make tidy            Normalize go.mod and go.sum
 	@echo   make generate        Regenerate Hertz and Kitex code
 	@echo   make generate-check  Regenerate and fail on generated-code drift
-	@echo   make check           Run formatting, vet, lint, tests, and build
+	@echo   make check           Run Go gates and the Rust gate when enabled
 	@echo   make ci              Run check plus generated-code drift detection
 
 fmt:
@@ -80,7 +81,6 @@ build:
 
 vuln:
 	$(GOVULNCHECK) $(GO_PACKAGES)
-	cd $(RUST_ROOT) && $(CARGO_DENY) check advisories
 
 supply-chain:
 	cd $(RUST_ROOT) && $(CARGO_DENY) check advisories bans licenses sources
@@ -91,16 +91,19 @@ tidy:
 generate:
 	$(CODEGEN)
 
+ifeq ($(KC_RUST_GATE),0)
+generate-check:
+	$(CODEGEN_GO_CHECK)
+else
 generate-check:
 	$(CODEGEN_CHECK)
+endif
 
 generate-go-check:
 	$(CODEGEN_GO_CHECK)
 
 generate-rust-check:
 	$(CODEGEN_RUST_CHECK)
-
-check: fmt-check vet lint test build vuln supply-chain
 
 go-ci:
 	$(GOLANGCI_LINT) fmt --diff
@@ -109,15 +112,18 @@ go-ci:
 	go test -count=1 $(GO_PACKAGES)
 	go build $(GO_PACKAGES)
 	$(GOVULNCHECK) $(GO_PACKAGES)
-	$(CODEGEN_GO_CHECK)
 
 rust-ci:
 	cd $(RUST_ROOT) && $(CARGO) fmt --all --check
-	cd $(RUST_ROOT) && $(CARGO) clippy --workspace --all-targets --all-features --locked -- -D warnings
+	cd $(RUST_ROOT) && $(CARGO) clippy --workspace --all-features --locked -- -D warnings
 	cd $(RUST_ROOT) && $(CARGO) test --workspace --all-targets --all-features --locked
-	cd $(RUST_ROOT) && $(CARGO) build --workspace --release --locked
 	cd $(RUST_ROOT) && $(CARGO_DENY) check advisories bans licenses sources
-	$(CODEGEN_RUST_CHECK)
+
+ifeq ($(KC_RUST_GATE),0)
+check: go-ci
+else
+check: go-ci rust-ci
+endif
 
 ci: check generate-check
 

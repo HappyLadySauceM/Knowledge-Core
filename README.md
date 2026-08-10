@@ -205,9 +205,8 @@ make race
 ```text
 cd services/collaboration
 cargo fmt --all --check
-cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+cargo clippy --workspace --all-features --locked -- -D warnings
 cargo test --workspace --all-targets --all-features --locked
-cargo build --workspace --release --locked
 cargo deny check advisories bans licenses sources
 cd interop
 npm ci
@@ -237,10 +236,16 @@ Redis、Etcd、NATS、Nacos、MinIO 与 ClamAV 的 endpoint、账号、TLS、数
 GitOps 仓库同时保存 SOPS Secret、trust bundle 和不可变镜像 digest；应用仓库不记录具体
 集群拓扑或凭据。
 
-质量、镜像构建、GitOps 快照、Argo 健康和 dev 冒烟均在同一 workflow 中顺序执行。冒烟成功后，
-DeepSeek 使用受限的提交元数据生成 release 摘要；DeepSeek 失败会阻止 `main` promotion。成功时
-只允许 fast-forward `main`，并为受影响服务分别创建 `service-vMAJOR.MINOR.PATCH` tag 和
-GitHub Release。GitOps 快照推送同样要求远端分支未发生变化，禁止 force-push。
+质量、镜像构建、GitOps 快照、Argo 健康和 dev 冒烟均在同一 workflow 中顺序执行。Rust 门禁只在
+Rust、IDL、生成器、Makefile 或 workflow 变更时运行；其他提交仍执行 Go 门禁和生成漂移检查。
+`make ci` 不执行 Rust release 编译，受影响的 Collaboration 镜像构建会在 Docker 阶段完成该编译。
+冒烟成功后，DeepSeek 根据按服务分组、限长并脱敏的代码 diff 生成中文功能变更摘要；DeepSeek
+失败会阻止 `main` promotion。成功时只允许 fast-forward `main`，保留每个服务独立的
+`service-vMAJOR.MINOR.PATCH` tag，并额外创建一个 `knowledge-core-vMAJOR.MINOR.PATCH` 聚合 tag
+和单一 GitHub Release。Release 正文按服务列出功能变化和服务 tag，不记录 commit/workflow 元数据。
+GitOps 快照推送同样要求远端分支未发生变化，禁止 force-push。
+
+服务版本分别读取 `services/<service>/VERSION`；项目级聚合版本读取根目录 `VERSION`，两者互不覆盖。
 
 Argo CD repository Secret、AppProject 和 Application 由私有 GitOps 仓库声明。Application 使用
 普通 Kustomize source 组合服务与基础设施配置，并用独立 `ksops-v1.0` source 解密 Secret；

@@ -15,35 +15,72 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  CI_IMAGE: harbor.happyladysauce.local/knowledge-core/ci-templates@sha256:3fd37ee7cad6554486051d903fb4a420d9174c3658b57767e144f002189f34e2
+  CI_IMAGE: harbor.happyladysauce.local/knowledge-core/ci-templates@sha256:c91df3c06e7914cc8dbf98537d4fee26312af2c87cdf8fc9afb403de250abe94 # v1.1.0
   CI_PROJECT_CONFIG_JSON: >-
-    {"project":"Knowledge-Core","source_repo":"HappyLadySauceM/Knowledge-Core","gitops_repo":"https://github.com/HappyLadySauceM/k3s-home-deploy.git","gitops_path":"Knowledge-Core","gitops_branch":"main","shared_paths":["pkg","idl","kitex_gen","services/collaboration/interop","Makefile","go.mod","go.sum"],"harbor_registry":"harbor.happyladysauce.local","harbor_project":"knowledge-core","argocd_server":"argocd.happyladysauce.local","argocd_application":"knowledge-core-dev","smoke_command":["make","smoke-ci"],"release_model":"git-independent-service","deepseek_model":"deepseek-v4-flash","base_images":[{"source":"docker.m.daocloud.io/library/golang:1.26.5-alpine@sha256:0178a641fbb4858c5f1b48e34bdaabe0350a330a1b1149aabd498d0699ff5fb2","destination":"harbor.happyladysauce.local/knowledge-core/base/golang:1.26.5-alpine"},{"source":"gcr.io/distroless/static-debian12:nonroot@sha256:f5b485ea962d9bd1186b2f6b3a061191539b905b82ec395de78cbfae51f20e35","destination":"harbor.happyladysauce.local/knowledge-core/base/distroless-static-debian12:nonroot"},{"source":"docker.m.daocloud.io/library/rust:1.97.1-bookworm@sha256:77fac8b98f9f46062bb680b6d25d5bcaabfc400143952ebc572e924bcbedc3fa","destination":"harbor.happyladysauce.local/knowledge-core/base/rust:1.97.1-bookworm"},{"source":"docker.m.daocloud.io/library/debian:bookworm-slim@sha256:7b140f374b289a7c2befc338f42ebe6441b7ea838a042bbd5acbfca6ec875818","destination":"harbor.happyladysauce.local/knowledge-core/base/debian:bookworm-slim"}],"services":[{"name":"gateway","source_path":"services/gateway","version_file":"services/gateway/VERSION","dockerfile":"docker/gateway/Dockerfile","context":".","image_repository":"harbor.happyladysauce.local/knowledge-core/gateway","deploy_snapshot":"deploy/gateway"},{"name":"identity","source_path":"services/identity","version_file":"services/identity/VERSION","dockerfile":"docker/identity/Dockerfile","context":".","image_repository":"harbor.happyladysauce.local/knowledge-core/identity","deploy_snapshot":"deploy/identity"},{"name":"knowledge","source_path":"services/knowledge","version_file":"services/knowledge/VERSION","dockerfile":"docker/knowledge/Dockerfile","context":".","image_repository":"harbor.happyladysauce.local/knowledge-core/knowledge","deploy_snapshot":"deploy/knowledge"},{"name":"collaboration","source_path":"services/collaboration","version_file":"services/collaboration/VERSION","dockerfile":"docker/collaboration/Dockerfile","context":".","image_repository":"harbor.happyladysauce.local/knowledge-core/collaboration","deploy_snapshot":"deploy/collaboration"}]}
+    {"project":"Knowledge-Core","source_repo":"HappyLadySauceM/Knowledge-Core","gitops_repo":"https://github.com/HappyLadySauceM/k3s-home-deploy.git","gitops_path":"Knowledge-Core","gitops_branch":"main","shared_paths":["pkg","idl","kitex_gen","services/collaboration/interop","Makefile","go.mod","go.sum"],"harbor_registry":"harbor.happyladysauce.local","harbor_project":"knowledge-core","argocd_server":"argocd.happyladysauce.local","argocd_application":"knowledge-core-dev","smoke_command":["make","smoke-ci"],"release_model":"git-independent-service-aggregate","aggregate_release_prefix":"knowledge-core","aggregate_version_file":"VERSION","release_language":"zh-CN","deepseek_model":"deepseek-v4-flash","base_images":[{"source":"docker.m.daocloud.io/library/golang:1.26.5-alpine@sha256:0178a641fbb4858c5f1b48e34bdaabe0350a330a1b1149aabd498d0699ff5fb2","destination":"harbor.happyladysauce.local/knowledge-core/base/golang:1.26.5-alpine"},{"source":"gcr.io/distroless/static-debian12:nonroot@sha256:f5b485ea962d9bd1186b2f6b3a061191539b905b82ec395de78cbfae51f20e35","destination":"harbor.happyladysauce.local/knowledge-core/base/distroless-static-debian12:nonroot"},{"source":"docker.m.daocloud.io/library/rust:1.97.1-bookworm@sha256:77fac8b98f9f46062bb680b6d25d5bcaabfc400143952ebc572e924bcbedc3fa","destination":"harbor.happyladysauce.local/knowledge-core/base/rust:1.97.1-bookworm"},{"source":"docker.m.daocloud.io/library/debian:bookworm-slim@sha256:7b140f374b289a7c2befc338f42ebe6441b7ea838a042bbd5acbfca6ec875818","destination":"harbor.happyladysauce.local/knowledge-core/base/debian:bookworm-slim"}],"services":[{"name":"gateway","source_path":"services/gateway","version_file":"services/gateway/VERSION","dockerfile":"docker/gateway/Dockerfile","context":".","image_repository":"harbor.happyladysauce.local/knowledge-core/gateway","deploy_snapshot":"deploy/gateway"},{"name":"identity","source_path":"services/identity","version_file":"services/identity/VERSION","dockerfile":"docker/identity/Dockerfile","context":".","image_repository":"harbor.happyladysauce.local/knowledge-core/identity","deploy_snapshot":"deploy/identity"},{"name":"knowledge","source_path":"services/knowledge","version_file":"services/knowledge/VERSION","dockerfile":"docker/knowledge/Dockerfile","context":".","image_repository":"harbor.happyladysauce.local/knowledge-core/knowledge","deploy_snapshot":"deploy/knowledge"},{"name":"collaboration","source_path":"services/collaboration","version_file":"services/collaboration/VERSION","dockerfile":"docker/collaboration/Dockerfile","context":".","image_repository":"harbor.happyladysauce.local/knowledge-core/collaboration","deploy_snapshot":"deploy/collaboration"}]}
 
 jobs:
   quality:
     runs-on: [self-hosted, Linux, X64]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
           cache: false
+      - name: Determine Rust quality scope
+        id: rust-scope
+        run: |
+          set -euo pipefail
+          rust_gate=false
+          while IFS= read -r path; do
+            case "$path" in
+              services/collaboration/*|docker/collaboration/Dockerfile|idl/*|Makefile|scripts/codegen.sh|scripts/codegen.ps1|scripts/generated-files.txt|.github/workflows/pipeline.yml)
+                rust_gate=true
+                break
+                ;;
+            esac
+          done < <(git diff --name-only origin/main...HEAD)
+          if [ "$rust_gate" = true ]; then
+            echo "KC_RUST_GATE=1" >> "$GITHUB_ENV"
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "KC_RUST_GATE=0" >> "$GITHUB_ENV"
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "Rust gate enabled: $rust_gate"
       - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772
+        if: steps.rust-scope.outputs.enabled == 'true'
         with:
           toolchain: 1.97.1
           components: clippy, rustfmt
       - uses: taiki-e/install-action@583939ec0c8ee9c523cc60342d3d979ce6730f38
+        if: steps.rust-scope.outputs.enabled == 'true'
         with:
           tool: cargo-deny@0.20.2
           fallback: none
+      - uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        if: steps.rust-scope.outputs.enabled == 'true'
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            services/collaboration/target
+          key: ${{ runner.os }}-knowledge-core-rust-${{ hashFiles('services/collaboration/Cargo.lock', 'services/collaboration/rust-toolchain.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-knowledge-core-rust-
       - name: Run repository quality gates
         run: make ci
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        if: steps.rust-scope.outputs.enabled == 'true'
         with:
           node-version: 24.18.1
           cache: npm
           cache-dependency-path: services/collaboration/interop/package-lock.json
       - name: Run collaboration interop gates
+        if: steps.rust-scope.outputs.enabled == 'true'
         working-directory: services/collaboration/interop
         run: npm ci && npm run ci
 
@@ -91,10 +128,13 @@ jobs:
             -v "$DOCKER_CONFIG:/root/.docker:ro" -v "$HARBOR_CA_FILE:/etc/harbor-ca/ca.crt:ro" \
             -e CI_PROJECT_CONFIG_JSON -e DOCKER_HOST=unix:///var/run/docker.sock -e DOCKER_CONFIG=/root/.docker -e SSL_CERT_FILE=/etc/harbor-ca/ca.crt -w /workspace "$CI_IMAGE" validate
           base="$(git rev-parse origin/main)"
+          details_file="$RUNNER_TEMP/knowledge-core-release/changes.json"
           changes=$(docker run --rm --network host -v "$GITHUB_WORKSPACE:/workspace" -v "$socket:/var/run/docker.sock" \
             -v "$DOCKER_CONFIG:/root/.docker:ro" -v "$HARBOR_CA_FILE:/etc/harbor-ca/ca.crt:ro" \
-            -e CI_PROJECT_CONFIG_JSON -w /workspace "$CI_IMAGE" changes --base "$base")
+            -v "$RUNNER_TEMP/knowledge-core-release:/release-tmp" \
+            -e CI_PROJECT_CONFIG_JSON -w /workspace "$CI_IMAGE" changes --base "$base" --details-file /release-tmp/changes.json)
           echo "$changes"
+          test -s "$details_file"
           affected=$(echo "$changes" | jq -r '.services | join(",")')
           echo "services=$affected" >> "$GITHUB_OUTPUT"
           overrides='{}'
@@ -203,8 +243,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
-          CI_RELEASE_METADATA_JSON: '{"commit":"${{ github.sha }}","workflow":"knowledge-core-pipeline","ref":"${{ github.ref_name }}"}'
+          CI_RELEASE_CHANGES_FILE: /run/knowledge-core/changes.json
         run: |
           docker run --rm --network host -v "$GITHUB_WORKSPACE:/workspace" \
-            -e CI_PROJECT_CONFIG_JSON -e GITHUB_TOKEN -e DEEPSEEK_API_KEY -e CI_RELEASE_METADATA_JSON \
+            -v "$RUNNER_TEMP/knowledge-core-release/changes.json:/run/knowledge-core/changes.json:ro" \
+            -e CI_PROJECT_CONFIG_JSON -e GITHUB_TOKEN -e DEEPSEEK_API_KEY -e CI_RELEASE_CHANGES_FILE \
             -w /workspace "$CI_IMAGE" release --services "${{ steps.build.outputs.services }}"
