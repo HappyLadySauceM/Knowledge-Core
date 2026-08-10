@@ -52,9 +52,18 @@ jobs:
     environment: release
     runs-on: [self-hosted, Linux, X64]
     steps:
+      - name: Mint GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.GH_APP_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+          owner: HappyLadySauceM
+          repositories: Knowledge-Core,k3s-home-deploy
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
       - name: Prepare release credentials
         env:
           HARBOR_DOCKER_CONFIG_JSON: ${{ secrets.HARBOR_DOCKER_CONFIG_JSON }}
@@ -73,14 +82,6 @@ jobs:
           echo "DOCKER_CONFIG=$RUNNER_TEMP/knowledge-core-release/harbor" >> "$GITHUB_ENV"
           echo "HARBOR_CA_FILE=$RUNNER_TEMP/knowledge-core-release/harbor/ca.crt" >> "$GITHUB_ENV"
           echo "KUBECONFIG=$RUNNER_TEMP/knowledge-core-release/kubeconfig" >> "$GITHUB_ENV"
-      - name: Mint GitHub App token
-        id: app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
-        with:
-          app-id: ${{ secrets.GH_APP_ID }}
-          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
-          owner: HappyLadySauceM
-          repositories: Knowledge-Core,k3s-home-deploy
       - name: Validate and build affected services
         id: build
         run: |
