@@ -188,7 +188,6 @@ jobs:
             --description "Knowledge Core dev deployment failed" --target-url "https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
       - name: Remove previous image tags after smoke
         if: steps.build.outputs.services != ''
-        continue-on-error: true
         run: |
           docker_socket="${DOCKER_HOST:-unix:///var/run/docker.sock}"
           socket="${docker_socket#unix://}"
