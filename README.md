@@ -232,7 +232,9 @@ PostgreSQL 和 Redis，并在独立 namespace 提供 Nacos、NATS、Etcd、MinIO
 中的 Deployment、Service 与 Kustomization，以及 `overlay/dev/` 中的日志、运行环境、
 超时等服务行为配置；不再使用共享的 `deploy/base` 或 `deploy/overlay/dev`。PostgreSQL、
 Redis、Etcd、NATS、Nacos、MinIO 与 ClamAV 的 endpoint、账号、TLS、数据库名和前缀由私有
-`k3s-home-deploy` 维护，并在 Argo CD 渲染时通过 Kustomize Component 合入服务 ConfigMap。
+`k3s-home-deploy` 维护，并在每个服务的独立 Argo CD Application 中通过 Kustomize Component
+合入对应服务 ConfigMap。共享 Namespace、Secret、trust bundle、NetworkPolicy 和发布 RBAC
+由 `knowledge-core-foundation-dev` 管理。
 GitOps 仓库同时保存 SOPS Secret、trust bundle 和不可变镜像 digest；应用仓库不记录具体
 集群拓扑或凭据。
 
@@ -247,8 +249,9 @@ GitOps 快照推送同样要求远端分支未发生变化，禁止 force-push�
 
 服务版本分别读取 `services/<service>/VERSION`；项目级聚合版本读取根目录 `VERSION`，两者互不覆盖。
 
-Argo CD repository Secret、AppProject 和 Application 由私有 GitOps 仓库声明。Application 使用
-普通 Kustomize source 组合服务与基础设施配置，并用独立 `ksops-v1.0` source 解密 Secret；
+Argo CD repository Secret、AppProject 和 ApplicationSet 由私有 GitOps 仓库声明。ApplicationSet
+为 Gateway、Identity、Knowledge、Collaboration 分别生成 Application；服务 Application 使用
+普通 Kustomize source，foundation Application 使用独立 `ksops-v1.0` source 解密 Secret；
 同步策略为 Automated/Prune/Self Heal，镜像始终引用不可变 Harbor digest。
 
 当前测试覆盖领域、逻辑、transport、严格输入、错误映射、Collaboration commit-before-broadcast、恢复、投影、outbox、生命周期、双向 Kitex/Volo、Yjs 和多实例 JetStream 行为。按照当前范围，Identity 与 Knowledge repository 尚未包含真实 PostgreSQL 集成测试；不要把现有 mock/单元测试等同于数据库兼容性验证。Rust Collaboration 的性能对比、完整 Compose WebSocket E2E、依赖 stop/start、备份及切换/回滚演练仍需在发布前完成。

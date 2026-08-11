@@ -281,14 +281,16 @@ Kubernetes 所有权分为三层：`k3s-home-deploy/k3s`（服务器 `/opt/k3s`�
 应用仓库的 `deploy/<service>/base` 和 `deploy/<service>/overlay/dev` 由各服务自主
 维护工作负载与日志、运行环境、超时等服务行为配置；私有
 `k3s-home-deploy/Knowledge-Core` 保存基础设施连接配置、SOPS Secret、trust bundle 和镜像
-digest，并通过根 Kustomization 引用服务 overlay、再用 Component 合入连接配置。不再使用
+digest。四个服务分别通过独立 Kustomization 引用服务 overlay、对应连接配置 Component 和统一
+镜像覆盖 Component；共享资源由 foundation Kustomization 持有。不再使用
 集中式 `deploy/base` 与 `deploy/overlay/dev`。公共
 Nacos、NATS、Etcd、MinIO、ClamAV 位于独立 namespace，PostgreSQL 和 Redis 复用现有服务；
 应用只使用项目级账号和前缀。
 
-k3s 不保存 CI cache/PVC、构建镜像或发布 ServiceAccount，只保留 Argo CD；其只读 repository Secret、
-AppProject 和 Application 由 GitOps 仓库声明，Application 使用普通 Kustomize source 与独立
-`ksops-v1.0` Secret source，自动同步、prune 和 self-heal。
+k3s 不保存 CI cache/PVC 或构建镜像，只保留 Argo CD；其只读 repository Secret、AppProject 和
+ApplicationSet 由 GitOps 仓库声明。平台组件与四个应用服务各自拥有独立 Application，共享资源由
+两个 foundation Application 管理；Secret 使用独立 `ksops-v1.0` source。CI 更新统一镜像覆盖后，
+只等待受影响服务的 Application，再执行集群内冒烟。
 
 ### 当前不兼容基线的迁移记录
 
@@ -307,7 +309,7 @@ AppProject 和 Application 由 GitOps 仓库声明，Application 使用普通 Ku
   和聚合 GitHub Release；首次启用前仍需在目标 GitHub、Harbor、Argo 和 runner 环境配置凭据并
   完成端到端演练。
 - 应用 Secret、trust bundle、四份 Nacos 加密动态文档以及 Argo CD repository Secret、
-  AppProject/Application 已配置，并已验证首次同步。
+  AppProject/ApplicationSet 已配置，并已验证独立 Application 同步。
 - 当前只有 development overlay；单节点集群不作为 production 环境。
 - Node/Rust 性能基线、PostgreSQL/NATS stop/start 故障演练、备份恢复、切换/回滚和滚动升级尚未完成。
 - 生产镜像最终 digest 只能在发布构建后记录，仓库内门禁不能替代部署环境证书、容量和网络策略验证。

@@ -234,7 +234,7 @@
     },
     {
       "id": "security.secrets-and-config",
-      "revision": 69,
+      "revision": 78,
       "section": "conventions",
       "sources": [
         {
@@ -259,6 +259,11 @@
         },
         {
           "detail": "evidence-sha256:3a5b9decd3a7cd80ccf8598e58807a4fa2d95bc471e6f015c80b275a349ae17b",
+          "kind": "documented",
+          "reference": "README.md#compose"
+        },
+        {
+          "detail": "evidence-sha256:3d736f8270406798ffdecad08947632f1fb7e366e1404f1d8d298608db853cc6",
           "kind": "documented",
           "reference": "README.md#compose"
         },
@@ -304,6 +309,11 @@
         },
         {
           "detail": "evidence-sha256:3a5b9decd3a7cd80ccf8598e58807a4fa2d95bc471e6f015c80b275a349ae17b",
+          "kind": "documented",
+          "reference": "README.md#k3s-gitops"
+        },
+        {
+          "detail": "evidence-sha256:3d736f8270406798ffdecad08947632f1fb7e366e1404f1d8d298608db853cc6",
           "kind": "documented",
           "reference": "README.md#k3s-gitops"
         },
@@ -334,6 +344,11 @@
         },
         {
           "detail": "evidence-sha256:3a5b9decd3a7cd80ccf8598e58807a4fa2d95bc471e6f015c80b275a349ae17b",
+          "kind": "documented",
+          "reference": "README.md#section"
+        },
+        {
+          "detail": "evidence-sha256:3d736f8270406798ffdecad08947632f1fb7e366e1404f1d8d298608db853cc6",
           "kind": "documented",
           "reference": "README.md#section"
         },
@@ -378,6 +393,11 @@
           "reference": "docs/framework-design.md#11"
         },
         {
+          "detail": "evidence-sha256:3d736f8270406798ffdecad08947632f1fb7e366e1404f1d8d298608db853cc6",
+          "kind": "documented",
+          "reference": "docs/framework-design.md#11"
+        },
+        {
           "detail": "evidence-sha256:3f77cc944fbf3ecb65ded3b5c02fb37dfe49326b6577ad32a38d887c1446c4b1",
           "kind": "documented",
           "reference": "docs/framework-design.md#11"
@@ -423,6 +443,11 @@
           "reference": "docs/framework-design.md#12"
         },
         {
+          "detail": "evidence-sha256:3d736f8270406798ffdecad08947632f1fb7e366e1404f1d8d298608db853cc6",
+          "kind": "documented",
+          "reference": "docs/framework-design.md#12"
+        },
+        {
           "detail": "evidence-sha256:3f77cc944fbf3ecb65ded3b5c02fb37dfe49326b6577ad32a38d887c1446c4b1",
           "kind": "documented",
           "reference": "docs/framework-design.md#12"
@@ -468,6 +493,11 @@
           "reference": "docs/framework-design.md#8-secret-tls"
         },
         {
+          "detail": "evidence-sha256:3d736f8270406798ffdecad08947632f1fb7e366e1404f1d8d298608db853cc6",
+          "kind": "documented",
+          "reference": "docs/framework-design.md#8-secret-tls"
+        },
+        {
           "detail": "evidence-sha256:3f77cc944fbf3ecb65ded3b5c02fb37dfe49326b6577ad32a38d887c1446c4b1",
           "kind": "documented",
           "reference": "docs/framework-design.md#8-secret-tls"
@@ -513,6 +543,11 @@
           "reference": "docs/rust-collaboration-design.md#2-1"
         },
         {
+          "detail": "evidence-sha256:3d736f8270406798ffdecad08947632f1fb7e366e1404f1d8d298608db853cc6",
+          "kind": "documented",
+          "reference": "docs/rust-collaboration-design.md#2-1"
+        },
+        {
           "detail": "evidence-sha256:3f77cc944fbf3ecb65ded3b5c02fb37dfe49326b6577ad32a38d887c1446c4b1",
           "kind": "documented",
           "reference": "docs/rust-collaboration-design.md#2-1"
@@ -554,6 +589,11 @@
         },
         {
           "detail": "evidence-sha256:3a5b9decd3a7cd80ccf8598e58807a4fa2d95bc471e6f015c80b275a349ae17b",
+          "kind": "documented",
+          "reference": "docs/rust-collaboration-design.md#7"
+        },
+        {
+          "detail": "evidence-sha256:3d736f8270406798ffdecad08947632f1fb7e366e1404f1d8d298608db853cc6",
           "kind": "documented",
           "reference": "docs/rust-collaboration-design.md#7"
         },
@@ -583,7 +623,7 @@
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-08-10T09:20:36Z",
+      "updatedAt": "2026-08-11T04:57:35Z",
       "value": "Secrets are injected only through environment variables, Kubernetes Secrets, or SOPS-encrypted GitOps manifests. This workflow does not automatically rotate keys; rotation requires explicit authorization. Sensitive values must not be stored in plaintext source, configuration, logs, metrics, spans, or release metadata."
     },
     {
@@ -878,11 +918,11 @@
     "profile": "generic",
     "slug": "knowledge-core"
   },
-  "revision": 75,
+  "revision": 78,
   "scan": {
-    "fingerprint": "ba1a4c22379b7c16973e9e53334f90191752f455288ad71064d3ffbb0807a752",
-    "inventoryCount": 320
+    "fingerprint": "42a2e1e64566f07f2a64e2a326e0d84301c043906b31c32820677c5a0317952d",
+    "inventoryCount": 321
   },
   "schemaVersion": 1,
-  "updatedAt": "2026-08-10T14:43:57Z"
+  "updatedAt": "2026-08-11T04:57:35Z"
 }
