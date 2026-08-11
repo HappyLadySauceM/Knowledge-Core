@@ -27,7 +27,6 @@ processors:
         type: probabilistic
         probabilistic:
           sampling_percentage: 10
-          hash_seed: 42
 
 exporters:
   otlp/tempo:

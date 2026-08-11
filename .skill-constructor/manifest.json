@@ -27,9 +27,14 @@
     },
     {
       "id": "architecture.summary",
-      "revision": 85,
+      "revision": 87,
       "section": "architecture",
       "sources": [
+        {
+          "detail": "evidence-sha256:6462346ae40e26ec86a8858c5679558383c9321c7e4059f30540e112aaa2e0ba",
+          "kind": "documented",
+          "reference": "README.md#knowledge-core"
+        },
         {
           "detail": "evidence-sha256:6cc08ddcf5525a7adc55f189cd2dadddf88fab06ae4e47bfeb47c2e58a779255",
           "kind": "documented",
@@ -51,9 +56,19 @@
           "reference": "deploy/overlay/dev/README.md#development-overlay"
         },
         {
+          "detail": "evidence-sha256:6462346ae40e26ec86a8858c5679558383c9321c7e4059f30540e112aaa2e0ba",
+          "kind": "documented",
+          "reference": "docs/framework-design.md#9"
+        },
+        {
           "detail": "evidence-sha256:fa04c3f9180293ecf2ff1344428c0f951f2c9a56e4e1ad32f2fc50466cd99952",
           "kind": "documented",
           "reference": "docs/framework-design.md#9"
+        },
+        {
+          "detail": "evidence-sha256:6462346ae40e26ec86a8858c5679558383c9321c7e4059f30540e112aaa2e0ba",
+          "kind": "documented",
+          "reference": "docs/framework-design.md#knowledge-core"
         },
         {
           "detail": "evidence-sha256:6cc08ddcf5525a7adc55f189cd2dadddf88fab06ae4e47bfeb47c2e58a779255",
@@ -69,6 +84,11 @@
           "detail": "evidence-sha256:fa04c3f9180293ecf2ff1344428c0f951f2c9a56e4e1ad32f2fc50466cd99952",
           "kind": "documented",
           "reference": "docs/framework-design.md#knowledge-core"
+        },
+        {
+          "detail": "evidence-sha256:6462346ae40e26ec86a8858c5679558383c9321c7e4059f30540e112aaa2e0ba",
+          "kind": "documented",
+          "reference": "docs/rust-collaboration-design.md#rust-collaboration"
         },
         {
           "detail": "evidence-sha256:6cc08ddcf5525a7adc55f189cd2dadddf88fab06ae4e47bfeb47c2e58a779255",
@@ -95,7 +115,7 @@
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-08-11T09:14:24Z",
+      "updatedAt": "2026-08-11T17:24:44Z",
       "value": "Knowledge Core contains four explicitly composed services: Go Gateway, Identity, and Knowledge services plus a Rust Collaboration service. Go assembly flows main/spec -> internal/config -> internal/context -> domain/logic/repository/transport. ServiceContext owns service dependencies, while pkg/app.Runtime is limited to process-level observability, health, metrics, and lifecycle orchestration. Business logic depends on service-local small interfaces; repositories own persistence and storage error mapping; transports validate and adapt protocols without domain rules."
     },
     {
@@ -258,7 +278,7 @@
     },
     {
       "id": "security.secrets-and-config",
-      "revision": 85,
+      "revision": 87,
       "section": "conventions",
       "sources": [
         {
@@ -312,6 +332,11 @@
           "reference": "README.md#compose"
         },
         {
+          "detail": "evidence-sha256:6f8469da75fd7458b41f42abdb86b3058ff3b8095c873349ede521d974462e12",
+          "kind": "documented",
+          "reference": "README.md#compose"
+        },
+        {
           "detail": "evidence-sha256:941a6edecdb39ffe70c789beceea38c86a9cf954994318dbe2a85aab826b6e77",
           "kind": "documented",
           "reference": "README.md#compose"
@@ -377,6 +402,11 @@
           "reference": "README.md#k3s-gitops"
         },
         {
+          "detail": "evidence-sha256:6f8469da75fd7458b41f42abdb86b3058ff3b8095c873349ede521d974462e12",
+          "kind": "documented",
+          "reference": "README.md#k3s-gitops"
+        },
+        {
           "detail": "evidence-sha256:941a6edecdb39ffe70c789beceea38c86a9cf954994318dbe2a85aab826b6e77",
           "kind": "documented",
           "reference": "README.md#k3s-gitops"
@@ -408,6 +438,11 @@
         },
         {
           "detail": "evidence-sha256:57362d70e1f44aa28d5abc4f82881b3ba21f313c84605636433b6b1a941d129a",
+          "kind": "documented",
+          "reference": "README.md#section"
+        },
+        {
+          "detail": "evidence-sha256:6f8469da75fd7458b41f42abdb86b3058ff3b8095c873349ede521d974462e12",
           "kind": "documented",
           "reference": "README.md#section"
         },
@@ -487,6 +522,11 @@
           "reference": "docs/framework-design.md#11"
         },
         {
+          "detail": "evidence-sha256:6f8469da75fd7458b41f42abdb86b3058ff3b8095c873349ede521d974462e12",
+          "kind": "documented",
+          "reference": "docs/framework-design.md#11"
+        },
+        {
           "detail": "evidence-sha256:941a6edecdb39ffe70c789beceea38c86a9cf954994318dbe2a85aab826b6e77",
           "kind": "documented",
           "reference": "docs/framework-design.md#11"
@@ -552,6 +592,11 @@
           "reference": "docs/framework-design.md#12"
         },
         {
+          "detail": "evidence-sha256:6f8469da75fd7458b41f42abdb86b3058ff3b8095c873349ede521d974462e12",
+          "kind": "documented",
+          "reference": "docs/framework-design.md#12"
+        },
+        {
           "detail": "evidence-sha256:941a6edecdb39ffe70c789beceea38c86a9cf954994318dbe2a85aab826b6e77",
           "kind": "documented",
           "reference": "docs/framework-design.md#12"
@@ -617,6 +662,11 @@
           "reference": "docs/framework-design.md#8-secret-tls"
         },
         {
+          "detail": "evidence-sha256:6f8469da75fd7458b41f42abdb86b3058ff3b8095c873349ede521d974462e12",
+          "kind": "documented",
+          "reference": "docs/framework-design.md#8-secret-tls"
+        },
+        {
           "detail": "evidence-sha256:941a6edecdb39ffe70c789beceea38c86a9cf954994318dbe2a85aab826b6e77",
           "kind": "documented",
           "reference": "docs/framework-design.md#8-secret-tls"
@@ -682,6 +732,11 @@
           "reference": "docs/rust-collaboration-design.md#2-1"
         },
         {
+          "detail": "evidence-sha256:6f8469da75fd7458b41f42abdb86b3058ff3b8095c873349ede521d974462e12",
+          "kind": "documented",
+          "reference": "docs/rust-collaboration-design.md#2-1"
+        },
+        {
           "detail": "evidence-sha256:941a6edecdb39ffe70c789beceea38c86a9cf954994318dbe2a85aab826b6e77",
           "kind": "documented",
           "reference": "docs/rust-collaboration-design.md#2-1"
@@ -747,6 +802,11 @@
           "reference": "docs/rust-collaboration-design.md#7"
         },
         {
+          "detail": "evidence-sha256:6f8469da75fd7458b41f42abdb86b3058ff3b8095c873349ede521d974462e12",
+          "kind": "documented",
+          "reference": "docs/rust-collaboration-design.md#7"
+        },
+        {
           "detail": "evidence-sha256:941a6edecdb39ffe70c789beceea38c86a9cf954994318dbe2a85aab826b6e77",
           "kind": "documented",
           "reference": "docs/rust-collaboration-design.md#7"
@@ -760,6 +820,11 @@
           "detail": "evidence-sha256:fb988f8708eb4b94a819f41a3914b44a9a14cf3188296c55433740d35f09ed4a",
           "kind": "documented",
           "reference": "docs/rust-collaboration-design.md#7"
+        },
+        {
+          "detail": "evidence-sha256:6f8469da75fd7458b41f42abdb86b3058ff3b8095c873349ede521d974462e12",
+          "kind": "documented",
+          "reference": "docs/trace-architecture.md#7-collector-tempo"
         },
         {
           "detail": "evidence-sha256:941a6edecdb39ffe70c789beceea38c86a9cf954994318dbe2a85aab826b6e77",
@@ -776,7 +841,7 @@
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-08-11T09:14:24Z",
+      "updatedAt": "2026-08-11T17:24:44Z",
       "value": "Secrets are injected only through environment variables, Kubernetes Secrets, or SOPS-encrypted GitOps manifests. Sensitive values must not be stored in plaintext source, configuration, logs, metrics, spans, or release metadata."
     },
     {
@@ -1085,11 +1150,11 @@
     "profile": "generic",
     "slug": "knowledge-core"
   },
-  "revision": 85,
+  "revision": 87,
   "scan": {
-    "fingerprint": "e96e2a269d43ef790f8f6ebf99288b2e4f907afdbd23ecfcb4b7eb1009494896",
+    "fingerprint": "419e61cc1e565721a3610bb08cdcdf74eaf2c02bfe9b81e4a88d441fa82b1c9b",
     "inventoryCount": 326
   },
   "schemaVersion": 1,
-  "updatedAt": "2026-08-11T09:14:24Z"
+  "updatedAt": "2026-08-11T17:24:44Z"
 }

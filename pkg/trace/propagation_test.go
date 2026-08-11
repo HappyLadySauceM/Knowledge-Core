@@ -47,6 +47,7 @@ func TestHertzMiddlewareExtractsTraceAndCreatesRequestID(t *testing.T) {
 		"/documents/42?token=must-not-appear",
 		nil,
 		ut.Header{Key: "traceparent", Value: "00-" + traceID + "-" + parentSpanID + "-01"},
+		ut.Header{Key: "tracestate", Value: "vendor=value"},
 	)
 	if response.Code != 200 || handlerSpan.TraceID().String() != traceID {
 		t.Fatalf("response = %d, handler span = %s", response.Code, handlerSpan.TraceID())
@@ -65,6 +66,9 @@ func TestHertzMiddlewareExtractsTraceAndCreatesRequestID(t *testing.T) {
 	span := spans[0]
 	if span.Name() != "GET /documents/:id" || span.Parent().SpanID().String() != parentSpanID || !span.Parent().IsRemote() {
 		t.Fatalf("span = name %q, parent %s, remote %t", span.Name(), span.Parent().SpanID(), span.Parent().IsRemote())
+	}
+	if got := span.Parent().TraceState().String(); got != "vendor=value" {
+		t.Fatalf("parent tracestate = %q, want %q", got, "vendor=value")
 	}
 	for _, item := range span.Attributes() {
 		if strings.Contains(string(item.Key), "url") || strings.Contains(item.Value.String(), "must-not-appear") {

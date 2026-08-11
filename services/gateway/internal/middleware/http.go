@@ -97,7 +97,7 @@ func CORS() app.HandlerFunc {
 		request.Header("Access-Control-Expose-Headers", "ETag, Location, X-Request-ID, X-Trace-ID")
 		request.Header("Vary", "Origin")
 		if string(request.Method()) == consts.MethodOptions && request.GetHeader("Access-Control-Request-Method") != nil {
-			request.Header("Access-Control-Allow-Headers", "Authorization, Content-Type, Idempotency-Key, If-Match, X-Request-ID")
+			request.Header("Access-Control-Allow-Headers", "Authorization, Content-Type, Idempotency-Key, If-Match, X-Request-ID, traceparent, tracestate")
 			request.Header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 			request.Header("Access-Control-Max-Age", "600")
 			request.Abort()
