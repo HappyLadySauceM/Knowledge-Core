@@ -232,9 +232,9 @@ PostgreSQL 和 Redis，并在独立 namespace 提供 Nacos、NATS、Etcd、MinIO
 中的 Deployment、Service 与 Kustomization，以及 `overlay/dev/` 中的日志、运行环境、
 超时等服务行为配置；不再使用共享的 `deploy/base` 或 `deploy/overlay/dev`。PostgreSQL、
 Redis、Etcd、NATS、Nacos、MinIO 与 ClamAV 的 endpoint、账号、TLS、数据库名和前缀由私有
-`k3s-home-deploy` 维护，并在每个服务的独立 Argo CD Application 中通过 Kustomize Component
-合入对应服务 ConfigMap。共享 Namespace、Secret、trust bundle、NetworkPolicy 和发布 RBAC
-由 `knowledge-core-foundation-dev` 管理。
+`k3s-home-deploy` 维护，并在 `Knowledge-Core/dev/<service>` 中合入对应服务 ConfigMap。
+`Knowledge-Core/dev/common` 统一提供运行时补丁和不可变镜像 digest；共享 Namespace、Secret、
+trust bundle、NetworkPolicy 和发布 RBAC 由 `knowledge-core-foundation-dev` 管理。
 GitOps 仓库同时保存 SOPS Secret、trust bundle 和不可变镜像 digest；应用仓库不记录具体
 集群拓扑或凭据。
 

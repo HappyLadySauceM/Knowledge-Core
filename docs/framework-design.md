@@ -281,8 +281,9 @@ Kubernetes 所有权分为三层：`k3s-home-deploy/k3s`（服务器 `/opt/k3s`�
 应用仓库的 `deploy/<service>/base` 和 `deploy/<service>/overlay/dev` 由各服务自主
 维护工作负载与日志、运行环境、超时等服务行为配置；私有
 `k3s-home-deploy/Knowledge-Core` 保存基础设施连接配置、SOPS Secret、trust bundle 和镜像
-digest。四个服务分别通过独立 Kustomization 引用服务 overlay、对应连接配置 Component 和统一
-镜像覆盖 Component；共享资源由 foundation Kustomization 持有。不再使用
+digest。`deploy/` 是应用仓库部署模板的原样快照；`dev/<service>` 分别通过独立 Kustomization
+引用服务 overlay 和连接配置，`dev/common` 统一提供运行时补丁与镜像覆盖，共享资源由
+`dev/foundation` 持有。不再使用
 集中式 `deploy/base` 与 `deploy/overlay/dev`。公共
 Nacos、NATS、Etcd、MinIO、ClamAV 位于独立 namespace，PostgreSQL 和 Redis 复用现有服务；
 应用只使用项目级账号和前缀。
