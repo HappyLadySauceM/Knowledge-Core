@@ -90,6 +90,9 @@ services:
       dockerfile: docker/identity/Dockerfile
     container_name: knowledge-core-identity
     environment:
+      IDENTITY_TRACE_ENABLED: "true"
+      IDENTITY_TRACE_ENDPOINT: otel-collector:4317
+      IDENTITY_TRACE_SAMPLE_RATIO: "1"
       IDENTITY_POSTGRES_HOST: postgres
       IDENTITY_POSTGRES_PASSWORD: ${KC_POSTGRES_PASSWORD:?KC_POSTGRES_PASSWORD is required}
       IDENTITY_REDIS_ADDRESS: redis:6379
@@ -114,6 +117,9 @@ services:
       dockerfile: docker/knowledge/Dockerfile
     container_name: knowledge-core-knowledge
     environment:
+      KNOWLEDGE_TRACE_ENABLED: "true"
+      KNOWLEDGE_TRACE_ENDPOINT: otel-collector:4317
+      KNOWLEDGE_TRACE_SAMPLE_RATIO: "1"
       KNOWLEDGE_POSTGRES_HOST: postgres
       KNOWLEDGE_POSTGRES_PASSWORD: ${KC_POSTGRES_PASSWORD:?KC_POSTGRES_PASSWORD is required}
       KNOWLEDGE_ETCD_ENDPOINTS: etcd:2379
@@ -162,6 +168,7 @@ services:
       COLLABORATION_ETCD_ENDPOINTS: http://etcd:2379
       COLLABORATION_ETCD_PREFIX: /knowledge-core/development/registry
       COLLABORATION_KNOWLEDGE_SERVICE_NAME: knowledge-core.knowledge
+      COLLABORATION_OTLP_ENDPOINT: http://otel-collector:4317
     depends_on:
       postgres:
         condition: service_healthy
@@ -185,6 +192,9 @@ services:
       dockerfile: docker/gateway/Dockerfile
     container_name: knowledge-core-gateway
     environment:
+      GATEWAY_TRACE_ENABLED: "true"
+      GATEWAY_TRACE_ENDPOINT: otel-collector:4317
+      GATEWAY_TRACE_SAMPLE_RATIO: "1"
       GATEWAY_REDIS_ADDRESS: redis:6379
       GATEWAY_ETCD_ENDPOINTS: etcd:2379
       GATEWAY_AUTH_PUBLIC_KEY: ${KC_AUTH_PUBLIC_KEY:?KC_AUTH_PUBLIC_KEY is required}
@@ -225,6 +235,31 @@ services:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - knowledge-core-prometheus-data:/prometheus
 
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.133.0
+    container_name: knowledge-core-otel-collector
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    depends_on:
+      tempo:
+        condition: service_started
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
+    restart: unless-stopped
+
+  tempo:
+    image: grafana/tempo:2.8.2
+    container_name: knowledge-core-tempo
+    command: ["-config.file=/etc/tempo.yaml"]
+    ports:
+      - "3200:3200"
+    volumes:
+      - ./tempo.yaml:/etc/tempo.yaml:ro
+      - knowledge-core-tempo-data:/var/tempo
+    restart: unless-stopped
+
 volumes:
   knowledge-core-postgres-data:
   knowledge-core-redis-data:
@@ -233,3 +268,4 @@ volumes:
   knowledge-core-minio-data:
   knowledge-core-clamav-data:
   knowledge-core-prometheus-data:
+  knowledge-core-tempo-data:

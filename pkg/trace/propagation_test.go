@@ -129,3 +129,28 @@ func TestRuntimeAcceptsNilLogger(t *testing.T) {
 		t.Fatalf("Shutdown() error = %v", err)
 	}
 }
+
+func TestSuppressedContextDropsInstrumentedSpans(t *testing.T) {
+	recorder := tracetest.NewSpanRecorder()
+	provider := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(&suppressionSpanProcessor{delegate: recorder}))
+	ctx, span := provider.Tracer("test").Start(Suppress(context.Background()), "health")
+	span.End()
+	if got := len(recorder.Ended()); got != 0 {
+		t.Fatalf("suppressed spans = %d, want 0", got)
+	}
+	_ = ctx
+	_ = provider.Shutdown(context.Background())
+}
+
+func TestNoisePoliciesCoverHealthAndProbeMethods(t *testing.T) {
+	for _, path := range []string{"/metrics", "/livez", "/readyz", "/health/live", "/health/ready"} {
+		if !IgnoreHTTPPath(path) {
+			t.Errorf("IgnoreHTTPPath(%q) = false", path)
+		}
+	}
+	for _, method := range []string{"Ping", "Live", "healthcheck"} {
+		if !IgnoreRPCMethod(method) {
+			t.Errorf("IgnoreRPCMethod(%q) = false", method)
+		}
+	}
+}

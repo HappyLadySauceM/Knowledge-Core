@@ -54,6 +54,8 @@ func (s *outboxRepositoryStub) RetryOutbox(ctx context.Context, id string, delay
 	return nil
 }
 
+func (s *outboxRepositoryStub) ParkOutbox(context.Context, string, string) error { return nil }
+
 func (*outboxRepositoryStub) QueueExpiredUploads(context.Context, int) error {
 	panic("unexpected QueueExpiredUploads call")
 }
@@ -119,7 +121,9 @@ func (*lifecycleRepositoryStub) MarkOutboxPublished(context.Context, string) err
 func (*lifecycleRepositoryStub) RetryOutbox(context.Context, string, time.Duration) error {
 	return nil
 }
-func (*lifecycleRepositoryStub) QueueExpiredUploads(context.Context, int) error { return nil }
+
+func (*lifecycleRepositoryStub) ParkOutbox(context.Context, string, string) error { return nil }
+func (*lifecycleRepositoryStub) QueueExpiredUploads(context.Context, int) error   { return nil }
 func (*lifecycleRepositoryStub) ClaimAttachmentJobs(context.Context, int, time.Duration) ([]domain.ScanJob, error) {
 	return nil, nil
 }

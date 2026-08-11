@@ -9,6 +9,8 @@ import (
 	"time"
 
 	natsclient "github.com/nats-io/nats.go"
+	"go.opentelemetry.io/otel/attribute"
+	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
 type jetStreamPublisher interface {
@@ -96,11 +98,14 @@ func (d *Delivery) Term(ctx context.Context, reason string) error {
 			deadLetter.Header.Set("X-Dead-Letter-Reason", reason)
 			deadLetter.Header.Set("X-Original-Subject", d.msg.Subject)
 			deadLetter.Header.Set("X-Delivery-Attempt", strconv.Itoa(d.attempt))
+			deadLetter.Header.Set("X-Message-ID", d.message.ID)
 			injectTrace(ctx, deadLetter.Header)
 			if _, err := d.js.PublishMsg(deadLetter, natsclient.Context(ctx)); err != nil {
+				oteltrace.SpanFromContext(ctx).RecordError(err)
 				return fmt.Errorf("publish nats dead letter: %w", err)
 			}
 		}
+		oteltrace.SpanFromContext(ctx).AddEvent("message.parked", oteltrace.WithAttributes(attribute.String("messaging.dead_letter.reason", reason)))
 		if err := d.msg.Term(); err != nil {
 			return fmt.Errorf("terminate nats delivery: %w", err)
 		}

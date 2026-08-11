@@ -137,6 +137,7 @@ type OutboxMessage struct {
 	ID       string
 	Subject  string
 	Payload  []byte
+	Headers  map[string]string
 	Attempts int
 }
 

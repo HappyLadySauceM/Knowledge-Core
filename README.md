@@ -109,7 +109,8 @@ Knowledge 不保存 Yjs update、快照或版本；这些数据属于 Collaborat
 | Knowledge RPC/admin | `8882` / `8083` |
 | Collaboration WebSocket/RPC/admin | `8091` / `8883` / `8084` |
 | PostgreSQL/Redis/Etcd/NATS | `5432` / `6379` / `2379` / `4222` |
-| MinIO/console/ClamAV/Prometheus | `9000` / `9001` / `3310` / `9090` |
+| MinIO/console/ClamAV/Prometheus/Tempo | `9000` / `9001` / `3310` / `9090` / `3200` |
+| OTel Collector (OTLP gRPC/HTTP) | `4317` / `4318` |
 
 ## Compose 快速开始
 
@@ -136,7 +137,7 @@ docker compose -f docker/infrastructure/docker-compose.yml up -d --build
 docker compose -f docker/infrastructure/docker-compose.yml ps
 ```
 
-ClamAV 首次启动需要初始化病毒库，Knowledge 在 ClamAV、对象存储、NATS、数据库、Etcd、Identity 和 Collaboration 均可用后才会 ready。检查入口：
+ClamAV 首次启动需要初始化病毒库，Knowledge 在 ClamAV、对象存储、NATS、数据库、Etcd、Identity 和 Collaboration 均可用后才会 ready。Compose 默认启用本地 OTel Collector + Tempo；打开 `http://127.0.0.1:3200` 查询 trace。collector 的 tail sampling 保留错误、parking/DLQ、超过 1 秒的 trace，并按 10% 保留其余成功 trace。生产部署不要复用本地地址，OTLP endpoint、TLS 和鉴权由部署平台注入。检查入口：
 
 ```powershell
 Invoke-RestMethod http://127.0.0.1:8081/readyz

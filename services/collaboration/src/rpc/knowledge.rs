@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use pilota::FastStr;
 use serde_json::{Map, Value};
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
+use tracing::Instrument as _;
 use volo::loadbalance::random::WeightedRandomBalance;
 use volo_thrift::client::CallOpt;
 
@@ -76,9 +77,19 @@ impl KnowledgeClient {
             .clone()
             .with_callopt(option)
             .authorize_collaboration(request);
-        let result = tokio::time::timeout(timeout, scope_outgoing_metadata(context, call))
-            .await
-            .map_err(|_| deadline_error())?;
+        let span = tracing::info_span!(
+            "collaboration.rpc.client",
+            rpc.system = "volo_thrift",
+            rpc.service = "knowledge",
+            rpc.method = "authorize_collaboration",
+            request_id = %context.request_id,
+        );
+        let result = tokio::time::timeout(
+            timeout,
+            scope_outgoing_metadata(context, call).instrument(span),
+        )
+        .await
+        .map_err(|_| deadline_error())?;
         result.map_err(knowledge_client_error)
     }
 
@@ -93,9 +104,19 @@ impl KnowledgeClient {
             .clone()
             .with_callopt(option)
             .project_collaboration(request);
-        let result = tokio::time::timeout(timeout, scope_outgoing_metadata(context, call))
-            .await
-            .map_err(|_| deadline_error())?;
+        let span = tracing::info_span!(
+            "collaboration.rpc.client",
+            rpc.system = "volo_thrift",
+            rpc.service = "knowledge",
+            rpc.method = "project_collaboration",
+            request_id = %context.request_id,
+        );
+        let result = tokio::time::timeout(
+            timeout,
+            scope_outgoing_metadata(context, call).instrument(span),
+        )
+        .await
+        .map_err(|_| deadline_error())?;
         result.map_err(knowledge_client_error)
     }
 

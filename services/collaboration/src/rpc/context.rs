@@ -7,6 +7,12 @@ use std::{
 
 use metainfo::{Forward, METAINFO, MetaInfo};
 use motore::{layer::Layer, service::Service};
+use opentelemetry::{
+    Context as OpenTelemetryContext, global,
+    propagation::{Extractor, Injector},
+};
+use tracing::Instrument as _;
+use tracing_opentelemetry::OpenTelemetrySpanExt as _;
 use uuid::Uuid;
 use volo::context::Context;
 use volo_thrift::{ServerError, context::ServerContext};
@@ -31,6 +37,21 @@ struct RpcMetadata {
     trace_parent: Option<Arc<str>>,
     trace_state: Option<Arc<str>>,
     baggage: Option<Arc<str>>,
+}
+
+impl Extractor for RpcMetadata {
+    fn get(&self, key: &str) -> Option<&str> {
+        match key {
+            TRACE_PARENT_KEY => self.trace_parent.as_deref(),
+            TRACE_STATE_KEY => self.trace_state.as_deref(),
+            BAGGAGE_KEY => self.baggage.as_deref(),
+            _ => None,
+        }
+    }
+
+    fn keys(&self) -> Vec<&str> {
+        vec![TRACE_PARENT_KEY, TRACE_STATE_KEY, BAGGAGE_KEY]
+    }
 }
 
 tokio::task_local! {
@@ -100,16 +121,42 @@ where
         let metadata = extract_metadata(timeout)
             .map_err(|error| super::biz::service_error_with_context(&error, None, None))?;
         let request_context = metadata.request.clone();
+        let method = context.rpc_info().method().to_string();
+        let span = (!is_ignored_rpc_method(&method)).then(|| {
+            let span = tracing::info_span!(
+                "collaboration.rpc.server",
+                rpc.system = "volo_thrift",
+                rpc.service = crate::SERVICE_NAME,
+                rpc.method = %method,
+                request_id = %request_context.request_id,
+            );
+            let parent = global::get_text_map_propagator(|propagator| {
+                propagator.extract_with_context(&OpenTelemetryContext::new(), &metadata)
+            });
+            let _ = span.set_parent(parent);
+            span
+        });
 
         RPC_METADATA
-            .scope(metadata, async {
-                match tokio::time::timeout(timeout, self.inner.call(context, request)).await {
-                    Ok(result) => result,
-                    Err(_) => Err(super::biz::deadline_error(&request_context)),
+            .scope(
+                metadata,
+                async {
+                    match tokio::time::timeout(timeout, self.inner.call(context, request)).await {
+                        Ok(result) => result,
+                        Err(_) => Err(super::biz::deadline_error(&request_context)),
+                    }
                 }
-            })
+                .instrument(span.unwrap_or_else(tracing::Span::none)),
+            )
             .await
     }
+}
+
+fn is_ignored_rpc_method(method: &str) -> bool {
+    matches!(
+        method.to_ascii_lowercase().as_str(),
+        "ping" | "live" | "health" | "healthcheck"
+    )
 }
 
 /// Returns the request context scoped to the current inbound RPC task.
@@ -169,21 +216,52 @@ pub async fn scope_outgoing_metadata<Output>(
             )
         })
         .unwrap_or_default();
+    let mut injected = PropagationInjector::default();
+    global::get_text_map_propagator(|propagator| {
+        propagator.inject_context(&OpenTelemetryContext::current(), &mut injected);
+    });
     let mut metadata = MetaInfo::new();
     metadata.set_persistent(REQUEST_ID_KEY, context.request_id.to_string());
     if let Some(token) = &context.access_token {
         metadata.set_persistent(ACCESS_TOKEN_KEY, token.expose().to_owned());
     }
-    if let Some(value) = propagation.0 {
-        metadata.set_persistent(TRACE_PARENT_KEY, value.to_string());
+    if let Some(value) = injected
+        .trace_parent
+        .or_else(|| propagation.0.map(|value| value.to_string()))
+    {
+        metadata.set_persistent(TRACE_PARENT_KEY, value);
     }
-    if let Some(value) = propagation.1 {
-        metadata.set_persistent(TRACE_STATE_KEY, value.to_string());
+    if let Some(value) = injected
+        .trace_state
+        .or_else(|| propagation.1.map(|value| value.to_string()))
+    {
+        metadata.set_persistent(TRACE_STATE_KEY, value);
     }
-    if let Some(value) = propagation.2 {
-        metadata.set_persistent(BAGGAGE_KEY, value.to_string());
+    if let Some(value) = injected
+        .baggage
+        .or_else(|| propagation.2.map(|value| value.to_string()))
+    {
+        metadata.set_persistent(BAGGAGE_KEY, value);
     }
     METAINFO.scope(RefCell::new(metadata), future).await
+}
+
+#[derive(Default)]
+struct PropagationInjector {
+    trace_parent: Option<String>,
+    trace_state: Option<String>,
+    baggage: Option<String>,
+}
+
+impl Injector for PropagationInjector {
+    fn set(&mut self, key: &str, value: String) {
+        match key {
+            TRACE_PARENT_KEY => self.trace_parent = Some(value),
+            TRACE_STATE_KEY => self.trace_state = Some(value),
+            BAGGAGE_KEY if value.len() <= MAX_BAGGAGE_LENGTH => self.baggage = Some(value),
+            _ => {}
+        }
+    }
 }
 
 #[cfg(test)]
@@ -245,6 +323,9 @@ fn extract_metadata(timeout: Duration) -> Result<RpcMetadata> {
             request_id: Arc::from(request_id),
             access_token,
             deadline: Instant::now().checked_add(timeout),
+            trace_parent: trace_parent.clone(),
+            trace_state: trace_state.clone(),
+            baggage: baggage.clone(),
         },
         trace_parent,
         trace_state,

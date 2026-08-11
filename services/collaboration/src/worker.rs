@@ -10,15 +10,19 @@ use std::{
 use async_nats::jetstream::{
     self,
     consumer::{self, AckPolicy, DeliverPolicy, pull},
+    message::AckKind,
     stream::{self, DiscardPolicy, RetentionPolicy, StorageType},
 };
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures_util::StreamExt as _;
+use opentelemetry::{Context as OpenTelemetryContext, global, propagation::Extractor};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use tokio::{sync::Mutex, task::AbortHandle};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
+use tracing::Instrument as _;
+use tracing_opentelemetry::OpenTelemetrySpanExt as _;
 
 use crate::{
     actor::{ActorRegistry, CLOSE_DOCUMENT_INVALIDATED},
@@ -46,6 +50,16 @@ const _: () = assert!(STREAM_MAX_AGE.as_millis() >= PERMISSION_REPLAY_MINIMUM.as
 #[async_trait]
 pub trait EventPublisher: Send + Sync {
     async fn publish(&self, subject: &str, payload: Vec<u8>) -> Result<()>;
+
+    async fn publish_with_headers(
+        &self,
+        subject: &str,
+        payload: Vec<u8>,
+        headers: &std::collections::BTreeMap<String, String>,
+    ) -> Result<()> {
+        let _ = headers;
+        self.publish(subject, payload).await
+    }
 
     async fn ping(&self) -> Result<()>;
 }
@@ -434,6 +448,7 @@ fn consumer_config(
         ack_wait,
         filter_subject: subject.to_owned(),
         max_ack_pending: 256,
+        max_deliver: 8,
         ..Default::default()
     }
 }
@@ -446,6 +461,7 @@ fn validate_consumer_config(expected: &pull::Config, actual: &consumer::Config) 
         || actual.ack_policy != expected.ack_policy
         || actual.ack_wait != expected.ack_wait
         || actual.max_ack_pending != expected.max_ack_pending
+        || actual.max_deliver != expected.max_deliver
     {
         return Err(ServiceError::conflict(
             "NATS JetStream consumer configuration does not match",
@@ -457,15 +473,34 @@ fn validate_consumer_config(expected: &pull::Config, actual: &consumer::Config) 
 #[async_trait]
 impl EventPublisher for NatsClient {
     async fn publish(&self, subject: &str, payload: Vec<u8>) -> Result<()> {
+        self.publish_with_headers(subject, payload, &std::collections::BTreeMap::new())
+            .await
+    }
+
+    async fn publish_with_headers(
+        &self,
+        subject: &str,
+        payload: Vec<u8>,
+        headers: &std::collections::BTreeMap<String, String>,
+    ) -> Result<()> {
         tokio::time::timeout(self.operation_timeout, async {
+            let mut nats_headers = async_nats::HeaderMap::new();
+            for (key, value) in headers {
+                if key.eq_ignore_ascii_case("baggage") && value.len() > 8_192 {
+                    continue;
+                }
+                nats_headers.insert(key.as_str(), value.as_str());
+            }
             let acknowledgement = self
                 .jetstream
-                .publish(subject.to_owned(), Bytes::from(payload))
+                .publish_with_headers(subject.to_owned(), nats_headers, Bytes::from(payload))
                 .await
                 .map_err(|error| dependency_error(error, "publish NATS JetStream event"))?
                 .await
                 .map_err(|error| dependency_error(error, "acknowledge NATS JetStream publish"))?;
-            if acknowledgement.stream != self.document_stream.as_ref() {
+            if acknowledgement.stream != self.document_stream.as_ref()
+                && acknowledgement.stream != self.permission_stream.as_ref()
+            {
                 return Err(ServiceError::unavailable(anyhow::anyhow!(
                     "NATS acknowledged the event from an unexpected stream"
                 )));
@@ -951,7 +986,27 @@ async fn publish_outbox_event(publisher: &dyn EventPublisher, event: &OutboxEven
     let payload = serde_json::to_vec(&event.payload).map_err(|error| {
         ServiceError::internal(anyhow::anyhow!(error).context("encode outbox payload"))
     })?;
-    publisher.publish(&event.subject, payload).await
+    let mut headers = event.trace_headers.clone();
+    headers.insert("X-Message-ID".to_owned(), event.id.to_string());
+    headers.insert("X-Message-Type".to_owned(), event.subject.clone());
+    headers.insert("X-Event-Key".to_owned(), event.event_key.clone());
+    let span = tracing::info_span!(
+        "collaboration.nats.publish",
+        messaging.system = "nats",
+        messaging.destination = %event.subject,
+        messaging.message_id = %event.id,
+    );
+    let parent = global::get_text_map_propagator(|propagator| {
+        propagator.extract_with_context(
+            &OpenTelemetryContext::new(),
+            &StoredHeaderExtractor::new(&event.trace_headers),
+        )
+    });
+    let _ = span.set_parent(parent);
+    publisher
+        .publish_with_headers(&event.subject, payload, &headers)
+        .instrument(span)
+        .await
 }
 
 #[derive(Clone, Copy)]
@@ -999,18 +1054,50 @@ async fn subscription_loop(
                 if message.info().is_ok_and(|info| info.delivered > 1) {
                     metrics.worker_operation("nats_redelivery", true);
                 }
+                let delivery_attempt = message.info().map_or(1, |info| info.delivered);
+                let consume_span = tracing::info_span!(
+                    "collaboration.nats.consume",
+                    messaging.system = "nats",
+                    messaging.destination = %message.message.subject,
+                    messaging.delivery_attempt = delivery_attempt,
+                );
+                let parent = message.message.headers.as_ref().map_or_else(
+                    OpenTelemetryContext::new,
+                    |headers| {
+                        global::get_text_map_propagator(|propagator| {
+                            propagator.extract_with_context(
+                                &OpenTelemetryContext::new(),
+                                &AsyncNatsHeaderExtractor { headers },
+                            )
+                        })
+                    },
+                );
+                let _ = consume_span.set_parent(parent);
                 let handled = tokio::time::timeout(
                     operation_timeout,
                     handle_event(kind, &message.payload, &actors),
-                ).await;
+                )
+                .instrument(consume_span)
+                .await;
                 if !matches!(handled, Ok(Ok(()))) {
                     if let Some(replay) = &startup_replay {
                         replay.failed();
                     }
-                    healthy.store(false, Ordering::Release);
-                    health.set_ready(false);
                     metrics.worker_operation("nats_event", false);
-                    break;
+                    let acknowledgement = if delivery_attempt >= 8 {
+                        metrics.worker_operation("nats_event_parked", true);
+                        message.double_ack_with(AckKind::Term)
+                    } else {
+                        let delay = Duration::from_secs(1_u64 << delivery_attempt.min(7));
+                        message.double_ack_with(AckKind::Nak(Some(delay)))
+                    };
+                    if acknowledgement.await.is_err() {
+                        healthy.store(false, Ordering::Release);
+                        health.set_ready(false);
+                        metrics.worker_operation("nats_ack", false);
+                        break;
+                    }
+                    continue;
                 }
                 let acknowledged = tokio::time::timeout(operation_timeout, message.double_ack()).await;
                 if !matches!(acknowledged, Ok(Ok(()))) {
@@ -1025,6 +1112,43 @@ async fn subscription_loop(
                 metrics.worker_operation("nats_event", true);
             }
         }
+    }
+}
+
+struct StoredHeaderExtractor<'a> {
+    headers: &'a std::collections::BTreeMap<String, String>,
+}
+
+impl<'a> StoredHeaderExtractor<'a> {
+    const fn new(headers: &'a std::collections::BTreeMap<String, String>) -> Self {
+        Self { headers }
+    }
+}
+
+impl Extractor for StoredHeaderExtractor<'_> {
+    fn get(&self, key: &str) -> Option<&str> {
+        self.headers
+            .iter()
+            .find(|(name, _)| name.eq_ignore_ascii_case(key))
+            .map(|(_, value)| value.as_str())
+    }
+
+    fn keys(&self) -> Vec<&str> {
+        self.headers.keys().map(String::as_str).collect()
+    }
+}
+
+struct AsyncNatsHeaderExtractor<'a> {
+    headers: &'a async_nats::HeaderMap,
+}
+
+impl Extractor for AsyncNatsHeaderExtractor<'_> {
+    fn get(&self, key: &str) -> Option<&str> {
+        self.headers.get(key).map(async_nats::HeaderValue::as_str)
+    }
+
+    fn keys(&self) -> Vec<&str> {
+        vec!["traceparent", "tracestate", "baggage"]
     }
 }
 
@@ -1528,6 +1652,7 @@ mod tests {
             event_key: "document.updated:test".to_owned(),
             subject: NATS_UPDATE_SUBJECT.to_owned(),
             payload: serde_json::json!({"document_id": DocumentId::new()}),
+            trace_headers: std::collections::BTreeMap::new(),
             attempts: 0,
         };
         let store = OutboxStore {
@@ -1844,6 +1969,7 @@ mod tests {
             ack_wait: expected.ack_wait,
             filter_subject: expected.filter_subject.clone(),
             max_ack_pending: expected.max_ack_pending,
+            max_deliver: expected.max_deliver,
             ..Default::default()
         }
     }

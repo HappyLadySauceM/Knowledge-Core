@@ -332,7 +332,7 @@ impl ActorRegistry {
         }
         let handle = self.actor(context, document_id, known_revision).await?;
         drop(permission_revisions);
-        handle.connect(session).await
+        handle.connect(context, session).await
     }
 
     /// Serializes a version restoration through the document actor.
@@ -542,10 +542,15 @@ struct ActorHandle {
 impl ActorHandle {
     async fn connect(
         &self,
+        context: &RequestContext,
         session: ActorSession,
     ) -> std::result::Result<ActorConnection, CloseSignal> {
         let (response, receiver) = oneshot::channel();
-        self.send_command(ActorCommand::Connect { session, response })?;
+        self.send_command(ActorCommand::Connect {
+            context: context.clone(),
+            session,
+            response,
+        })?;
         match tokio::time::timeout(self.command_timeout, receiver).await {
             Ok(Ok(result)) => result,
             Ok(Err(_)) | Err(_) => Err(CLOSE_DEPENDENCY_UNAVAILABLE),
@@ -640,6 +645,7 @@ pub struct ActorConnection {
     document_id: DocumentId,
     commands: mpsc::Sender<ActorCommand>,
     command_timeout: Duration,
+    request_context: RequestContext,
     outbound: mpsc::Receiver<Vec<u8>>,
     close: watch::Receiver<Option<CloseSignal>>,
     disconnected: CancellationToken,
@@ -660,6 +666,7 @@ impl ActorConnection {
         let command = ActorCommand::Frame {
             connection_id: self.id,
             payload,
+            context: self.request_context.with_deadline(self.command_timeout),
             response,
         };
         match self.commands.try_send(command) {
@@ -715,12 +722,14 @@ pub enum ConnectionEvent {
 
 enum ActorCommand {
     Connect {
+        context: RequestContext,
         session: ActorSession,
         response: oneshot::Sender<std::result::Result<ActorConnection, CloseSignal>>,
     },
     Frame {
         connection_id: Uuid,
         payload: Vec<u8>,
+        context: RequestContext,
         response: oneshot::Sender<std::result::Result<(), CloseSignal>>,
     },
     ApplyRemote {
@@ -871,11 +880,24 @@ async fn run_actor(
                     break;
                 };
                 match command {
-                    ActorCommand::Connect { session, response } => {
-                        let _ = response.send(actor.connect(session, command_sender.clone()));
+                    ActorCommand::Connect {
+                        context,
+                        session,
+                        response,
+                    } => {
+                        let _ = response.send(actor.connect(
+                            session,
+                            command_sender.clone(),
+                            context,
+                        ));
                     }
-                    ActorCommand::Frame { connection_id, payload, response } => {
-                        let result = actor.handle_frame(connection_id, &payload).await;
+                    ActorCommand::Frame {
+                        connection_id,
+                        payload,
+                        context,
+                        response,
+                    } => {
+                        let result = actor.handle_frame(connection_id, &payload, &context).await;
                         if let Err(close) = result {
                             actor.close_connection(connection_id, close);
                         }
@@ -946,6 +968,7 @@ impl DocumentActor {
         &mut self,
         session: ActorSession,
         commands: mpsc::Sender<ActorCommand>,
+        request_context: RequestContext,
     ) -> std::result::Result<ActorConnection, CloseSignal> {
         self.prune_connections();
         if session.expires_at <= time::OffsetDateTime::now_utc() {
@@ -987,6 +1010,7 @@ impl DocumentActor {
             document_id: self.document_id,
             commands,
             command_timeout: self.limits.command_timeout,
+            request_context,
             outbound: receiver,
             close: close_receiver,
             disconnected,
@@ -1068,6 +1092,7 @@ impl DocumentActor {
         &mut self,
         connection_id: Uuid,
         payload: &[u8],
+        context: &RequestContext,
     ) -> std::result::Result<(), CloseSignal> {
         let messages = decode_messages(payload)?;
         for message in messages {
@@ -1090,7 +1115,8 @@ impl DocumentActor {
                     SyncMessage::SyncStep2(update) | SyncMessage::Update(update),
                 ) => {
                     self.check_rate(connection_id, RateKind::Update)?;
-                    self.apply_client_update(connection_id, &update).await?;
+                    self.apply_client_update(connection_id, &update, context)
+                        .await?;
                 }
                 SyncProtocolMessage::Awareness(update) => {
                     self.check_rate(connection_id, RateKind::Awareness)?;
@@ -1130,6 +1156,7 @@ impl DocumentActor {
         &mut self,
         connection_id: Uuid,
         update: &[u8],
+        context: &RequestContext,
     ) -> std::result::Result<(), CloseSignal> {
         let Some(connection) = self.connections.get(&connection_id) else {
             return Err(CLOSE_DEPENDENCY_UNAVAILABLE);
@@ -1145,7 +1172,7 @@ impl DocumentActor {
         let committed = self
             .store
             .append_update(
-                &operation_context(self.limits.command_timeout),
+                context,
                 self.document_id,
                 update,
                 &actor,

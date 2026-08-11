@@ -42,6 +42,11 @@ func KitexClientMiddleware(runtime *Runtime) endpoint.Middleware {
 		return func(ctx context.Context, req, resp any) error {
 			ctx = metadata.EnsureRequestID(ctx)
 			service, method := rpcDetails(ctx)
+			if IsSuppressed(ctx) || IgnoreRPCMethod(method) {
+				ctx = Suppress(ctx)
+				ctx = injectRPCMetadata(ctx)
+				return next(ctx, req, resp)
+			}
 			ctx, span := tracer(runtime, "knowledge-core/kitex/client").Start(
 				ctx,
 				service+"/"+method,
@@ -63,6 +68,10 @@ func KitexServerMiddleware(runtime *Runtime) endpoint.Middleware {
 		return func(ctx context.Context, req, resp any) error {
 			ctx = extractRPCMetadata(ctx)
 			service, method := rpcDetails(ctx)
+			if IsSuppressed(ctx) || IgnoreRPCMethod(method) {
+				ctx = Suppress(ctx)
+				return next(ctx, req, resp)
+			}
 			ctx, span := tracer(runtime, "knowledge-core/kitex/server").Start(
 				ctx,
 				service+"/"+method,

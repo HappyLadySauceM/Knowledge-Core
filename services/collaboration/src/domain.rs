@@ -210,6 +210,9 @@ pub struct RequestContext {
     pub request_id: Arc<str>,
     pub access_token: Option<Secret>,
     pub deadline: Option<Instant>,
+    pub trace_parent: Option<Arc<str>>,
+    pub trace_state: Option<Arc<str>>,
+    pub baggage: Option<Arc<str>>,
 }
 
 impl RequestContext {
@@ -218,7 +221,35 @@ impl RequestContext {
             request_id: request_id.into(),
             access_token: None,
             deadline: None,
+            trace_parent: None,
+            trace_state: None,
+            baggage: None,
         }
+    }
+
+    pub fn propagation_headers(&self) -> std::collections::BTreeMap<String, String> {
+        let mut headers = std::collections::BTreeMap::new();
+        headers.insert("X-Request-ID".to_owned(), self.request_id.to_string());
+        headers.insert("X-Correlation-ID".to_owned(), self.request_id.to_string());
+        if let Some(value) = &self.trace_parent {
+            headers.insert("traceparent".to_owned(), value.to_string());
+        }
+        if let Some(value) = &self.trace_state {
+            headers.insert("tracestate".to_owned(), value.to_string());
+        }
+        if let Some(value) = &self.baggage
+            && value.len() <= 8_192
+        {
+            headers.insert("baggage".to_owned(), value.to_string());
+        }
+        headers
+    }
+
+    #[must_use]
+    pub fn with_deadline(&self, maximum_wait: std::time::Duration) -> Self {
+        let mut context = self.clone();
+        context.deadline = std::time::Instant::now().checked_add(maximum_wait);
+        context
     }
 }
 

@@ -8,7 +8,11 @@ import (
 	"time"
 
 	"github.com/HappyLadySauce/Knowledge-Core/pkg/option"
+	coretrace "github.com/HappyLadySauce/Knowledge-Core/pkg/trace"
 	natsclient "github.com/nats-io/nats.go"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
 type jetStreamClient interface {
@@ -79,6 +83,8 @@ func (b *DurableBroker) Publish(ctx context.Context, message Message, opts Publi
 	if message.Subject == "" {
 		return errors.New("publish durable nats message: subject is required")
 	}
+	ctx, span := startMessageSpan(ctx, "publish", message.ID, message.Subject, oteltrace.SpanKindProducer)
+	defer span.End()
 	msg := natsclient.NewMsg(message.Subject)
 	msg.Data = append([]byte(nil), message.Body...)
 	for key, value := range message.Headers {
@@ -101,8 +107,11 @@ func (b *DurableBroker) Publish(ctx context.Context, message Message, opts Publi
 	operationCtx, cancel := boundedContext(ctx, b.timeout)
 	defer cancel()
 	if _, err := b.js.PublishMsg(msg, natsclient.Context(operationCtx)); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "publish NATS message failed")
 		return fmt.Errorf("publish durable nats message: %w", err)
 	}
+	span.SetAttributes(attribute.Int("messaging.batch.message_count", 1))
 	return nil
 }
 
@@ -182,6 +191,15 @@ func (b *DurableBroker) Subscribe(ctx context.Context, cfg ConsumerConfig, handl
 }
 
 func (b *DurableBroker) handleDelivery(ctx context.Context, cfg ConsumerConfig, handler Handler, delivery *Delivery) {
+	// Retries stay attached to the first logical consume operation. Intermediate
+	// deliveries are represented by bounded delivery metrics/logs instead of a
+	// new span for every attempt.
+	if delivery.attempt > 1 {
+		ctx = coretrace.Suppress(ctx)
+	}
+	ctx, span := startMessageSpan(ctx, "consume", delivery.message.ID, delivery.message.Subject, oteltrace.SpanKindConsumer)
+	defer span.End()
+	span.SetAttributes(attribute.Int("messaging.delivery.attempt", delivery.attempt))
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			b.logger.ErrorContext(ctx, "nats consumer panicked",
@@ -197,6 +215,9 @@ func (b *DurableBroker) handleDelivery(ctx context.Context, cfg ConsumerConfig, 
 		}
 	}()
 	handler(ctx, delivery)
+	if !delivery.isSettled() {
+		span.SetStatus(codes.Error, "NATS delivery was not settled")
+	}
 }
 
 func (b *DurableBroker) Ping(ctx context.Context) error {

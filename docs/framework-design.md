@@ -187,6 +187,7 @@ Knowledge 使用带版本记录的显式 SQL migration。`knowledge` schema 包�
 - 写操作通过 revision/`If-Match` 提供乐观并发控制。
 - 文档子串搜索先用 `UNION` 从 metadata 与 projection trigram GIN 索引生成去重 document ID，再应用权限、状态、稳定游标排序和最终宽行读取。
 - 文档软删除后进入保留期；worker 依次清理 Collaboration 数据、S3 对象和 Knowledge 记录。
+- outbox 与领域变更同一事务保存受限 W3C propagation headers；发布失败最多退避 8 次，随后进入 parked 状态，保留 message ID 供人工 redrive。消费者按事件 ID/业务 revision 幂等处理。
 - 领域变更与 outbox 在同一数据库事务内落地。worker 使用 JetStream server PubAck 后才标记 published，并以 outbox message ID 作为 deduplication ID；stream 缺失或发布失败会记录 retry，不能把 Core NATS 接收当成持久化成功。消费者仍必须按事件 ID/业务 revision 幂等处理。
 - 附件创建在文档 row lock 之外还按 uploader 获取 transaction advisory lock，使跨文档的用户配额检查与插入串行化；完成上传后进入按 next-attempt 稳定排序的扫描队列。ClamAV 不可用时有界退避，污染或类型不匹配对象进入 rejected 并异步删除，只有 ready 对象可下载。
 
@@ -198,6 +199,7 @@ Collaboration 使用按版本有序执行并逐项校验 checksum 的显式 SQLx
 - compaction 候选通过单个 lateral aggregate 同时计算待压缩 update 数量和字节数，选中后仍在 document row lock 下重新检查阈值。
 - 手工/自动版本保存不可变 Yjs state；恢复要求 expected sequence，在 actor 内生成恢复 update，并在单一事务中提交 baseline/update/version/head/projection/idempotency/outbox，避免覆盖并发更新或产生部分状态。
 - 投影 worker 把当前 Yjs 文档转换为受限 rich-text JSON 和 plain text，再调用 Knowledge；失败按有界重试处理。
+- Collaboration outbox 与事件 headers 同事务保存 trace context，发布时透传 W3C headers；JetStream delivery 超过 8 次会停车并保持幂等 event key，避免循环/重试放大 span 数量。
 - `knowledge.permissions.changed` 和 `collaboration.documents.invalidated` 只用于失效通知，不替代 PostgreSQL 持久化。
 - Collaboration 是两套 JetStream stream contract 的 owner。默认 `KNOWLEDGE_CORE_EVENTS` 只包含 `collaboration.documents.updated` 与 `collaboration.documents.invalidated`，使用 24 小时 max age、1 GiB max bytes；默认 `KNOWLEDGE_CORE_PERMISSIONS` 只包含 `knowledge.permissions.changed`，使用 24 小时 max age 且 `max_bytes=-1`，避免容量驱逐破坏 ticket TTL 覆盖。两者名称必须不同，并共同要求 Limits retention、File storage、DiscardOld、24 小时 duplicate window 与 1 MiB max message；subject 或已有 stream 配置漂移时拒绝 ready。每个副本使用由唯一且重启稳定的 `COLLABORATION_INSTANCE_ID` 派生的 durable consumer，确保 fanout 与未 ACK redelivery。
 
@@ -235,7 +237,13 @@ Redis 固定窗口限流默认全局 `300/min`，注册/登录额外 `20/min`。
 
 Go 服务日志统一使用 `log/slog` JSON 和 `pkg/log` 脱敏，trace 使用 W3C TraceContext/Baggage。Hertz、Kitex、GORM、Redis 与 NATS 从入口 context 延续 deadline、request ID 和 trace；SQL 参数、Redis key、Authorization、Cookie、payload 和原始错误文本不得进入日志或 metric label。
 
+链路以 Gateway 的入口 server span 开始，并覆盖 Gateway 响应结束；Kitex/Volo client/server、数据库、缓存和 JetStream producer/consumer 作为同一 W3C trace 的子 span。`/metrics`、`/livez`、`/readyz`、`/health/live`、`/health/ready`、RPC `Ping`/`Live` 及 WebSocket ping/pong 完全抑制 trace，异常只通过日志和 metrics 保留。JetStream 重投递不为每次 attempt 创建新 span，而是保留一次逻辑消费 span并记录有限 attempt/parking 事件。collector 端使用 15 分钟 tail-sampling decision cache：错误、停车/DLQ 和超过 1 秒的 trace 100% 保留，其余成功 trace 保留 10%。
+
+本地 Compose 提供 OTel Collector (`4317/4318`) 与 Tempo (`3200`)；Go/Rust 服务只通过环境变量注入 OTLP endpoint，生产 endpoint、TLS 和鉴权由部署平台提供。W3C baggage 允许完整合法字段但总长度上限为 8 KiB，既不写入日志/span attribute，也不进入业务消息 payload。
+
 四个服务各自持有独立 Prometheus registry，并在 admin listener 的 `/metrics` 暴露。标签只使用路由模板、RPC 方法、状态码、稳定业务码和依赖名等低基数字段。Rust Collaboration 使用 `tracing` JSON、W3C TraceContext/Baggage 与可选 OTLP exporter；WebSocket、Volo、SQLx、Redis、Etcd 和 NATS 延续 request context，且不记录 ticket、token、payload、DSN 或用户/文档 ID metric label。
+
+面向日常排障和交接的链路追踪说明见 [`trace-architecture.md`](trace-architecture.md)。
 
 ## 10. 生命周期与 readiness
 

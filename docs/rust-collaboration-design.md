@@ -218,7 +218,7 @@ snapshot worker 用单个 lateral aggregate 同时计算每个 document 自水�
 - Secret 只从环境变量或 Secret manager 注入；配置文件只保存非敏感默认值。ticket、JWT、TLS key、DSN、Redis key、payload 和 SQL 参数禁止进入日志与 telemetry。
 - Gateway 对 session route 使用认证、按用户/IP 限流和请求体空校验；Rust 对握手、连接、document、update 和 awareness 再执行独立边界。
 - Prometheus label 只使用稳定 route/RPC method、status/code、dependency 和 access；禁止 document/user/session/request ID 与原始错误。
-- WebSocket session 建立 span 后只记录有界事件；update payload 不进入 span。Thrift、SQLx、Redis、Etcd 和 NATS 延续 request ID、deadline 与 trace。
+- WebSocket handshake、Volo Thrift server/client、SQLx、Redis、Etcd 和 NATS 延续同一 W3C trace；handshake context 会传给 actor/store，事件 outbox 在业务事务内保存 propagation headers，发布时只写入 NATS headers。WebSocket frame 仅保留有界操作事件，ping/pong 和 update payload 不创建或写入 span；重复 JetStream delivery 通过一次逻辑消费 span、attempt metrics 和最终 parking 事件表达。
 - NATS permission/invalidation subscription 异常时停止接收新 session、关闭受保护连接并标记 not-ready，不为可用性静默放行；当前恢复策略是由外部编排重启进程，不在进程内无界重连。
 - 每个副本的 `COLLABORATION_INSTANCE_ID` 必须唯一且重启后稳定；它用于派生各角色的 JetStream durable consumer identity，使副本间 fanout 与同一副本的未 ACK redelivery 同时成立。
 - update、document invalidation 与 permission subject 分别固定为 `collaboration.documents.updated`、`collaboration.documents.invalidated` 和 `knowledge.permissions.changed`；相关环境变量只能等于协议值，不能用于部署级改名。document 与 permission stream 名称可配置但必须不同；两者的 max age 与 duplicate window 都固定为 24 小时并做严格漂移校验。

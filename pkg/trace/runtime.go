@@ -41,6 +41,73 @@ type Runtime struct {
 	shutdownErr  error
 }
 
+type suppressionContextKey struct{}
+
+// Suppress marks a request as low-value telemetry. The marker is carried with
+// the request context so all instrumented dependencies can drop their spans.
+func Suppress(ctx context.Context) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return context.WithValue(ctx, suppressionContextKey{}, true)
+}
+
+func IsSuppressed(ctx context.Context) bool {
+	if ctx == nil {
+		return false
+	}
+	suppressed, _ := ctx.Value(suppressionContextKey{}).(bool)
+	return suppressed
+}
+
+// IgnoreHTTPPath contains endpoints that are polled continuously and should
+// be observed through health/metric signals rather than traces.
+func IgnoreHTTPPath(path string) bool {
+	switch strings.TrimSpace(path) {
+	case "/metrics", "/livez", "/readyz", "/health/live", "/health/ready":
+		return true
+	default:
+		return false
+	}
+}
+
+func IgnoreRPCMethod(method string) bool {
+	switch strings.ToLower(strings.TrimSpace(method)) {
+	case "ping", "live", "health", "healthcheck":
+		return true
+	default:
+		return false
+	}
+}
+
+type suppressionSpanProcessor struct {
+	delegate sdktrace.SpanProcessor
+	skipped  sync.Map
+}
+
+func (p *suppressionSpanProcessor) OnStart(parent context.Context, span sdktrace.ReadWriteSpan) {
+	if IsSuppressed(parent) {
+		p.skipped.Store(span.SpanContext().SpanID().String(), struct{}{})
+		return
+	}
+	p.delegate.OnStart(parent, span)
+}
+
+func (p *suppressionSpanProcessor) OnEnd(span sdktrace.ReadOnlySpan) {
+	key := span.SpanContext().SpanID().String()
+	if _, skipped := p.skipped.LoadAndDelete(key); skipped {
+		return
+	}
+	p.delegate.OnEnd(span)
+}
+
+func (p *suppressionSpanProcessor) Shutdown(ctx context.Context) error {
+	return p.delegate.Shutdown(ctx)
+}
+func (p *suppressionSpanProcessor) ForceFlush(ctx context.Context) error {
+	return p.delegate.ForceFlush(ctx)
+}
+
 func New(ctx context.Context, config Config, logger *slog.Logger) (*Runtime, error) {
 	if err := config.Validate(); err != nil {
 		return nil, err
@@ -76,7 +143,8 @@ func New(ctx context.Context, config Config, logger *slog.Logger) (*Runtime, err
 		if config.ExportTimeout > 0 {
 			batchOptions = append(batchOptions, sdktrace.WithExportTimeout(config.ExportTimeout))
 		}
-		options = append(options, sdktrace.WithBatcher(exporter, batchOptions...))
+		processor := sdktrace.NewBatchSpanProcessor(exporter, batchOptions...)
+		options = append(options, sdktrace.WithSpanProcessor(&suppressionSpanProcessor{delegate: processor}))
 	}
 
 	provider := sdktrace.NewTracerProvider(options...)

@@ -23,6 +23,7 @@ type Repository interface {
 	ClaimOutbox(context.Context, int, time.Duration) ([]domain.OutboxMessage, error)
 	MarkOutboxPublished(context.Context, string) error
 	RetryOutbox(context.Context, string, time.Duration) error
+	ParkOutbox(context.Context, string, string) error
 	QueueExpiredUploads(context.Context, int) error
 	ClaimAttachmentJobs(context.Context, int, time.Duration) ([]domain.ScanJob, error)
 	MarkAttachmentReady(context.Context, string, string) error
@@ -170,9 +171,16 @@ func (w *Worker) processOutbox(ctx context.Context) error {
 		if err := w.publisher.Publish(ctx, natsresource.Message{
 			ID:          message.ID,
 			Subject:     message.Subject,
+			Headers:     message.Headers,
 			ContentType: "application/json",
 			Body:        message.Payload,
 		}, natsresource.PublishOptions{DeduplicationID: message.ID}); err != nil {
+			if message.Attempts >= 8 {
+				if parkErr := w.repository.ParkOutbox(ctx, message.ID, "publish_retry_exhausted"); parkErr != nil {
+					return errors.Join(err, parkErr)
+				}
+				continue
+			}
 			if retryErr := w.repository.RetryOutbox(ctx, message.ID, boundedBackoff(message.Attempts)); retryErr != nil {
 				return errors.Join(err, retryErr)
 			}

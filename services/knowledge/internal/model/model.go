@@ -90,8 +90,11 @@ type Outbox struct {
 	ID            string     `gorm:"type:uuid;primaryKey"`
 	Subject       string     `gorm:"size:128;not null"`
 	Payload       []byte     `gorm:"type:jsonb;not null"`
+	TraceHeaders  []byte     `gorm:"type:jsonb;not null;default:'{}'"`
 	Attempts      int        `gorm:"not null;default:0"`
 	NextAttemptAt time.Time  `gorm:"type:timestamptz;not null"`
+	LastErrorKey  string     `gorm:"size:64;not null;default:''"`
+	ParkedAt      *time.Time `gorm:"type:timestamptz"`
 	PublishedAt   *time.Time `gorm:"type:timestamptz"`
 	CreatedAt     time.Time  `gorm:"type:timestamptz;not null"`
 }

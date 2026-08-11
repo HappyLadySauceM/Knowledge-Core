@@ -202,6 +202,9 @@ mod tests {
             request_id: Arc::from("request-123"),
             access_token: None,
             deadline: None,
+            trace_parent: None,
+            trace_state: None,
+            baggage: None,
         };
         let ServerError::Biz(error) = service_error_with_context(
             &ServiceError::invalid_input("document_id is invalid"),

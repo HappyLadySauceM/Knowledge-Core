@@ -34,7 +34,9 @@ func HertzServerMiddleware(runtime *Runtime, ignore HertzIgnoreFunc) app.Handler
 		}
 		// Low-value endpoints such as /metrics may opt out of span creation,
 		// but still receive sanitized request metadata for logs and responses.
-		if ignore != nil && ignore(ctx, request) {
+		path := string(request.Request.URI().Path())
+		if IgnoreHTTPPath(path) || (ignore != nil && ignore(ctx, request)) {
+			ctx = Suppress(ctx)
 			request.Next(ctx)
 			return
 		}

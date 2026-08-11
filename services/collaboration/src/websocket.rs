@@ -408,6 +408,7 @@ async fn upgrade(
     let context = handshake_context(
         state.config.handshake_timeout,
         Arc::clone(&propagation.request_id),
+        &propagation,
     );
     let authorization = tokio::time::timeout(
         state.config.handshake_timeout,
@@ -459,9 +460,16 @@ async fn authorize(
         .map_err(HttpReject::from_close)
 }
 
-fn handshake_context(maximum_wait: Duration, request_id: Arc<str>) -> RequestContext {
+fn handshake_context(
+    maximum_wait: Duration,
+    request_id: Arc<str>,
+    propagation: &InboundPropagation,
+) -> RequestContext {
     let mut context = RequestContext::new(request_id);
     context.deadline = Instant::now().checked_add(maximum_wait);
+    context.trace_parent.clone_from(&propagation.trace_parent);
+    context.trace_state.clone_from(&propagation.trace_state);
+    context.baggage.clone_from(&propagation.baggage);
     context
 }
 

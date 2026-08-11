@@ -41,7 +41,7 @@ struct Migration {
     sql: &'static str,
 }
 
-const MIGRATIONS: [Migration; 2] = [
+const MIGRATIONS: [Migration; 3] = [
     Migration {
         version: 1,
         name: "001_initial",
@@ -51,6 +51,11 @@ const MIGRATIONS: [Migration; 2] = [
         version: 2,
         name: "002_worker_indexes",
         sql: include_str!("../../migrations/002_worker_indexes.sql"),
+    },
+    Migration {
+        version: 3,
+        name: "003_outbox_trace",
+        sql: include_str!("../../migrations/003_outbox_trace.sql"),
     },
 ];
 
@@ -300,6 +305,7 @@ impl PostgresStore {
         update: &[u8],
         actor: &PublicUser,
         limits: UpdateLimits,
+        trace_headers: std::collections::BTreeMap<String, String>,
     ) -> Result<CommittedUpdate> {
         actor.validate()?;
         let mut transaction = self
@@ -391,6 +397,7 @@ impl PostgresStore {
                 actor_id: Some(actor.id),
             },
             now,
+            &trace_headers,
         )
         .await?;
         transaction
@@ -413,6 +420,7 @@ impl PostgresStore {
         &self,
         document_id: DocumentId,
         candidate: RestorationCandidate<'_>,
+        trace_headers: std::collections::BTreeMap<String, String>,
     ) -> Result<RestoreVersion> {
         let mut transaction = self
             .pool
@@ -582,6 +590,7 @@ impl PostgresStore {
                 actor_id: Some(candidate.actor.id),
             },
             now,
+            &trace_headers,
         )
         .await?;
         save_idempotency(
@@ -646,10 +655,11 @@ impl DocumentStore for PostgresStore {
         actor: &PublicUser,
         limits: UpdateLimits,
     ) -> Result<CommittedUpdate> {
+        let trace_headers = context.propagation_headers();
         self.timed_request(
             context,
             "append document update",
-            self.append_update_inner(document_id, update, actor, limits),
+            self.append_update_inner(document_id, update, actor, limits, trace_headers),
         )
         .await
     }
@@ -675,10 +685,11 @@ impl DocumentStore for PostgresStore {
             ));
         }
         validate_idempotency_key(candidate.idempotency_key)?;
+        let trace_headers = context.propagation_headers();
         self.timed_request(
             context,
             "commit document restoration",
-            self.commit_restoration_inner(document_id, candidate),
+            self.commit_restoration_inner(document_id, candidate, trace_headers),
         )
         .await
     }
@@ -913,6 +924,7 @@ impl VersionStore for PostgresStore {
         context: &RequestContext,
         document_id: DocumentId,
     ) -> Result<()> {
+        let trace_headers = context.propagation_headers();
         self.timed_request(context, "purge collaborative document", async {
             let mut transaction = self
                 .pool
@@ -1002,6 +1014,7 @@ impl VersionStore for PostgresStore {
                     actor_id: None,
                 },
                 now,
+                &trace_headers,
             )
             .await?;
             transaction
@@ -1386,7 +1399,7 @@ impl WorkerStore for PostgresStore {
             let rows = sqlx::query(
                 "WITH selected AS (
                    SELECT id FROM collaboration.outbox
-                   WHERE published_at IS NULL AND next_attempt_at <= now()
+                   WHERE published_at IS NULL AND parked_at IS NULL AND next_attempt_at <= now()
                      AND (lease_until IS NULL OR lease_until <= now())
                    ORDER BY next_attempt_at, created_at, id
                    FOR UPDATE SKIP LOCKED LIMIT $1
@@ -1394,7 +1407,8 @@ impl WorkerStore for PostgresStore {
                  UPDATE collaboration.outbox AS event
                  SET lease_until = $2
                  FROM selected WHERE event.id = selected.id
-                 RETURNING event.id, event.event_key, event.subject, event.payload, event.attempts",
+                 RETURNING event.id, event.event_key, event.subject, event.payload,
+                           event.trace_headers, event.attempts",
             )
             .bind(batch_size)
             .bind(lease_until)
@@ -1416,6 +1430,16 @@ impl WorkerStore for PostgresStore {
                         payload: row
                             .try_get("payload")
                             .map_err(|error| storage_error(error, "decode outbox payload"))?,
+                        trace_headers: serde_json::from_value(
+                            row.try_get("trace_headers").map_err(|error| {
+                                storage_error(error, "decode outbox trace headers")
+                            })?,
+                        )
+                        .map_err(|error| {
+                            ServiceError::internal(
+                                anyhow!(error).context("decode outbox trace headers"),
+                            )
+                        })?,
                         attempts: row
                             .try_get("attempts")
                             .map_err(|error| storage_error(error, "decode outbox attempts"))?,
@@ -1454,7 +1478,8 @@ impl WorkerStore for PostgresStore {
             sqlx::query(
                 "UPDATE collaboration.outbox
                  SET attempts = attempts + 1, next_attempt_at = $2,
-                     lease_until = NULL, last_error_key = $3
+                     lease_until = NULL, last_error_key = $3,
+                     parked_at = CASE WHEN attempts >= 8 THEN now() ELSE parked_at END
                  WHERE id = $1 AND published_at IS NULL",
             )
             .bind(event.id)
@@ -1995,6 +2020,7 @@ async fn insert_event(
     kind: &str,
     event: DocumentEvent,
     now: OffsetDateTime,
+    trace_headers: &std::collections::BTreeMap<String, String>,
 ) -> Result<()> {
     let id = Uuid::now_v7();
     let event_key = format!(
@@ -2006,11 +2032,20 @@ async fn insert_event(
     let sequence = event.sequence;
     let payload = serde_json::to_value(event)
         .map_err(|error| ServiceError::internal(anyhow!(error).context("encode outbox event")))?;
+    let mut message_headers = trace_headers.clone();
+    message_headers.insert("X-Message-Type".to_owned(), subject.to_owned());
+    message_headers.insert("X-Schema-Version".to_owned(), "1".to_owned());
+    message_headers.insert("X-Aggregate-ID".to_owned(), document_id.to_string());
+    message_headers.insert("X-Aggregate-Version".to_owned(), sequence.to_string());
+    message_headers.insert("X-Causation-ID".to_owned(), event_key.clone());
+    let trace_headers = serde_json::to_value(message_headers).map_err(|error| {
+        ServiceError::internal(anyhow!(error).context("encode outbox trace context"))
+    })?;
     sqlx::query(
         "INSERT INTO collaboration.outbox(
-           id, event_key, subject, document_id, generation, sequence, payload,
+           id, event_key, subject, document_id, generation, sequence, payload, trace_headers,
            attempts, next_attempt_at, created_at
-         ) VALUES ($1, $2, $3, $4, $5, $6, $7, 0, $8, $8)
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 0, $9, $9)
          ON CONFLICT (event_key) DO NOTHING",
     )
     .bind(id)
@@ -2020,6 +2055,7 @@ async fn insert_event(
     .bind(generation)
     .bind(sequence)
     .bind(payload)
+    .bind(trace_headers)
     .bind(now)
     .execute(&mut *connection)
     .await

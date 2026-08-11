@@ -111,6 +111,7 @@ pub struct OutboxEvent {
     pub event_key: String,
     pub subject: String,
     pub payload: serde_json::Value,
+    pub trace_headers: std::collections::BTreeMap<String, String>,
     pub attempts: i32,
 }
 
