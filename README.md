@@ -216,7 +216,9 @@ npm run ci
 
 `.github/workflows/pipeline.yml` 是唯一项目 workflow；它调用 `/opt/HappyLadySauceM/ci-templates`
 发布的 Python 控制镜像。`dev` push 先运行 `make ci` 与 Collaboration Node 互操作门禁，再按
-变更服务从 Harbor 缓存构建并覆盖 `dev` 镜像 tag。镜像不扫描、不签名；当前 `dev` tag 构建前会
+变更服务从 Harbor 缓存构建并覆盖 `dev` 镜像 tag。控制镜像复用稳定 Buildx builder，并向
+Dockerfile 传入 `BUILD_JOBS`（宿主机 CPU 的 3/4）；Go/Rust 构建层通过固定 cache mount id
+跨服务复用 module/cargo 缓存。镜像不扫描、不签名；当前 `dev` tag 构建前会
 保留为 `previous`，Argo CD 同步和冒烟成功后删除 `previous`，由 Harbor 垃圾回收回收旧层。
 
 仓库 Actions Secret 只提供 `HARBOR_DOCKER_CONFIG_JSON` 与 `HARBOR_CA_PEM`。`release` environment

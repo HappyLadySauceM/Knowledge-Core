@@ -5,18 +5,21 @@ FROM --platform=$BUILDPLATFORM ${GO_BASE_IMAGE} AS build
 ARG GOPROXY=https://goproxy.cn,direct
 ARG TARGETOS=linux
 ARG TARGETARCH
+ARG BUILD_JOBS=1
 ENV GOPROXY=${GOPROXY}
+ENV GOMAXPROCS=${BUILD_JOBS}
 RUN apk add --no-cache ca-certificates git
 WORKDIR /src
 COPY go.mod go.sum ./
-RUN --mount=type=cache,target=/go/pkg/mod go mod download
+RUN --mount=type=cache,id=kc-go-mod,target=/go/pkg/mod go mod download
 COPY pkg ./pkg
 COPY kitex_gen/collaboration ./kitex_gen/collaboration
 COPY kitex_gen/common ./kitex_gen/common
 COPY kitex_gen/identity ./kitex_gen/identity
 COPY kitex_gen/knowledge ./kitex_gen/knowledge
 COPY services/knowledge ./services/knowledge
-RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
+RUN --mount=type=cache,id=kc-go-mod,target=/go/pkg/mod \
+    --mount=type=cache,id=kc-go-build,target=/root/.cache/go-build \
     CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -mod=readonly -trimpath -buildvcs=false -ldflags="-s -w" -o /out/knowledge ./services/knowledge
 FROM ${RUNTIME_BASE_IMAGE}
 WORKDIR /app

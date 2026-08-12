@@ -7,6 +7,9 @@ CARGO_DENY ?= cargo deny
 RUST_ROOT ?= services/collaboration
 IDL_COMPAT_BASE ?= HEAD^
 KC_RUST_GATE ?= 1
+# Cap local/CI compile parallelism at three quarters of host CPUs.
+# 将本地/CI 编译并行度限制为宿主机 CPU 的四分之三。
+BUILD_JOBS ?= $(shell nproc 2>/dev/null | awk '{v=int($$1*3/4); if (v<1) v=1; print v}')
 
 # Keep the Node interoperability fixture and its dependency tree out of Go discovery.
 GO_PACKAGES ?= \
@@ -60,27 +63,27 @@ fmt-check:
 	cd $(RUST_ROOT) && $(CARGO) fmt --all --check
 
 vet:
-	go vet $(GO_PACKAGES)
+	GOMAXPROCS=$(BUILD_JOBS) go vet $(GO_PACKAGES)
 
 lint:
-	$(GOLANGCI_LINT) run $(GO_PACKAGES)
-	cd $(RUST_ROOT) && $(CARGO) clippy --workspace --all-targets --all-features --locked -- -D warnings
+	GOMAXPROCS=$(BUILD_JOBS) $(GOLANGCI_LINT) run $(GO_PACKAGES)
+	cd $(RUST_ROOT) && CARGO_BUILD_JOBS=$(BUILD_JOBS) $(CARGO) clippy --workspace --all-targets --all-features --locked -j $(BUILD_JOBS) -- -D warnings
 
 line: lint
 
 test:
-	go test -count=1 $(GO_PACKAGES)
-	cd $(RUST_ROOT) && $(CARGO) test --workspace --all-targets --all-features --locked
+	GOMAXPROCS=$(BUILD_JOBS) go test -count=1 $(GO_PACKAGES)
+	cd $(RUST_ROOT) && CARGO_BUILD_JOBS=$(BUILD_JOBS) $(CARGO) test --workspace --all-targets --all-features --locked -j $(BUILD_JOBS)
 
 race:
-	go test -race -count=1 $(GO_PACKAGES)
+	GOMAXPROCS=$(BUILD_JOBS) go test -race -count=1 $(GO_PACKAGES)
 
 build:
-	go build $(GO_PACKAGES)
-	cd $(RUST_ROOT) && $(CARGO) build --workspace --release --locked
+	GOMAXPROCS=$(BUILD_JOBS) go build $(GO_PACKAGES)
+	cd $(RUST_ROOT) && CARGO_BUILD_JOBS=$(BUILD_JOBS) $(CARGO) build --workspace --release --locked -j $(BUILD_JOBS)
 
 vuln:
-	$(GOVULNCHECK) $(GO_PACKAGES)
+	GOMAXPROCS=$(BUILD_JOBS) $(GOVULNCHECK) $(GO_PACKAGES)
 
 supply-chain:
 	cd $(RUST_ROOT) && $(CARGO_DENY) check advisories bans licenses sources
@@ -107,16 +110,16 @@ generate-rust-check:
 
 go-ci:
 	$(GOLANGCI_LINT) fmt --diff
-	go vet $(GO_PACKAGES)
-	$(GOLANGCI_LINT) run $(GO_PACKAGES)
-	go test -count=1 $(GO_PACKAGES)
-	go build $(GO_PACKAGES)
-	$(GOVULNCHECK) $(GO_PACKAGES)
+	GOMAXPROCS=$(BUILD_JOBS) go vet $(GO_PACKAGES)
+	GOMAXPROCS=$(BUILD_JOBS) $(GOLANGCI_LINT) run $(GO_PACKAGES)
+	GOMAXPROCS=$(BUILD_JOBS) go test -count=1 $(GO_PACKAGES)
+	GOMAXPROCS=$(BUILD_JOBS) go build $(GO_PACKAGES)
+	GOMAXPROCS=$(BUILD_JOBS) $(GOVULNCHECK) $(GO_PACKAGES)
 
 rust-ci:
 	cd $(RUST_ROOT) && $(CARGO) fmt --all --check
-	cd $(RUST_ROOT) && $(CARGO) clippy --workspace --all-features --locked -- -D warnings
-	cd $(RUST_ROOT) && $(CARGO) test --workspace --all-targets --all-features --locked
+	cd $(RUST_ROOT) && CARGO_BUILD_JOBS=$(BUILD_JOBS) $(CARGO) clippy --workspace --all-features --locked -j $(BUILD_JOBS) -- -D warnings
+	cd $(RUST_ROOT) && CARGO_BUILD_JOBS=$(BUILD_JOBS) $(CARGO) test --workspace --all-targets --all-features --locked -j $(BUILD_JOBS)
 	cd $(RUST_ROOT) && $(CARGO_DENY) check advisories bans licenses sources
 
 ifeq ($(KC_RUST_GATE),0)

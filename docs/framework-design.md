@@ -278,9 +278,12 @@ go run ./scripts/idlguard compat-git <merge-base> idl
 
 开发交付只保留 `dev`，`main` 对开发者保持只读。`.github/workflows/pipeline.yml` 调用通用
 Python CI 控制镜像，依次执行质量门禁、变更服务镜像构建、GitOps deploy 快照提交、Argo CD
-健康检查和 dev 冒烟；镜像使用 Harbor registry cache，只维护 `dev`/`previous` 临时 tag，
-不执行镜像扫描或签名。Rust 门禁对 Rust、IDL、生成器、Makefile 和 workflow 变更启用，其他提交
-跳过 Rust 检查；`make ci` 不重复执行 release 编译，最终镜像构建仍负责该编译。冒烟后由 DeepSeek
+健康检查和 dev 冒烟；镜像使用 Harbor registry cache，并在 runner 上复用稳定 Buildx builder
+`ci-templates`，使 Go（`kc-go-mod`/`kc-go-build`）与 Rust（`kc-cargo-*`）的 BuildKit cache
+mount 跨服务存活。编译并行度通过 `BUILD_JOBS` / BuildKit `max-parallelism` 限制为宿主机
+CPU 的四分之三。只维护 `dev`/`previous` 临时 tag，不执行镜像扫描或签名。Rust 门禁对 Rust、
+IDL、生成器、Makefile 和 workflow 变更启用，其他提交跳过 Rust 检查；`make ci` 不重复执行
+release 编译，最终镜像构建仍负责该编译。冒烟后由 DeepSeek
 根据限长、脱敏的代码变更上下文生成按服务分组的功能摘要，调用失败即停止；成功后仅 fast-forward
 `main`，再按服务创建独立版本 tag 和一个聚合项目 GitHub Release。GitOps 与源码仓库均使用普通
 fast-forward compare-and-swap push，检测到远端分支变化即停止。
