@@ -264,7 +264,9 @@ Collaboration 收到信号后先 not-ready 并撤销 Etcd 注册，再停止 RPC
 
 ## 11. 生成、验证与交付
 
-Collaboration production Dockerfile 只封装调用方提供的 release artifact，不包含第二个 Cargo build stage。
+Collaboration production Dockerfile（`docker/collaboration/Dockerfile`）在镜像内执行
+`cargo build --locked --release`，再将二进制拷入无特权 runtime 层；不依赖宿主机预编译
+`.ci-artifacts`。
 
 IDL 源位于 `idl/http/v1` 和 `idl/rpc/v1`。生成工具固定为 Kitex `v0.16.2`、Hertz `v0.9.7`、thriftgo `0.4.5`；生成文件所有权以 `scripts/generated-files.txt` 为准。Gateway handler 和未列入清单的 route middleware 保持手写/混合所有权。
 
