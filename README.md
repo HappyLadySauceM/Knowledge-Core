@@ -244,13 +244,14 @@ GitOps 仓库同时保存 SOPS Secret、trust bundle 和不可变镜像 digest�
 质量、镜像构建、GitOps 快照、Argo 健康和 dev 冒烟均在同一 workflow 中顺序执行。Rust 门禁只在
 Rust、IDL、生成器、Makefile 或 workflow 变更时运行；其他提交仍执行 Go 门禁和生成漂移检查。
 `make ci` 不执行 Rust release 编译，受影响的 Collaboration 镜像构建会在 Docker 阶段完成该编译。
-冒烟成功后，DeepSeek 根据按服务分组、限长并脱敏的代码 diff 生成中文功能变更摘要；DeepSeek
-失败会阻止 `main` promotion。成功时只允许 fast-forward `main`，保留每个服务独立的
-`service-vMAJOR.MINOR.PATCH` tag，并额外创建一个 `knowledge-core-vMAJOR.MINOR.PATCH` 聚合 tag
-和单一 GitHub Release。Release 正文按服务列出功能变化和服务 tag，不记录 commit/workflow 元数据。
+冒烟成功后，DeepSeek 根据限长并脱敏的代码 diff 生成中文功能变更摘要：共享/CI/构建类变更
+写入 Release 的 Shared changes；仅当 `services/<svc>` 或 `deploy/<svc>` 有业务变更时才出现
+对应服务小节。DeepSeek 失败会阻止 `main` promotion。成功时只允许 fast-forward `main`，
+并只创建一个 `knowledge-core-vMAJOR.MINOR.PATCH` 聚合 tag 与单一 GitHub Release；不再创建
+各服务独立 Git tag。Release 列出本次 Deployed services，不记录 commit/workflow 元数据。
 GitOps 快照推送同样要求远端分支未发生变化，禁止 force-push。
 
-服务版本分别读取 `services/<service>/VERSION`；项目级聚合版本读取根目录 `VERSION`，两者互不覆盖。
+项目级聚合版本读取根目录 `VERSION`；`services/<service>/VERSION` 可作人工参考，CI 不再据此打 tag。
 
 Argo CD repository Secret、AppProject 和 ApplicationSet 由私有 GitOps 仓库声明。ApplicationSet
 为 Gateway、Identity、Knowledge、Collaboration 分别生成 Application；服务 Application 使用
