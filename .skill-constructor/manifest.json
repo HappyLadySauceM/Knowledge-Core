@@ -278,10 +278,15 @@
     },
     {
       "id": "security.secrets-and-config",
-      "revision": 87,
+      "revision": 90,
       "section": "conventions",
       "sources": [
         {
+          "detail": "evidence-sha256:08fe26d59eb8a9b4aba2ee77ff84f206bc5a59cd1c42aff9532458469fd002d3",
+          "kind": "documented",
+          "reference": "README.md#compose"
+        },
+        {
           "detail": "evidence-sha256:169cb3579a7f13e97489407e05a1e625c65d48efdff5f844fd0f2f07daea027e",
           "kind": "documented",
           "reference": "README.md#compose"
@@ -352,6 +357,11 @@
           "reference": "README.md#compose"
         },
         {
+          "detail": "evidence-sha256:08fe26d59eb8a9b4aba2ee77ff84f206bc5a59cd1c42aff9532458469fd002d3",
+          "kind": "documented",
+          "reference": "README.md#k3s-gitops"
+        },
+        {
           "detail": "evidence-sha256:169cb3579a7f13e97489407e05a1e625c65d48efdff5f844fd0f2f07daea027e",
           "kind": "documented",
           "reference": "README.md#k3s-gitops"
@@ -420,6 +430,11 @@
           "detail": "evidence-sha256:fb988f8708eb4b94a819f41a3914b44a9a14cf3188296c55433740d35f09ed4a",
           "kind": "documented",
           "reference": "README.md#k3s-gitops"
+        },
+        {
+          "detail": "evidence-sha256:08fe26d59eb8a9b4aba2ee77ff84f206bc5a59cd1c42aff9532458469fd002d3",
+          "kind": "documented",
+          "reference": "README.md#section"
         },
         {
           "detail": "evidence-sha256:22d8b15c6a4937a5f3816e1e74b4a3c20306a462ea6a88f948cecb7093c892d4",
@@ -472,6 +487,11 @@
           "reference": "deploy/overlay/dev/README.md#development-overlay"
         },
         {
+          "detail": "evidence-sha256:08fe26d59eb8a9b4aba2ee77ff84f206bc5a59cd1c42aff9532458469fd002d3",
+          "kind": "documented",
+          "reference": "docs/framework-design.md#11"
+        },
+        {
           "detail": "evidence-sha256:169cb3579a7f13e97489407e05a1e625c65d48efdff5f844fd0f2f07daea027e",
           "kind": "documented",
           "reference": "docs/framework-design.md#11"
@@ -542,6 +562,11 @@
           "reference": "docs/framework-design.md#11"
         },
         {
+          "detail": "evidence-sha256:08fe26d59eb8a9b4aba2ee77ff84f206bc5a59cd1c42aff9532458469fd002d3",
+          "kind": "documented",
+          "reference": "docs/framework-design.md#12"
+        },
+        {
           "detail": "evidence-sha256:169cb3579a7f13e97489407e05a1e625c65d48efdff5f844fd0f2f07daea027e",
           "kind": "documented",
           "reference": "docs/framework-design.md#12"
@@ -612,6 +637,11 @@
           "reference": "docs/framework-design.md#12"
         },
         {
+          "detail": "evidence-sha256:08fe26d59eb8a9b4aba2ee77ff84f206bc5a59cd1c42aff9532458469fd002d3",
+          "kind": "documented",
+          "reference": "docs/framework-design.md#8-secret-tls"
+        },
+        {
           "detail": "evidence-sha256:169cb3579a7f13e97489407e05a1e625c65d48efdff5f844fd0f2f07daea027e",
           "kind": "documented",
           "reference": "docs/framework-design.md#8-secret-tls"
@@ -682,6 +712,11 @@
           "reference": "docs/framework-design.md#8-secret-tls"
         },
         {
+          "detail": "evidence-sha256:08fe26d59eb8a9b4aba2ee77ff84f206bc5a59cd1c42aff9532458469fd002d3",
+          "kind": "documented",
+          "reference": "docs/rust-collaboration-design.md#2-1"
+        },
+        {
           "detail": "evidence-sha256:169cb3579a7f13e97489407e05a1e625c65d48efdff5f844fd0f2f07daea027e",
           "kind": "documented",
           "reference": "docs/rust-collaboration-design.md#2-1"
@@ -752,6 +787,11 @@
           "reference": "docs/rust-collaboration-design.md#2-1"
         },
         {
+          "detail": "evidence-sha256:08fe26d59eb8a9b4aba2ee77ff84f206bc5a59cd1c42aff9532458469fd002d3",
+          "kind": "documented",
+          "reference": "docs/rust-collaboration-design.md#7"
+        },
+        {
           "detail": "evidence-sha256:169cb3579a7f13e97489407e05a1e625c65d48efdff5f844fd0f2f07daea027e",
           "kind": "documented",
           "reference": "docs/rust-collaboration-design.md#7"
@@ -820,6 +860,11 @@
           "detail": "evidence-sha256:fb988f8708eb4b94a819f41a3914b44a9a14cf3188296c55433740d35f09ed4a",
           "kind": "documented",
           "reference": "docs/rust-collaboration-design.md#7"
+        },
+        {
+          "detail": "evidence-sha256:08fe26d59eb8a9b4aba2ee77ff84f206bc5a59cd1c42aff9532458469fd002d3",
+          "kind": "documented",
+          "reference": "docs/trace-architecture.md#7-collector-tempo"
         },
         {
           "detail": "evidence-sha256:6f8469da75fd7458b41f42abdb86b3058ff3b8095c873349ede521d974462e12",
@@ -841,7 +886,7 @@
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-08-11T17:24:44Z",
+      "updatedAt": "2026-08-12T05:25:57Z",
       "value": "Secrets are injected only through environment variables, Kubernetes Secrets, or SOPS-encrypted GitOps manifests. Sensitive values must not be stored in plaintext source, configuration, logs, metrics, spans, or release metadata."
     },
     {
@@ -1150,11 +1195,11 @@
     "profile": "generic",
     "slug": "knowledge-core"
   },
-  "revision": 88,
+  "revision": 90,
   "scan": {
-    "fingerprint": "09b49c323683b4659d6eae2ad45670a1a36a43df1bebf48feda0e591db5612f7",
+    "fingerprint": "30152b2ed44fd1af956bd04e34983a5c04d0e070c947f2934c402cebdf1a14d7",
     "inventoryCount": 329
   },
   "schemaVersion": 1,
-  "updatedAt": "2026-08-12T03:26:58Z"
+  "updatedAt": "2026-08-12T05:25:57Z"
 }
