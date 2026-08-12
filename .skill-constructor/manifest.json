@@ -1150,11 +1150,11 @@
     "profile": "generic",
     "slug": "knowledge-core"
   },
-  "revision": 87,
+  "revision": 88,
   "scan": {
-    "fingerprint": "419e61cc1e565721a3610bb08cdcdf74eaf2c02bfe9b81e4a88d441fa82b1c9b",
-    "inventoryCount": 326
+    "fingerprint": "09b49c323683b4659d6eae2ad45670a1a36a43df1bebf48feda0e591db5612f7",
+    "inventoryCount": 329
   },
   "schemaVersion": 1,
-  "updatedAt": "2026-08-11T17:24:44Z"
+  "updatedAt": "2026-08-12T03:26:58Z"
 }

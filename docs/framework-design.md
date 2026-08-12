@@ -188,7 +188,7 @@ Knowledge 使用带版本记录的显式 SQL migration。`knowledge` schema 包�
 - 文档子串搜索先用 `UNION` 从 metadata 与 projection trigram GIN 索引生成去重 document ID，再应用权限、状态、稳定游标排序和最终宽行读取。
 - 文档软删除后进入保留期；worker 依次清理 Collaboration 数据、S3 对象和 Knowledge 记录。
 - outbox 与领域变更同一事务保存受限 W3C propagation headers；发布失败最多退避 8 次，随后进入 parked 状态，保留 message ID 供人工 redrive。消费者按事件 ID/业务 revision 幂等处理。
-- 领域变更与 outbox 在同一数据库事务内落地。worker 使用 JetStream server PubAck 后才标记 published，并以 outbox message ID 作为 deduplication ID；stream 缺失或发布失败会记录 retry，不能把 Core NATS 接收当成持久化成功。消费者仍必须按事件 ID/业务 revision 幂等处理。
+- 领域变更与 outbox 在同一数据库事务内落地，并同事务 `NOTIFY knowledge_workers`（payload `outbox` / `attachment`）唤醒后台 worker；`workers.poll_interval`（默认 30s）只做到期重试、过期上传、purge/maintenance 与 LISTEN 断线补偿。worker 使用 JetStream server PubAck 后才标记 published，并以 outbox message ID 作为 deduplication ID；stream 缺失或发布失败会记录 retry，不能把 Core NATS 接收当成持久化成功。消费者仍必须按事件 ID/业务 revision 幂等处理。
 - 附件创建在文档 row lock 之外还按 uploader 获取 transaction advisory lock，使跨文档的用户配额检查与插入串行化；完成上传后进入按 next-attempt 稳定排序的扫描队列。ClamAV 不可用时有界退避，污染或类型不匹配对象进入 rejected 并异步删除，只有 ready 对象可下载。
 
 ### 7.3 Collaboration

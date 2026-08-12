@@ -110,5 +110,7 @@ collaboration_rpc:
     enabled: false
 
 workers:
-  poll_interval: 1s
+  # Fallback poll for due retries, expired uploads, and purge maintenance.
+  # 到期重试、过期上传与 purge 维护的兜底轮询。
+  poll_interval: 30s
   operation_timeout: 30s

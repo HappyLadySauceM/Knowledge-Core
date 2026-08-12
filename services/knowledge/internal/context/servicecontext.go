@@ -178,7 +178,7 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 	}
 
 	workers, err := worker.New(
-		ctx, *cfg.Workers, store, objects, malwareScanner, events, collaboration, runtime.Logger,
+		ctx, *cfg.Workers, sqlDB, store, objects, malwareScanner, events, collaboration, runtime.Logger,
 	)
 	if err != nil {
 		return nil, err

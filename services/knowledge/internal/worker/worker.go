@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"io"
@@ -12,9 +13,13 @@ import (
 	"time"
 
 	natsresource "github.com/HappyLadySauce/Knowledge-Core/pkg/nats"
+	coretrace "github.com/HappyLadySauce/Knowledge-Core/pkg/trace"
 	"github.com/HappyLadySauce/Knowledge-Core/services/knowledge/internal/config"
 	"github.com/HappyLadySauce/Knowledge-Core/services/knowledge/internal/domain"
 	"github.com/HappyLadySauce/Knowledge-Core/services/knowledge/internal/repository"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
 const componentName = "knowledge-background-workers"
@@ -59,6 +64,7 @@ type Worker struct {
 	scanner       Scanner
 	publisher     Publisher
 	collaboration DocumentPurger
+	wakeSource    WakeSource
 	logger        *slog.Logger
 	runContext    context.Context
 	cancel        context.CancelFunc
@@ -66,11 +72,14 @@ type Worker struct {
 	done          chan struct{}
 	started       atomic.Bool
 	readyOnce     sync.Once
+	pendingMu     sync.Mutex
+	pendingWake   WakeKind
 }
 
 func New(
 	ctx context.Context,
 	options config.WorkerOptions,
+	db *sql.DB,
 	repository Repository,
 	objects ObjectStore,
 	scanner Scanner,
@@ -78,7 +87,25 @@ func New(
 	collaboration DocumentPurger,
 	logger *slog.Logger,
 ) (*Worker, error) {
-	if ctx == nil || repository == nil || objects == nil || scanner == nil || publisher == nil || collaboration == nil || logger == nil {
+	wakeSource, err := newPostgresWakeSource(db, logger)
+	if err != nil {
+		return nil, fmt.Errorf("create knowledge workers: %w", err)
+	}
+	return newWorker(ctx, options, wakeSource, repository, objects, scanner, publisher, collaboration, logger)
+}
+
+func newWorker(
+	ctx context.Context,
+	options config.WorkerOptions,
+	wakeSource WakeSource,
+	repository Repository,
+	objects ObjectStore,
+	scanner Scanner,
+	publisher Publisher,
+	collaboration DocumentPurger,
+	logger *slog.Logger,
+) (*Worker, error) {
+	if ctx == nil || wakeSource == nil || repository == nil || objects == nil || scanner == nil || publisher == nil || collaboration == nil || logger == nil {
 		return nil, errors.New("create knowledge workers: context and dependencies are required")
 	}
 	if err := options.Validate(); err != nil {
@@ -89,8 +116,8 @@ func New(
 	runContext, cancel := context.WithCancel(context.WithoutCancel(ctx))
 	return &Worker{
 		options: options, repository: repository, objects: objects, scanner: scanner,
-		publisher: publisher, collaboration: collaboration, logger: logger, runContext: runContext,
-		cancel: cancel, ready: make(chan struct{}), done: make(chan struct{}),
+		publisher: publisher, collaboration: collaboration, wakeSource: wakeSource, logger: logger,
+		runContext: runContext, cancel: cancel, ready: make(chan struct{}), done: make(chan struct{}),
 	}, nil
 }
 
@@ -102,6 +129,28 @@ func (w *Worker) Serve() error {
 	}
 	w.readyOnce.Do(func() { close(w.ready) })
 	defer close(w.done)
+
+	signal := make(chan struct{}, 1)
+	var listenDone sync.WaitGroup
+	listenDone.Add(1)
+	go func() {
+		defer listenDone.Done()
+		if err := w.wakeSource.Run(w.runContext, func(kind WakeKind) {
+			w.queueWake(kind)
+			select {
+			case signal <- struct{}{}:
+			default:
+			}
+		}); err != nil && !errors.Is(err, context.Canceled) {
+			w.logger.WarnContext(w.runContext, "knowledge worker wake source stopped",
+				slog.String("component", "knowledge.worker"),
+				slog.String("event", "wake_source_stopped"),
+				slog.String("error.type", fmt.Sprintf("%T", err)),
+			)
+		}
+	}()
+	defer listenDone.Wait()
+
 	w.runOnce()
 	ticker := time.NewTicker(w.options.PollInterval)
 	defer ticker.Stop()
@@ -111,7 +160,38 @@ func (w *Worker) Serve() error {
 			return nil
 		case <-ticker.C:
 			w.runOnce()
+		case <-signal:
+			w.drainWake()
 		}
+	}
+}
+
+func (w *Worker) queueWake(kind WakeKind) {
+	if kind == 0 {
+		return
+	}
+	w.pendingMu.Lock()
+	w.pendingWake |= kind
+	w.pendingMu.Unlock()
+}
+
+func (w *Worker) drainWake() {
+	w.pendingMu.Lock()
+	kind := w.pendingWake
+	w.pendingWake = 0
+	w.pendingMu.Unlock()
+	if kind == 0 {
+		return
+	}
+	if kind&WakeAll != 0 || kind&(WakeOutbox|WakeAttachment) == (WakeOutbox|WakeAttachment) {
+		w.runOnce()
+		return
+	}
+	if kind&WakeOutbox != 0 {
+		w.runBounded("outbox", w.processOutbox)
+	}
+	if kind&WakeAttachment != 0 {
+		w.runBounded("attachments", w.processAttachments)
 	}
 }
 
@@ -163,12 +243,14 @@ func (w *Worker) runBounded(operation string, run func(context.Context) error) {
 }
 
 func (w *Worker) processOutbox(ctx context.Context) error {
-	messages, err := w.repository.ClaimOutbox(ctx, 50, w.options.OperationTimeout)
+	probeCtx := coretrace.Suppress(ctx)
+	messages, err := w.repository.ClaimOutbox(probeCtx, 50, w.options.OperationTimeout)
 	if err != nil {
 		return err
 	}
 	for _, message := range messages {
-		if err := w.publisher.Publish(ctx, natsresource.Message{
+		workCtx := coretrace.ContextFromPropagation(ctx, message.Headers)
+		if err := w.publisher.Publish(workCtx, natsresource.Message{
 			ID:          message.ID,
 			Subject:     message.Subject,
 			Headers:     message.Headers,
@@ -176,17 +258,17 @@ func (w *Worker) processOutbox(ctx context.Context) error {
 			Body:        message.Payload,
 		}, natsresource.PublishOptions{DeduplicationID: message.ID}); err != nil {
 			if message.Attempts >= 8 {
-				if parkErr := w.repository.ParkOutbox(ctx, message.ID, "publish_retry_exhausted"); parkErr != nil {
+				if parkErr := w.repository.ParkOutbox(workCtx, message.ID, "publish_retry_exhausted"); parkErr != nil {
 					return errors.Join(err, parkErr)
 				}
 				continue
 			}
-			if retryErr := w.repository.RetryOutbox(ctx, message.ID, boundedBackoff(message.Attempts)); retryErr != nil {
+			if retryErr := w.repository.RetryOutbox(workCtx, message.ID, boundedBackoff(message.Attempts)); retryErr != nil {
 				return errors.Join(err, retryErr)
 			}
 			continue
 		}
-		if err := w.repository.MarkOutboxPublished(ctx, message.ID); err != nil {
+		if err := w.repository.MarkOutboxPublished(workCtx, message.ID); err != nil {
 			return err
 		}
 	}
@@ -194,46 +276,60 @@ func (w *Worker) processOutbox(ctx context.Context) error {
 }
 
 func (w *Worker) processAttachments(ctx context.Context) error {
-	if err := w.repository.QueueExpiredUploads(ctx, 100); err != nil {
+	probeCtx := coretrace.Suppress(ctx)
+	if err := w.repository.QueueExpiredUploads(probeCtx, 100); err != nil {
 		return err
 	}
-	jobs, err := w.repository.ClaimAttachmentJobs(ctx, 10, w.options.OperationTimeout)
+	jobs, err := w.repository.ClaimAttachmentJobs(probeCtx, 10, w.options.OperationTimeout)
 	if err != nil {
 		return err
 	}
 	for _, job := range jobs {
-		attachment := job.Attachment
-		switch attachment.Status {
-		case domain.AttachmentScanning:
-			if err := w.scanAttachment(ctx, job); err != nil {
-				if retryErr := w.repository.RetryAttachmentJob(ctx, attachment.ID, "scan_unavailable", job.Attempts); retryErr != nil {
-					return errors.Join(err, retryErr)
-				}
+		if err := w.handleAttachmentJob(ctx, job); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (w *Worker) handleAttachmentJob(ctx context.Context, job domain.ScanJob) error {
+	workCtx, span := otel.Tracer("knowledge-core/knowledge").Start(ctx, "knowledge.worker.attachment_job",
+		oteltrace.WithSpanKind(oteltrace.SpanKindInternal),
+		oteltrace.WithAttributes(attribute.String("attachment.status", job.Attachment.Status)),
+	)
+	defer span.End()
+
+	attachment := job.Attachment
+	switch attachment.Status {
+	case domain.AttachmentScanning:
+		if err := w.scanAttachment(workCtx, job); err != nil {
+			if retryErr := w.repository.RetryAttachmentJob(workCtx, attachment.ID, "scan_unavailable", job.Attempts); retryErr != nil {
+				return errors.Join(err, retryErr)
 			}
-		case domain.AttachmentRejected:
-			if err := w.objects.RemoveObject(ctx, attachment.ObjectKey); err != nil {
-				if retryErr := w.repository.RetryAttachmentJob(ctx, attachment.ID, "cleanup_unavailable", job.Attempts); retryErr != nil {
-					return errors.Join(err, retryErr)
-				}
-				continue
+		}
+	case domain.AttachmentRejected:
+		if err := w.objects.RemoveObject(workCtx, attachment.ObjectKey); err != nil {
+			if retryErr := w.repository.RetryAttachmentJob(workCtx, attachment.ID, "cleanup_unavailable", job.Attempts); retryErr != nil {
+				return errors.Join(err, retryErr)
 			}
-			if err := w.repository.FinishAttachmentCleanup(ctx, attachment.ID, false); err != nil {
-				return err
+			return nil
+		}
+		if err := w.repository.FinishAttachmentCleanup(workCtx, attachment.ID, false); err != nil {
+			return err
+		}
+	case domain.AttachmentDeleting:
+		if err := w.objects.RemoveObject(workCtx, attachment.ObjectKey); err != nil {
+			if retryErr := w.repository.RetryAttachmentJob(workCtx, attachment.ID, "delete_unavailable", job.Attempts); retryErr != nil {
+				return errors.Join(err, retryErr)
 			}
-		case domain.AttachmentDeleting:
-			if err := w.objects.RemoveObject(ctx, attachment.ObjectKey); err != nil {
-				if retryErr := w.repository.RetryAttachmentJob(ctx, attachment.ID, "delete_unavailable", job.Attempts); retryErr != nil {
-					return errors.Join(err, retryErr)
-				}
-				continue
-			}
-			if err := w.repository.FinishAttachmentCleanup(ctx, attachment.ID, true); err != nil {
-				return err
-			}
-		default:
-			if err := w.repository.FinishAttachmentCleanup(ctx, attachment.ID, false); err != nil {
-				return err
-			}
+			return nil
+		}
+		if err := w.repository.FinishAttachmentCleanup(workCtx, attachment.ID, true); err != nil {
+			return err
+		}
+	default:
+		if err := w.repository.FinishAttachmentCleanup(workCtx, attachment.ID, false); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -256,24 +352,32 @@ func (w *Worker) scanAttachment(ctx context.Context, job domain.ScanJob) error {
 }
 
 func (w *Worker) processPurge(ctx context.Context) error {
-	candidates, err := w.repository.ListPurgeCandidates(ctx, 20)
+	probeCtx := coretrace.Suppress(ctx)
+	candidates, err := w.repository.ListPurgeCandidates(probeCtx, 20)
 	if err != nil {
 		return err
 	}
 	for _, candidate := range candidates {
-		if err := w.collaboration.PurgeDocument(ctx, candidate.DocumentID); err != nil {
+		workCtx, span := otel.Tracer("knowledge-core/knowledge").Start(ctx, "knowledge.worker.purge_document",
+			oteltrace.WithSpanKind(oteltrace.SpanKindInternal),
+		)
+		if err := w.collaboration.PurgeDocument(workCtx, candidate.DocumentID); err != nil {
+			span.End()
 			return err
 		}
 		for _, objectKey := range candidate.ObjectKeys {
-			if err := w.objects.RemoveObject(ctx, objectKey); err != nil {
+			if err := w.objects.RemoveObject(workCtx, objectKey); err != nil {
+				span.End()
 				return err
 			}
 		}
-		if err := w.repository.PurgeDocument(ctx, candidate.DocumentID); err != nil {
+		if err := w.repository.PurgeDocument(workCtx, candidate.DocumentID); err != nil {
+			span.End()
 			return err
 		}
+		span.End()
 	}
-	return w.repository.PurgeMaintenanceData(ctx)
+	return w.repository.PurgeMaintenanceData(probeCtx)
 }
 
 func boundedBackoff(attempt int) time.Duration {

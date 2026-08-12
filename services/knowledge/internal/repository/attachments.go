@@ -170,6 +170,9 @@ func (s *Store) MarkAttachmentScanning(ctx context.Context, documentID, attachme
 		if err := tx.Create(&job).Error; err != nil {
 			return mapWriteError("enqueue attachment scan", err)
 		}
+		if err := notifyWorkers(tx, WorkerWakePayloadAttachment); err != nil {
+			return err
+		}
 		record.Status = domain.AttachmentScanning
 		record.UpdatedAt = now
 		result = attachmentFromModel(&record)
@@ -206,6 +209,9 @@ func (s *Store) QueueAttachmentDeletion(ctx context.Context, documentID, attachm
 			DoUpdates: clause.Assignments(map[string]any{"next_attempt_at": now, "last_error_key": "delete", "updated_at": now}),
 		}).Create(&job).Error; err != nil {
 			return fmt.Errorf("enqueue attachment deletion: %w", err)
+		}
+		if err := notifyWorkers(tx, WorkerWakePayloadAttachment); err != nil {
+			return err
 		}
 		record.Status = domain.AttachmentDeleting
 		record.UpdatedAt = now
@@ -277,6 +283,9 @@ func (s *Store) MarkAttachmentRejected(ctx context.Context, attachmentID, reason
 		if err := tx.Model(&model.AttachmentScanJob{}).Where("attachment_id = ?", attachmentID).
 			Updates(map[string]any{"next_attempt_at": now, "last_error_key": "cleanup", "updated_at": now}).Error; err != nil {
 			return fmt.Errorf("queue rejected attachment cleanup: %w", err)
+		}
+		if err := notifyWorkers(tx, WorkerWakePayloadAttachment); err != nil {
+			return err
 		}
 		return nil
 	})

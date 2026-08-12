@@ -76,8 +76,17 @@ span attribute 只使用低基数字段，例如 route template、RPC method、s
 - HTTP：`/metrics`、`/livez`、`/readyz`、`/health/live`、`/health/ready`。
 - RPC：`Ping`、`Live`、`health`、`healthcheck`。
 - WebSocket：ping/pong 保活帧。
+- Knowledge worker 空转探测：`ClaimOutbox`、`ClaimAttachmentJobs`、`QueueExpiredUploads`、
+  `ListPurgeCandidates`、`PurgeMaintenanceData` 使用 `trace.Suppress`。空 claim 不会导出
+  单 span root（例如 `select outbox`）。claim 到真实工作后改为未抑制的 work context：outbox
+  从消息 headers 恢复 W3C parent 再发布；attachment/purge 文档使用短操作 span。
 
-抑制标记放在 request context 中，并由 span processor 继承处理。因此健康请求下面由 GORM、Redis 等自动 instrumentation 创建的子 span 也会被丢弃。
+抑制标记放在 request context 中，并由 span processor 继承处理。因此健康请求和 worker 空转
+下面由 GORM、Redis 等自动 instrumentation 创建的子 span 也会被丢弃。
+
+Knowledge worker 主路径是 PostgreSQL `NOTIFY`（channel `knowledge_workers`，payload 仅
+`outbox` / `attachment`），与作业入队同事务发出。`workers.poll_interval` 是兜底慢轮询，用于
+到期重试、过期上传、purge/maintenance，以及 LISTEN 断线重连后的补偿扫描；默认 30s。
 
 ## 5. 重试、循环和停车
 
@@ -148,7 +157,7 @@ Go 服务通过 `<SERVICE>_TRACE_ENABLED`、`<SERVICE>_TRACE_ENDPOINT`、`<SERVI
 | Go sampler、抑制策略、W3C headers | `pkg/trace/runtime.go`、`pkg/trace/propagation.go` |
 | Hertz/Kitex 传播 | `pkg/trace/hertz.go`、`pkg/trace/kitex.go` |
 | Go NATS producer/consumer | `pkg/nats/propagation.go`、`pkg/nats/durable.go`、`pkg/nats/delivery.go` |
-| Knowledge outbox | `services/knowledge/internal/repository/outbox.go`、`services/knowledge/internal/worker/worker.go` |
+| Knowledge outbox / worker wake | `services/knowledge/internal/repository/outbox.go`、`attachments.go`、`notify.go`、`services/knowledge/internal/worker/worker.go`、`wake.go` |
 | Rust RPC/WebSocket context | `services/collaboration/src/rpc/context.rs`、`websocket.rs`、`actor.rs` |
 | Rust NATS/outbox | `services/collaboration/src/worker.rs`、`storage/postgres.rs` |
 | 本地 Collector/Tempo | `docker/infrastructure/otel-collector-config.yaml`、`tempo.yaml`、`docker-compose.yml` |

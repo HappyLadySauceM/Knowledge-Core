@@ -6,10 +6,12 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"sync"
 	"testing"
 	"time"
 
 	natsresource "github.com/HappyLadySauce/Knowledge-Core/pkg/nats"
+	coretrace "github.com/HappyLadySauce/Knowledge-Core/pkg/trace"
 	"github.com/HappyLadySauce/Knowledge-Core/services/knowledge/internal/config"
 	"github.com/HappyLadySauce/Knowledge-Core/services/knowledge/internal/domain"
 	"github.com/HappyLadySauce/Knowledge-Core/services/knowledge/internal/repository"
@@ -105,12 +107,17 @@ type publisherStub struct {
 }
 
 type lifecycleRepositoryStub struct {
+	mu          sync.Mutex
 	claims      int
 	secondClaim chan struct{}
+	ops         []string
 }
 
 func (s *lifecycleRepositoryStub) ClaimOutbox(context.Context, int, time.Duration) ([]domain.OutboxMessage, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.claims++
+	s.ops = append(s.ops, "outbox")
 	if s.claims == 2 {
 		close(s.secondClaim)
 	}
@@ -123,8 +130,16 @@ func (*lifecycleRepositoryStub) RetryOutbox(context.Context, string, time.Durati
 }
 
 func (*lifecycleRepositoryStub) ParkOutbox(context.Context, string, string) error { return nil }
-func (*lifecycleRepositoryStub) QueueExpiredUploads(context.Context, int) error   { return nil }
-func (*lifecycleRepositoryStub) ClaimAttachmentJobs(context.Context, int, time.Duration) ([]domain.ScanJob, error) {
+func (s *lifecycleRepositoryStub) QueueExpiredUploads(context.Context, int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.ops = append(s.ops, "queue_expired")
+	return nil
+}
+func (s *lifecycleRepositoryStub) ClaimAttachmentJobs(context.Context, int, time.Duration) ([]domain.ScanJob, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.ops = append(s.ops, "attachments")
 	return nil, nil
 }
 func (*lifecycleRepositoryStub) MarkAttachmentReady(context.Context, string, string) error {
@@ -139,11 +154,31 @@ func (*lifecycleRepositoryStub) FinishAttachmentCleanup(context.Context, string,
 func (*lifecycleRepositoryStub) RetryAttachmentJob(context.Context, string, string, int) error {
 	return nil
 }
-func (*lifecycleRepositoryStub) ListPurgeCandidates(context.Context, int) ([]repository.PurgeCandidate, error) {
+func (s *lifecycleRepositoryStub) ListPurgeCandidates(context.Context, int) ([]repository.PurgeCandidate, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.ops = append(s.ops, "purge")
 	return nil, nil
 }
 func (*lifecycleRepositoryStub) PurgeDocument(context.Context, string) error { return nil }
-func (*lifecycleRepositoryStub) PurgeMaintenanceData(context.Context) error  { return nil }
+func (s *lifecycleRepositoryStub) PurgeMaintenanceData(context.Context) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.ops = append(s.ops, "maintenance")
+	return nil
+}
+
+func (s *lifecycleRepositoryStub) snapshotOps() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]string(nil), s.ops...)
+}
+
+func (s *lifecycleRepositoryStub) resetOps() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.ops = nil
+}
 
 type lifecycleObjectStoreStub struct{}
 
@@ -177,12 +212,39 @@ func (s *publisherStub) Publish(ctx context.Context, message natsresource.Messag
 
 type outboxContextKey struct{}
 
+type idleWakeSource struct{}
+
+func (*idleWakeSource) Run(ctx context.Context, _ func(WakeKind)) error {
+	<-ctx.Done()
+	return nil
+}
+
+type channelWakeSource struct {
+	wakes <-chan WakeKind
+}
+
+func (s *channelWakeSource) Run(ctx context.Context, emit func(WakeKind)) error {
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case kind, ok := <-s.wakes:
+			if !ok {
+				<-ctx.Done()
+				return nil
+			}
+			emit(kind)
+		}
+	}
+}
+
 func TestWorkerLifetimeIsOwnedByShutdown(t *testing.T) {
 	startupCtx, cancelStartup := context.WithCancel(context.Background())
 	repository := &lifecycleRepositoryStub{secondClaim: make(chan struct{})}
-	worker, err := New(
+	worker, err := newWorker(
 		startupCtx,
 		config.WorkerOptions{PollInterval: time.Millisecond, OperationTimeout: time.Second},
+		&idleWakeSource{},
 		repository,
 		&lifecycleObjectStoreStub{},
 		&lifecycleScannerStub{},
@@ -224,11 +286,94 @@ func TestWorkerLifetimeIsOwnedByShutdown(t *testing.T) {
 	}
 }
 
+func TestWorkerWakeRunsSelectiveLanesAndCoalesces(t *testing.T) {
+	repository := &lifecycleRepositoryStub{secondClaim: make(chan struct{})}
+	w := &Worker{
+		options:       config.WorkerOptions{OperationTimeout: time.Second},
+		repository:    repository,
+		objects:       &lifecycleObjectStoreStub{},
+		scanner:       &lifecycleScannerStub{},
+		publisher:     &lifecyclePublisherStub{},
+		collaboration: &lifecyclePurgerStub{},
+		logger:        slog.New(slog.NewTextHandler(io.Discard, nil)),
+		runContext:    context.Background(),
+	}
+
+	w.queueWake(WakeOutbox)
+	w.queueWake(WakeOutbox)
+	w.drainWake()
+	assertOperationOrder(t, repository.snapshotOps(), []string{"outbox"})
+	repository.resetOps()
+
+	w.queueWake(WakeAttachment)
+	w.drainWake()
+	assertOperationOrder(t, repository.snapshotOps(), []string{"queue_expired", "attachments"})
+	repository.resetOps()
+
+	w.queueWake(WakeOutbox)
+	w.queueWake(WakeAttachment)
+	w.drainWake()
+	assertOperationOrder(t, repository.snapshotOps(), []string{"outbox", "queue_expired", "attachments", "purge", "maintenance"})
+	repository.resetOps()
+
+	w.queueWake(WakeAll)
+	w.drainWake()
+	assertOperationOrder(t, repository.snapshotOps(), []string{"outbox", "queue_expired", "attachments", "purge", "maintenance"})
+}
+
+func TestWorkerWakeSourceTriggersOutboxLane(t *testing.T) {
+	wakes := make(chan WakeKind, 1)
+	repository := &lifecycleRepositoryStub{secondClaim: make(chan struct{})}
+	worker, err := newWorker(
+		context.Background(),
+		config.WorkerOptions{PollInterval: time.Hour, OperationTimeout: time.Second},
+		&channelWakeSource{wakes: wakes},
+		repository,
+		&lifecycleObjectStoreStub{},
+		&lifecycleScannerStub{},
+		&lifecyclePublisherStub{},
+		&lifecyclePurgerStub{},
+		slog.New(slog.NewTextHandler(io.Discard, nil)),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	serveDone := make(chan error, 1)
+	go func() { serveDone <- worker.Serve() }()
+	t.Cleanup(func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		_ = worker.Shutdown(shutdownCtx)
+		<-serveDone
+	})
+
+	waitCtx, cancelWait := context.WithTimeout(context.Background(), time.Second)
+	defer cancelWait()
+	if err := worker.Ready(waitCtx); err != nil {
+		t.Fatal(err)
+	}
+	waitForOps(t, repository, "outbox", "queue_expired", "attachments", "purge", "maintenance")
+	baseline := len(repository.snapshotOps())
+
+	wakes <- WakeOutbox
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		ops := repository.snapshotOps()
+		if len(ops) > baseline && ops[len(ops)-1] == "outbox" {
+			return
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	t.Fatalf("ops after wake = %v, want trailing outbox", repository.snapshotOps())
+}
+
 func TestProcessOutboxMarksExactlyOnceAfterAcknowledgedPublish(t *testing.T) {
 	operationTimeout := 9 * time.Second
 	payload := []byte(`{"document_id":"document-1"}`)
 	message := domain.OutboxMessage{
 		ID: "outbox-1", Subject: "knowledge.permission.changed", Payload: payload, Attempts: 2,
+		Headers: map[string]string{"traceparent": "00-0123456789abcdef0123456789abcdef-0123456789abcdef-01"},
 	}
 	order := make([]string, 0, 3)
 	repository := &outboxRepositoryStub{messages: []domain.OutboxMessage{message}, operationOrder: &order}
@@ -249,10 +394,16 @@ func TestProcessOutboxMarksExactlyOnceAfterAcknowledgedPublish(t *testing.T) {
 	if repository.claimLimit != 50 || repository.claimLease != operationTimeout {
 		t.Fatalf("ClaimOutbox() = limit %d, lease %s", repository.claimLimit, repository.claimLease)
 	}
+	if !coretrace.IsSuppressed(repository.claimContext) {
+		t.Fatal("ClaimOutbox() context should be suppressed for empty-poll noise control")
+	}
 	if len(publisher.calls) != 1 {
 		t.Fatalf("Publish() calls = %d, want 1", len(publisher.calls))
 	}
 	call := publisher.calls[0]
+	if coretrace.IsSuppressed(call.ctx) {
+		t.Fatal("Publish() context must not inherit claim suppression")
+	}
 	if call.message.ID != message.ID || call.message.Subject != message.Subject {
 		t.Fatalf("Publish() message identity = %#v", call.message)
 	}
@@ -272,7 +423,7 @@ func TestProcessOutboxMarksExactlyOnceAfterAcknowledgedPublish(t *testing.T) {
 		t.Fatalf("RetryOutbox() calls = %v, want none", repository.retries)
 	}
 	assertOperationOrder(t, order, []string{"claim", "publish", "mark"})
-	assertContextPreserved(t, ctx, repository.claimContext, call.ctx, repository.markContexts[0])
+	assertWorkContextPreserved(t, ctx, call.ctx, repository.markContexts[0])
 }
 
 func TestProcessOutboxRetriesPublishFailureWithoutMarking(t *testing.T) {
@@ -305,11 +456,17 @@ func TestProcessOutboxRetriesPublishFailureWithoutMarking(t *testing.T) {
 				t.Fatalf("processOutbox() error = %v", err)
 			}
 
+			if !coretrace.IsSuppressed(repository.claimContext) {
+				t.Fatal("ClaimOutbox() context should be suppressed")
+			}
 			if len(repository.markedIDs) != 0 {
 				t.Fatalf("MarkOutboxPublished() IDs = %v, want none", repository.markedIDs)
 			}
 			if len(publisher.calls) != 1 {
 				t.Fatalf("Publish() calls = %d, want 1", len(publisher.calls))
+			}
+			if coretrace.IsSuppressed(publisher.calls[0].ctx) {
+				t.Fatal("Publish() context must not be suppressed")
 			}
 			if len(repository.retries) != 1 {
 				t.Fatalf("RetryOutbox() calls = %v, want 1", repository.retries)
@@ -318,9 +475,47 @@ func TestProcessOutboxRetriesPublishFailureWithoutMarking(t *testing.T) {
 				t.Fatalf("RetryOutbox() = %#v, want ID %q and delay %s", retry, message.ID, boundedBackoff(message.Attempts))
 			}
 			assertOperationOrder(t, order, []string{"claim", "publish", "retry"})
-			assertContextPreserved(t, ctx, repository.claimContext, publisher.calls[0].ctx, repository.retryContexts[0])
+			assertWorkContextPreserved(t, ctx, publisher.calls[0].ctx, repository.retryContexts[0])
 		})
 	}
+}
+
+func TestParseWakePayload(t *testing.T) {
+	t.Parallel()
+	if got := parseWakePayload(repository.WorkerWakePayloadOutbox); got != WakeOutbox {
+		t.Fatalf("parseWakePayload(outbox) = %v", got)
+	}
+	if got := parseWakePayload(repository.WorkerWakePayloadAttachment); got != WakeAttachment {
+		t.Fatalf("parseWakePayload(attachment) = %v", got)
+	}
+	if got := parseWakePayload("purge"); got != 0 {
+		t.Fatalf("parseWakePayload(purge) = %v, want 0", got)
+	}
+}
+
+func waitForOps(t *testing.T, repository *lifecycleRepositoryStub, want ...string) {
+	t.Helper()
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		ops := repository.snapshotOps()
+		if hasPrefixOps(ops, want...) {
+			return
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	t.Fatalf("ops = %v, want prefix %v", repository.snapshotOps(), want)
+}
+
+func hasPrefixOps(got []string, want ...string) bool {
+	if len(got) < len(want) {
+		return false
+	}
+	for index := range want {
+		if got[index] != want[index] {
+			return false
+		}
+	}
+	return true
 }
 
 func assertOperationOrder(t *testing.T, got, want []string) {
@@ -335,21 +530,21 @@ func assertOperationOrder(t *testing.T, got, want []string) {
 	}
 }
 
-func assertContextPreserved(t *testing.T, want context.Context, contexts ...context.Context) {
+func assertWorkContextPreserved(t *testing.T, parent context.Context, contexts ...context.Context) {
 	t.Helper()
-	wantDeadline, wantHasDeadline := want.Deadline()
+	wantDeadline, wantHasDeadline := parent.Deadline()
 	for index, got := range contexts {
 		if got == nil {
 			t.Fatalf("context %d is nil", index)
 		}
-		if got != want {
-			t.Errorf("context %d was replaced", index)
+		if coretrace.IsSuppressed(got) {
+			t.Errorf("context %d is suppressed", index)
 		}
 		gotDeadline, gotHasDeadline := got.Deadline()
 		if gotHasDeadline != wantHasDeadline || !gotDeadline.Equal(wantDeadline) {
 			t.Errorf("context %d deadline = %v, %t; want %v, %t", index, gotDeadline, gotHasDeadline, wantDeadline, wantHasDeadline)
 		}
-		if got.Value(outboxContextKey{}) != want.Value(outboxContextKey{}) {
+		if got.Value(outboxContextKey{}) != parent.Value(outboxContextKey{}) {
 			t.Errorf("context %d value was not preserved", index)
 		}
 	}
@@ -358,4 +553,6 @@ func assertContextPreserved(t *testing.T, want context.Context, contexts ...cont
 var (
 	_ Repository = (*outboxRepositoryStub)(nil)
 	_ Publisher  = (*publisherStub)(nil)
+	_ WakeSource = (*idleWakeSource)(nil)
+	_ WakeSource = (*channelWakeSource)(nil)
 )

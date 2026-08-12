@@ -55,6 +55,9 @@ func (s *Store) enqueuePermissionChanged(tx *gorm.DB, document *model.Document, 
 	if err := tx.Create(&record).Error; err != nil {
 		return fmt.Errorf("enqueue permission change event: %w", err)
 	}
+	if err := notifyWorkers(tx, WorkerWakePayloadOutbox); err != nil {
+		return err
+	}
 	return nil
 }
 

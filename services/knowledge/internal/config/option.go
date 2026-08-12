@@ -106,7 +106,7 @@ type WorkerOptions struct {
 
 func NewWorkerOptions() *WorkerOptions {
 	return &WorkerOptions{
-		PollInterval: time.Second, OperationTimeout: 30 * time.Second,
+		PollInterval: 30 * time.Second, OperationTimeout: 30 * time.Second,
 	}
 }
 
