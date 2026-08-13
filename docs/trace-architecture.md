@@ -80,6 +80,9 @@ span attribute 只使用低基数字段，例如 route template、RPC method、s
   `ListPurgeCandidates`、`PurgeMaintenanceData` 使用 `trace.Suppress`。空 claim 不会导出
   单 span root（例如 `select outbox`）。claim 到真实工作后改为未抑制的 work context：outbox
   从消息 headers 恢复 W3C parent 再发布；attachment/purge 文档使用短操作 span。
+- Redis 连接池拨号：`pkg/redis` 启用 redisotel `WithDialFilter`，不导出 `redis.dial`
+  span（连接池补连常用无父级 context，易形成噪音 root）。业务请求下的 Redis 命令 span
+  仍会导出；连接问题继续通过 Redis pool metrics / 日志观察。
 
 抑制标记放在 request context 中，并由 span processor 继承处理。因此健康请求和 worker 空转
 下面由 GORM、Redis 等自动 instrumentation 创建的子 span 也会被丢弃。

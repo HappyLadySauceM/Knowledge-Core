@@ -61,9 +61,9 @@ func Open(
 		MaxRetries:            opts.MaxRetries,
 		TLSConfig:             tlsConfig,
 	})
-	if err := redisotel.InstrumentTracing(client, redisotel.WithDBStatement(false)); err != nil {
+	if err := instrumentClientTracing(client); err != nil {
 		_ = client.Close()
-		return nil, fmt.Errorf("instrument redis tracing: %w", err)
+		return nil, err
 	}
 	metricsCollector := newPoolCollector(dependency, client)
 	if err := metricsRegistry.Register(metricsCollector); err != nil {
@@ -83,6 +83,20 @@ func Open(
 		logger.DebugContext(ctx, "redis connected", slog.String("address", opts.Address), slog.Int("db", opts.DB))
 	}
 	return resource, nil
+}
+
+func instrumentClientTracing(client *redisclient.Client, extra ...redisotel.TracingOption) error {
+	// Drop connection-pool dial spans; they often use a parentless context and become orphan root traces.
+	// 过滤连接池拨号 span：无父级 context 时会变成噪音 root trace；保留命令级 Redis span。
+	options := []redisotel.TracingOption{
+		redisotel.WithDBStatement(false),
+		redisotel.WithDialFilter(true),
+	}
+	options = append(options, extra...)
+	if err := redisotel.InstrumentTracing(client, options...); err != nil {
+		return fmt.Errorf("instrument redis tracing: %w", err)
+	}
+	return nil
 }
 
 func (r *Resource) Ping(ctx context.Context) error {

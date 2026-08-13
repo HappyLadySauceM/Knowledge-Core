@@ -2,13 +2,17 @@ package redis
 
 import (
 	"context"
+	"net"
 	"strings"
 	"testing"
 	"time"
 
 	coremetrics "github.com/HappyLadySauce/Knowledge-Core/pkg/metrics"
 	"github.com/HappyLadySauce/Knowledge-Core/pkg/option"
+	"github.com/redis/go-redis/extra/redisotel/v9"
 	redisclient "github.com/redis/go-redis/v9"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 )
 
 func TestOpenRejectsInvalidOptions(t *testing.T) {
@@ -33,6 +37,54 @@ func TestOpenClosesClientAfterPingFailure(t *testing.T) {
 		t.Fatalf("Open() error = %v, want ping redis failure", err)
 	}
 	assertMetricAbsent(t, registry, "knowledge_core_redis_pool_connections")
+}
+
+func TestInstrumentTracingFiltersDialSpans(t *testing.T) {
+	t.Parallel()
+	recorder := tracetest.NewSpanRecorder()
+	provider := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(recorder))
+	t.Cleanup(func() { _ = provider.Shutdown(context.Background()) })
+
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("Listen() error = %v", err)
+	}
+	t.Cleanup(func() { _ = listener.Close() })
+	go acceptAndClose(listener)
+
+	client := redisclient.NewClient(&redisclient.Options{
+		Addr:         listener.Addr().String(),
+		DialTimeout:  200 * time.Millisecond,
+		ReadTimeout:  200 * time.Millisecond,
+		WriteTimeout: 200 * time.Millisecond,
+		MaxRetries:   -1,
+		PoolSize:     1,
+		MinIdleConns: 0,
+	})
+	t.Cleanup(func() { _ = client.Close() })
+	if err := instrumentClientTracing(client, redisotel.WithTracerProvider(provider)); err != nil {
+		t.Fatalf("instrumentClientTracing() error = %v", err)
+	}
+
+	// Force a dial against the local listener; Redis protocol may fail after connect.
+	// 强制对本地 listener 拨号；协议层失败不影响 dial span 断言。
+	_ = client.Ping(context.Background()).Err()
+
+	for _, span := range recorder.Ended() {
+		if span.Name() == "redis.dial" {
+			t.Fatalf("unexpected redis.dial span exported")
+		}
+	}
+}
+
+func acceptAndClose(listener net.Listener) {
+	for {
+		connection, err := listener.Accept()
+		if err != nil {
+			return
+		}
+		_ = connection.Close()
+	}
 }
 
 func TestPoolMetricsAreUnregisteredOnClose(t *testing.T) {
