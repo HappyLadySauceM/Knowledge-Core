@@ -154,7 +154,7 @@
     },
     {
       "id": "cicd.pipeline",
-      "revision": 65,
+      "revision": 102,
       "section": "workflows",
       "sources": [
         {
@@ -167,8 +167,8 @@
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-08-10T07:33:09Z",
-      "value": "A push to dev triggers the reusable Python CI control image from ci-templates. The pipeline runs make ci and the Collaboration Node interop checks under Node 24.18.1, detects affected services, prewarms pinned base images into Harbor, builds only affected images with Harbor registry cache, and publishes the dev tag without image scanning or signing. Before replacement it preserves the current dev image as previous. Knowledge-Core/deploy is the editable deployment source; CI copies it into the Knowledge-Core/deploy snapshot in k3s-home-deploy, updates root image digests, and pushes with a fast-forward compare-and-swap check while Argo CD watches the k3s repository. Argo health and deployment smoke must pass before release. On Argo or smoke failure, CI reverts the exact GitOps snapshot commit as a normal fast-forward commit and restores each affected Harbor previous tag to dev; if the remote branch moved, rollback refuses to overwrite it. On success previous tags must be deleted for Harbor garbage collection, and cleanup failure blocks release. DeepSeek release-summary failure blocks main promotion. On success dev is fast-forwarded to main and each affected service receives an independent service-v<MAJOR>.<MINOR>.<PATCH> Git tag and GitHub Release targeting the exact promoted commit SHA. Retrying the same commit reuses matching service tags and existing Releases, but refuses tags that point to another commit. Shared history is never force-pushed or rebased."
+      "updatedAt": "2026-08-13T06:43:05Z",
+      "value": "A push to dev triggers the reusable Python CI control image from ci-templates. The pipeline runs make ci and the Collaboration Node interop checks under Node 24.18.1, detects affected services, prewarms pinned base images into Harbor, builds only affected images with Harbor registry cache, and publishes the dev tag without image scanning or signing. Before replacement it preserves the current dev image as previous. Knowledge-Core/deploy is the editable deployment source; CI copies it into the Knowledge-Core/deploy snapshot in k3s-home-deploy, updates root image digests, and pushes with a fast-forward compare-and-swap check while Argo CD watches the k3s repository. Argo health and deployment smoke must pass before release. On Argo or smoke failure, CI reverts the exact GitOps snapshot commit as a normal fast-forward commit and restores each affected Harbor previous tag to dev; if the remote branch moved, rollback refuses to overwrite it. On success previous tags must be deleted for Harbor garbage collection, and cleanup failure blocks release. DeepSeek release-summary failure blocks main promotion. On success dev is fast-forwarded to main and one aggregate vMAJOR.MINOR.PATCH Git tag and GitHub Release are created targeting the exact promoted commit SHA; the Release title is the same version tag. Existing knowledge-core-v* tags still count when choosing the next patch or retrying a commit that already has a prefixed tag. Retrying the same commit reuses matching aggregate tags and existing Releases, but refuses tags that point to another commit. Shared history is never force-pushed or rebased."
     },
     {
       "id": "constraints.project",
@@ -278,7 +278,7 @@
     },
     {
       "id": "security.secrets-and-config",
-      "revision": 100,
+      "revision": 104,
       "section": "conventions",
       "sources": [
         {
@@ -327,6 +327,11 @@
           "reference": "README.md#compose"
         },
         {
+          "detail": "evidence-sha256:4b6f4541eadeec2065a2f1f26030d8327d249392d4cc0030265e07b25155358b",
+          "kind": "documented",
+          "reference": "README.md#compose"
+        },
+        {
           "detail": "evidence-sha256:4cc991c8785e0118decd7d11538028062864b27bc12085669c23712cc64db2cf",
           "kind": "documented",
           "reference": "README.md#compose"
@@ -417,6 +422,11 @@
           "reference": "README.md#k3s-gitops"
         },
         {
+          "detail": "evidence-sha256:4b6f4541eadeec2065a2f1f26030d8327d249392d4cc0030265e07b25155358b",
+          "kind": "documented",
+          "reference": "README.md#k3s-gitops"
+        },
+        {
           "detail": "evidence-sha256:4cc991c8785e0118decd7d11538028062864b27bc12085669c23712cc64db2cf",
           "kind": "documented",
           "reference": "README.md#k3s-gitops"
@@ -482,6 +492,11 @@
           "reference": "README.md#section"
         },
         {
+          "detail": "evidence-sha256:4b6f4541eadeec2065a2f1f26030d8327d249392d4cc0030265e07b25155358b",
+          "kind": "documented",
+          "reference": "README.md#section"
+        },
+        {
           "detail": "evidence-sha256:57362d70e1f44aa28d5abc4f82881b3ba21f313c84605636433b6b1a941d129a",
           "kind": "documented",
           "reference": "README.md#section"
@@ -525,6 +540,11 @@
           "detail": "evidence-sha256:2b07231c2b6c7eb0272df6c01752e385fde7019c6a06c9ebd45a751fa8315b17",
           "kind": "documented",
           "reference": "deploy/base/README.md#application-deployment-base"
+        },
+        {
+          "detail": "evidence-sha256:4b6f4541eadeec2065a2f1f26030d8327d249392d4cc0030265e07b25155358b",
+          "kind": "documented",
+          "reference": "deploy/nacos/README.md#nacos-application-configuration"
         },
         {
           "detail": "evidence-sha256:a4a91bf712de2cb1f3ab5eb2443d97915559f7ff283841d7aac578685acd7a42",
@@ -582,6 +602,11 @@
           "reference": "docs/framework-design.md#11"
         },
         {
+          "detail": "evidence-sha256:4b6f4541eadeec2065a2f1f26030d8327d249392d4cc0030265e07b25155358b",
+          "kind": "documented",
+          "reference": "docs/framework-design.md#11"
+        },
+        {
           "detail": "evidence-sha256:4cc991c8785e0118decd7d11538028062864b27bc12085669c23712cc64db2cf",
           "kind": "documented",
           "reference": "docs/framework-design.md#11"
@@ -672,6 +697,11 @@
           "reference": "docs/framework-design.md#12"
         },
         {
+          "detail": "evidence-sha256:4b6f4541eadeec2065a2f1f26030d8327d249392d4cc0030265e07b25155358b",
+          "kind": "documented",
+          "reference": "docs/framework-design.md#12"
+        },
+        {
           "detail": "evidence-sha256:4cc991c8785e0118decd7d11538028062864b27bc12085669c23712cc64db2cf",
           "kind": "documented",
           "reference": "docs/framework-design.md#12"
@@ -762,6 +792,11 @@
           "reference": "docs/framework-design.md#8-secret-tls"
         },
         {
+          "detail": "evidence-sha256:4b6f4541eadeec2065a2f1f26030d8327d249392d4cc0030265e07b25155358b",
+          "kind": "documented",
+          "reference": "docs/framework-design.md#8-secret-tls"
+        },
+        {
           "detail": "evidence-sha256:4cc991c8785e0118decd7d11538028062864b27bc12085669c23712cc64db2cf",
           "kind": "documented",
           "reference": "docs/framework-design.md#8-secret-tls"
@@ -852,6 +887,11 @@
           "reference": "docs/rust-collaboration-design.md#2-1"
         },
         {
+          "detail": "evidence-sha256:4b6f4541eadeec2065a2f1f26030d8327d249392d4cc0030265e07b25155358b",
+          "kind": "documented",
+          "reference": "docs/rust-collaboration-design.md#2-1"
+        },
+        {
           "detail": "evidence-sha256:4cc991c8785e0118decd7d11538028062864b27bc12085669c23712cc64db2cf",
           "kind": "documented",
           "reference": "docs/rust-collaboration-design.md#2-1"
@@ -942,6 +982,11 @@
           "reference": "docs/rust-collaboration-design.md#7"
         },
         {
+          "detail": "evidence-sha256:4b6f4541eadeec2065a2f1f26030d8327d249392d4cc0030265e07b25155358b",
+          "kind": "documented",
+          "reference": "docs/rust-collaboration-design.md#7"
+        },
+        {
           "detail": "evidence-sha256:4cc991c8785e0118decd7d11538028062864b27bc12085669c23712cc64db2cf",
           "kind": "documented",
           "reference": "docs/rust-collaboration-design.md#7"
@@ -988,6 +1033,11 @@
         },
         {
           "detail": "evidence-sha256:08fe26d59eb8a9b4aba2ee77ff84f206bc5a59cd1c42aff9532458469fd002d3",
+          "kind": "documented",
+          "reference": "docs/trace-architecture.md#7-collector-tempo"
+        },
+        {
+          "detail": "evidence-sha256:4b6f4541eadeec2065a2f1f26030d8327d249392d4cc0030265e07b25155358b",
           "kind": "documented",
           "reference": "docs/trace-architecture.md#7-collector-tempo"
         },
@@ -1026,7 +1076,7 @@
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-08-13T03:49:50Z",
+      "updatedAt": "2026-08-13T06:43:23Z",
       "value": "Secrets are injected only through environment variables, Kubernetes Secrets, or SOPS-encrypted GitOps manifests. Sensitive values must not be stored in plaintext source, configuration, logs, metrics, spans, or release metadata."
     },
     {
@@ -1345,11 +1395,11 @@
     "profile": "generic",
     "slug": "knowledge-core"
   },
-  "revision": 101,
+  "revision": 104,
   "scan": {
-    "fingerprint": "acbcd58fb9644bae4f4b9b71d2eb1121cd8750b3cdf7ef8019ac1330b1a4dac4",
-    "inventoryCount": 332
+    "fingerprint": "bebd830af09244220c58cd3d3e9bc5f0da50c5e336855b2e87cef4ddbafb5a50",
+    "inventoryCount": 330
   },
   "schemaVersion": 1,
-  "updatedAt": "2026-08-13T04:28:18Z"
+  "updatedAt": "2026-08-13T06:43:23Z"
 }

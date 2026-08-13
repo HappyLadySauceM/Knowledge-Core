@@ -290,7 +290,7 @@ IDL、生成器、Makefile 和 workflow 变更启用，其他提交跳过 Rust �
 release 编译，最终镜像构建仍负责该编译。冒烟后由 DeepSeek 根据限长、脱敏的代码变更上下文
 生成分层功能摘要：共享/CI/构建变更写入 Shared changes，服务业务路径变更才进入
 Service-specific changes；调用失败即停止。成功后仅 fast-forward `main`，并只创建一个
-`knowledge-core-v*` 聚合 tag 与对应 GitHub Release（不再创建各服务独立 tag）。GitOps 与源码
+`v*` 聚合 tag 与对应 GitHub Release（不再创建各服务独立 tag）。GitOps 与源码
 仓库均使用普通 fast-forward compare-and-swap push，检测到远端分支变化即停止。
 
 Kubernetes 所有权分为三层：`k3s-home-deploy/k3s`（服务器 `/opt/k3s`）是公共基础设施真源；
@@ -323,7 +323,7 @@ ApplicationSet 由 GitOps 仓库声明。平台组件与四个应用服务各自
 - Knowledge repository/migration、事务、约束和 SQL cursor 没有针对真实 PostgreSQL 的自动化集成测试。
 - 远端 CI 已配置；production image smoke 与完整 Compose 跨服务 WebSocket E2E 仍不是自动门禁。
 - CI/CD workflow 已定义上述自动 GitOps 更新、dev smoke、`main` fast-forward、聚合
-  `knowledge-core-v*` tag 与分层 GitHub Release；首次启用前仍需在目标 GitHub、Harbor、Argo
+  `v*` tag 与分层 GitHub Release；首次启用前仍需在目标 GitHub、Harbor、Argo
   和 runner 环境配置凭据并完成端到端演练。
 - 应用 Secret、trust bundle、四份 Nacos 加密动态文档以及 Argo CD repository Secret、
   AppProject/ApplicationSet 已配置，并已验证独立 Application 同步。

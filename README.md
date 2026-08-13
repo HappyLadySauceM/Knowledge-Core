@@ -247,7 +247,7 @@ Rust、IDL、生成器、Makefile 或 workflow 变更时运行；其他提交仍
 冒烟成功后，DeepSeek 根据限长并脱敏的代码 diff 生成中文功能变更摘要：共享/CI/构建类变更
 写入 Release 的 Shared changes；仅当 `services/<svc>` 或 `deploy/<svc>` 有业务变更时才出现
 对应服务小节。DeepSeek 失败会阻止 `main` promotion。成功时只允许 fast-forward `main`，
-并只创建一个 `knowledge-core-vMAJOR.MINOR.PATCH` 聚合 tag 与单一 GitHub Release；不再创建
+并只创建一个 `vMAJOR.MINOR.PATCH` 聚合 tag 与单一 GitHub Release（标题同为该版本号）；不再创建
 各服务独立 Git tag。Release 列出本次 Deployed services，不记录 commit/workflow 元数据。
 GitOps 快照推送同样要求远端分支未发生变化，禁止 force-push。
 
