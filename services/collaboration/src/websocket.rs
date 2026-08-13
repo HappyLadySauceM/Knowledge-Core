@@ -39,6 +39,7 @@ use crate::{
     config::{PublicConfig, TicketConfig},
     domain::{DocumentId, RequestContext},
     error::{ErrorCode, Result, ServiceError},
+    routing::RoutingService,
     rpc::{
         BAGGAGE_KEY, REQUEST_ID_KEY, TRACE_PARENT_KEY, TRACE_STATE_KEY, new_request_id,
         valid_baggage, valid_request_id, valid_trace_parent, valid_trace_state,
@@ -116,6 +117,7 @@ struct PublicState {
     health: HealthState,
     connection_tasks: ConnectionTasks,
     cancellation: CancellationToken,
+    routing: Arc<RoutingService>,
 }
 
 pub struct WebSocketServer {
@@ -237,10 +239,12 @@ impl WebSocketServer {
     /// # Errors
     ///
     /// Returns an error when configuration is invalid or the listener cannot bind.
+    #[allow(clippy::too_many_arguments)]
     pub async fn start(
         public: &PublicConfig,
         ticket: &TicketConfig,
         tickets: TicketService,
+        routing: RoutingService,
         actors: ActorRegistry,
         metrics: Metrics,
         health: HealthState,
@@ -258,21 +262,31 @@ impl WebSocketServer {
         let connection_tasks = ConnectionTasks::default();
         let handshake_limiter =
             HandshakeLimiter::new(public.handshakes_per_second, public.handshake_burst)?;
+        let connections = Arc::new(Semaphore::new(public.max_connections));
+        let routing = Arc::new(routing);
+        routing.spawn_load_heartbeat(Arc::clone(&connections), cancellation.clone());
+        let mut router = Router::new().route(
+            "/v1/instances/{ordinal}/documents/{document_id}",
+            get(upgrade_instance),
+        );
+        if routing.accepts_legacy_document_path() {
+            router = router.route("/v1/documents/{document_id}", get(upgrade_legacy));
+        }
         let state = PublicState {
             config: Arc::new(ArcSwap::from_pointee(public.clone())),
             subprotocol: Arc::from(ticket.subprotocol.as_str()),
             tickets,
             actors,
             metrics,
-            connections: Arc::new(Semaphore::new(public.max_connections)),
+            connections,
             handshake_limiter: Arc::new(ArcSwap::from_pointee(handshake_limiter)),
             accepting: Arc::new(AtomicBool::new(false)),
             health,
             connection_tasks,
             cancellation: cancellation.clone(),
+            routing,
         };
-        let router = Router::new()
-            .route("/v1/documents/{document_id}", get(upgrade))
+        let router = router
             .fallback(not_found)
             .with_state(state.clone())
             .layer(middleware::from_fn(inbound_context));
@@ -378,12 +392,53 @@ async fn inbound_context(mut request: Request<Body>, next: Next) -> Response<Bod
 
 #[tracing::instrument(
     skip_all,
-    fields(http.route = "/v1/documents/{document_id}", request_id = tracing::field::Empty)
+    fields(
+        http.route = "/v1/instances/{ordinal}/documents/{document_id}",
+        request_id = tracing::field::Empty,
+        instance.ordinal = tracing::field::Empty
+    )
 )]
-async fn upgrade(
+async fn upgrade_instance(
+    State(state): State<PublicState>,
+    Path((ordinal, document_id)): Path<(u32, String)>,
+    Extension(propagation): Extension<InboundPropagation>,
+    headers: HeaderMap,
+    websocket: WebSocketUpgrade,
+) -> Response<Body> {
+    handshake_upgrade(
+        state,
+        Some(ordinal),
+        document_id,
+        propagation,
+        headers,
+        websocket,
+    )
+    .await
+}
+
+#[tracing::instrument(
+    skip_all,
+    fields(
+        http.route = "/v1/documents/{document_id}",
+        request_id = tracing::field::Empty,
+        instance.ordinal = tracing::field::Empty
+    )
+)]
+async fn upgrade_legacy(
     State(state): State<PublicState>,
     Path(document_id): Path<String>,
     Extension(propagation): Extension<InboundPropagation>,
+    headers: HeaderMap,
+    websocket: WebSocketUpgrade,
+) -> Response<Body> {
+    handshake_upgrade(state, None, document_id, propagation, headers, websocket).await
+}
+
+async fn handshake_upgrade(
+    state: PublicState,
+    path_ordinal: Option<u32>,
+    document_id: String,
+    propagation: InboundPropagation,
     headers: HeaderMap,
     websocket: WebSocketUpgrade,
 ) -> Response<Body> {
@@ -397,6 +452,14 @@ async fn upgrade(
     if !state.accepting.load(Ordering::Acquire) || !state.health.is_ready() {
         return reject(&state.metrics, HttpReject::Unavailable);
     }
+    let expected_ordinal = match path_ordinal {
+        Some(ordinal) => match local_handshake_ordinal(ordinal, state.routing.local_ordinal()) {
+            Ok(ordinal) => ordinal,
+            Err(rejection) => return reject(&state.metrics, rejection),
+        },
+        None => state.routing.local_ordinal(),
+    };
+    span.record("instance.ordinal", expected_ordinal);
     let Ok(document_id) = DocumentId::parse(&document_id) else {
         return reject(&state.metrics, HttpReject::BadRequest);
     };
@@ -414,6 +477,7 @@ async fn upgrade(
     let Ok(permit) = Arc::clone(&state.connections).try_acquire_owned() else {
         return reject(&state.metrics, HttpReject::RateLimited);
     };
+    publish_load_best_effort(&state).await;
     let context = handshake_context(
         config.handshake_timeout,
         Arc::clone(&propagation.request_id),
@@ -421,20 +485,38 @@ async fn upgrade(
     );
     let authorization = tokio::time::timeout(
         config.handshake_timeout,
-        authorize(&state, &context, document_id, &ticket),
+        authorize(&state, &context, document_id, expected_ordinal, &ticket),
     )
     .await;
     let connection = match authorization {
         Ok(Ok(connection)) => connection,
-        Ok(Err(rejection)) => return reject(&state.metrics, rejection),
-        Err(_) => return reject(&state.metrics, HttpReject::Unavailable),
+        Ok(Err(rejection)) => {
+            drop(permit);
+            publish_load_best_effort(&state).await;
+            return reject(&state.metrics, rejection);
+        }
+        Err(_) => {
+            drop(permit);
+            publish_load_best_effort(&state).await;
+            return reject(&state.metrics, HttpReject::Unavailable);
+        }
     };
+    if let Err(error) = state.routing.refresh_route(&context, document_id).await {
+        tracing::warn!(
+            error = %error,
+            document.id = %document_id,
+            instance.ordinal = expected_ordinal,
+            "failed to refresh collaboration route mapping"
+        );
+    }
     state.metrics.handshake("accepted");
     let protocol = state.subprotocol.to_string();
     let maximum_frame_bytes = config.max_frame_bytes;
     let write_timeout = config.handshake_timeout;
     let cancellation = state.cancellation.child_token();
     let connection_tasks = state.connection_tasks.clone();
+    let routing = Arc::clone(&state.routing);
+    let connections = Arc::clone(&state.connections);
     websocket
         .max_frame_size(maximum_frame_bytes)
         .max_message_size(maximum_frame_bytes)
@@ -444,6 +526,8 @@ async fn upgrade(
                 socket,
                 connection,
                 permit,
+                routing,
+                connections,
                 maximum_frame_bytes,
                 write_timeout,
                 cancellation,
@@ -451,15 +535,29 @@ async fn upgrade(
         })
 }
 
+/// Accepts a path ordinal only when it names this process.
+/// 仅当路径序号指向本进程时才接受握手。
+const fn local_handshake_ordinal(
+    path_ordinal: u32,
+    local_ordinal: u32,
+) -> std::result::Result<u32, HttpReject> {
+    if path_ordinal == local_ordinal {
+        Ok(path_ordinal)
+    } else {
+        Err(HttpReject::NotFound)
+    }
+}
+
 async fn authorize(
     state: &PublicState,
     context: &RequestContext,
     document_id: DocumentId,
+    expected_ordinal: u32,
     ticket: &str,
 ) -> std::result::Result<crate::actor::ActorConnection, HttpReject> {
     let claims = state
         .tickets
-        .consume(context, ticket, document_id)
+        .consume(context, ticket, document_id, expected_ordinal)
         .await
         .map_err(|error| HttpReject::from_service_error(&error))?;
     state
@@ -467,6 +565,20 @@ async fn authorize(
         .connect(context, document_id, ActorSession::from(claims))
         .await
         .map_err(HttpReject::from_close)
+}
+
+async fn publish_load_best_effort(state: &PublicState) {
+    if let Err(error) = state
+        .routing
+        .publish_semaphore_load(&state.connections)
+        .await
+    {
+        tracing::warn!(
+            error = %error,
+            instance.ordinal = state.routing.local_ordinal(),
+            "failed to publish collaboration instance load"
+        );
+    }
 }
 
 fn handshake_context(
@@ -482,10 +594,13 @@ fn handshake_context(
     context
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn run_connection(
     mut socket: ws::WebSocket,
     mut connection: crate::actor::ActorConnection,
-    _permit: OwnedSemaphorePermit,
+    permit: OwnedSemaphorePermit,
+    routing: Arc<RoutingService>,
+    connections: Arc<Semaphore>,
     maximum_frame_bytes: usize,
     write_timeout: Duration,
     cancellation: CancellationToken,
@@ -537,6 +652,14 @@ async fn run_connection(
         }
     }
     drop(connection);
+    drop(permit);
+    if let Err(error) = routing.publish_semaphore_load(&connections).await {
+        tracing::warn!(
+            error = %error,
+            instance.ordinal = routing.local_ordinal(),
+            "failed to publish collaboration instance load"
+        );
+    }
 }
 
 async fn send_message(
@@ -653,6 +776,7 @@ enum HttpReject {
     BadRequest,
     Unauthenticated,
     Forbidden,
+    NotFound,
     RateLimited,
     Unavailable,
 }
@@ -684,6 +808,7 @@ impl HttpReject {
             Self::BadRequest => StatusCode::BAD_REQUEST,
             Self::Unauthenticated => StatusCode::UNAUTHORIZED,
             Self::Forbidden => StatusCode::FORBIDDEN,
+            Self::NotFound => StatusCode::NOT_FOUND,
             Self::RateLimited => StatusCode::TOO_MANY_REQUESTS,
             Self::Unavailable => StatusCode::SERVICE_UNAVAILABLE,
         }
@@ -694,6 +819,7 @@ impl HttpReject {
             Self::BadRequest => "bad_request",
             Self::Unauthenticated => "unauthenticated",
             Self::Forbidden => "forbidden",
+            Self::NotFound => "not_found",
             Self::RateLimited => "rate_limited",
             Self::Unavailable => "unavailable",
         }
@@ -704,6 +830,7 @@ impl HttpReject {
             Self::BadRequest => r#"{"error":"invalid_request"}"#,
             Self::Unauthenticated => r#"{"error":"authentication_required"}"#,
             Self::Forbidden => r#"{"error":"permission_denied"}"#,
+            Self::NotFound => r#"{"error":"not_found"}"#,
             Self::RateLimited => r#"{"error":"rate_limited"}"#,
             Self::Unavailable => r#"{"error":"dependency_unavailable"}"#,
         }
@@ -753,8 +880,8 @@ mod tests {
     };
 
     use super::{
-        ConnectionTasks, InboundPropagation, TICKET_PROTOCOL_PREFIX, TokenBucket,
-        extract_ticket_from_protocols, inbound_context, valid_origin,
+        ConnectionTasks, HttpReject, InboundPropagation, TICKET_PROTOCOL_PREFIX, TokenBucket,
+        extract_ticket_from_protocols, inbound_context, local_handshake_ordinal, valid_origin,
     };
     use axum::{
         Router,
@@ -894,6 +1021,22 @@ mod tests {
         );
         let propagation = InboundPropagation::from_headers(&headers);
         assert!(propagation.get(BAGGAGE_KEY).is_none());
+    }
+
+    #[test]
+    fn handshake_rejects_path_ordinals_that_are_not_local() {
+        assert_eq!(local_handshake_ordinal(0, 0).expect("local ordinal"), 0);
+        assert_eq!(local_handshake_ordinal(1, 1).expect("local ordinal"), 1);
+        assert!(matches!(
+            local_handshake_ordinal(1, 0),
+            Err(HttpReject::NotFound)
+        ));
+        assert!(matches!(
+            local_handshake_ordinal(0, 1),
+            Err(HttpReject::NotFound)
+        ));
+        assert_eq!(HttpReject::NotFound.status(), StatusCode::NOT_FOUND);
+        assert_eq!(HttpReject::NotFound.metric(), "not_found");
     }
 
     #[test]

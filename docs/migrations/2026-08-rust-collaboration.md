@@ -6,7 +6,7 @@
 
 - `DocumentDetailData` 删除 field 5 `websocket_url` 和 field 6 `fragment`，field ID 不复用。
 - Gateway 新增 `POST /api/v1/studio/documents/:document_id/collaboration-sessions`。客户端必须先创建短期 session，再把固定协议和一次性 ticket 放入 `Sec-WebSocket-Protocol`。
-- WebSocket 路径改为 `/v1/documents/{document_id}`；不再支持 Hocuspocus token refresh 扩展、匿名公开协作或旧 `/collaboration` 行为。
+- WebSocket 路径改为 `/v1/instances/{ordinal}/documents/{document_id}`；`COLLABORATION_INSTANCE_COUNT=1` 时进程额外接受 `/v1/documents/{document_id}`。不再支持 Hocuspocus token refresh 扩展、匿名公开协作或旧 `/collaboration` 行为。Gateway 必须使用 Collaboration RPC 的 `instance_ordinal` 构造可信 `websocket_url`。
 - Gateway、Knowledge 和 Collaboration 的版本、清理、授权与投影调用统一切换到生成的 Thrift client/server。旧 internal HTTP listener 不保留兼容层。
 - Knowledge RPC 新增独立 `Live`：`Ping` 保持 readiness 语义，Collaboration 启动探测使用 `Live`，避免 Knowledge 与 Collaboration 的 readiness 冷启动环。
 - `go run ./scripts/idlguard compat-git d0b96df70be36e1db602d68ca2c26c8f09f36a1a idl` 已执行；唯一不兼容项是上述两个 `DocumentDetailData` 字段删除。`Live` 与 Collaboration RPC 新增项没有产生额外兼容告警。

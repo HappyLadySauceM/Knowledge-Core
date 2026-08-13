@@ -24,6 +24,7 @@ struct CollaborationSession {
   4: required string access
   5: required string ticket_expires_at
   6: required string session_expires_at
+  7: optional i32 instance_ordinal
 }
 
 struct Version {

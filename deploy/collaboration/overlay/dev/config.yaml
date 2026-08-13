@@ -9,3 +9,4 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
 data:
   COLLABORATION_ENVIRONMENT: development
+  COLLABORATION_INSTANCE_COUNT: "2"

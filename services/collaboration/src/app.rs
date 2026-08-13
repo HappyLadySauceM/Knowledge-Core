@@ -18,6 +18,7 @@ use crate::{
     error::{Result, ServiceError},
     ports::KnowledgePort,
     remote_config::RemoteRuntime,
+    routing::{RedisRoutingStore, RoutingService, parse_instance_ordinal},
     rpc::{
         CollaborationHandler, KnowledgeClient, RpcReadiness, RpcServer,
         etcd::{EtcdDiscovery, EtcdRegistration},
@@ -235,6 +236,21 @@ impl Application {
         let tickets = TicketService::new(redis, &config.ticket)?;
         startup.tickets = Some(tickets.clone());
 
+        let local_ordinal =
+            parse_instance_ordinal(&config.instance_id, config.routing.instance_count)?;
+        let max_connections = u32::try_from(config.public.max_connections).map_err(|error| {
+            ServiceError::internal(
+                anyhow::anyhow!(error).context("encode collaboration max connections"),
+            )
+        })?;
+        let routing = RoutingService::new(
+            Arc::new(RedisRoutingStore::open(&config.redis).await?),
+            config.routing.instance_count,
+            local_ordinal,
+            max_connections,
+        )?;
+        routing.publish_load(0).await?;
+
         let nats = Arc::new(NatsClient::connect(&config.nats, &config.instance_id).await?);
         startup.nats = Some(Arc::clone(&nats));
 
@@ -293,6 +309,7 @@ impl Application {
                 &config.public,
                 &config.ticket,
                 tickets.clone(),
+                routing.clone(),
                 actors.clone(),
                 metrics.clone(),
                 startup.health.clone(),
@@ -322,6 +339,7 @@ impl Application {
                 startup_ticket: config.ticket.clone(),
                 startup_actor: config.actor.clone(),
                 startup_workers: config.workers.clone(),
+                startup_routing: config.routing.clone(),
             };
             startup.remote = Some(
                 remote
@@ -367,6 +385,7 @@ impl Application {
             tickets.clone(),
             versions,
             actors.clone(),
+            routing,
             &config.ticket,
             application_readiness,
         )?;

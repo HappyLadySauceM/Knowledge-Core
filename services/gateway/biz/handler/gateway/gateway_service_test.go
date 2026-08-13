@@ -273,6 +273,7 @@ func TestCreateCollaborationSessionReturnsOneTimeTicket(t *testing.T) {
 		return &collaborationv1.CollaborationSession{
 			Ticket: ticket, Subprotocol: collaborationSubprotocol, Fragment: collaborationFragment, Access: "editor",
 			TicketExpiresAt: "2026-08-03T12:00:30Z", SessionExpiresAt: "2026-08-03T12:15:00Z",
+			InstanceOrdinal: instanceOrdinal(0),
 		}, nil
 	}}
 	request := handlerRequest(&identityStub{}, "")
@@ -296,7 +297,7 @@ func TestCreateCollaborationSessionReturnsOneTimeTicket(t *testing.T) {
 	if err := jsoncodec.Unmarshal(request.Response.Body(), &response); err != nil {
 		t.Fatal(err)
 	}
-	if response.WebsocketURL != "wss://collaboration.example.com/v1/documents/"+documentID ||
+	if response.WebsocketURL != "wss://collaboration.example.com/v1/instances/0/documents/"+documentID ||
 		response.Ticket != ticket || response.Access != "editor" {
 		t.Fatalf("response = %#v", response)
 	}
@@ -311,6 +312,7 @@ func TestCollaborationSessionAllowsTicketAndSessionToExpireTogether(t *testing.T
 		&collaborationv1.CollaborationSession{
 			Ticket: ticket, Subprotocol: collaborationSubprotocol, Fragment: collaborationFragment, Access: "viewer",
 			TicketExpiresAt: expiresAt.Format(time.RFC3339), SessionExpiresAt: expiresAt.Format(time.RFC3339),
+			InstanceOrdinal: instanceOrdinal(0),
 		},
 		"0198f0e0-7b6d-7a11-8e21-1123456789ab",
 		"wss://collaboration.example.com",
@@ -347,6 +349,46 @@ func TestCreateCollaborationSessionRejectsAmbiguousOrInvalidUpstreamInput(t *tes
 	CreateCollaborationSession(context.Background(), request)
 	if request.Response.StatusCode() != consts.StatusBadGateway {
 		t.Fatalf("invalid upstream status = %d, body = %s", request.Response.StatusCode(), request.Response.Body())
+	}
+
+	request = handlerRequest(&identityStub{}, "")
+	request.Params = param.Params{{Key: "document_id", Value: documentID}}
+	tokenExpiry := time.Date(2026, time.August, 3, 12, 15, 0, 0, time.UTC)
+	now := time.Date(2026, time.August, 3, 12, 0, 0, 0, time.UTC)
+	request.Set("gateway.principal", coreauth.Principal{UserID: 7, ExpiresAt: tokenExpiry})
+	request.Set("gateway.access_token", "signed-token")
+	dependencies, _ = gatewaymiddleware.FromRequest(request)
+	ticket := base64.RawURLEncoding.EncodeToString(make([]byte, 32))
+	dependencies.Collaboration = &collaborationStub{createSession: func(context.Context, *collaborationv1.CreateSessionRequest) (*collaborationv1.CollaborationSession, error) {
+		return &collaborationv1.CollaborationSession{
+			Ticket: ticket, Subprotocol: collaborationSubprotocol, Fragment: collaborationFragment, Access: "owner",
+			TicketExpiresAt: "2026-08-03T12:00:30Z", SessionExpiresAt: "2026-08-03T12:15:00Z",
+		}, nil
+	}}
+	dependencies.Endpoints = config.EndpointOptions{CollaborationWebSocketBaseURL: "wss://collaboration.example.com"}
+	dependencies.Now = func() time.Time { return now }
+	CreateCollaborationSession(context.Background(), request)
+	if request.Response.StatusCode() != consts.StatusBadGateway {
+		t.Fatalf("missing ordinal status = %d, body = %s", request.Response.StatusCode(), request.Response.Body())
+	}
+
+	request = handlerRequest(&identityStub{}, "")
+	request.Params = param.Params{{Key: "document_id", Value: documentID}}
+	request.Set("gateway.principal", coreauth.Principal{UserID: 7, ExpiresAt: tokenExpiry})
+	request.Set("gateway.access_token", "signed-token")
+	dependencies, _ = gatewaymiddleware.FromRequest(request)
+	dependencies.Collaboration = &collaborationStub{createSession: func(context.Context, *collaborationv1.CreateSessionRequest) (*collaborationv1.CollaborationSession, error) {
+		return &collaborationv1.CollaborationSession{
+			Ticket: ticket, Subprotocol: collaborationSubprotocol, Fragment: collaborationFragment, Access: "owner",
+			TicketExpiresAt: "2026-08-03T12:00:30Z", SessionExpiresAt: "2026-08-03T12:15:00Z",
+			InstanceOrdinal: instanceOrdinal(-1),
+		}, nil
+	}}
+	dependencies.Endpoints = config.EndpointOptions{CollaborationWebSocketBaseURL: "wss://collaboration.example.com"}
+	dependencies.Now = func() time.Time { return now }
+	CreateCollaborationSession(context.Background(), request)
+	if request.Response.StatusCode() != consts.StatusBadGateway {
+		t.Fatalf("negative ordinal status = %d, body = %s", request.Response.StatusCode(), request.Response.Body())
 	}
 }
 
@@ -400,4 +442,8 @@ func completeUser() *identityv1.User {
 		Id: 7, Username: "alice", Email: "alice@example.com", Role: "user", Status: "active",
 		TokenVersion: 1, CreatedAt: "2026-08-02T12:00:00Z", UpdatedAt: "2026-08-02T12:00:00Z",
 	}
+}
+
+func instanceOrdinal(value int32) *int32 {
+	return &value
 }

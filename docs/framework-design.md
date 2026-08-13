@@ -73,7 +73,7 @@ services/collaboration/
   tools/rust-codegen/ Collaboration Thrift/Volo 生成工具
 
 deploy/<service>/
-  base/               服务私有 Deployment、Service 与 Kustomization
+  base/               服务私有 Deployment/StatefulSet、Service 与 Kustomization
   overlay/dev/        仅含服务行为 ConfigMap 与 dev Kustomization
 ```
 
@@ -150,7 +150,7 @@ Knowledge RPC 除文档、成员和附件用例外，还提供：
 
 Collaboration RPC 提供 `Ping`、`CreateSession`、版本列表/创建/详情/恢复和 `PurgeDocument`。除 `Ping` 外的六个业务 RPC 都先检查完整应用 readiness；not-ready 时统一返回 `40007 / collaboration.unavailable`，且不会调用 Knowledge、ticket、store 或 actor。Gateway 通过 `CreateSession` 获得短期 ticket；Knowledge 的清理 worker 通过 `PurgeDocument` 删除协作数据。生产 RPC 双向验证 mTLS，并通过 TTHeader 传播 deadline、request ID、W3C trace 和必要的敏感 token metadata；token 永不进入日志或 telemetry。
 
-WebSocket 入口固定为 `/v1/documents/{document_id}`。客户端先调用 Gateway session API，再通过 `Sec-WebSocket-Protocol: knowledge-core-yjs-v1, ticket.<opaque>` 传递一次性 ticket；ticket 只以 SHA-256 key 存入 Redis，并用 `GETDEL` 原子消费。握手严格校验 UUIDv7、精确 Origin、协议、容量与速率边界。viewer 只读，session 到期后客户端重新创建 session；不提供旧 Hocuspocus token refresh 扩展。
+WebSocket 入口为 `/v1/instances/{ordinal}/documents/{document_id}`。`COLLABORATION_INSTANCE_COUNT=1` 时进程额外接受 `/v1/documents/{document_id}`，供 Compose 单实例直连。CreateSession 按 `document_id` 的 SHA-256 桶与 Redis 粘性映射分配实例；Gateway 用 RPC 返回的 `instance_ordinal` 和已校验的 WebSocket base URL 构造 `websocket_url`，不得使用请求 `Host`。握手必须先核对路径 ordinal 与本机一致，再 `GETDEL` ticket；错实例返回 HTTP 404 且不消费 ticket。客户端先调用 Gateway session API，再通过 `Sec-WebSocket-Protocol: knowledge-core-yjs-v1, ticket.<opaque>` 传递一次性 ticket。握手还校验 UUIDv7、精确 Origin、协议、容量与速率边界。viewer 只读，session 到期后客户端重新创建 session；不提供旧 Hocuspocus token refresh 扩展。
 
 每个活跃文档由单一 actor 串行拥有 Yrs state、sequence、generation、连接集合和有界 command queue。客户端 update 先在候选 state 中校验大小和 rich-text schema，再由 PostgreSQL transaction 写入 update、projection job 与 outbox；只有 commit 成功后才更新共享内存并广播。重复且不改变 state 的 update 不推进 sequence。远端实例通过 JetStream fanout 接收已提交 update，发现 gap 时从 PostgreSQL 补齐；PostgreSQL 始终是持久事实源。
 

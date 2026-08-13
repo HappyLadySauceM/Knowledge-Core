@@ -248,6 +248,20 @@ func (p *CollaborationSession) FastRead(buf []byte) (int, error) {
 					goto SkipFieldError
 				}
 			}
+		case 7:
+			if fieldTypeId == thrift.I32 {
+				l, err = p.FastReadField7(buf[offset:])
+				offset += l
+				if err != nil {
+					goto ReadFieldError
+				}
+			} else {
+				l, err = thrift.Binary.Skip(buf[offset:], fieldTypeId)
+				offset += l
+				if err != nil {
+					goto SkipFieldError
+				}
+			}
 		default:
 			l, err = thrift.Binary.Skip(buf[offset:], fieldTypeId)
 			offset += l
@@ -381,6 +395,20 @@ func (p *CollaborationSession) FastReadField6(buf []byte) (int, error) {
 	return offset, nil
 }
 
+func (p *CollaborationSession) FastReadField7(buf []byte) (int, error) {
+	offset := 0
+
+	var _field *int32
+	if v, l, err := thrift.Binary.ReadI32(buf[offset:]); err != nil {
+		return offset, err
+	} else {
+		offset += l
+		_field = &v
+	}
+	p.InstanceOrdinal = _field
+	return offset, nil
+}
+
 func (p *CollaborationSession) FastWrite(buf []byte) int {
 	return p.FastWriteNocopy(buf, nil)
 }
@@ -388,6 +416,7 @@ func (p *CollaborationSession) FastWrite(buf []byte) int {
 func (p *CollaborationSession) FastWriteNocopy(buf []byte, w thrift.NocopyWriter) int {
 	offset := 0
 	if p != nil {
+		offset += p.fastWriteField7(buf[offset:], w)
 		offset += p.fastWriteField1(buf[offset:], w)
 		offset += p.fastWriteField2(buf[offset:], w)
 		offset += p.fastWriteField3(buf[offset:], w)
@@ -408,6 +437,7 @@ func (p *CollaborationSession) BLength() int {
 		l += p.field4Length()
 		l += p.field5Length()
 		l += p.field6Length()
+		l += p.field7Length()
 	}
 	l += thrift.Binary.FieldStopLength()
 	return l
@@ -455,6 +485,15 @@ func (p *CollaborationSession) fastWriteField6(buf []byte, w thrift.NocopyWriter
 	return offset
 }
 
+func (p *CollaborationSession) fastWriteField7(buf []byte, w thrift.NocopyWriter) int {
+	offset := 0
+	if p.IsSetInstanceOrdinal() {
+		offset += thrift.Binary.WriteFieldBegin(buf[offset:], thrift.I32, 7)
+		offset += thrift.Binary.WriteI32(buf[offset:], *p.InstanceOrdinal)
+	}
+	return offset
+}
+
 func (p *CollaborationSession) field1Length() int {
 	l := 0
 	l += thrift.Binary.FieldBeginLength()
@@ -494,6 +533,15 @@ func (p *CollaborationSession) field6Length() int {
 	l := 0
 	l += thrift.Binary.FieldBeginLength()
 	l += thrift.Binary.StringLengthNocopy(p.SessionExpiresAt)
+	return l
+}
+
+func (p *CollaborationSession) field7Length() int {
+	l := 0
+	if p.IsSetInstanceOrdinal() {
+		l += thrift.Binary.FieldBeginLength()
+		l += thrift.Binary.I32Length()
+	}
 	return l
 }
 

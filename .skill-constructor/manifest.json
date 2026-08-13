@@ -278,10 +278,15 @@
     },
     {
       "id": "security.secrets-and-config",
-      "revision": 104,
+      "revision": 108,
       "section": "conventions",
       "sources": [
         {
+          "detail": "evidence-sha256:029a7717f5c228a917800def31d05a9655897eed451ca58bdbbb9796ca927136",
+          "kind": "documented",
+          "reference": "README.md#compose"
+        },
+        {
           "detail": "evidence-sha256:08fe26d59eb8a9b4aba2ee77ff84f206bc5a59cd1c42aff9532458469fd002d3",
           "kind": "documented",
           "reference": "README.md#compose"
@@ -377,6 +382,11 @@
           "reference": "README.md#compose"
         },
         {
+          "detail": "evidence-sha256:029a7717f5c228a917800def31d05a9655897eed451ca58bdbbb9796ca927136",
+          "kind": "documented",
+          "reference": "README.md#k3s-gitops"
+        },
+        {
           "detail": "evidence-sha256:08fe26d59eb8a9b4aba2ee77ff84f206bc5a59cd1c42aff9532458469fd002d3",
           "kind": "documented",
           "reference": "README.md#k3s-gitops"
@@ -470,6 +480,11 @@
           "detail": "evidence-sha256:fb988f8708eb4b94a819f41a3914b44a9a14cf3188296c55433740d35f09ed4a",
           "kind": "documented",
           "reference": "README.md#k3s-gitops"
+        },
+        {
+          "detail": "evidence-sha256:029a7717f5c228a917800def31d05a9655897eed451ca58bdbbb9796ca927136",
+          "kind": "documented",
+          "reference": "README.md#section"
         },
         {
           "detail": "evidence-sha256:08fe26d59eb8a9b4aba2ee77ff84f206bc5a59cd1c42aff9532458469fd002d3",
@@ -542,6 +557,11 @@
           "reference": "deploy/base/README.md#application-deployment-base"
         },
         {
+          "detail": "evidence-sha256:029a7717f5c228a917800def31d05a9655897eed451ca58bdbbb9796ca927136",
+          "kind": "documented",
+          "reference": "deploy/nacos/README.md#nacos-application-configuration"
+        },
+        {
           "detail": "evidence-sha256:4b6f4541eadeec2065a2f1f26030d8327d249392d4cc0030265e07b25155358b",
           "kind": "documented",
           "reference": "deploy/nacos/README.md#nacos-application-configuration"
@@ -557,6 +577,11 @@
           "reference": "deploy/overlay/dev/README.md#development-overlay"
         },
         {
+          "detail": "evidence-sha256:029a7717f5c228a917800def31d05a9655897eed451ca58bdbbb9796ca927136",
+          "kind": "documented",
+          "reference": "docs/framework-design.md#11"
+        },
+        {
           "detail": "evidence-sha256:08fe26d59eb8a9b4aba2ee77ff84f206bc5a59cd1c42aff9532458469fd002d3",
           "kind": "documented",
           "reference": "docs/framework-design.md#11"
@@ -652,6 +677,11 @@
           "reference": "docs/framework-design.md#11"
         },
         {
+          "detail": "evidence-sha256:029a7717f5c228a917800def31d05a9655897eed451ca58bdbbb9796ca927136",
+          "kind": "documented",
+          "reference": "docs/framework-design.md#12"
+        },
+        {
           "detail": "evidence-sha256:08fe26d59eb8a9b4aba2ee77ff84f206bc5a59cd1c42aff9532458469fd002d3",
           "kind": "documented",
           "reference": "docs/framework-design.md#12"
@@ -747,6 +777,11 @@
           "reference": "docs/framework-design.md#12"
         },
         {
+          "detail": "evidence-sha256:029a7717f5c228a917800def31d05a9655897eed451ca58bdbbb9796ca927136",
+          "kind": "documented",
+          "reference": "docs/framework-design.md#8-secret-tls"
+        },
+        {
           "detail": "evidence-sha256:08fe26d59eb8a9b4aba2ee77ff84f206bc5a59cd1c42aff9532458469fd002d3",
           "kind": "documented",
           "reference": "docs/framework-design.md#8-secret-tls"
@@ -842,6 +877,11 @@
           "reference": "docs/framework-design.md#8-secret-tls"
         },
         {
+          "detail": "evidence-sha256:029a7717f5c228a917800def31d05a9655897eed451ca58bdbbb9796ca927136",
+          "kind": "documented",
+          "reference": "docs/rust-collaboration-design.md#2-1"
+        },
+        {
           "detail": "evidence-sha256:08fe26d59eb8a9b4aba2ee77ff84f206bc5a59cd1c42aff9532458469fd002d3",
           "kind": "documented",
           "reference": "docs/rust-collaboration-design.md#2-1"
@@ -937,6 +977,11 @@
           "reference": "docs/rust-collaboration-design.md#2-1"
         },
         {
+          "detail": "evidence-sha256:029a7717f5c228a917800def31d05a9655897eed451ca58bdbbb9796ca927136",
+          "kind": "documented",
+          "reference": "docs/rust-collaboration-design.md#7"
+        },
+        {
           "detail": "evidence-sha256:08fe26d59eb8a9b4aba2ee77ff84f206bc5a59cd1c42aff9532458469fd002d3",
           "kind": "documented",
           "reference": "docs/rust-collaboration-design.md#7"
@@ -1030,6 +1075,11 @@
           "detail": "evidence-sha256:fb988f8708eb4b94a819f41a3914b44a9a14cf3188296c55433740d35f09ed4a",
           "kind": "documented",
           "reference": "docs/rust-collaboration-design.md#7"
+        },
+        {
+          "detail": "evidence-sha256:029a7717f5c228a917800def31d05a9655897eed451ca58bdbbb9796ca927136",
+          "kind": "documented",
+          "reference": "docs/trace-architecture.md#7-collector-tempo"
         },
         {
           "detail": "evidence-sha256:08fe26d59eb8a9b4aba2ee77ff84f206bc5a59cd1c42aff9532458469fd002d3",
@@ -1076,7 +1126,7 @@
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-08-13T06:43:23Z",
+      "updatedAt": "2026-08-13T10:38:51Z",
       "value": "Secrets are injected only through environment variables, Kubernetes Secrets, or SOPS-encrypted GitOps manifests. Sensitive values must not be stored in plaintext source, configuration, logs, metrics, spans, or release metadata."
     },
     {
@@ -1100,9 +1150,14 @@
     },
     {
       "id": "validation.definition-of-done",
-      "revision": 100,
+      "revision": 107,
       "section": "workflows",
       "sources": [
+        {
+          "detail": "evidence-sha256:0b3cbbbb402ab6c19a25056fc7da8d31098075aaa81a50fad5046a644e0f9205",
+          "kind": "documented",
+          "reference": "docs/migrations/2026-08-rust-collaboration.md#section"
+        },
         {
           "detail": "evidence-sha256:2e0efd24cb83ee79466c0dc4958a72836f898287d959fd4aa9498964a4dd1081",
           "kind": "documented",
@@ -1117,6 +1172,11 @@
           "detail": "evidence-sha256:d9f3d59bee26f2c471bdb47976d0649c51fc825f5fc1cc540d62a7ac1dd92f95",
           "kind": "documented",
           "reference": "docs/migrations/2026-08-rust-collaboration.md#section"
+        },
+        {
+          "detail": "evidence-sha256:0b3cbbbb402ab6c19a25056fc7da8d31098075aaa81a50fad5046a644e0f9205",
+          "kind": "documented",
+          "reference": "docs/rust-collaboration-design.md#7"
         },
         {
           "detail": "evidence-sha256:2e0efd24cb83ee79466c0dc4958a72836f898287d959fd4aa9498964a4dd1081",
@@ -1143,7 +1203,7 @@
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-08-13T03:49:50Z",
+      "updatedAt": "2026-08-13T10:38:16Z",
       "value": "Run make ci after each change; it covers check plus generate-check, including Go and Rust formatting, vet/clippy, lint, uncached tests, build, vulnerability/supply-chain checks, and generated drift. Add make race for Go concurrency, goroutine, orchestration, or lifecycle work. Run npm ci && npm run ci under services/collaboration/interop for Node fixture changes. For IDL changes, also regenerate, review wire/API compatibility, and run go run ./scripts/idlguard compat-git <merge-base> idl."
     },
     {
@@ -1395,11 +1455,11 @@
     "profile": "generic",
     "slug": "knowledge-core"
   },
-  "revision": 104,
+  "revision": 108,
   "scan": {
-    "fingerprint": "bebd830af09244220c58cd3d3e9bc5f0da50c5e336855b2e87cef4ddbafb5a50",
-    "inventoryCount": 330
+    "fingerprint": "eaf6376cadaade78d5c63d8476220bf5775b7ddb61650e8b1a84f6317bacded5",
+    "inventoryCount": 335
   },
   "schemaVersion": 1,
-  "updatedAt": "2026-08-13T06:43:23Z"
+  "updatedAt": "2026-08-13T10:38:51Z"
 }

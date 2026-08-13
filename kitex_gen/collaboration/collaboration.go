@@ -63,6 +63,7 @@ type CollaborationSession struct {
 	Access           string `thrift:"access,4,required" frugal:"4,required,string" json:"access"`
 	TicketExpiresAt  string `thrift:"ticket_expires_at,5,required" frugal:"5,required,string" json:"ticket_expires_at"`
 	SessionExpiresAt string `thrift:"session_expires_at,6,required" frugal:"6,required,string" json:"session_expires_at"`
+	InstanceOrdinal  *int32 `thrift:"instance_ordinal,7,optional" frugal:"7,optional,i32" json:"instance_ordinal,omitempty"`
 }
 
 func NewCollaborationSession() *CollaborationSession {
@@ -95,6 +96,15 @@ func (p *CollaborationSession) GetTicketExpiresAt() (v string) {
 func (p *CollaborationSession) GetSessionExpiresAt() (v string) {
 	return p.SessionExpiresAt
 }
+
+var CollaborationSession_InstanceOrdinal_DEFAULT int32
+
+func (p *CollaborationSession) GetInstanceOrdinal() (v int32) {
+	if !p.IsSetInstanceOrdinal() {
+		return CollaborationSession_InstanceOrdinal_DEFAULT
+	}
+	return *p.InstanceOrdinal
+}
 func (p *CollaborationSession) SetTicket(val string) {
 	p.Ticket = val
 }
@@ -113,6 +123,13 @@ func (p *CollaborationSession) SetTicketExpiresAt(val string) {
 func (p *CollaborationSession) SetSessionExpiresAt(val string) {
 	p.SessionExpiresAt = val
 }
+func (p *CollaborationSession) SetInstanceOrdinal(val *int32) {
+	p.InstanceOrdinal = val
+}
+
+func (p *CollaborationSession) IsSetInstanceOrdinal() bool {
+	return p.InstanceOrdinal != nil
+}
 
 func (p *CollaborationSession) String() string {
 	if p == nil {
@@ -128,6 +145,7 @@ var fieldIDToName_CollaborationSession = map[int16]string{
 	4: "access",
 	5: "ticket_expires_at",
 	6: "session_expires_at",
+	7: "instance_ordinal",
 }
 
 type Version struct {

@@ -1,5 +1,5 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: knowledge-core-collaboration
   labels:
@@ -8,14 +8,14 @@ metadata:
     app.kubernetes.io/part-of: knowledge-core
     app.kubernetes.io/managed-by: kustomize
 spec:
+  serviceName: knowledge-core-collaboration-headless
   replicas: 1
   revisionHistoryLimit: 3
   minReadySeconds: 5
-  strategy:
+  updateStrategy:
     type: RollingUpdate
     rollingUpdate:
       maxUnavailable: 1
-      maxSurge: 0
   selector:
     matchLabels:
       app.kubernetes.io/name: knowledge-core-collaboration

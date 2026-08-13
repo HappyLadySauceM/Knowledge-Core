@@ -24,7 +24,7 @@ Status: `verified`
 
 Run make ci after each change; it covers check plus generate-check, including Go and Rust formatting, vet/clippy, lint, uncached tests, build, vulnerability/supply-chain checks, and generated drift. Add make race for Go concurrency, goroutine, orchestration, or lifecycle work. Run npm ci && npm run ci under services/collaboration/interop for Node fixture changes. For IDL changes, also regenerate, review wire/API compatibility, and run go run ./scripts/idlguard compat-git <merge-base> idl.
 
-Sources: `docs/migrations/2026-08-rust-collaboration.md#section`, `docs/migrations/2026-08-rust-collaboration.md#section`, `docs/migrations/2026-08-rust-collaboration.md#section`, `docs/rust-collaboration-design.md#7`, `docs/rust-collaboration-design.md#7`, `docs/rust-collaboration-design.md#7`, `AGENTS.md user-provided repository instructions`, `user-confirmed`
+Sources: `docs/migrations/2026-08-rust-collaboration.md#section`, `docs/migrations/2026-08-rust-collaboration.md#section`, `docs/migrations/2026-08-rust-collaboration.md#section`, `docs/migrations/2026-08-rust-collaboration.md#section`, `docs/rust-collaboration-design.md#7`, `docs/rust-collaboration-design.md#7`, `docs/rust-collaboration-design.md#7`, `docs/rust-collaboration-design.md#7`, `AGENTS.md user-provided repository instructions`, `user-confirmed`
 
 ## `workflows.build`
 

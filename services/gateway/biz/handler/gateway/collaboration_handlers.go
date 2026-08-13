@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"net/url"
+	"strconv"
 	"time"
 
 	collaborationv1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/collaboration"
@@ -79,10 +80,27 @@ func toCollaborationSessionData(
 	if err != nil || endpoint == nil {
 		return nil, errors.New("collaboration WebSocket base URL is invalid")
 	}
-	endpoint.Path = "/v1/documents/" + url.PathEscape(documentID)
+	path, err := collaborationWebSocketPath(value, documentID)
+	if err != nil {
+		return nil, err
+	}
+	endpoint.Path = path
 	return &gatewaymodel.CollaborationSessionData{
 		WebsocketURL: endpoint.String(), Ticket: value.Ticket, Subprotocol: value.Subprotocol,
 		Fragment: value.Fragment, Access: value.Access, TicketExpiresAt: value.TicketExpiresAt,
 		SessionExpiresAt: value.SessionExpiresAt,
 	}, nil
+}
+
+// collaborationWebSocketPath builds the trusted instance WebSocket path from the RPC session.
+// collaborationWebSocketPath 用 RPC 会话构造可信的实例 WebSocket 路径。
+func collaborationWebSocketPath(value *collaborationv1.CollaborationSession, documentID string) (string, error) {
+	if value == nil || !value.IsSetInstanceOrdinal() {
+		return "", errors.New("collaboration instance ordinal is missing")
+	}
+	ordinal := value.GetInstanceOrdinal()
+	if ordinal < 0 {
+		return "", errors.New("collaboration instance ordinal is invalid")
+	}
+	return "/v1/instances/" + strconv.FormatInt(int64(ordinal), 10) + "/documents/" + url.PathEscape(documentID), nil
 }

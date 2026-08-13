@@ -45,7 +45,7 @@ Rust Collaboration 是一个进程，显式持有三类入口：
 
 | 入口 | 默认地址 | 用途 |
 | --- | --- | --- |
-| Public WebSocket | `:8091` | `/v1/documents/{document_id}` 的 Yjs 协作连接 |
+| Public WebSocket | `:8091` | `/v1/instances/{ordinal}/documents/{document_id}` 的 Yjs 协作连接；`N=1` 时额外接受 `/v1/documents/{document_id}` |
 | Thrift RPC | `:8883` | Gateway/Knowledge 的 session、version 和 purge 调用 |
 | Admin HTTP | `:8084` | `/health/live`、`/health/ready`、`/metrics` |
 
@@ -96,7 +96,7 @@ Authorization: Bearer <access-token>
 
 ```json
 {
-  "websocket_url": "wss://collaboration.example.com/v1/documents/018f...",
+  "websocket_url": "wss://collaboration.example.com/v1/instances/0/documents/018f...",
   "ticket": "<base64url opaque value>",
   "subprotocol": "knowledge-core-yjs-v1",
   "fragment": "default",
@@ -106,7 +106,7 @@ Authorization: Bearer <access-token>
 }
 ```
 
-- Gateway 从已校验配置构造 `websocket_url`，不得使用请求 `Host`。
+- Gateway 从已校验配置和 Collaboration RPC 返回的 `instance_ordinal` 构造 `websocket_url`，不得使用请求 `Host`。未设置或负数 ordinal 视为无效上游响应。
 - `ticket` 是 32-byte CSPRNG 随机值的 base64url 表示；Redis key 只包含其 SHA-256，不保存或记录明文 ticket。
 - ticket 默认 30 秒过期、最长不得超过 60 秒，并通过 Redis `GETDEL` 原子单次消费。
 - `session_expires_at` 不得晚于原 access token 的 `exp`。会话不做 token refresh；客户端在关闭后重新创建 session 并同步 Yjs state。
@@ -117,15 +117,17 @@ Authorization: Bearer <access-token>
 
 ### 4.2 WebSocket 握手
 
-客户端连接 `/v1/documents/{document_id}`，提供两个 `Sec-WebSocket-Protocol` 值：
+客户端连接 `/v1/instances/{ordinal}/documents/{document_id}`，提供两个 `Sec-WebSocket-Protocol` 值：
 
 ```text
 knowledge-core-yjs-v1, ticket.<opaque-ticket>
 ```
 
+`COLLABORATION_INSTANCE_COUNT=1` 时，进程额外接受 `/v1/documents/{document_id}`，供 Compose 单实例直连；Gateway 仍始终返回实例路径。路径 ordinal 必须等于本机 `COLLABORATION_INSTANCE_ID` 解析出的序号，且该核对发生在 Redis `GETDEL` 之前；错实例返回 HTTP 404 且不消费 ticket。
+
 服务端校验 path、UUIDv7、精确 Origin、连接限流和 ticket 后，只回显 `knowledge-core-yjs-v1`。ticket 不进入 URL、日志、metric label、span attribute 或错误响应；入口代理也必须禁止记录 `Sec-WebSocket-Protocol` 原值。
 
-握手前错误使用 HTTP `400/401/403/429/503`。升级后的稳定关闭码为：
+握手前错误使用 HTTP `400/401/403/404/429/503`。升级后的稳定关闭码为：
 
 | Code | Reason | 行为 |
 | --- | --- | --- |
@@ -138,6 +140,19 @@ knowledge-core-yjs-v1, ticket.<opaque-ticket>
 
 awareness 不持久化，但必须有独立的消息大小、频率和连接数边界。单次 update、合并文档、节点数量、嵌套深度和 outbound queue 都必须有配置上限；慢消费者被断开，不能反压整个 document actor。
 
+### 4.3 多实例 Hash 路由
+
+`N` 来自 `COLLABORATION_INSTANCE_COUNT` 或 Nacos `routing.instance_count`（显式环境变量优先），范围 `1..=32`，不是实时 Ready 实例数。Hash 键是 `document_id`：`sha256(uuid bytes) % N`。同一文档的编辑者落到同一实例，Yrs actor 与 awareness 保持本地。
+
+Redis 粘性映射是溢出和故障转移后的事实源：
+
+- `{prefix}:route:{document_id}` → ordinal，TTL 约 90s
+- `{prefix}:load:{ordinal}` → 连接数，TTL 约 3s；缺失视为该实例对新放置 not Ready
+
+放置规则：已有映射且实例 Ready 则跟随；映射指向满载实例时拒绝新连接（`40007 collaboration.unavailable`），不把同一文档拆到两台 actor。映射指向不存在或 not Ready 的 ordinal 时删除映射并重新放置。无映射时从 `hash % N` 起沿环寻找第一台 `Ready && load < max_connections` 的实例并用 `SET NX` 写入；全环满载或 not Ready 时返回 `40007`。溢出只适用于尚未分配的文档。
+
+Kubernetes 使用无 PVC 的 StatefulSet：`COLLABORATION_INSTANCE_ID` 取 `metadata.name`（`knowledge-core-collaboration-0`）。dev overlay `N=2`。Higress 按 `/v1/instances/{n}/documents/` 指向对应 per-pod Service，不再把 `/v1/documents/` 随机转到 ClusterIP。崩溃或滚动后客户端必须重新 `CreateSession`；不迁移直播 session。
+
 ## 5. 内部 Thrift 契约
 
 新增 `idl/rpc/v1/collaboration.thrift`，由 thriftgo 生成 Go Kitex client/server 类型，由仓库 Rust codegen 脚本生成 Volo/Pilota 类型。生成输出必须加入 `scripts/generated-files.txt`，禁止手改或由 `build.rs` 隐式生成。
@@ -145,7 +160,7 @@ awareness 不持久化，但必须有独立的消息大小、频率和连接数�
 `CollaborationService` 提供：
 
 - `Ping(common.PingRequest) -> common.PingResponse`
-- `CreateSession(CreateSessionRequest) -> CollaborationSession`
+- `CreateSession(CreateSessionRequest) -> CollaborationSession`，会话包含 Gateway 拼 WebSocket 路径所需的 `instance_ordinal`
 - `ListVersions(ListVersionsRequest) -> VersionPage`
 - `CreateVersion(CreateVersionRequest) -> Version`
 - `GetVersion(GetVersionRequest) -> VersionDetail`
@@ -215,7 +230,7 @@ snapshot worker 用单个 lateral aggregate 同时计算每个 document 自水�
 
 - Production 必须使用 `wss`、精确非空 Origin、RPC mTLS、PostgreSQL 验证 TLS、`rediss`、NATS TLS 和 Etcd TLS/认证。
 - Nacos SDK 的 HTTPS 登录与 gRPC 使用同一显式 CA，但分别受 `SSL_CERT_FILE` 与 `NACOS_CLIENT_TLS_CA_CERT` 控制；`HOME/nacos` 对齐 `KNOWLEDGE_CORE_NACOS_RUNTIME_DIR` 的有界 `emptyDir`。启动在创建 SDK 前校验 CA、路径并预建 cache 目录，SDK auth 日志被强制关闭且其余 SDK 日志不高于 warn，动态 debug 级别不能放开凭据或配置 payload。
-- Collaboration 同时接受迁移期 `v1alpha1/DynamicConfig` 与服务绑定的 `v1beta1/ApplicationConfig`。初始文档在依赖装配前合并，优先级为默认值 `<` Nacos `<` 显式 `COLLABORATION_*` 环境变量；监听器只在 ticket、actor 与 WebSocket 动态目标全部创建后启动。Origin、握手限流、frame/update/document/awareness 限制、ticket TTL 和新 actor 限制可在线替换；listener、连接、最大总连接信号量、固定 channel 容量、协议名和 worker 调度变化标记 `restart_required`。无效修订整体拒绝并保留 last-good。
+- Collaboration 同时接受迁移期 `v1alpha1/DynamicConfig` 与服务绑定的 `v1beta1/ApplicationConfig`。初始文档在依赖装配前合并，优先级为默认值 `<` Nacos `<` 显式 `COLLABORATION_*` 环境变量；监听器只在 ticket、actor 与 WebSocket 动态目标全部创建后启动。Origin、握手限流、frame/update/document/awareness 限制、ticket TTL 和新 actor 限制可在线替换；listener、连接、最大总连接信号量、固定 channel 容量、协议名、worker 调度和 `routing.instance_count` 变化标记 `restart_required`。无效修订整体拒绝并保留 last-good。
 - `log.health_check_requests` 默认开启，dev Nacos 模板关闭。当前 Rust admin 与 Volo Ping/Live 不产生成功 access completion log，因此关闭开关不会隐藏错误、panic 或业务请求日志，并为后续新增 access log 保留统一契约。
 - Secret 只从环境变量或 Secret manager 注入；配置文件只保存非敏感默认值。ticket、JWT、TLS key、DSN、Redis key、payload 和 SQL 参数禁止进入日志与 telemetry。
 - Gateway 对 session route 使用认证、按用户/IP 限流和请求体空校验；Rust 对握手、连接、document、update 和 awareness 再执行独立边界。
@@ -296,7 +311,7 @@ Rust 在相同负载下必须同时满足：
 | --- | --- | --- |
 | 互操作探针 | 代码与自动化完成 | Kitex/Volo TTHeader、BizStatus、metadata、mTLS、Etcd 和 `Live` wire 已覆盖；Node 性能基线待补 |
 | Rust 骨架与数据层 | 完成 | pinned workspace、配置、telemetry、runtime、migration、repository、真实依赖测试和 admin health 已落地 |
-| session 与 WebSocket | 完成 | Gateway session API、Redis ticket、Yrs actor、y-sync/awareness、边界和 commit-before-broadcast 已落地 |
+| session 与 WebSocket | 完成 | Gateway session API、Redis ticket、document_id Hash 路由、实例路径握手、Yrs actor、y-sync/awareness、边界和 commit-before-broadcast 已落地 |
 | 版本、投影与多实例 | 完成 | codec、snapshot/version/restore、outbox、JetStream fanout/redelivery/gap recovery 和失效关闭已落地 |
 | 调用方与部署代码 | 完成 | IDL/生成物、Gateway/Knowledge Kitex client、Compose、Rust image 已切换，旧 internal HTTP 与 Node production code 已删除 |
 | 发布验收 | 未完成 | 最终本地门禁已通过；远端功能阶段有通过记录，但单次完整流水线受外部网络和 production image 构建阻塞，现已暂停远端操作；性能、完整 Compose、故障、备份和切换/回滚演练待执行 |

@@ -23,7 +23,7 @@ use crate::{
 };
 
 const TICKET_BYTES: usize = 32;
-const CLAIMS_VERSION: u8 = 1;
+const CLAIMS_VERSION: u8 = 2;
 const MAX_GENERATION_ATTEMPTS: usize = 4;
 
 #[derive(Clone)]
@@ -56,10 +56,11 @@ pub struct TicketClaims {
     pub access: Access,
     pub permission_revision: i64,
     pub session_expires_at: OffsetDateTime,
+    pub instance_ordinal: u32,
 }
 
 impl TicketClaims {
-    fn from_authorization(authorization: &Authorization) -> Result<Self> {
+    fn from_authorization(authorization: &Authorization, instance_ordinal: u32) -> Result<Self> {
         authorization.actor.validate()?;
         if authorization.permission_revision <= 0 {
             return Err(ServiceError::invalid_input(
@@ -73,13 +74,20 @@ impl TicketClaims {
             access: authorization.access,
             permission_revision: authorization.permission_revision,
             session_expires_at: authorization.token_expires_at,
+            instance_ordinal,
         })
     }
 
-    fn validate(&self, expected_document: DocumentId, now: OffsetDateTime) -> Result<()> {
+    fn validate(
+        &self,
+        expected_document: DocumentId,
+        expected_ordinal: u32,
+        now: OffsetDateTime,
+    ) -> Result<()> {
         self.actor.validate()?;
         if self.version != CLAIMS_VERSION
             || self.document_id != expected_document
+            || self.instance_ordinal != expected_ordinal
             || self.permission_revision <= 0
             || self.session_expires_at <= now
         {
@@ -142,6 +150,7 @@ impl TicketService {
         &self,
         context: &RequestContext,
         authorization: &Authorization,
+        instance_ordinal: u32,
     ) -> Result<IssuedTicket> {
         let now = OffsetDateTime::now_utc();
         let configured_expiry = now
@@ -156,7 +165,7 @@ impl TicketService {
         let ttl = Duration::try_from(expires_at - now).map_err(|error| {
             ServiceError::internal(anyhow::anyhow!(error).context("convert ticket TTL"))
         })?;
-        let claims = TicketClaims::from_authorization(authorization)?;
+        let claims = TicketClaims::from_authorization(authorization, instance_ordinal)?;
         let value = serde_json::to_vec(&claims).map_err(|error| {
             ServiceError::internal(anyhow::anyhow!(error).context("encode ticket claims"))
         })?;
@@ -195,6 +204,7 @@ impl TicketService {
         context: &RequestContext,
         ticket: &str,
         expected_document: DocumentId,
+        expected_ordinal: u32,
     ) -> Result<TicketClaims> {
         let bytes = decode_ticket(ticket)?;
         let Some(value) = self.backend.take(context, ticket_digest(&bytes)).await? else {
@@ -202,7 +212,11 @@ impl TicketService {
         };
         let claims: TicketClaims =
             serde_json::from_slice(&value).map_err(|_| ServiceError::unauthenticated())?;
-        claims.validate(expected_document, OffsetDateTime::now_utc())?;
+        claims.validate(
+            expected_document,
+            expected_ordinal,
+            OffsetDateTime::now_utc(),
+        )?;
         Ok(claims)
     }
 
@@ -530,6 +544,7 @@ mod tests {
                     permission_revision: 1,
                     token_expires_at: OffsetDateTime::now_utc() + time::Duration::minutes(5),
                 },
+                0,
             )
             .await
             .expect("issue ticket");
@@ -539,7 +554,12 @@ mod tests {
             let ticket = Arc::clone(&ticket);
             tokio::spawn(async move {
                 service
-                    .consume(&request_context("consume-ticket-1"), &ticket, document_id)
+                    .consume(
+                        &request_context("consume-ticket-1"),
+                        &ticket,
+                        document_id,
+                        0,
+                    )
                     .await
             })
         };
@@ -547,7 +567,12 @@ mod tests {
             let service = service.clone();
             tokio::spawn(async move {
                 service
-                    .consume(&request_context("consume-ticket-2"), &ticket, document_id)
+                    .consume(
+                        &request_context("consume-ticket-2"),
+                        &ticket,
+                        document_id,
+                        0,
+                    )
                     .await
             })
         };
@@ -556,6 +581,49 @@ mod tests {
             second.await.expect("second join"),
         ];
         assert_eq!(results.iter().filter(|result| result.is_ok()).count(), 1);
+    }
+
+    #[tokio::test]
+    async fn consume_rejects_a_ticket_issued_for_another_instance() {
+        let backend = Arc::new(MemoryBackend::default());
+        let service = TicketService::new(
+            backend,
+            &TicketConfig {
+                ttl: Duration::from_secs(30),
+                subprotocol: "knowledge-core-yjs-v1".to_owned(),
+                fragment: "default".to_owned(),
+            },
+        )
+        .expect("valid service");
+        let document_id = DocumentId::new();
+        let issued = service
+            .issue(
+                &request_context("issue-ticket"),
+                &Authorization {
+                    document_id,
+                    actor: PublicUser {
+                        id: 1,
+                        username: "editor".to_owned(),
+                        avatar: String::new(),
+                    },
+                    access: Access::Editor,
+                    permission_revision: 1,
+                    token_expires_at: OffsetDateTime::now_utc() + time::Duration::minutes(5),
+                },
+                0,
+            )
+            .await
+            .expect("issue ticket");
+        let error = service
+            .consume(
+                &request_context("consume-wrong-instance"),
+                issued.ticket.expose(),
+                document_id,
+                1,
+            )
+            .await
+            .expect_err("wrong instance");
+        assert_eq!(error.code(), ErrorCode::Unauthenticated);
     }
 
     #[test]

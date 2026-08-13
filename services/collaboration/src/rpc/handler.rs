@@ -14,6 +14,7 @@ use crate::{
     generated::{collaboration, common, knowledge},
     ports::KnowledgePort,
     richtext::projection_from_state,
+    routing::RoutingService,
     storage::{VersionCursor, VersionStore},
     ticket::TicketService,
 };
@@ -30,6 +31,7 @@ pub struct CollaborationHandler {
     tickets: TicketService,
     versions: Arc<dyn VersionStore>,
     actors: ActorRegistry,
+    routing: RoutingService,
     subprotocol: Arc<str>,
     fragment: Arc<str>,
     readiness: Arc<dyn RpcReadiness>,
@@ -46,6 +48,7 @@ impl CollaborationHandler {
         tickets: TicketService,
         versions: Arc<dyn VersionStore>,
         actors: ActorRegistry,
+        routing: RoutingService,
         ticket: &TicketConfig,
         readiness: Arc<dyn RpcReadiness>,
     ) -> Result<Self> {
@@ -59,6 +62,7 @@ impl CollaborationHandler {
             tickets,
             versions,
             actors,
+            routing,
             subprotocol: Arc::from(ticket.subprotocol.as_str()),
             fragment: Arc::from(ticket.fragment.as_str()),
             readiness,
@@ -128,7 +132,11 @@ impl collaboration::CollaborationService for CollaborationHandler {
             self.require_ready().await?;
             let document_id = DocumentId::parse(request.document_id.as_str())?;
             let (context, authorization) = self.authorization(document_id, false).await?;
-            let issued = self.tickets.issue(&context, &authorization).await?;
+            let ordinal = self.routing.assign(&context, document_id).await?;
+            let issued = self
+                .tickets
+                .issue(&context, &authorization, ordinal)
+                .await?;
             Ok(collaboration::CollaborationSession {
                 ticket: FastStr::from_string(issued.ticket.expose().to_owned()),
                 subprotocol: FastStr::from_string(self.subprotocol.to_string()),
@@ -136,6 +144,11 @@ impl collaboration::CollaborationService for CollaborationHandler {
                 access: FastStr::from_string(authorization.access.to_string()),
                 ticket_expires_at: format_time(issued.expires_at)?,
                 session_expires_at: format_time(issued.session_expires_at)?,
+                instance_ordinal: Some(i32::try_from(ordinal).map_err(|error| {
+                    ServiceError::internal(
+                        anyhow::anyhow!(error).context("encode collaboration instance ordinal"),
+                    )
+                })?),
             })
         }
         .await;
@@ -462,6 +475,7 @@ mod tests {
         },
         ports::KnowledgePort,
         richtext,
+        routing::{MemoryRoutingStore, RoutingService},
         rpc::{RpcReadiness, context::scope_request_context_for_test},
         storage::{
             CommittedUpdate, DocumentStore, LoadedDocument, RestorationCandidate, RestoreVersion,
@@ -546,6 +560,7 @@ mod tests {
         .expect("create session");
         assert_eq!(session.access.as_str(), "viewer");
         assert_eq!(session.ticket.len(), 43);
+        assert_eq!(session.instance_ordinal, Some(0));
         assert_eq!(knowledge.calls.load(Ordering::Relaxed), 1);
         assert_eq!(store.create_calls.load(Ordering::Relaxed), 0);
 
@@ -557,6 +572,28 @@ mod tests {
         .expect_err("missing token must fail closed");
         assert_biz_code(error, 40_002);
         assert_eq!(knowledge.calls.load(Ordering::Relaxed), 1);
+    }
+
+    #[tokio::test]
+    async fn create_session_assigns_the_same_instance_for_one_document() {
+        let (handler, _, _, _, document_id) = handler(Access::Editor);
+        let request = collaboration::CreateSessionRequest {
+            document_id: document_id.to_string().into(),
+        };
+        let first = scope_request_context_for_test(
+            authenticated_context(),
+            handler.create_session(request.clone()),
+        )
+        .await
+        .expect("first session");
+        let second = scope_request_context_for_test(
+            authenticated_context(),
+            handler.create_session(request),
+        )
+        .await
+        .expect("second session");
+        assert_eq!(first.instance_ordinal, Some(0));
+        assert_eq!(first.instance_ordinal, second.instance_ordinal);
     }
 
     #[tokio::test]
@@ -674,6 +711,7 @@ mod tests {
         .await
         .expect("session creation resumes when ready");
         assert_eq!(session.access.as_str(), "viewer");
+        assert_eq!(session.instance_ordinal, Some(0));
         assert_eq!(readiness.calls.load(Ordering::Relaxed), 7);
         assert_eq!(knowledge.calls.load(Ordering::Relaxed), 1);
         assert_eq!(tickets.put_calls.load(Ordering::Relaxed), 1);
@@ -811,11 +849,15 @@ mod tests {
             Metrics::new().expect("metrics"),
             CancellationToken::new(),
         );
+        let routing_store = Arc::new(MemoryRoutingStore::default());
+        routing_store.seed_load(0, 0);
+        let routing = RoutingService::new(routing_store, 1, 0, 8).expect("routing");
         let handler = CollaborationHandler::new(
             knowledge_port,
             tickets,
             versions,
             actors,
+            routing,
             &ticket,
             readiness,
         )

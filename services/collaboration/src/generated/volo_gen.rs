@@ -1315,6 +1315,8 @@ pub mod volo_gen {
             pub ticket_expires_at: ::pilota::FastStr,
 
             pub session_expires_at: ::pilota::FastStr,
+
+            pub instance_ordinal: ::std::option::Option<i32>,
         }
         impl ::pilota::thrift::Message for CollaborationSession {
             fn encode<T: ::pilota::thrift::TOutputProtocol>(
@@ -1334,6 +1336,9 @@ pub mod volo_gen {
                 __protocol.write_faststr_field(4, (&self.access).clone())?;
                 __protocol.write_faststr_field(5, (&self.ticket_expires_at).clone())?;
                 __protocol.write_faststr_field(6, (&self.session_expires_at).clone())?;
+                if let Some(value) = self.instance_ordinal.as_ref() {
+                    __protocol.write_i32_field(7, *value)?;
+                }
                 __protocol.write_field_stop()?;
                 __protocol.write_struct_end()?;
                 ::std::result::Result::Ok(())
@@ -1351,6 +1356,7 @@ pub mod volo_gen {
                 let mut var_4 = None;
                 let mut var_5 = None;
                 let mut var_6 = None;
+                let mut var_7 = None;
 
                 let mut __pilota_decoding_field_id = None;
 
@@ -1395,6 +1401,9 @@ pub mod volo_gen {
                                 if field_ident.field_type == ::pilota::thrift::TType::Binary =>
                             {
                                 var_6 = Some(__protocol.read_faststr()?);
+                            }
+                            Some(7) if field_ident.field_type == ::pilota::thrift::TType::I32 => {
+                                var_7 = Some(__protocol.read_i32()?);
                             }
                             _ => {
                                 __protocol.skip(field_ident.field_type)?;
@@ -1460,6 +1469,7 @@ pub mod volo_gen {
                     access: var_4,
                     ticket_expires_at: var_5,
                     session_expires_at: var_6,
+                    instance_ordinal: var_7,
                 };
                 ::std::result::Result::Ok(data)
             }
@@ -1481,6 +1491,7 @@ pub mod volo_gen {
                     let mut var_4 = None;
                     let mut var_5 = None;
                     let mut var_6 = None;
+                    let mut var_7 = None;
 
                     let mut __pilota_decoding_field_id = None;
 
@@ -1529,6 +1540,11 @@ pub mod volo_gen {
                                         == ::pilota::thrift::TType::Binary =>
                                 {
                                     var_6 = Some(__protocol.read_faststr().await?);
+                                }
+                                Some(7)
+                                    if field_ident.field_type == ::pilota::thrift::TType::I32 =>
+                                {
+                                    var_7 = Some(__protocol.read_i32().await?);
                                 }
                                 _ => {
                                     __protocol.skip(field_ident.field_type).await?;
@@ -1604,6 +1620,7 @@ pub mod volo_gen {
                         access: var_4,
                         ticket_expires_at: var_5,
                         session_expires_at: var_6,
+                        instance_ordinal: var_7,
                     };
                     ::std::result::Result::Ok(data)
                 })
@@ -1620,6 +1637,10 @@ pub mod volo_gen {
                     + __protocol.faststr_field_len(Some(4), &self.access)
                     + __protocol.faststr_field_len(Some(5), &self.ticket_expires_at)
                     + __protocol.faststr_field_len(Some(6), &self.session_expires_at)
+                    + self
+                        .instance_ordinal
+                        .as_ref()
+                        .map_or(0, |value| __protocol.i32_field_len(Some(7), *value))
                     + __protocol.field_stop_len()
                     + __protocol.struct_end_len()
             }
