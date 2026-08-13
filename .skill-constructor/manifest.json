@@ -3,14 +3,9 @@
   "facts": [
     {
       "id": "architecture.modules",
-      "revision": 14,
+      "revision": 109,
       "section": "architecture",
       "sources": [
-        {
-          "detail": "evidence-sha256:248817b1174f6e497c59142efba965fda4c761ad6bf4c198fdf3faf85432b785",
-          "kind": "detected",
-          "reference": "filesystem:top-level-directories"
-        },
         {
           "detail": "evidence-sha256:fb49439604caa33dc85772806bbaf1c661444c36fa63031490372ba995970e25",
           "kind": "detected",
@@ -27,24 +22,9 @@
     },
     {
       "id": "architecture.summary",
-      "revision": 87,
+      "revision": 109,
       "section": "architecture",
       "sources": [
-        {
-          "detail": "evidence-sha256:6462346ae40e26ec86a8858c5679558383c9321c7e4059f30540e112aaa2e0ba",
-          "kind": "documented",
-          "reference": "README.md#knowledge-core"
-        },
-        {
-          "detail": "evidence-sha256:6cc08ddcf5525a7adc55f189cd2dadddf88fab06ae4e47bfeb47c2e58a779255",
-          "kind": "documented",
-          "reference": "README.md#knowledge-core"
-        },
-        {
-          "detail": "evidence-sha256:c25874112f127fd8ff9232e99638a03236428db91d951b92c68f4278991737f1",
-          "kind": "documented",
-          "reference": "README.md#knowledge-core"
-        },
         {
           "detail": "evidence-sha256:fa04c3f9180293ecf2ff1344428c0f951f2c9a56e4e1ad32f2fc50466cd99952",
           "kind": "documented",
@@ -56,49 +36,14 @@
           "reference": "deploy/overlay/dev/README.md#development-overlay"
         },
         {
-          "detail": "evidence-sha256:6462346ae40e26ec86a8858c5679558383c9321c7e4059f30540e112aaa2e0ba",
+          "detail": "evidence-sha256:fa04c3f9180293ecf2ff1344428c0f951f2c9a56e4e1ad32f2fc50466cd99952",
           "kind": "documented",
           "reference": "docs/framework-design.md#9"
         },
         {
           "detail": "evidence-sha256:fa04c3f9180293ecf2ff1344428c0f951f2c9a56e4e1ad32f2fc50466cd99952",
           "kind": "documented",
-          "reference": "docs/framework-design.md#9"
-        },
-        {
-          "detail": "evidence-sha256:6462346ae40e26ec86a8858c5679558383c9321c7e4059f30540e112aaa2e0ba",
-          "kind": "documented",
           "reference": "docs/framework-design.md#knowledge-core"
-        },
-        {
-          "detail": "evidence-sha256:6cc08ddcf5525a7adc55f189cd2dadddf88fab06ae4e47bfeb47c2e58a779255",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#knowledge-core"
-        },
-        {
-          "detail": "evidence-sha256:c25874112f127fd8ff9232e99638a03236428db91d951b92c68f4278991737f1",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#knowledge-core"
-        },
-        {
-          "detail": "evidence-sha256:fa04c3f9180293ecf2ff1344428c0f951f2c9a56e4e1ad32f2fc50466cd99952",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#knowledge-core"
-        },
-        {
-          "detail": "evidence-sha256:6462346ae40e26ec86a8858c5679558383c9321c7e4059f30540e112aaa2e0ba",
-          "kind": "documented",
-          "reference": "docs/rust-collaboration-design.md#rust-collaboration"
-        },
-        {
-          "detail": "evidence-sha256:6cc08ddcf5525a7adc55f189cd2dadddf88fab06ae4e47bfeb47c2e58a779255",
-          "kind": "documented",
-          "reference": "docs/rust-collaboration-design.md#rust-collaboration"
-        },
-        {
-          "detail": "evidence-sha256:c25874112f127fd8ff9232e99638a03236428db91d951b92c68f4278991737f1",
-          "kind": "documented",
-          "reference": "docs/rust-collaboration-design.md#rust-collaboration"
         },
         {
           "detail": "evidence-sha256:fa04c3f9180293ecf2ff1344428c0f951f2c9a56e4e1ad32f2fc50466cd99952",
@@ -278,273 +223,18 @@
     },
     {
       "id": "security.secrets-and-config",
-      "revision": 108,
+      "revision": 109,
       "section": "conventions",
       "sources": [
         {
-          "detail": "evidence-sha256:029a7717f5c228a917800def31d05a9655897eed451ca58bdbbb9796ca927136",
-          "kind": "documented",
-          "reference": "README.md#compose"
-        },
-        {
-          "detail": "evidence-sha256:08fe26d59eb8a9b4aba2ee77ff84f206bc5a59cd1c42aff9532458469fd002d3",
-          "kind": "documented",
-          "reference": "README.md#compose"
-        },
-        {
-          "detail": "evidence-sha256:169cb3579a7f13e97489407e05a1e625c65d48efdff5f844fd0f2f07daea027e",
-          "kind": "documented",
-          "reference": "README.md#compose"
-        },
-        {
-          "detail": "evidence-sha256:2024c362e384645cce0fadb79c1ffad1fc41ec89f4691aabc6e393f2fa6b3e5d",
-          "kind": "documented",
-          "reference": "README.md#compose"
-        },
-        {
-          "detail": "evidence-sha256:22d8b15c6a4937a5f3816e1e74b4a3c20306a462ea6a88f948cecb7093c892d4",
-          "kind": "documented",
-          "reference": "README.md#compose"
-        },
-        {
-          "detail": "evidence-sha256:2b07231c2b6c7eb0272df6c01752e385fde7019c6a06c9ebd45a751fa8315b17",
-          "kind": "documented",
-          "reference": "README.md#compose"
-        },
-        {
-          "detail": "evidence-sha256:3a5b9decd3a7cd80ccf8598e58807a4fa2d95bc471e6f015c80b275a349ae17b",
-          "kind": "documented",
-          "reference": "README.md#compose"
-        },
-        {
-          "detail": "evidence-sha256:3d736f8270406798ffdecad08947632f1fb7e366e1404f1d8d298608db853cc6",
-          "kind": "documented",
-          "reference": "README.md#compose"
-        },
-        {
-          "detail": "evidence-sha256:3f77cc944fbf3ecb65ded3b5c02fb37dfe49326b6577ad32a38d887c1446c4b1",
-          "kind": "documented",
-          "reference": "README.md#compose"
-        },
-        {
-          "detail": "evidence-sha256:4523e4341990bea5e320075f233e9256536e7336d2eea3757ec8869fb9793aab",
-          "kind": "documented",
-          "reference": "README.md#compose"
-        },
-        {
-          "detail": "evidence-sha256:4b6f4541eadeec2065a2f1f26030d8327d249392d4cc0030265e07b25155358b",
-          "kind": "documented",
-          "reference": "README.md#compose"
-        },
-        {
-          "detail": "evidence-sha256:4cc991c8785e0118decd7d11538028062864b27bc12085669c23712cc64db2cf",
-          "kind": "documented",
-          "reference": "README.md#compose"
-        },
-        {
-          "detail": "evidence-sha256:57362d70e1f44aa28d5abc4f82881b3ba21f313c84605636433b6b1a941d129a",
-          "kind": "documented",
-          "reference": "README.md#compose"
-        },
-        {
-          "detail": "evidence-sha256:6f8469da75fd7458b41f42abdb86b3058ff3b8095c873349ede521d974462e12",
-          "kind": "documented",
-          "reference": "README.md#compose"
-        },
-        {
-          "detail": "evidence-sha256:941a6edecdb39ffe70c789beceea38c86a9cf954994318dbe2a85aab826b6e77",
-          "kind": "documented",
-          "reference": "README.md#compose"
-        },
-        {
-          "detail": "evidence-sha256:94ef24230d0ba23b4f6b3cdd84674001709f3ca7ba32ea2c15de9132e746b33a",
-          "kind": "documented",
-          "reference": "README.md#compose"
-        },
-        {
-          "detail": "evidence-sha256:9d7763b5126ecbb98d373d98a8e841decd4ac9f9afa3c4503e840629b63a8cb7",
-          "kind": "documented",
-          "reference": "README.md#compose"
-        },
-        {
-          "detail": "evidence-sha256:a1e211923e6b4c911452e65bfccb33c98578fe9db1315ddbcb48d0c0b052f250",
-          "kind": "documented",
-          "reference": "README.md#compose"
-        },
-        {
-          "detail": "evidence-sha256:a4a91bf712de2cb1f3ab5eb2443d97915559f7ff283841d7aac578685acd7a42",
+          "detail": "evidence-sha256:fb988f8708eb4b94a819f41a3914b44a9a14cf3188296c55433740d35f09ed4a",
           "kind": "documented",
           "reference": "README.md#compose"
         },
         {
           "detail": "evidence-sha256:fb988f8708eb4b94a819f41a3914b44a9a14cf3188296c55433740d35f09ed4a",
           "kind": "documented",
-          "reference": "README.md#compose"
-        },
-        {
-          "detail": "evidence-sha256:029a7717f5c228a917800def31d05a9655897eed451ca58bdbbb9796ca927136",
-          "kind": "documented",
           "reference": "README.md#k3s-gitops"
-        },
-        {
-          "detail": "evidence-sha256:08fe26d59eb8a9b4aba2ee77ff84f206bc5a59cd1c42aff9532458469fd002d3",
-          "kind": "documented",
-          "reference": "README.md#k3s-gitops"
-        },
-        {
-          "detail": "evidence-sha256:169cb3579a7f13e97489407e05a1e625c65d48efdff5f844fd0f2f07daea027e",
-          "kind": "documented",
-          "reference": "README.md#k3s-gitops"
-        },
-        {
-          "detail": "evidence-sha256:2024c362e384645cce0fadb79c1ffad1fc41ec89f4691aabc6e393f2fa6b3e5d",
-          "kind": "documented",
-          "reference": "README.md#k3s-gitops"
-        },
-        {
-          "detail": "evidence-sha256:22d8b15c6a4937a5f3816e1e74b4a3c20306a462ea6a88f948cecb7093c892d4",
-          "kind": "documented",
-          "reference": "README.md#k3s-gitops"
-        },
-        {
-          "detail": "evidence-sha256:2b07231c2b6c7eb0272df6c01752e385fde7019c6a06c9ebd45a751fa8315b17",
-          "kind": "documented",
-          "reference": "README.md#k3s-gitops"
-        },
-        {
-          "detail": "evidence-sha256:3a5b9decd3a7cd80ccf8598e58807a4fa2d95bc471e6f015c80b275a349ae17b",
-          "kind": "documented",
-          "reference": "README.md#k3s-gitops"
-        },
-        {
-          "detail": "evidence-sha256:3d736f8270406798ffdecad08947632f1fb7e366e1404f1d8d298608db853cc6",
-          "kind": "documented",
-          "reference": "README.md#k3s-gitops"
-        },
-        {
-          "detail": "evidence-sha256:3f77cc944fbf3ecb65ded3b5c02fb37dfe49326b6577ad32a38d887c1446c4b1",
-          "kind": "documented",
-          "reference": "README.md#k3s-gitops"
-        },
-        {
-          "detail": "evidence-sha256:4523e4341990bea5e320075f233e9256536e7336d2eea3757ec8869fb9793aab",
-          "kind": "documented",
-          "reference": "README.md#k3s-gitops"
-        },
-        {
-          "detail": "evidence-sha256:4b6f4541eadeec2065a2f1f26030d8327d249392d4cc0030265e07b25155358b",
-          "kind": "documented",
-          "reference": "README.md#k3s-gitops"
-        },
-        {
-          "detail": "evidence-sha256:4cc991c8785e0118decd7d11538028062864b27bc12085669c23712cc64db2cf",
-          "kind": "documented",
-          "reference": "README.md#k3s-gitops"
-        },
-        {
-          "detail": "evidence-sha256:57362d70e1f44aa28d5abc4f82881b3ba21f313c84605636433b6b1a941d129a",
-          "kind": "documented",
-          "reference": "README.md#k3s-gitops"
-        },
-        {
-          "detail": "evidence-sha256:6f8469da75fd7458b41f42abdb86b3058ff3b8095c873349ede521d974462e12",
-          "kind": "documented",
-          "reference": "README.md#k3s-gitops"
-        },
-        {
-          "detail": "evidence-sha256:941a6edecdb39ffe70c789beceea38c86a9cf954994318dbe2a85aab826b6e77",
-          "kind": "documented",
-          "reference": "README.md#k3s-gitops"
-        },
-        {
-          "detail": "evidence-sha256:94ef24230d0ba23b4f6b3cdd84674001709f3ca7ba32ea2c15de9132e746b33a",
-          "kind": "documented",
-          "reference": "README.md#k3s-gitops"
-        },
-        {
-          "detail": "evidence-sha256:9d7763b5126ecbb98d373d98a8e841decd4ac9f9afa3c4503e840629b63a8cb7",
-          "kind": "documented",
-          "reference": "README.md#k3s-gitops"
-        },
-        {
-          "detail": "evidence-sha256:a1e211923e6b4c911452e65bfccb33c98578fe9db1315ddbcb48d0c0b052f250",
-          "kind": "documented",
-          "reference": "README.md#k3s-gitops"
-        },
-        {
-          "detail": "evidence-sha256:a4a91bf712de2cb1f3ab5eb2443d97915559f7ff283841d7aac578685acd7a42",
-          "kind": "documented",
-          "reference": "README.md#k3s-gitops"
-        },
-        {
-          "detail": "evidence-sha256:fb988f8708eb4b94a819f41a3914b44a9a14cf3188296c55433740d35f09ed4a",
-          "kind": "documented",
-          "reference": "README.md#k3s-gitops"
-        },
-        {
-          "detail": "evidence-sha256:029a7717f5c228a917800def31d05a9655897eed451ca58bdbbb9796ca927136",
-          "kind": "documented",
-          "reference": "README.md#section"
-        },
-        {
-          "detail": "evidence-sha256:08fe26d59eb8a9b4aba2ee77ff84f206bc5a59cd1c42aff9532458469fd002d3",
-          "kind": "documented",
-          "reference": "README.md#section"
-        },
-        {
-          "detail": "evidence-sha256:22d8b15c6a4937a5f3816e1e74b4a3c20306a462ea6a88f948cecb7093c892d4",
-          "kind": "documented",
-          "reference": "README.md#section"
-        },
-        {
-          "detail": "evidence-sha256:3a5b9decd3a7cd80ccf8598e58807a4fa2d95bc471e6f015c80b275a349ae17b",
-          "kind": "documented",
-          "reference": "README.md#section"
-        },
-        {
-          "detail": "evidence-sha256:3d736f8270406798ffdecad08947632f1fb7e366e1404f1d8d298608db853cc6",
-          "kind": "documented",
-          "reference": "README.md#section"
-        },
-        {
-          "detail": "evidence-sha256:4b6f4541eadeec2065a2f1f26030d8327d249392d4cc0030265e07b25155358b",
-          "kind": "documented",
-          "reference": "README.md#section"
-        },
-        {
-          "detail": "evidence-sha256:57362d70e1f44aa28d5abc4f82881b3ba21f313c84605636433b6b1a941d129a",
-          "kind": "documented",
-          "reference": "README.md#section"
-        },
-        {
-          "detail": "evidence-sha256:6f8469da75fd7458b41f42abdb86b3058ff3b8095c873349ede521d974462e12",
-          "kind": "documented",
-          "reference": "README.md#section"
-        },
-        {
-          "detail": "evidence-sha256:941a6edecdb39ffe70c789beceea38c86a9cf954994318dbe2a85aab826b6e77",
-          "kind": "documented",
-          "reference": "README.md#section"
-        },
-        {
-          "detail": "evidence-sha256:94ef24230d0ba23b4f6b3cdd84674001709f3ca7ba32ea2c15de9132e746b33a",
-          "kind": "documented",
-          "reference": "README.md#section"
-        },
-        {
-          "detail": "evidence-sha256:9d7763b5126ecbb98d373d98a8e841decd4ac9f9afa3c4503e840629b63a8cb7",
-          "kind": "documented",
-          "reference": "README.md#section"
-        },
-        {
-          "detail": "evidence-sha256:a1e211923e6b4c911452e65bfccb33c98578fe9db1315ddbcb48d0c0b052f250",
-          "kind": "documented",
-          "reference": "README.md#section"
-        },
-        {
-          "detail": "evidence-sha256:a4a91bf712de2cb1f3ab5eb2443d97915559f7ff283841d7aac578685acd7a42",
-          "kind": "documented",
-          "reference": "README.md#section"
         },
         {
           "detail": "evidence-sha256:fb988f8708eb4b94a819f41a3914b44a9a14cf3188296c55433740d35f09ed4a",
@@ -557,16 +247,6 @@
           "reference": "deploy/base/README.md#application-deployment-base"
         },
         {
-          "detail": "evidence-sha256:029a7717f5c228a917800def31d05a9655897eed451ca58bdbbb9796ca927136",
-          "kind": "documented",
-          "reference": "deploy/nacos/README.md#nacos-application-configuration"
-        },
-        {
-          "detail": "evidence-sha256:4b6f4541eadeec2065a2f1f26030d8327d249392d4cc0030265e07b25155358b",
-          "kind": "documented",
-          "reference": "deploy/nacos/README.md#nacos-application-configuration"
-        },
-        {
           "detail": "evidence-sha256:a4a91bf712de2cb1f3ab5eb2443d97915559f7ff283841d7aac578685acd7a42",
           "kind": "documented",
           "reference": "deploy/nacos/README.md#nacos-application-configuration"
@@ -577,199 +257,9 @@
           "reference": "deploy/overlay/dev/README.md#development-overlay"
         },
         {
-          "detail": "evidence-sha256:029a7717f5c228a917800def31d05a9655897eed451ca58bdbbb9796ca927136",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#11"
-        },
-        {
-          "detail": "evidence-sha256:08fe26d59eb8a9b4aba2ee77ff84f206bc5a59cd1c42aff9532458469fd002d3",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#11"
-        },
-        {
-          "detail": "evidence-sha256:169cb3579a7f13e97489407e05a1e625c65d48efdff5f844fd0f2f07daea027e",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#11"
-        },
-        {
-          "detail": "evidence-sha256:2024c362e384645cce0fadb79c1ffad1fc41ec89f4691aabc6e393f2fa6b3e5d",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#11"
-        },
-        {
-          "detail": "evidence-sha256:22d8b15c6a4937a5f3816e1e74b4a3c20306a462ea6a88f948cecb7093c892d4",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#11"
-        },
-        {
-          "detail": "evidence-sha256:2b07231c2b6c7eb0272df6c01752e385fde7019c6a06c9ebd45a751fa8315b17",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#11"
-        },
-        {
-          "detail": "evidence-sha256:3a5b9decd3a7cd80ccf8598e58807a4fa2d95bc471e6f015c80b275a349ae17b",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#11"
-        },
-        {
-          "detail": "evidence-sha256:3d736f8270406798ffdecad08947632f1fb7e366e1404f1d8d298608db853cc6",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#11"
-        },
-        {
-          "detail": "evidence-sha256:3f77cc944fbf3ecb65ded3b5c02fb37dfe49326b6577ad32a38d887c1446c4b1",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#11"
-        },
-        {
-          "detail": "evidence-sha256:4523e4341990bea5e320075f233e9256536e7336d2eea3757ec8869fb9793aab",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#11"
-        },
-        {
-          "detail": "evidence-sha256:4b6f4541eadeec2065a2f1f26030d8327d249392d4cc0030265e07b25155358b",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#11"
-        },
-        {
-          "detail": "evidence-sha256:4cc991c8785e0118decd7d11538028062864b27bc12085669c23712cc64db2cf",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#11"
-        },
-        {
-          "detail": "evidence-sha256:57362d70e1f44aa28d5abc4f82881b3ba21f313c84605636433b6b1a941d129a",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#11"
-        },
-        {
-          "detail": "evidence-sha256:6f8469da75fd7458b41f42abdb86b3058ff3b8095c873349ede521d974462e12",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#11"
-        },
-        {
-          "detail": "evidence-sha256:941a6edecdb39ffe70c789beceea38c86a9cf954994318dbe2a85aab826b6e77",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#11"
-        },
-        {
-          "detail": "evidence-sha256:94ef24230d0ba23b4f6b3cdd84674001709f3ca7ba32ea2c15de9132e746b33a",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#11"
-        },
-        {
-          "detail": "evidence-sha256:9d7763b5126ecbb98d373d98a8e841decd4ac9f9afa3c4503e840629b63a8cb7",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#11"
-        },
-        {
-          "detail": "evidence-sha256:a1e211923e6b4c911452e65bfccb33c98578fe9db1315ddbcb48d0c0b052f250",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#11"
-        },
-        {
-          "detail": "evidence-sha256:a4a91bf712de2cb1f3ab5eb2443d97915559f7ff283841d7aac578685acd7a42",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#11"
-        },
-        {
           "detail": "evidence-sha256:fb988f8708eb4b94a819f41a3914b44a9a14cf3188296c55433740d35f09ed4a",
           "kind": "documented",
           "reference": "docs/framework-design.md#11"
-        },
-        {
-          "detail": "evidence-sha256:029a7717f5c228a917800def31d05a9655897eed451ca58bdbbb9796ca927136",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#12"
-        },
-        {
-          "detail": "evidence-sha256:08fe26d59eb8a9b4aba2ee77ff84f206bc5a59cd1c42aff9532458469fd002d3",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#12"
-        },
-        {
-          "detail": "evidence-sha256:169cb3579a7f13e97489407e05a1e625c65d48efdff5f844fd0f2f07daea027e",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#12"
-        },
-        {
-          "detail": "evidence-sha256:2024c362e384645cce0fadb79c1ffad1fc41ec89f4691aabc6e393f2fa6b3e5d",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#12"
-        },
-        {
-          "detail": "evidence-sha256:22d8b15c6a4937a5f3816e1e74b4a3c20306a462ea6a88f948cecb7093c892d4",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#12"
-        },
-        {
-          "detail": "evidence-sha256:2b07231c2b6c7eb0272df6c01752e385fde7019c6a06c9ebd45a751fa8315b17",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#12"
-        },
-        {
-          "detail": "evidence-sha256:3a5b9decd3a7cd80ccf8598e58807a4fa2d95bc471e6f015c80b275a349ae17b",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#12"
-        },
-        {
-          "detail": "evidence-sha256:3d736f8270406798ffdecad08947632f1fb7e366e1404f1d8d298608db853cc6",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#12"
-        },
-        {
-          "detail": "evidence-sha256:3f77cc944fbf3ecb65ded3b5c02fb37dfe49326b6577ad32a38d887c1446c4b1",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#12"
-        },
-        {
-          "detail": "evidence-sha256:4523e4341990bea5e320075f233e9256536e7336d2eea3757ec8869fb9793aab",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#12"
-        },
-        {
-          "detail": "evidence-sha256:4b6f4541eadeec2065a2f1f26030d8327d249392d4cc0030265e07b25155358b",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#12"
-        },
-        {
-          "detail": "evidence-sha256:4cc991c8785e0118decd7d11538028062864b27bc12085669c23712cc64db2cf",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#12"
-        },
-        {
-          "detail": "evidence-sha256:57362d70e1f44aa28d5abc4f82881b3ba21f313c84605636433b6b1a941d129a",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#12"
-        },
-        {
-          "detail": "evidence-sha256:6f8469da75fd7458b41f42abdb86b3058ff3b8095c873349ede521d974462e12",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#12"
-        },
-        {
-          "detail": "evidence-sha256:941a6edecdb39ffe70c789beceea38c86a9cf954994318dbe2a85aab826b6e77",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#12"
-        },
-        {
-          "detail": "evidence-sha256:94ef24230d0ba23b4f6b3cdd84674001709f3ca7ba32ea2c15de9132e746b33a",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#12"
-        },
-        {
-          "detail": "evidence-sha256:9d7763b5126ecbb98d373d98a8e841decd4ac9f9afa3c4503e840629b63a8cb7",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#12"
-        },
-        {
-          "detail": "evidence-sha256:a1e211923e6b4c911452e65bfccb33c98578fe9db1315ddbcb48d0c0b052f250",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#12"
-        },
-        {
-          "detail": "evidence-sha256:a4a91bf712de2cb1f3ab5eb2443d97915559f7ff283841d7aac578685acd7a42",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#12"
         },
         {
           "detail": "evidence-sha256:fb988f8708eb4b94a819f41a3914b44a9a14cf3188296c55433740d35f09ed4a",
@@ -777,199 +267,9 @@
           "reference": "docs/framework-design.md#12"
         },
         {
-          "detail": "evidence-sha256:029a7717f5c228a917800def31d05a9655897eed451ca58bdbbb9796ca927136",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#8-secret-tls"
-        },
-        {
-          "detail": "evidence-sha256:08fe26d59eb8a9b4aba2ee77ff84f206bc5a59cd1c42aff9532458469fd002d3",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#8-secret-tls"
-        },
-        {
-          "detail": "evidence-sha256:169cb3579a7f13e97489407e05a1e625c65d48efdff5f844fd0f2f07daea027e",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#8-secret-tls"
-        },
-        {
-          "detail": "evidence-sha256:2024c362e384645cce0fadb79c1ffad1fc41ec89f4691aabc6e393f2fa6b3e5d",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#8-secret-tls"
-        },
-        {
-          "detail": "evidence-sha256:22d8b15c6a4937a5f3816e1e74b4a3c20306a462ea6a88f948cecb7093c892d4",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#8-secret-tls"
-        },
-        {
-          "detail": "evidence-sha256:2b07231c2b6c7eb0272df6c01752e385fde7019c6a06c9ebd45a751fa8315b17",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#8-secret-tls"
-        },
-        {
-          "detail": "evidence-sha256:3a5b9decd3a7cd80ccf8598e58807a4fa2d95bc471e6f015c80b275a349ae17b",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#8-secret-tls"
-        },
-        {
-          "detail": "evidence-sha256:3d736f8270406798ffdecad08947632f1fb7e366e1404f1d8d298608db853cc6",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#8-secret-tls"
-        },
-        {
-          "detail": "evidence-sha256:3f77cc944fbf3ecb65ded3b5c02fb37dfe49326b6577ad32a38d887c1446c4b1",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#8-secret-tls"
-        },
-        {
-          "detail": "evidence-sha256:4523e4341990bea5e320075f233e9256536e7336d2eea3757ec8869fb9793aab",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#8-secret-tls"
-        },
-        {
-          "detail": "evidence-sha256:4b6f4541eadeec2065a2f1f26030d8327d249392d4cc0030265e07b25155358b",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#8-secret-tls"
-        },
-        {
-          "detail": "evidence-sha256:4cc991c8785e0118decd7d11538028062864b27bc12085669c23712cc64db2cf",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#8-secret-tls"
-        },
-        {
-          "detail": "evidence-sha256:57362d70e1f44aa28d5abc4f82881b3ba21f313c84605636433b6b1a941d129a",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#8-secret-tls"
-        },
-        {
-          "detail": "evidence-sha256:6f8469da75fd7458b41f42abdb86b3058ff3b8095c873349ede521d974462e12",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#8-secret-tls"
-        },
-        {
-          "detail": "evidence-sha256:941a6edecdb39ffe70c789beceea38c86a9cf954994318dbe2a85aab826b6e77",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#8-secret-tls"
-        },
-        {
-          "detail": "evidence-sha256:94ef24230d0ba23b4f6b3cdd84674001709f3ca7ba32ea2c15de9132e746b33a",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#8-secret-tls"
-        },
-        {
-          "detail": "evidence-sha256:9d7763b5126ecbb98d373d98a8e841decd4ac9f9afa3c4503e840629b63a8cb7",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#8-secret-tls"
-        },
-        {
-          "detail": "evidence-sha256:a1e211923e6b4c911452e65bfccb33c98578fe9db1315ddbcb48d0c0b052f250",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#8-secret-tls"
-        },
-        {
-          "detail": "evidence-sha256:a4a91bf712de2cb1f3ab5eb2443d97915559f7ff283841d7aac578685acd7a42",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#8-secret-tls"
-        },
-        {
           "detail": "evidence-sha256:fb988f8708eb4b94a819f41a3914b44a9a14cf3188296c55433740d35f09ed4a",
           "kind": "documented",
           "reference": "docs/framework-design.md#8-secret-tls"
-        },
-        {
-          "detail": "evidence-sha256:029a7717f5c228a917800def31d05a9655897eed451ca58bdbbb9796ca927136",
-          "kind": "documented",
-          "reference": "docs/rust-collaboration-design.md#2-1"
-        },
-        {
-          "detail": "evidence-sha256:08fe26d59eb8a9b4aba2ee77ff84f206bc5a59cd1c42aff9532458469fd002d3",
-          "kind": "documented",
-          "reference": "docs/rust-collaboration-design.md#2-1"
-        },
-        {
-          "detail": "evidence-sha256:169cb3579a7f13e97489407e05a1e625c65d48efdff5f844fd0f2f07daea027e",
-          "kind": "documented",
-          "reference": "docs/rust-collaboration-design.md#2-1"
-        },
-        {
-          "detail": "evidence-sha256:2024c362e384645cce0fadb79c1ffad1fc41ec89f4691aabc6e393f2fa6b3e5d",
-          "kind": "documented",
-          "reference": "docs/rust-collaboration-design.md#2-1"
-        },
-        {
-          "detail": "evidence-sha256:22d8b15c6a4937a5f3816e1e74b4a3c20306a462ea6a88f948cecb7093c892d4",
-          "kind": "documented",
-          "reference": "docs/rust-collaboration-design.md#2-1"
-        },
-        {
-          "detail": "evidence-sha256:2b07231c2b6c7eb0272df6c01752e385fde7019c6a06c9ebd45a751fa8315b17",
-          "kind": "documented",
-          "reference": "docs/rust-collaboration-design.md#2-1"
-        },
-        {
-          "detail": "evidence-sha256:3a5b9decd3a7cd80ccf8598e58807a4fa2d95bc471e6f015c80b275a349ae17b",
-          "kind": "documented",
-          "reference": "docs/rust-collaboration-design.md#2-1"
-        },
-        {
-          "detail": "evidence-sha256:3d736f8270406798ffdecad08947632f1fb7e366e1404f1d8d298608db853cc6",
-          "kind": "documented",
-          "reference": "docs/rust-collaboration-design.md#2-1"
-        },
-        {
-          "detail": "evidence-sha256:3f77cc944fbf3ecb65ded3b5c02fb37dfe49326b6577ad32a38d887c1446c4b1",
-          "kind": "documented",
-          "reference": "docs/rust-collaboration-design.md#2-1"
-        },
-        {
-          "detail": "evidence-sha256:4523e4341990bea5e320075f233e9256536e7336d2eea3757ec8869fb9793aab",
-          "kind": "documented",
-          "reference": "docs/rust-collaboration-design.md#2-1"
-        },
-        {
-          "detail": "evidence-sha256:4b6f4541eadeec2065a2f1f26030d8327d249392d4cc0030265e07b25155358b",
-          "kind": "documented",
-          "reference": "docs/rust-collaboration-design.md#2-1"
-        },
-        {
-          "detail": "evidence-sha256:4cc991c8785e0118decd7d11538028062864b27bc12085669c23712cc64db2cf",
-          "kind": "documented",
-          "reference": "docs/rust-collaboration-design.md#2-1"
-        },
-        {
-          "detail": "evidence-sha256:57362d70e1f44aa28d5abc4f82881b3ba21f313c84605636433b6b1a941d129a",
-          "kind": "documented",
-          "reference": "docs/rust-collaboration-design.md#2-1"
-        },
-        {
-          "detail": "evidence-sha256:6f8469da75fd7458b41f42abdb86b3058ff3b8095c873349ede521d974462e12",
-          "kind": "documented",
-          "reference": "docs/rust-collaboration-design.md#2-1"
-        },
-        {
-          "detail": "evidence-sha256:941a6edecdb39ffe70c789beceea38c86a9cf954994318dbe2a85aab826b6e77",
-          "kind": "documented",
-          "reference": "docs/rust-collaboration-design.md#2-1"
-        },
-        {
-          "detail": "evidence-sha256:94ef24230d0ba23b4f6b3cdd84674001709f3ca7ba32ea2c15de9132e746b33a",
-          "kind": "documented",
-          "reference": "docs/rust-collaboration-design.md#2-1"
-        },
-        {
-          "detail": "evidence-sha256:9d7763b5126ecbb98d373d98a8e841decd4ac9f9afa3c4503e840629b63a8cb7",
-          "kind": "documented",
-          "reference": "docs/rust-collaboration-design.md#2-1"
-        },
-        {
-          "detail": "evidence-sha256:a1e211923e6b4c911452e65bfccb33c98578fe9db1315ddbcb48d0c0b052f250",
-          "kind": "documented",
-          "reference": "docs/rust-collaboration-design.md#2-1"
-        },
-        {
-          "detail": "evidence-sha256:a4a91bf712de2cb1f3ab5eb2443d97915559f7ff283841d7aac578685acd7a42",
-          "kind": "documented",
-          "reference": "docs/rust-collaboration-design.md#2-1"
         },
         {
           "detail": "evidence-sha256:fb988f8708eb4b94a819f41a3914b44a9a14cf3188296c55433740d35f09ed4a",
@@ -977,139 +277,9 @@
           "reference": "docs/rust-collaboration-design.md#2-1"
         },
         {
-          "detail": "evidence-sha256:029a7717f5c228a917800def31d05a9655897eed451ca58bdbbb9796ca927136",
-          "kind": "documented",
-          "reference": "docs/rust-collaboration-design.md#7"
-        },
-        {
-          "detail": "evidence-sha256:08fe26d59eb8a9b4aba2ee77ff84f206bc5a59cd1c42aff9532458469fd002d3",
-          "kind": "documented",
-          "reference": "docs/rust-collaboration-design.md#7"
-        },
-        {
-          "detail": "evidence-sha256:169cb3579a7f13e97489407e05a1e625c65d48efdff5f844fd0f2f07daea027e",
-          "kind": "documented",
-          "reference": "docs/rust-collaboration-design.md#7"
-        },
-        {
-          "detail": "evidence-sha256:2024c362e384645cce0fadb79c1ffad1fc41ec89f4691aabc6e393f2fa6b3e5d",
-          "kind": "documented",
-          "reference": "docs/rust-collaboration-design.md#7"
-        },
-        {
-          "detail": "evidence-sha256:22d8b15c6a4937a5f3816e1e74b4a3c20306a462ea6a88f948cecb7093c892d4",
-          "kind": "documented",
-          "reference": "docs/rust-collaboration-design.md#7"
-        },
-        {
-          "detail": "evidence-sha256:2b07231c2b6c7eb0272df6c01752e385fde7019c6a06c9ebd45a751fa8315b17",
-          "kind": "documented",
-          "reference": "docs/rust-collaboration-design.md#7"
-        },
-        {
-          "detail": "evidence-sha256:3a5b9decd3a7cd80ccf8598e58807a4fa2d95bc471e6f015c80b275a349ae17b",
-          "kind": "documented",
-          "reference": "docs/rust-collaboration-design.md#7"
-        },
-        {
-          "detail": "evidence-sha256:3d736f8270406798ffdecad08947632f1fb7e366e1404f1d8d298608db853cc6",
-          "kind": "documented",
-          "reference": "docs/rust-collaboration-design.md#7"
-        },
-        {
-          "detail": "evidence-sha256:3f77cc944fbf3ecb65ded3b5c02fb37dfe49326b6577ad32a38d887c1446c4b1",
-          "kind": "documented",
-          "reference": "docs/rust-collaboration-design.md#7"
-        },
-        {
-          "detail": "evidence-sha256:4523e4341990bea5e320075f233e9256536e7336d2eea3757ec8869fb9793aab",
-          "kind": "documented",
-          "reference": "docs/rust-collaboration-design.md#7"
-        },
-        {
-          "detail": "evidence-sha256:4b6f4541eadeec2065a2f1f26030d8327d249392d4cc0030265e07b25155358b",
-          "kind": "documented",
-          "reference": "docs/rust-collaboration-design.md#7"
-        },
-        {
-          "detail": "evidence-sha256:4cc991c8785e0118decd7d11538028062864b27bc12085669c23712cc64db2cf",
-          "kind": "documented",
-          "reference": "docs/rust-collaboration-design.md#7"
-        },
-        {
-          "detail": "evidence-sha256:57362d70e1f44aa28d5abc4f82881b3ba21f313c84605636433b6b1a941d129a",
-          "kind": "documented",
-          "reference": "docs/rust-collaboration-design.md#7"
-        },
-        {
-          "detail": "evidence-sha256:6f8469da75fd7458b41f42abdb86b3058ff3b8095c873349ede521d974462e12",
-          "kind": "documented",
-          "reference": "docs/rust-collaboration-design.md#7"
-        },
-        {
-          "detail": "evidence-sha256:941a6edecdb39ffe70c789beceea38c86a9cf954994318dbe2a85aab826b6e77",
-          "kind": "documented",
-          "reference": "docs/rust-collaboration-design.md#7"
-        },
-        {
-          "detail": "evidence-sha256:94ef24230d0ba23b4f6b3cdd84674001709f3ca7ba32ea2c15de9132e746b33a",
-          "kind": "documented",
-          "reference": "docs/rust-collaboration-design.md#7"
-        },
-        {
-          "detail": "evidence-sha256:9d7763b5126ecbb98d373d98a8e841decd4ac9f9afa3c4503e840629b63a8cb7",
-          "kind": "documented",
-          "reference": "docs/rust-collaboration-design.md#7"
-        },
-        {
-          "detail": "evidence-sha256:a1e211923e6b4c911452e65bfccb33c98578fe9db1315ddbcb48d0c0b052f250",
-          "kind": "documented",
-          "reference": "docs/rust-collaboration-design.md#7"
-        },
-        {
-          "detail": "evidence-sha256:a4a91bf712de2cb1f3ab5eb2443d97915559f7ff283841d7aac578685acd7a42",
-          "kind": "documented",
-          "reference": "docs/rust-collaboration-design.md#7"
-        },
-        {
           "detail": "evidence-sha256:fb988f8708eb4b94a819f41a3914b44a9a14cf3188296c55433740d35f09ed4a",
           "kind": "documented",
           "reference": "docs/rust-collaboration-design.md#7"
-        },
-        {
-          "detail": "evidence-sha256:029a7717f5c228a917800def31d05a9655897eed451ca58bdbbb9796ca927136",
-          "kind": "documented",
-          "reference": "docs/trace-architecture.md#7-collector-tempo"
-        },
-        {
-          "detail": "evidence-sha256:08fe26d59eb8a9b4aba2ee77ff84f206bc5a59cd1c42aff9532458469fd002d3",
-          "kind": "documented",
-          "reference": "docs/trace-architecture.md#7-collector-tempo"
-        },
-        {
-          "detail": "evidence-sha256:4b6f4541eadeec2065a2f1f26030d8327d249392d4cc0030265e07b25155358b",
-          "kind": "documented",
-          "reference": "docs/trace-architecture.md#7-collector-tempo"
-        },
-        {
-          "detail": "evidence-sha256:6f8469da75fd7458b41f42abdb86b3058ff3b8095c873349ede521d974462e12",
-          "kind": "documented",
-          "reference": "docs/trace-architecture.md#7-collector-tempo"
-        },
-        {
-          "detail": "evidence-sha256:941a6edecdb39ffe70c789beceea38c86a9cf954994318dbe2a85aab826b6e77",
-          "kind": "documented",
-          "reference": "docs/trace-architecture.md#7-collector-tempo"
-        },
-        {
-          "detail": "evidence-sha256:94ef24230d0ba23b4f6b3cdd84674001709f3ca7ba32ea2c15de9132e746b33a",
-          "kind": "documented",
-          "reference": "docs/trace-architecture.md#7-collector-tempo"
-        },
-        {
-          "detail": "evidence-sha256:9d7763b5126ecbb98d373d98a8e841decd4ac9f9afa3c4503e840629b63a8cb7",
-          "kind": "documented",
-          "reference": "docs/trace-architecture.md#7-collector-tempo"
         },
         {
           "detail": "evidence-sha256:a4a91bf712de2cb1f3ab5eb2443d97915559f7ff283841d7aac578685acd7a42",
@@ -1150,43 +320,13 @@
     },
     {
       "id": "validation.definition-of-done",
-      "revision": 107,
+      "revision": 109,
       "section": "workflows",
       "sources": [
-        {
-          "detail": "evidence-sha256:0b3cbbbb402ab6c19a25056fc7da8d31098075aaa81a50fad5046a644e0f9205",
-          "kind": "documented",
-          "reference": "docs/migrations/2026-08-rust-collaboration.md#section"
-        },
-        {
-          "detail": "evidence-sha256:2e0efd24cb83ee79466c0dc4958a72836f898287d959fd4aa9498964a4dd1081",
-          "kind": "documented",
-          "reference": "docs/migrations/2026-08-rust-collaboration.md#section"
-        },
-        {
-          "detail": "evidence-sha256:6f4866f11b1ab97ecbbcd923b76271f2646b809221c152cf234aee15e66b3e97",
-          "kind": "documented",
-          "reference": "docs/migrations/2026-08-rust-collaboration.md#section"
-        },
         {
           "detail": "evidence-sha256:d9f3d59bee26f2c471bdb47976d0649c51fc825f5fc1cc540d62a7ac1dd92f95",
           "kind": "documented",
           "reference": "docs/migrations/2026-08-rust-collaboration.md#section"
-        },
-        {
-          "detail": "evidence-sha256:0b3cbbbb402ab6c19a25056fc7da8d31098075aaa81a50fad5046a644e0f9205",
-          "kind": "documented",
-          "reference": "docs/rust-collaboration-design.md#7"
-        },
-        {
-          "detail": "evidence-sha256:2e0efd24cb83ee79466c0dc4958a72836f898287d959fd4aa9498964a4dd1081",
-          "kind": "documented",
-          "reference": "docs/rust-collaboration-design.md#7"
-        },
-        {
-          "detail": "evidence-sha256:6f4866f11b1ab97ecbbcd923b76271f2646b809221c152cf234aee15e66b3e97",
-          "kind": "documented",
-          "reference": "docs/rust-collaboration-design.md#7"
         },
         {
           "detail": "evidence-sha256:d9f3d59bee26f2c471bdb47976d0649c51fc825f5fc1cc540d62a7ac1dd92f95",
@@ -1447,7 +587,7 @@
   ],
   "generator": {
     "name": "skill-constructor",
-    "version": "0.4.2"
+    "version": "0.4.3"
   },
   "project": {
     "language": "en",
@@ -1455,11 +595,11 @@
     "profile": "generic",
     "slug": "knowledge-core"
   },
-  "revision": 108,
+  "revision": 109,
   "scan": {
     "fingerprint": "eaf6376cadaade78d5c63d8476220bf5775b7ddb61650e8b1a84f6317bacded5",
     "inventoryCount": 335
   },
   "schemaVersion": 1,
-  "updatedAt": "2026-08-13T10:38:51Z"
+  "updatedAt": "2026-08-13T10:56:57Z"
 }
