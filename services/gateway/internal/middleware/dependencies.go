@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"net"
+	"sync/atomic"
 	"time"
 
 	collaborationv1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/collaboration"
@@ -13,6 +14,7 @@ import (
 	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/knowledge/knowledgeservice"
 	coreauth "github.com/HappyLadySauce/Knowledge-Core/pkg/auth"
 	"github.com/HappyLadySauce/Knowledge-Core/pkg/health"
+	corelog "github.com/HappyLadySauce/Knowledge-Core/pkg/log"
 	"github.com/HappyLadySauce/Knowledge-Core/services/gateway/internal/config"
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/kitex/client/callopt"
@@ -48,12 +50,21 @@ type Dependencies struct {
 	Limiter        RateLimiter
 	Health         *health.Registry
 	Logger         *slog.Logger
+	RequestLogs    *corelog.RequestControl
 	AllowedOrigins map[string]struct{}
 	TrustedProxies []*net.IPNet
 	RateLimit      config.RateLimitOptions
 	Endpoints      config.EndpointOptions
 	Secure         bool
 	Now            func() time.Time
+	dynamic        atomic.Pointer[dynamicConfig]
+}
+
+type dynamicConfig struct {
+	allowedOrigins map[string]struct{}
+	trustedProxies []*net.IPNet
+	rateLimit      config.RateLimitOptions
+	endpoints      config.EndpointOptions
 }
 
 type CollaborationClient interface {
@@ -73,6 +84,7 @@ func NewDependencies(
 	limiter RateLimiter,
 	healthRegistry *health.Registry,
 	logger *slog.Logger,
+	requestLogs *corelog.RequestControl,
 	cors config.CORSOptions,
 	rateLimit config.RateLimitOptions,
 	endpoints config.EndpointOptions,
@@ -98,12 +110,43 @@ func NewDependencies(
 	for _, origin := range cors.AllowedOrigins {
 		allowedOrigins[origin] = struct{}{}
 	}
-	return &Dependencies{
+	dependencies := &Dependencies{
 		Identity: identity, Knowledge: knowledge, Collaboration: collaboration,
-		Verifier: verifier, Limiter: limiter, Health: healthRegistry, Logger: logger,
+		Verifier: verifier, Limiter: limiter, Health: healthRegistry, Logger: logger, RequestLogs: requestLogs,
 		AllowedOrigins: allowedOrigins, TrustedProxies: trustedProxies, RateLimit: rateLimit, Endpoints: endpoints, Secure: secure,
 		Now: time.Now,
-	}, nil
+	}
+	dependencies.dynamic.Store(&dynamicConfig{allowedOrigins: allowedOrigins, trustedProxies: trustedProxies, rateLimit: rateLimit, endpoints: endpoints})
+	return dependencies, nil
+}
+
+func (d *Dependencies) ApplyDynamic(cors config.CORSOptions, rateLimit config.RateLimitOptions, endpoints config.EndpointOptions) error {
+	if err := errors.Join(cors.Validate(), rateLimit.Validate(), endpoints.Validate()); err != nil {
+		return err
+	}
+	trustedProxies, err := cors.ParsedTrustedProxyCIDRs()
+	if err != nil {
+		return err
+	}
+	allowedOrigins := make(map[string]struct{}, len(cors.AllowedOrigins))
+	for _, origin := range cors.AllowedOrigins {
+		allowedOrigins[origin] = struct{}{}
+	}
+	d.dynamic.Store(&dynamicConfig{allowedOrigins: allowedOrigins, trustedProxies: trustedProxies, rateLimit: rateLimit, endpoints: endpoints})
+	return nil
+}
+
+func (d *Dependencies) Dynamic() (map[string]struct{}, []*net.IPNet, config.RateLimitOptions, config.EndpointOptions) {
+	value := d.dynamic.Load()
+	if value == nil {
+		return d.AllowedOrigins, d.TrustedProxies, d.RateLimit, d.Endpoints
+	}
+	return value.allowedOrigins, value.trustedProxies, value.rateLimit, value.endpoints
+}
+
+func (d *Dependencies) EndpointOptions() config.EndpointOptions {
+	_, _, _, endpoints := d.Dynamic()
+	return endpoints
 }
 
 func Inject(dependencies *Dependencies) app.HandlerFunc {

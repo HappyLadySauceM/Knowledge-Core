@@ -12,12 +12,16 @@ import (
 const serviceName = "knowledge"
 
 func knowledgeSpec() coreapp.Spec[config.Config] {
+	provider := config.NewProvider()
 	return coreapp.Spec[config.Config]{
 		Name:           serviceName,
-		Config:         config.NewProvider(),
+		Config:         provider,
 		RuntimeOptions: knowledgeRuntimeOptions,
 		Register: func(ctx context.Context, cfg config.Config, runtime *coreapp.Runtime) error {
-			_, err := servicecontext.NewServiceContext(ctx, cfg, runtime)
+			service, err := servicecontext.NewServiceContext(ctx, cfg, runtime)
+			if err == nil {
+				provider.BindServiceApplier(service.ApplyDynamicConfig)
+			}
 			return err
 		},
 	}

@@ -40,6 +40,7 @@ struct MetricSet {
     config_connected: IntGauge,
     config_last_success: IntGauge,
     config_reloads: IntCounterVec,
+    config_restart_required: IntGauge,
 }
 
 impl Metrics {
@@ -114,6 +115,11 @@ impl Metrics {
             &["outcome"],
         )
         .map_err(metric_error)?;
+        let config_restart_required = IntGauge::with_opts(Opts::new(
+            "config_restart_required",
+            "Whether the latest applied configuration contains startup-only changes.",
+        ))
+        .map_err(metric_error)?;
 
         for collector in [
             Box::new(active_actors.clone()) as Box<dyn prometheus::core::Collector>,
@@ -125,6 +131,7 @@ impl Metrics {
             Box::new(config_connected.clone()),
             Box::new(config_last_success.clone()),
             Box::new(config_reloads.clone()),
+            Box::new(config_restart_required.clone()),
         ] {
             registry.register(collector).map_err(metric_error)?;
         }
@@ -141,6 +148,7 @@ impl Metrics {
                 config_connected,
                 config_last_success,
                 config_reloads,
+                config_restart_required,
             }),
         })
     }
@@ -204,12 +212,21 @@ impl Metrics {
         self.inner.config_connected.set(0);
     }
 
-    pub(crate) fn config_applied(&self) {
+    pub(crate) fn config_applied(&self, restart_required: bool) {
         self.config_success();
         self.inner
             .config_reloads
-            .with_label_values(&["applied"])
+            .with_label_values(&[if restart_required {
+                "applied_restart_required"
+            } else {
+                "applied"
+            }])
             .inc();
+        self.config_restart_required(restart_required);
+    }
+
+    pub(crate) fn config_restart_required(&self, required: bool) {
+        self.inner.config_restart_required.set(i64::from(required));
     }
 
     pub(crate) fn config_rejected(&self) {

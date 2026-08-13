@@ -86,7 +86,7 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 		return nil, err
 	}
 	middlewareDependencies, err := gatewaymiddleware.NewDependencies(
-		identity, knowledge, collaboration, verifier, limiter, runtime.Health, runtime.Logger,
+		identity, knowledge, collaboration, verifier, limiter, runtime.Health, runtime.Logger, runtime.Requests,
 		*cfg.CORS, *cfg.RateLimit, *cfg.Endpoints, cfg.PublicHTTP.TLS.Enabled,
 	)
 	if err != nil {
@@ -112,6 +112,7 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 		runtime.Metrics,
 		runtime.Trace,
 		runtime.Logger,
+		runtime.Requests,
 	)
 	if err != nil {
 		return nil, err
@@ -143,6 +144,13 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 		Config: cfg, Redis: cache, Etcd: resolver, Identity: identity, Knowledge: knowledge, Collaboration: collaboration, Verifier: verifier,
 		Limiter: limiter, Middleware: middlewareDependencies, AdminServer: admin, PublicServer: public,
 	}, nil
+}
+
+func (s *ServiceContext) ApplyDynamicConfig(cfg config.Config) error {
+	if s == nil || s.Middleware == nil {
+		return errors.New("apply gateway dynamic configuration: service context is required")
+	}
+	return s.Middleware.ApplyDynamic(*cfg.CORS, *cfg.RateLimit, *cfg.Endpoints)
 }
 
 func addReadinessChecks(

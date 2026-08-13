@@ -12,12 +12,16 @@ import (
 const serviceName = "gateway"
 
 func gatewaySpec() coreapp.Spec[config.Config] {
+	provider := config.NewProvider()
 	return coreapp.Spec[config.Config]{
 		Name:           serviceName,
-		Config:         config.NewProvider(),
+		Config:         provider,
 		RuntimeOptions: gatewayRuntimeOptions,
 		Register: func(ctx context.Context, cfg config.Config, runtime *coreapp.Runtime) error {
-			_, err := servicecontext.NewServiceContext(ctx, cfg, runtime)
+			service, err := servicecontext.NewServiceContext(ctx, cfg, runtime)
+			if err == nil {
+				provider.BindServiceApplier(service.ApplyDynamicConfig)
+			}
 			return err
 		},
 	}

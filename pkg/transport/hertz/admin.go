@@ -14,6 +14,7 @@ import (
 
 	jsoncodec "github.com/HappyLadySauce/Knowledge-Core/pkg/codec/json"
 	"github.com/HappyLadySauce/Knowledge-Core/pkg/health"
+	corelog "github.com/HappyLadySauce/Knowledge-Core/pkg/log"
 	"github.com/HappyLadySauce/Knowledge-Core/pkg/metadata"
 	"github.com/HappyLadySauce/Knowledge-Core/pkg/metrics"
 	"github.com/HappyLadySauce/Knowledge-Core/pkg/option"
@@ -47,6 +48,7 @@ func NewAdminServer(
 	metricsRegistry *metrics.Registry,
 	telemetry *coretrace.Runtime,
 	logger *slog.Logger,
+	requestLogs *corelog.RequestControl,
 ) (*AdminServer, error) {
 	cfg.ComponentName = strings.TrimSpace(cfg.ComponentName)
 	cfg.LogComponent = strings.TrimSpace(cfg.LogComponent)
@@ -86,7 +88,7 @@ func NewAdminServer(
 	h.Use(
 		coretrace.HertzServerMiddleware(telemetry, isMetricsRequest),
 		metrics.HertzServerMiddleware(metricsRegistry, isMetricsRequest),
-		result.accessLogMiddleware(logger),
+		result.accessLogMiddleware(logger, requestLogs),
 		result.recoveryMiddleware(logger),
 	)
 	h.GET("/livez", healthHandler(healthRegistry.Live))
@@ -167,11 +169,15 @@ func writeStatus(ctx context.Context, request *app.RequestContext, code int, sta
 	request.Data(code, consts.MIMEApplicationJSONUTF8, payload)
 }
 
-func (s *AdminServer) accessLogMiddleware(logger *slog.Logger) app.HandlerFunc {
+func (s *AdminServer) accessLogMiddleware(logger *slog.Logger, requestLogs *corelog.RequestControl) app.HandlerFunc {
 	return func(ctx context.Context, request *app.RequestContext) {
 		started := time.Now()
 		request.Next(ctx)
 		if isMetricsRequest(ctx, request) {
+			return
+		}
+		status := request.Response.StatusCode()
+		if status >= 200 && status < 300 && isHealthRequest(request) && !requestLogs.HealthCheckRequests() {
 			return
 		}
 		logger.InfoContext(ctx, "HTTP request completed",
@@ -183,6 +189,11 @@ func (s *AdminServer) accessLogMiddleware(logger *slog.Logger) app.HandlerFunc {
 			slog.Duration("duration", time.Since(started)),
 		)
 	}
+}
+
+func isHealthRequest(request *app.RequestContext) bool {
+	path := string(request.Request.URI().Path())
+	return path == "/livez" || path == "/readyz"
 }
 
 func (s *AdminServer) recoveryMiddleware(logger *slog.Logger) app.HandlerFunc {

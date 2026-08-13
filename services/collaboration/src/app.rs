@@ -212,31 +212,6 @@ impl Application {
             }
         };
         let mut startup = Startup::new(telemetry);
-        if let Some(remote) = &config.remote {
-            let log_controller = startup
-                .telemetry
-                .as_ref()
-                .ok_or_else(|| {
-                    ServiceError::internal(anyhow::anyhow!(
-                        "telemetry was not retained during application startup"
-                    ))
-                })?
-                .log_controller();
-            match remote
-                .start(
-                    log_controller,
-                    metrics.clone(),
-                    startup.root_cancellation.child_token(),
-                )
-                .await
-            {
-                Ok(runtime) => startup.remote = Some(runtime),
-                Err(error) => {
-                    startup.rollback().await;
-                    return Err(error);
-                }
-            }
-        }
         match Self::assemble(config, metrics, &mut startup).await {
             Ok(application) => Ok(application),
             Err(error) => {
@@ -326,6 +301,38 @@ impl Application {
             .await?,
         );
         startup.public = Some(Arc::clone(&public));
+
+        if let Some(remote) = &config.remote {
+            let log = startup
+                .telemetry
+                .as_ref()
+                .ok_or_else(|| {
+                    ServiceError::internal(anyhow::anyhow!(
+                        "telemetry was not retained during application startup"
+                    ))
+                })?
+                .log_controller();
+            let targets = crate::remote_config::RuntimeTargets {
+                log,
+                startup_log_level: config.telemetry.log_level.clone(),
+                tickets: tickets.clone(),
+                actors: actors.clone(),
+                public: Arc::clone(&public),
+                startup_public: config.public.clone(),
+                startup_ticket: config.ticket.clone(),
+                startup_actor: config.actor.clone(),
+                startup_workers: config.workers.clone(),
+            };
+            startup.remote = Some(
+                remote
+                    .start(
+                        targets,
+                        metrics.clone(),
+                        startup.root_cancellation.child_token(),
+                    )
+                    .await?,
+            );
+        }
 
         let admin = Arc::new(
             AdminServer::start(

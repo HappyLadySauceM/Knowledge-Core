@@ -44,7 +44,7 @@ func handleCreateCollaborationSession(ctx context.Context, request *app.RequestC
 		now = dependencies.Now().UTC()
 	}
 	data, err := toCollaborationSessionData(
-		session, documentID, dependencies.Endpoints.CollaborationWebSocketBaseURL, principal.ExpiresAt, now,
+		session, documentID, dependencies.EndpointOptions().CollaborationWebSocketBaseURL, principal.ExpiresAt, now,
 	)
 	if err != nil {
 		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidUpstreamResponse)

@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/HappyLadySauce/Knowledge-Core/pkg/health"
+	corelog "github.com/HappyLadySauce/Knowledge-Core/pkg/log"
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 )
@@ -29,6 +30,29 @@ func TestHealthHandler(t *testing.T) {
 	healthHandler(registry.Ready)(context.Background(), request)
 	if request.Response.StatusCode() != consts.StatusServiceUnavailable {
 		t.Fatalf("status = %d", request.Response.StatusCode())
+	}
+}
+
+func TestAccessLogSuppressesOnlySuccessfulHealthRequests(t *testing.T) {
+	var output bytes.Buffer
+	server := &AdminServer{logComponent: "test.admin"}
+	logger := slog.New(slog.NewTextHandler(&output, nil))
+	control := corelog.NewRequestControl(false)
+	request := app.NewContext(0)
+	request.Request.SetRequestURI("/livez")
+	request.SetFullPath("/livez")
+	request.SetHandlers(app.HandlersChain{server.accessLogMiddleware(logger, control), func(context.Context, *app.RequestContext) { request.Status(consts.StatusOK) }})
+	request.Next(context.Background())
+	if output.Len() != 0 {
+		t.Fatalf("successful health log was not suppressed: %s", output.String())
+	}
+	request = app.NewContext(0)
+	request.Request.SetRequestURI("/readyz")
+	request.SetFullPath("/readyz")
+	request.SetHandlers(app.HandlersChain{server.accessLogMiddleware(logger, control), func(context.Context, *app.RequestContext) { request.Status(consts.StatusServiceUnavailable) }})
+	request.Next(context.Background())
+	if !strings.Contains(output.String(), "http.status_code=503") {
+		t.Fatalf("failed health log was suppressed: %s", output.String())
 	}
 }
 

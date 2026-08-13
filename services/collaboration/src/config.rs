@@ -3,6 +3,7 @@ use std::{env, net::SocketAddr, path::PathBuf, time::Duration};
 use url::Url;
 
 use crate::{
+    actor::ActorLimits,
     endpoint::validate_socket_endpoint,
     error::{Result, ServiceError},
     remote_config::{RemoteConfig, validate_log_level},
@@ -74,6 +75,7 @@ pub struct AdminConfig {
 #[derive(Clone)]
 pub struct TelemetryConfig {
     pub log_level: String,
+    pub health_check_requests: bool,
     pub otlp_endpoint: Option<Url>,
     pub export_timeout: Duration,
     pub shutdown_timeout: Duration,
@@ -219,13 +221,334 @@ impl Config {
         let mut config = Self::from_environment()?;
         if let Some(remote) = RemoteConfig::load("collaboration").await? {
             let remote_document = remote.document();
-            config
-                .telemetry
-                .log_level
-                .clone_from(&remote_document.log_level);
+            config.apply_remote(&remote_document)?;
             config.remote = Some(remote);
         }
         Ok(config)
+    }
+
+    #[allow(clippy::too_many_lines)]
+    fn apply_remote(&mut self, document: &crate::remote_config::DynamicDocument) -> Result<()> {
+        if env::var_os("COLLABORATION_LOG_LEVEL").is_none() {
+            self.telemetry.log_level.clone_from(&document.log_level);
+        }
+        if env::var_os("COLLABORATION_LOG_HEALTH_CHECK_REQUESTS").is_none() {
+            self.telemetry.health_check_requests = document.health_check_requests;
+        }
+        let Some(overrides) = &document.config else {
+            return Ok(());
+        };
+        if let Some(log) = &overrides.log
+            && env::var_os("COLLABORATION_LOG_LEVEL").is_none()
+        {
+            self.telemetry.log_level.clone_from(&log.level);
+            self.telemetry.health_check_requests = log.health_check_requests;
+        }
+        if env::var_os("COLLABORATION_SHUTDOWN_TIMEOUT_MS").is_none()
+            && let Some(value) = overrides.shutdown_timeout_ms
+        {
+            self.shutdown_timeout = Duration::from_millis(value);
+        }
+        if let Some(value) = &overrides.public {
+            if env::var_os("COLLABORATION_ALLOWED_ORIGINS").is_none()
+                && let Some(origins) = &value.allowed_origins
+            {
+                self.public.allowed_origins.clone_from(origins);
+            }
+            macro_rules! apply {
+                ($field:ident, $env:literal) => {
+                    if env::var_os($env).is_none()
+                        && let Some(value) = value.$field
+                    {
+                        self.public.$field = value;
+                    }
+                };
+            }
+            apply!(max_frame_bytes, "COLLABORATION_MAX_FRAME_BYTES");
+            apply!(max_update_bytes, "COLLABORATION_MAX_UPDATE_BYTES");
+            apply!(max_document_bytes, "COLLABORATION_MAX_DOCUMENT_BYTES");
+            apply!(max_awareness_bytes, "COLLABORATION_MAX_AWARENESS_BYTES");
+            apply!(max_connections, "COLLABORATION_MAX_CONNECTIONS");
+            apply!(
+                max_connections_per_document,
+                "COLLABORATION_MAX_CONNECTIONS_PER_DOCUMENT"
+            );
+            apply!(handshakes_per_second, "COLLABORATION_HANDSHAKES_PER_SECOND");
+            apply!(handshake_burst, "COLLABORATION_HANDSHAKE_BURST");
+            if env::var_os("COLLABORATION_HANDSHAKE_TIMEOUT_MS").is_none()
+                && let Some(value) = value.handshake_timeout_ms
+            {
+                self.public.handshake_timeout = Duration::from_millis(value);
+            }
+        }
+        if let Some(value) = &overrides.ticket
+            && env::var_os("COLLABORATION_TICKET_TTL_MS").is_none()
+            && let Some(value) = value.ttl_ms
+        {
+            self.ticket.ttl = Duration::from_millis(value);
+        }
+        if let Some(value) = &overrides.actor {
+            macro_rules! apply {
+                ($field:ident, $env:literal) => {
+                    if env::var_os($env).is_none()
+                        && let Some(value) = value.$field
+                    {
+                        self.actor.$field = value;
+                    }
+                };
+            }
+            apply!(command_capacity, "COLLABORATION_ACTOR_COMMAND_CAPACITY");
+            apply!(outbound_capacity, "COLLABORATION_OUTBOUND_CAPACITY");
+            apply!(
+                awareness_messages_per_second,
+                "COLLABORATION_AWARENESS_RATE"
+            );
+            apply!(updates_per_second, "COLLABORATION_UPDATE_RATE");
+            if env::var_os("COLLABORATION_ACTOR_IDLE_TIMEOUT_MS").is_none()
+                && let Some(value) = value.idle_timeout_ms
+            {
+                self.actor.idle_timeout = Duration::from_millis(value);
+            }
+            if env::var_os("COLLABORATION_ACTOR_COMMAND_TIMEOUT_MS").is_none()
+                && let Some(value) = value.command_timeout_ms
+            {
+                self.actor.command_timeout = Duration::from_millis(value);
+            }
+        }
+        if let Some(value) = &overrides.workers {
+            macro_rules! duration {
+                ($field:ident, $source:ident, $env:literal) => {
+                    if env::var_os($env).is_none()
+                        && let Some(value) = value.$source
+                    {
+                        self.workers.$field = Duration::from_millis(value);
+                    }
+                };
+            }
+            duration!(
+                poll_interval,
+                poll_interval_ms,
+                "COLLABORATION_WORKER_POLL_MS"
+            );
+            duration!(
+                operation_timeout,
+                operation_timeout_ms,
+                "COLLABORATION_WORKER_TIMEOUT_MS"
+            );
+            duration!(
+                projection_lease,
+                projection_lease_ms,
+                "COLLABORATION_PROJECTION_LEASE_MS"
+            );
+            duration!(
+                automatic_version_interval,
+                automatic_version_interval_ms,
+                "COLLABORATION_AUTOMATIC_VERSION_INTERVAL_MS"
+            );
+            if env::var_os("COLLABORATION_SNAPSHOT_UPDATE_THRESHOLD").is_none()
+                && let Some(v) = value.snapshot_update_threshold
+            {
+                self.workers.snapshot_update_threshold = v;
+            }
+            if env::var_os("COLLABORATION_SNAPSHOT_BYTE_THRESHOLD").is_none()
+                && let Some(v) = value.snapshot_byte_threshold
+            {
+                self.workers.snapshot_byte_threshold = v;
+            }
+            if env::var_os("COLLABORATION_OUTBOX_BATCH_SIZE").is_none()
+                && let Some(v) = value.outbox_batch_size
+            {
+                self.workers.outbox_batch_size = v;
+            }
+        }
+        if let Some(value) = &overrides.rpc {
+            if env::var_os("COLLABORATION_RPC_ADDRESS").is_none()
+                && let Some(raw) = &value.address
+            {
+                self.rpc.address = raw.parse().map_err(|error| {
+                    ServiceError::invalid_input("Nacos rpc.address must be an IP socket address")
+                        .with_source(error)
+                })?;
+            }
+            if env::var_os("COLLABORATION_RPC_ADVERTISED_ADDRESS").is_none()
+                && let Some(raw) = &value.advertised_address
+            {
+                validate_socket_endpoint(raw).map_err(|error| {
+                    ServiceError::invalid_input("Nacos rpc.advertised_address must be host:port")
+                        .with_source(error)
+                })?;
+                self.rpc.advertised_address.clone_from(raw);
+            }
+            if env::var_os("COLLABORATION_RPC_SERVICE_NAME").is_none()
+                && let Some(raw) = &value.service_name
+            {
+                self.rpc.service_name = required("Nacos rpc.service_name", raw)?;
+            }
+            if env::var_os("COLLABORATION_RPC_REQUEST_TIMEOUT_MS").is_none()
+                && let Some(v) = value.request_timeout_ms
+            {
+                self.rpc.request_timeout = Duration::from_millis(v);
+            }
+        }
+        if let Some(value) = &overrides.admin {
+            if env::var_os("COLLABORATION_ADMIN_ADDRESS").is_none()
+                && let Some(raw) = &value.address
+            {
+                self.admin.address = raw.parse().map_err(|error| {
+                    ServiceError::invalid_input("Nacos admin.address must be an IP socket address")
+                        .with_source(error)
+                })?;
+            }
+            if env::var_os("COLLABORATION_ADMIN_REQUEST_TIMEOUT_MS").is_none()
+                && let Some(v) = value.request_timeout_ms
+            {
+                self.admin.request_timeout = Duration::from_millis(v);
+            }
+        }
+        if let Some(value) = &overrides.telemetry {
+            if env::var_os("COLLABORATION_OTLP_ENDPOINT").is_none()
+                && let Some(raw) = &value.otlp_endpoint
+            {
+                self.telemetry.otlp_endpoint = Some(parse_url(
+                    "Nacos telemetry.otlp_endpoint",
+                    raw,
+                    &["http", "https"],
+                    false,
+                )?);
+            }
+            if env::var_os("COLLABORATION_OTLP_EXPORT_TIMEOUT_MS").is_none()
+                && let Some(v) = value.export_timeout_ms
+            {
+                self.telemetry.export_timeout = Duration::from_millis(v);
+            }
+            if env::var_os("COLLABORATION_TELEMETRY_SHUTDOWN_TIMEOUT_MS").is_none()
+                && let Some(v) = value.shutdown_timeout_ms
+            {
+                self.telemetry.shutdown_timeout = Duration::from_millis(v);
+            }
+        }
+        if let Some(value) = &overrides.postgres {
+            if env::var_os("COLLABORATION_POSTGRES_MAX_CONNECTIONS").is_none()
+                && let Some(v) = value.max_connections
+            {
+                self.postgres.max_connections = v;
+            }
+            if env::var_os("COLLABORATION_POSTGRES_CONNECT_TIMEOUT_MS").is_none()
+                && let Some(v) = value.connect_timeout_ms
+            {
+                self.postgres.connect_timeout = Duration::from_millis(v);
+            }
+            if env::var_os("COLLABORATION_POSTGRES_ACQUIRE_TIMEOUT_MS").is_none()
+                && let Some(v) = value.acquire_timeout_ms
+            {
+                self.postgres.acquire_timeout = Duration::from_millis(v);
+            }
+            if env::var_os("COLLABORATION_POSTGRES_OPERATION_TIMEOUT_MS").is_none()
+                && let Some(v) = value.operation_timeout_ms
+            {
+                self.postgres.operation_timeout = Duration::from_millis(v);
+            }
+        }
+        if let Some(value) = &overrides.redis {
+            if env::var_os("COLLABORATION_REDIS_PREFIX").is_none()
+                && let Some(raw) = &value.prefix
+            {
+                self.redis.prefix = required("Nacos redis.prefix", raw)?;
+            }
+            if env::var_os("COLLABORATION_REDIS_OPERATION_TIMEOUT_MS").is_none()
+                && let Some(v) = value.operation_timeout_ms
+            {
+                self.redis.operation_timeout = Duration::from_millis(v);
+            }
+        }
+        if let Some(value) = &overrides.nats {
+            if env::var_os("COLLABORATION_NATS_SERVERS").is_none()
+                && let Some(servers) = &value.servers
+            {
+                for server in servers {
+                    parse_url("Nacos nats.servers", server, &["nats", "tls"], false)?;
+                }
+                self.nats.servers.clone_from(servers);
+            }
+            macro_rules! text {
+                ($field:ident, $env:literal) => {
+                    if env::var_os($env).is_none()
+                        && let Some(raw) = &value.$field
+                    {
+                        self.nats.$field =
+                            required(concat!("Nacos nats.", stringify!($field)), raw)?;
+                    }
+                };
+            }
+            text!(name, "COLLABORATION_NATS_NAME");
+            text!(stream, "COLLABORATION_NATS_STREAM");
+            text!(permission_stream, "COLLABORATION_NATS_PERMISSION_STREAM");
+            text!(update_subject, "COLLABORATION_NATS_UPDATE_SUBJECT");
+            text!(
+                invalidation_subject,
+                "COLLABORATION_NATS_INVALIDATION_SUBJECT"
+            );
+            text!(permission_subject, "COLLABORATION_NATS_PERMISSION_SUBJECT");
+            if env::var_os("COLLABORATION_NATS_CONNECT_TIMEOUT_MS").is_none()
+                && let Some(v) = value.connect_timeout_ms
+            {
+                self.nats.connect_timeout = Duration::from_millis(v);
+            }
+            if env::var_os("COLLABORATION_NATS_OPERATION_TIMEOUT_MS").is_none()
+                && let Some(v) = value.operation_timeout_ms
+            {
+                self.nats.operation_timeout = Duration::from_millis(v);
+            }
+        }
+        if let Some(value) = &overrides.etcd {
+            if env::var_os("COLLABORATION_ETCD_ENDPOINTS").is_none()
+                && let Some(endpoints) = &value.endpoints
+            {
+                for endpoint in endpoints {
+                    parse_url("Nacos etcd.endpoints", endpoint, &["http", "https"], false)?;
+                }
+                self.etcd.endpoints.clone_from(endpoints);
+            }
+            if env::var_os("COLLABORATION_ETCD_PREFIX").is_none()
+                && let Some(raw) = &value.prefix
+            {
+                self.etcd.prefix = required("Nacos etcd.prefix", raw)?;
+            }
+            if env::var_os("COLLABORATION_ETCD_CONNECT_TIMEOUT_MS").is_none()
+                && let Some(v) = value.connect_timeout_ms
+            {
+                self.etcd.connect_timeout = Duration::from_millis(v);
+            }
+            if env::var_os("COLLABORATION_ETCD_REQUEST_TIMEOUT_MS").is_none()
+                && let Some(v) = value.request_timeout_ms
+            {
+                self.etcd.request_timeout = Duration::from_millis(v);
+            }
+            if env::var_os("COLLABORATION_ETCD_LEASE_TTL_MS").is_none()
+                && let Some(v) = value.lease_ttl_ms
+            {
+                self.etcd.lease_ttl = Duration::from_millis(v);
+            }
+        }
+        if let Some(value) = &overrides.knowledge {
+            if env::var_os("COLLABORATION_KNOWLEDGE_SERVICE_NAME").is_none()
+                && let Some(raw) = &value.service_name
+            {
+                self.knowledge.service_name = required("Nacos knowledge.service_name", raw)?;
+            }
+            if env::var_os("COLLABORATION_KNOWLEDGE_REQUEST_TIMEOUT_MS").is_none()
+                && let Some(v) = value.request_timeout_ms
+            {
+                self.knowledge.request_timeout = Duration::from_millis(v);
+            }
+        }
+        validate_log_level(&self.telemetry.log_level)?;
+        ActorLimits::from_config(&self.actor, &self.public)?;
+        self.nats.validate_protocol_contract()?;
+        if self.ticket.ttl.is_zero() || self.ticket.ttl > Duration::from_millis(MAX_TICKET_TTL_MS) {
+            return Err(ServiceError::invalid_input("ticket TTL is invalid"));
+        }
+        Ok(())
     }
 
     /// Loads and strictly validates the complete Collaboration process configuration.
@@ -605,6 +928,7 @@ fn telemetry_config(environment: Environment) -> Result<TelemetryConfig> {
     }
     Ok(TelemetryConfig {
         log_level,
+        health_check_requests: boolean("COLLABORATION_LOG_HEALTH_CHECK_REQUESTS", true)?,
         otlp_endpoint,
         export_timeout: duration("COLLABORATION_OTLP_EXPORT_TIMEOUT_MS", 5_000, 100, 60_000)?,
         shutdown_timeout: duration(

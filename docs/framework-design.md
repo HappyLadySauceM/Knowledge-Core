@@ -208,16 +208,18 @@ Collaboration 使用按版本有序执行并逐项校验 checksum 的显式 SQLx
 Go 服务分别使用 `IDENTITY_`、`KNOWLEDGE_`、`GATEWAY_` 环境变量前缀。配置优先级为：
 
 ```text
-默认值 < 严格 YAML < 环境变量
+默认值 < 严格 YAML < Nacos ApplicationConfig < 环境变量
 ```
 
 每个命令持有独立 Cobra flag set 和 Viper 实例，YAML 严格拒绝未知字段。配置文件只保存非敏感值；password、DSN、JWT key、对象存储凭据、NATS/Redis 认证材料只能由环境变量或部署平台 Secret manager 注入。
 
-Collaboration 完全通过 `COLLABORATION_*` 环境变量配置，数值、URL、Origin、认证组合和 TLS 文件在启动前严格校验。
+Collaboration 的静态基线来自默认值，Nacos 可覆盖非敏感应用字段，`COLLABORATION_*` 环境变量保持最高优先级；数值、URL、Origin、认证组合和 TLS 文件在启动前严格校验。
 
-四个服务可通过 `KNOWLEDGE_CORE_NACOS_*` 启用 Nacos `3.2.3` 动态配置。bootstrap 严格要求 HTTPS endpoint、namespace/group/data ID、每服务 reader 凭据、CA 文件、key ID 和 32-byte KEK；Go 与 Rust 使用同一 AES-256-GCM 信封和坐标 AAD。Rust SDK 的 gRPC 与 native-tls HTTP 路径必须分别通过 `NACOS_CLIENT_TLS_CA_CERT` 和 `SSL_CERT_FILE` 指向同一 CA，且 `HOME/nacos` 必须等于挂载的 `KNOWLEDGE_CORE_NACOS_RUNTIME_DIR`，启动会在连接前校验并创建 SDK cache 目录。初始配置获取失败会阻断启动，运行中失联保留 last-good 并告警，恢复后继续监听/轮询。当前动态文档只实现原子日志级别更新，依赖池和监听地址仍由静态 YAML/环境变量装配，不得描述为已经支持热换。
+四个服务可通过 `KNOWLEDGE_CORE_NACOS_*` 启用 Nacos `3.2.3` 动态配置。bootstrap 严格要求 HTTPS endpoint、namespace/group/data ID、每服务 reader 凭据、CA 文件、key ID 和 32-byte KEK；Go 与 Rust 使用同一 AES-256-GCM 信封和坐标 AAD。Rust SDK 的 gRPC 与 native-tls HTTP 路径必须分别通过 `NACOS_CLIENT_TLS_CA_CERT` 和 `SSL_CERT_FILE` 指向同一 CA，且 `HOME/nacos` 必须等于挂载的 `KNOWLEDGE_CORE_NACOS_RUNTIME_DIR`，启动会在连接前校验并创建 SDK cache 目录。初始配置获取失败会阻断启动，运行中失联保留 last-good 并告警，恢复后继续监听/轮询。
 
-k3s 中 Nacos 部署在 `nacos` namespace，HTTP/gRPC 使用现有 `happyladysauce-ca` 签发的 TLS 证书，并复用已有 PostgreSQL 服务中的独立 `nacos` database。唯一应用环境使用 Nacos namespace `dev`，每个服务只读自己的 `<service>.dynamic.yaml`。应用 namespace 通过只含公共证书的 ConfigMap 挂载 CA；TLS 私钥不跨 namespace 复制。
+Nacos Data ID 继续使用 `<service>.dynamic.yaml`。新格式为 `knowledge-core.io/v1beta1/ApplicationConfig`，包含 `service`、单调递增 `revision` 和严格的 `config` 映射；旧 `v1alpha1/DynamicConfig` 日志级别文档在迁移期仍可读取。每次修订先完整解密、严格解码、服务绑定和配置校验，任一字段无效会整体拒绝并保留 last-good。日志级别与 `log.health_check_requests` 原子更新；关闭后只抑制成功的 `/livez`、`/readyz`、Gateway `/health/live`、`/health/ready` 以及 Go RPC `Ping`/`Live` 完成日志，失败、业务错误、非 2xx 和 panic 仍记录。Gateway 的 Origin/可信代理/限流/公开端点，Identity 的 bcrypt/新 token TTL/登录锁定策略，Knowledge 的预签名 TTL/ClamAV 限制/worker 时序，以及 Collaboration 的 Origin/握手限流/ticket TTL/新 actor 限制可在线更新。监听地址、连接池、凭据、固定容量和 worker 拓扑等启动期变化不重建依赖，而通过 `knowledge_core_config_restart_required`（Rust 为 `knowledge_core_collaboration_config_restart_required`）和有界字段名日志报告需重启；同一修订中的安全字段仍生效。
+
+k3s 中 Nacos 部署在 `nacos` namespace，HTTP/gRPC 使用现有 `happyladysauce-ca` 签发的 TLS 证书，并复用已有 PostgreSQL 服务中的独立 `nacos` database。唯一应用环境使用 Nacos namespace `dev`，每个服务只读自己的 `<service>.dynamic.yaml`。应用 namespace 通过只含公共证书的 ConfigMap 挂载 CA；TLS 私钥不跨 namespace 复制。发布必须使用独立运维 writer 身份，只授予 `dev/KNOWLEDGE_CORE/<service>.dynamic.yaml` 的写权限，禁止复用应用 reader 或 Nacos 管理员。明文模板位于 `deploy/nacos/`，只包含非敏感配置；`configctl validate/encrypt --service <service>` 在发布前校验服务绑定，实际凭据和 KEK 仅从受控 Secret/环境注入。
 
 k3s 的项目 PostgreSQL database 为 `knowledge_core_dev`。Identity、Knowledge、Collaboration 使用独立 role 和各自拥有的 schema；由于当前启动 migration 会幂等执行 `CREATE SCHEMA IF NOT EXISTS`，三个 role 需要该 database 的 `CONNECT,CREATE`，但不获得其他 schema 的对象权限。Etcd readiness 使用项目已授权 registry prefix 的有界 range read 验证 TLS、认证与权限，不调用只允许 root 的 Maintenance/Status。
 

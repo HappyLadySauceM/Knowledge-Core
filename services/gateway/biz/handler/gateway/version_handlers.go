@@ -71,7 +71,7 @@ func handleCreateVersion(ctx context.Context, request *app.RequestContext) {
 		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidUpstreamResponse)
 		return
 	}
-	request.Header("Location", endpointURL(dependencies.Endpoints, "/api/v1/studio/documents/"+url.PathEscape(documentID)+"/versions/"+url.PathEscape(data.ID)))
+	request.Header("Location", endpointURL(dependencies.EndpointOptions(), "/api/v1/studio/documents/"+url.PathEscape(documentID)+"/versions/"+url.PathEscape(data.ID)))
 	writeJSON(ctx, request, consts.StatusCreated, data)
 }
 
@@ -132,7 +132,7 @@ func handleRestoreVersion(ctx context.Context, request *app.RequestContext) {
 		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidUpstreamResponse)
 		return
 	}
-	request.Header("Location", endpointURL(dependencies.Endpoints, "/api/v1/studio/documents/"+url.PathEscape(documentID)+"/versions/"+url.PathEscape(data.ID)))
+	request.Header("Location", endpointURL(dependencies.EndpointOptions(), "/api/v1/studio/documents/"+url.PathEscape(documentID)+"/versions/"+url.PathEscape(data.ID)))
 	writeJSON(ctx, request, consts.StatusCreated, data)
 }
 

@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"sync"
 	"time"
 
 	coreapp "github.com/HappyLadySauce/Knowledge-Core/pkg/app"
@@ -17,6 +18,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
+	"gopkg.in/yaml.v3"
 )
 
 const envPrefix = "IDENTITY"
@@ -32,6 +34,11 @@ type Provider struct {
 	configFile string
 	flagsAdded bool
 	remote     *configcenter.Manager
+	mu         sync.Mutex
+	current    Config
+	baseline   Config
+	startup    Config
+	apply      func(Config) error
 }
 
 func NewProvider() *Provider {
@@ -97,13 +104,20 @@ func (p *Provider) Load(ctx context.Context, command *cobra.Command) (Config, er
 	if err != nil {
 		return Config{}, fmt.Errorf("load identity dynamic configuration: %w", err)
 	}
+	baseline := loaded
 	if document != nil {
-		loaded.Log.Level = document.Log.Level
+		loaded, _, err = applyDocument(loaded, baseline, loaded, *document)
+		if err != nil {
+			return Config{}, err
+		}
 	}
 	if err := loaded.Validate(); err != nil {
 		return Config{}, err
 	}
 	p.remote = remote
+	p.current = loaded
+	p.baseline = baseline
+	p.startup = loaded
 	return loaded, nil
 }
 
@@ -114,15 +128,107 @@ func (p *Provider) BindRuntime(ctx context.Context, runtime *coreapp.Runtime) er
 	if p.remote == nil || !p.remote.Enabled() {
 		return nil
 	}
+	if p.apply == nil {
+		return fmt.Errorf("bind identity runtime configuration: service applier is required")
+	}
 	return p.remote.Start(
 		ctx,
 		runtime.Logger,
 		runtime.Metrics.Registerer(),
-		func(document configcenter.DynamicDocument) error {
-			return runtime.SetLogLevel(document.Log.Level)
+		func(document configcenter.DynamicDocument) (configcenter.ApplyResult, error) {
+			p.mu.Lock()
+			candidate, result, err := applyDocument(p.current, p.baseline, p.startup, document)
+			if err != nil {
+				p.mu.Unlock()
+				return result, err
+			}
+			if err := runtime.SetLogLevel(candidate.Log.Level); err != nil {
+				p.mu.Unlock()
+				return result, err
+			}
+			runtime.SetHealthCheckRequestLogs(candidate.Log.HealthCheckRequests)
+			if err := p.apply(candidate); err != nil {
+				p.mu.Unlock()
+				return result, err
+			}
+			p.current = candidate
+			p.mu.Unlock()
+			return result, nil
 		},
 		runtime.AddCleanup,
 	)
+}
+
+func (p *Provider) BindServiceApplier(apply func(Config) error) { p.apply = apply }
+
+func applyDocument(current, baseline, startup Config, document configcenter.DynamicDocument) (Config, configcenter.ApplyResult, error) {
+	result := configcenter.ApplyResult{}
+	candidate, err := cloneConfig(baseline)
+	if err != nil {
+		return Config{}, result, err
+	}
+	if err := document.ValidateApplication("identity", "app.version", "auth.private_key", "auth.public_key", "postgres.dsn", "postgres.password", "redis.username", "redis.password", "etcd.username", "etcd.password", "trace.headers", "trace.tls.key_file", "rpc.tls.key_file", "http.tls.key_file"); err != nil {
+		return Config{}, result, err
+	}
+	if document.Legacy() {
+		candidate, err = cloneConfig(current)
+		if err != nil {
+			return Config{}, result, err
+		}
+		candidate.Log.Level = document.Log.Level
+	} else {
+		contents, err := yaml.Marshal(document.Config)
+		if err != nil {
+			return Config{}, result, fmt.Errorf("encode identity dynamic configuration: %w", err)
+		}
+		decoder := yaml.NewDecoder(bytes.NewReader(contents))
+		decoder.KnownFields(true)
+		if err := decoder.Decode(&candidate); err != nil {
+			return Config{}, result, fmt.Errorf("apply identity dynamic configuration: %w", err)
+		}
+	}
+	candidate, err = applyEnvironmentOverrides(candidate)
+	if err != nil {
+		return Config{}, result, err
+	}
+	if err := candidate.Validate(); err != nil {
+		return Config{}, result, fmt.Errorf("validate identity dynamic configuration: %w", err)
+	}
+	result.RestartRequiredFields = configcenter.RestartRequiredFields(startup, candidate,
+		"log.level", "log.health_check_requests", "bcrypt.cost", "auth.access_token_ttl", "auth.failure_threshold", "auth.lock_duration")
+	return candidate, result, nil
+}
+
+func cloneConfig(source Config) (Config, error) {
+	contents, err := yaml.Marshal(source)
+	if err != nil {
+		return Config{}, fmt.Errorf("clone identity configuration: %w", err)
+	}
+	clone := New()
+	decoder := yaml.NewDecoder(bytes.NewReader(contents))
+	decoder.KnownFields(true)
+	if err := decoder.Decode(&clone); err != nil {
+		return Config{}, fmt.Errorf("clone identity configuration: %w", err)
+	}
+	return clone, nil
+}
+
+func applyEnvironmentOverrides(base Config) (Config, error) {
+	v := viper.New()
+	v.SetEnvPrefix(envPrefix)
+	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_", "-", "_"))
+	v.AllowEmptyEnv(true)
+	setDefaults(v, reflect.ValueOf(base), "")
+	for _, key := range configurationKeys(reflect.ValueOf(base), "") {
+		if err := v.BindEnv(key); err != nil {
+			return Config{}, fmt.Errorf("bind identity environment variable for %q: %w", key, err)
+		}
+	}
+	loaded := New()
+	if err := v.UnmarshalExact(&loaded, viper.DecodeHook(configurationDecodeHook())); err != nil {
+		return Config{}, fmt.Errorf("decode identity environment overrides: %w", err)
+	}
+	return loaded, nil
 }
 
 func readYAMLConfig(v *viper.Viper, path string) error {

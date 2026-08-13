@@ -32,13 +32,18 @@ type Manager struct {
 	close   sync.Once
 	logger  *slog.Logger
 	metrics managerMetrics
-	apply   func(DynamicDocument) error
+	apply   func(DynamicDocument) (ApplyResult, error)
 }
 
 type managerMetrics struct {
-	connected   prometheus.Gauge
-	lastSuccess prometheus.Gauge
-	reloads     *prometheus.CounterVec
+	connected       prometheus.Gauge
+	lastSuccess     prometheus.Gauge
+	reloads         *prometheus.CounterVec
+	restartRequired prometheus.Gauge
+}
+
+type ApplyResult struct {
+	RestartRequiredFields []string
 }
 
 func NewManager(bootstrap Bootstrap) *Manager {
@@ -113,7 +118,7 @@ func (m *Manager) Start(
 	ctx context.Context,
 	logger *slog.Logger,
 	registerer prometheus.Registerer,
-	apply func(DynamicDocument) error,
+	apply func(DynamicDocument) (ApplyResult, error),
 	registerCleanup CleanupRegistrar,
 ) error {
 	if !m.Enabled() {
@@ -255,27 +260,38 @@ func (m *Manager) applyDocument(document DynamicDocument) error {
 			return fmt.Errorf("reject dynamic configuration revision rollback from %d to %d", current.Revision, document.Revision)
 		}
 		if document.Revision == current.Revision {
-			if document.Log.Level != current.Log.Level {
+			if !document.Equal(*current) {
 				return fmt.Errorf("reject conflicting dynamic configuration revision %d", document.Revision)
 			}
 			m.markSuccess()
 			return nil
 		}
 	}
-	if err := m.apply(document); err != nil {
+	result, err := m.apply(document)
+	if err != nil {
 		return err
 	}
 	copy := document
 	m.current.Store(&copy)
 	m.markSuccess()
 	if m.metrics.reloads != nil {
-		m.metrics.reloads.WithLabelValues("applied").Inc()
+		outcome := "applied"
+		if len(result.RestartRequiredFields) != 0 {
+			outcome = "applied_restart_required"
+		}
+		m.metrics.reloads.WithLabelValues(outcome).Inc()
+		if len(result.RestartRequiredFields) == 0 {
+			m.metrics.restartRequired.Set(0)
+		} else {
+			m.metrics.restartRequired.Set(1)
+		}
 	}
 	if m.logger != nil {
 		m.logger.Info("dynamic configuration applied",
 			slog.String("component", "config.nacos"),
 			slog.String("event", "reload"),
 			slog.Uint64("revision", document.Revision),
+			slog.Any("restart_required_fields", result.RestartRequiredFields),
 		)
 	}
 	return nil
@@ -347,8 +363,14 @@ func newManagerMetrics(registerer prometheus.Registerer) (managerMetrics, error)
 			Name:      "reloads_total",
 			Help:      "Dynamic configuration reload outcomes.",
 		}, []string{"outcome"}),
+		restartRequired: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: "knowledge_core",
+			Subsystem: "config",
+			Name:      "restart_required",
+			Help:      "Whether the latest applied configuration contains startup-only changes.",
+		}),
 	}
-	collectors := []prometheus.Collector{metrics.connected, metrics.lastSuccess, metrics.reloads}
+	collectors := []prometheus.Collector{metrics.connected, metrics.lastSuccess, metrics.reloads, metrics.restartRequired}
 	for index, collector := range collectors {
 		if err := registerer.Register(collector); err != nil {
 			for _, registered := range collectors[:index] {

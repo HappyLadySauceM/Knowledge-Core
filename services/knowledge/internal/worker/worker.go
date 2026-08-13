@@ -59,6 +59,7 @@ type DocumentPurger interface {
 
 type Worker struct {
 	options       config.WorkerOptions
+	dynamic       atomic.Pointer[config.WorkerOptions]
 	repository    Repository
 	objects       ObjectStore
 	scanner       Scanner
@@ -114,11 +115,13 @@ func newWorker(
 	// Register is bounded by the application startup deadline. The worker owns
 	// its longer lifetime and is stopped explicitly through Shutdown.
 	runContext, cancel := context.WithCancel(context.WithoutCancel(ctx))
-	return &Worker{
+	worker := &Worker{
 		options: options, repository: repository, objects: objects, scanner: scanner,
 		publisher: publisher, collaboration: collaboration, wakeSource: wakeSource, logger: logger,
 		runContext: runContext, cancel: cancel, ready: make(chan struct{}), done: make(chan struct{}),
-	}, nil
+	}
+	worker.SetOptions(options)
+	return worker, nil
 }
 
 func (w *Worker) Name() string { return componentName }
@@ -152,7 +155,7 @@ func (w *Worker) Serve() error {
 	defer listenDone.Wait()
 
 	w.runOnce()
-	ticker := time.NewTicker(w.options.PollInterval)
+	ticker := time.NewTicker(w.currentOptions().PollInterval)
 	defer ticker.Stop()
 	for {
 		select {
@@ -160,10 +163,25 @@ func (w *Worker) Serve() error {
 			return nil
 		case <-ticker.C:
 			w.runOnce()
+			ticker.Reset(w.currentOptions().PollInterval)
 		case <-signal:
 			w.drainWake()
 		}
 	}
+}
+
+func (w *Worker) SetOptions(options config.WorkerOptions) {
+	if w != nil {
+		copy := options
+		w.dynamic.Store(&copy)
+	}
+}
+
+func (w *Worker) currentOptions() config.WorkerOptions {
+	if options := w.dynamic.Load(); options != nil {
+		return *options
+	}
+	return w.options
 }
 
 func (w *Worker) queueWake(kind WakeKind) {
@@ -230,7 +248,7 @@ func (w *Worker) runOnce() {
 }
 
 func (w *Worker) runBounded(operation string, run func(context.Context) error) {
-	ctx, cancel := context.WithTimeout(w.runContext, w.options.OperationTimeout)
+	ctx, cancel := context.WithTimeout(w.runContext, w.currentOptions().OperationTimeout)
 	defer cancel()
 	if err := run(ctx); err != nil && !errors.Is(err, context.Canceled) {
 		w.logger.WarnContext(ctx, "knowledge background operation failed",
@@ -244,7 +262,7 @@ func (w *Worker) runBounded(operation string, run func(context.Context) error) {
 
 func (w *Worker) processOutbox(ctx context.Context) error {
 	probeCtx := coretrace.Suppress(ctx)
-	messages, err := w.repository.ClaimOutbox(probeCtx, 50, w.options.OperationTimeout)
+	messages, err := w.repository.ClaimOutbox(probeCtx, 50, w.currentOptions().OperationTimeout)
 	if err != nil {
 		return err
 	}
@@ -280,7 +298,7 @@ func (w *Worker) processAttachments(ctx context.Context) error {
 	if err := w.repository.QueueExpiredUploads(probeCtx, 100); err != nil {
 		return err
 	}
-	jobs, err := w.repository.ClaimAttachmentJobs(probeCtx, 10, w.options.OperationTimeout)
+	jobs, err := w.repository.ClaimAttachmentJobs(probeCtx, 10, w.currentOptions().OperationTimeout)
 	if err != nil {
 		return err
 	}

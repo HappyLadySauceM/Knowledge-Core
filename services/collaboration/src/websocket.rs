@@ -9,6 +9,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+use arc_swap::ArcSwap;
 use axum::{
     Router,
     body::Body,
@@ -104,13 +105,13 @@ impl Extractor for InboundPropagation {
 
 #[derive(Clone)]
 struct PublicState {
-    config: Arc<PublicConfig>,
+    config: Arc<ArcSwap<PublicConfig>>,
     subprotocol: Arc<str>,
     tickets: TicketService,
     actors: ActorRegistry,
     metrics: Metrics,
     connections: Arc<Semaphore>,
-    handshake_limiter: HandshakeLimiter,
+    handshake_limiter: Arc<ArcSwap<HandshakeLimiter>>,
     accepting: Arc<AtomicBool>,
     health: HealthState,
     connection_tasks: ConnectionTasks,
@@ -258,13 +259,13 @@ impl WebSocketServer {
         let handshake_limiter =
             HandshakeLimiter::new(public.handshakes_per_second, public.handshake_burst)?;
         let state = PublicState {
-            config: Arc::new(public.clone()),
+            config: Arc::new(ArcSwap::from_pointee(public.clone())),
             subprotocol: Arc::from(ticket.subprotocol.as_str()),
             tickets,
             actors,
             metrics,
             connections: Arc::new(Semaphore::new(public.max_connections)),
-            handshake_limiter,
+            handshake_limiter: Arc::new(ArcSwap::from_pointee(handshake_limiter)),
             accepting: Arc::new(AtomicBool::new(false)),
             health,
             connection_tasks,
@@ -305,6 +306,13 @@ impl WebSocketServer {
 
     pub fn stop_accepting(&self) {
         self.state.accepting.store(false, Ordering::Release);
+    }
+
+    pub(crate) fn apply_dynamic(&self, public: &PublicConfig) -> Result<()> {
+        let limiter = HandshakeLimiter::new(public.handshakes_per_second, public.handshake_burst)?;
+        self.state.config.store(Arc::new(public.clone()));
+        self.state.handshake_limiter.store(Arc::new(limiter));
+        Ok(())
     }
 
     /// Enables upgrades after all process dependencies have passed readiness checks.
@@ -392,26 +400,27 @@ async fn upgrade(
     let Ok(document_id) = DocumentId::parse(&document_id) else {
         return reject(&state.metrics, HttpReject::BadRequest);
     };
-    if !valid_origin(&headers, &state.config.allowed_origins) {
+    let config = state.config.load_full();
+    if !valid_origin(&headers, &config.allowed_origins) {
         return reject(&state.metrics, HttpReject::Forbidden);
     }
     let ticket = match requested_ticket(&websocket, &state.subprotocol) {
         Ok(ticket) => ticket,
         Err(rejection) => return reject(&state.metrics, rejection),
     };
-    if !state.handshake_limiter.allow() {
+    if !state.handshake_limiter.load().allow() {
         return reject(&state.metrics, HttpReject::RateLimited);
     }
     let Ok(permit) = Arc::clone(&state.connections).try_acquire_owned() else {
         return reject(&state.metrics, HttpReject::RateLimited);
     };
     let context = handshake_context(
-        state.config.handshake_timeout,
+        config.handshake_timeout,
         Arc::clone(&propagation.request_id),
         &propagation,
     );
     let authorization = tokio::time::timeout(
-        state.config.handshake_timeout,
+        config.handshake_timeout,
         authorize(&state, &context, document_id, &ticket),
     )
     .await;
@@ -422,8 +431,8 @@ async fn upgrade(
     };
     state.metrics.handshake("accepted");
     let protocol = state.subprotocol.to_string();
-    let maximum_frame_bytes = state.config.max_frame_bytes;
-    let write_timeout = state.config.handshake_timeout;
+    let maximum_frame_bytes = config.max_frame_bytes;
+    let write_timeout = config.handshake_timeout;
     let cancellation = state.cancellation.child_token();
     let connection_tasks = state.connection_tasks.clone();
     websocket

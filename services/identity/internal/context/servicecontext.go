@@ -31,6 +31,8 @@ type ServiceContext struct {
 	Etcd         *etcdresource.Resources
 	Register     *identitylogic.RegisterLogic
 	Authenticate *identitylogic.AuthenticateLogic
+	Hasher       *security.BcryptHasher
+	Issuer       *coreauth.Issuer
 	GetUser      *identitylogic.GetUserLogic
 	RPCHandler   *identityrpc.Handler
 	RPCServer    *identityrpc.RPCServer
@@ -134,6 +136,7 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 		runtime.Metrics,
 		runtime.Trace,
 		runtime.Logger,
+		runtime.Requests,
 	)
 	if err != nil {
 		return nil, err
@@ -157,6 +160,7 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 		runtime.Trace,
 		runtime.Metrics,
 		runtime.Logger,
+		runtime.Requests,
 		map[string]string{
 			"environment": cfg.App.Environment,
 			"version":     cfg.App.Version,
@@ -180,11 +184,20 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 		Etcd:         registry,
 		Register:     register,
 		Authenticate: authenticate,
+		Hasher:       hasher,
+		Issuer:       issuer,
 		GetUser:      getUser,
 		RPCHandler:   handler,
 		RPCServer:    rpcServer,
 		Admin:        admin,
 	}, nil
+}
+
+func (s *ServiceContext) ApplyDynamicConfig(cfg config.Config) error {
+	if s == nil || s.Hasher == nil || s.Issuer == nil || s.Authenticate == nil {
+		return errors.New("apply identity dynamic configuration: service context is required")
+	}
+	return errors.Join(s.Hasher.SetCost(cfg.Bcrypt.Cost), s.Issuer.SetTTL(cfg.Auth.AccessTokenTTL), s.Authenticate.SetPolicy(cfg.Auth.FailureThreshold, cfg.Auth.LockDuration))
 }
 
 func addReadinessChecks(

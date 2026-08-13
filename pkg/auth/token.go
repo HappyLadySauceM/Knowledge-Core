@@ -13,6 +13,7 @@ import (
 	"io"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -94,7 +95,7 @@ func (c Claims) Validate() error {
 
 type Issuer struct {
 	privateKey ed25519.PrivateKey
-	ttl        time.Duration
+	ttl        atomic.Int64
 	now        func() time.Time
 	random     io.Reader
 }
@@ -107,7 +108,9 @@ func NewIssuer(encodedPrivateKey string, ttl time.Duration) (*Issuer, error) {
 	if ttl <= 0 {
 		return nil, errors.New("create access token issuer: TTL must be positive")
 	}
-	return &Issuer{privateKey: privateKey, ttl: ttl, now: time.Now, random: rand.Reader}, nil
+	issuer := &Issuer{privateKey: privateKey, now: time.Now, random: rand.Reader}
+	issuer.ttl.Store(int64(ttl))
+	return issuer, nil
 }
 
 func (i *Issuer) Issue(principal Principal) (IssuedToken, error) {
@@ -122,7 +125,7 @@ func (i *Issuer) Issue(principal Principal) (IssuedToken, error) {
 		return IssuedToken{}, fmt.Errorf("issue access token ID: %w", err)
 	}
 	now := i.now().UTC()
-	expiresAt := now.Add(i.ttl)
+	expiresAt := now.Add(time.Duration(i.ttl.Load()))
 	claims := Claims{
 		Role:         principal.Role,
 		TokenVersion: principal.TokenVersion,
@@ -141,6 +144,14 @@ func (i *Issuer) Issue(principal Principal) (IssuedToken, error) {
 		return IssuedToken{}, fmt.Errorf("sign access token: %w", err)
 	}
 	return IssuedToken{Value: value, ExpiresAt: expiresAt}, nil
+}
+
+func (i *Issuer) SetTTL(ttl time.Duration) error {
+	if i == nil || ttl <= 0 {
+		return errors.New("set access token TTL: issuer and positive TTL are required")
+	}
+	i.ttl.Store(int64(ttl))
+	return nil
 }
 
 type Verifier struct {

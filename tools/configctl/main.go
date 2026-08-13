@@ -45,6 +45,7 @@ func newCommand() *cobra.Command {
 
 func newValidateCommand() *cobra.Command {
 	var input string
+	var service string
 	command := &cobra.Command{
 		Use:   "validate",
 		Short: "Validate one plaintext dynamic configuration document",
@@ -54,13 +55,18 @@ func newValidateCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if _, err := configcenter.DecodeDynamicDocument(contents); err != nil {
+			document, err := configcenter.DecodeDynamicDocument(contents)
+			if err != nil {
 				return err
+			}
+			if strings.TrimSpace(service) != "" {
+				return document.ValidateApplication(strings.TrimSpace(service))
 			}
 			return nil
 		},
 	}
 	command.Flags().StringVarP(&input, "input", "i", "", "Plaintext YAML input file")
+	command.Flags().StringVar(&service, "service", "", "Expected service for v1beta1 documents")
 	_ = command.MarkFlagRequired("input")
 	return command
 }
@@ -69,6 +75,7 @@ func newEncryptCommand() *cobra.Command {
 	var input string
 	var output string
 	var values coordinates
+	var service string
 	command := &cobra.Command{
 		Use:   "encrypt",
 		Short: "Validate and encrypt one dynamic configuration document",
@@ -78,8 +85,14 @@ func newEncryptCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if _, err := configcenter.DecodeDynamicDocument(contents); err != nil {
+			document, err := configcenter.DecodeDynamicDocument(contents)
+			if err != nil {
 				return err
+			}
+			if strings.TrimSpace(service) != "" {
+				if err := document.ValidateApplication(strings.TrimSpace(service)); err != nil {
+					return err
+				}
 			}
 			key, err := keyFromEnvironment(values.keyEnv)
 			if err != nil {
@@ -95,6 +108,7 @@ func newEncryptCommand() *cobra.Command {
 	command.Flags().StringVarP(&input, "input", "i", "", "Plaintext YAML input file")
 	command.Flags().StringVarP(&output, "output", "o", "", "Encrypted JSON output file")
 	addCoordinateFlags(command, &values)
+	command.Flags().StringVar(&service, "service", "", "Expected service for v1beta1 documents")
 	_ = command.MarkFlagRequired("input")
 	_ = command.MarkFlagRequired("output")
 	return command
@@ -149,6 +163,17 @@ func newPublishCommand() *cobra.Command {
 			}
 			bootstrap, err := configcenter.BootstrapFromEnvironment(service)
 			if err != nil {
+				return err
+			}
+			plaintext, err := configcenter.Decrypt(contents, bootstrap.Key, bootstrap.KeyID, bootstrap.Binding)
+			if err != nil {
+				return err
+			}
+			document, err := configcenter.DecodeDynamicDocument(plaintext)
+			if err != nil {
+				return err
+			}
+			if err := document.ValidateApplication(strings.TrimSpace(service)); err != nil {
 				return err
 			}
 			return configcenter.Publish(command.Context(), bootstrap, contents)

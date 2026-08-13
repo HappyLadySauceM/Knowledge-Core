@@ -8,6 +8,7 @@ app:
 log:
   level: info
   add_source: false
+  health_check_requests: false
 
 trace:
   enabled: false

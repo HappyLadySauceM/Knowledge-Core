@@ -1,0 +1,38 @@
+api_version: knowledge-core.io/v1beta1
+kind: ApplicationConfig
+service: collaboration
+revision: 1
+config:
+  log: {level: info, health_check_requests: false}
+  shutdown_timeout_ms: 30000
+  public:
+    allowed_origins: [http://localhost:3000]
+    max_frame_bytes: 1064960
+    max_update_bytes: 1048576
+    max_document_bytes: 16777216
+    max_awareness_bytes: 65536
+    max_connections: 20000
+    max_connections_per_document: 200
+    handshakes_per_second: 200
+    handshake_burst: 400
+    handshake_timeout_ms: 5000
+  rpc: {address: 0.0.0.0:8883, advertised_address: 127.0.0.1:8883, service_name: knowledge-core.collaboration, request_timeout_ms: 5000}
+  admin: {address: 0.0.0.0:8084, request_timeout_ms: 5000}
+  telemetry: {export_timeout_ms: 5000, shutdown_timeout_ms: 5000}
+  postgres: {max_connections: 20, connect_timeout_ms: 5000, acquire_timeout_ms: 5000, operation_timeout_ms: 30000}
+  redis: {prefix: knowledge-core:collaboration, operation_timeout_ms: 3000}
+  nats:
+    servers: [nats://127.0.0.1:4222]
+    name: knowledge-core.collaboration
+    stream: KNOWLEDGE_CORE_EVENTS
+    permission_stream: KNOWLEDGE_CORE_PERMISSIONS
+    update_subject: collaboration.documents.updated
+    invalidation_subject: collaboration.documents.invalidated
+    permission_subject: knowledge.permissions.changed
+    connect_timeout_ms: 5000
+    operation_timeout_ms: 5000
+  etcd: {endpoints: [http://127.0.0.1:2379], prefix: /knowledge-core/development/registry, connect_timeout_ms: 5000, request_timeout_ms: 5000, lease_ttl_ms: 60000}
+  knowledge: {service_name: knowledge-core.knowledge, request_timeout_ms: 5000}
+  ticket: {ttl_ms: 30000}
+  actor: {command_capacity: 256, outbound_capacity: 128, idle_timeout_ms: 60000, command_timeout_ms: 30000, awareness_messages_per_second: 20, updates_per_second: 50}
+  workers: {poll_interval_ms: 1000, operation_timeout_ms: 30000, projection_lease_ms: 30000, snapshot_update_threshold: 500, snapshot_byte_threshold: 8388608, automatic_version_interval_ms: 1800000, outbox_batch_size: 50}

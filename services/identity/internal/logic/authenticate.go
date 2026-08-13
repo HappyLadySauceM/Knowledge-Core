@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	coreauth "github.com/HappyLadySauce/Knowledge-Core/pkg/auth"
@@ -41,13 +42,17 @@ type authenticateUsers interface {
 }
 
 type AuthenticateLogic struct {
-	users            authenticateUsers
-	passwords        PasswordVerifier
-	tokens           AccessTokenIssuer
-	dummyHash        string
+	users     authenticateUsers
+	passwords PasswordVerifier
+	tokens    AccessTokenIssuer
+	dummyHash string
+	policy    atomic.Pointer[authenticationPolicy]
+	now       func() time.Time
+}
+
+type authenticationPolicy struct {
 	failureThreshold int
 	lockDuration     time.Duration
-	now              func() time.Time
 }
 
 func NewAuthenticateLogic(
@@ -67,10 +72,12 @@ func NewAuthenticateLogic(
 	if err != nil {
 		return nil, fmt.Errorf("create identity dummy password: %w", err)
 	}
-	return &AuthenticateLogic{
+	logic := &AuthenticateLogic{
 		users: users, passwords: passwords, tokens: tokens, dummyHash: dummyHash,
-		failureThreshold: failureThreshold, lockDuration: lockDuration, now: time.Now,
-	}, nil
+		now: time.Now,
+	}
+	logic.policy.Store(&authenticationPolicy{failureThreshold: failureThreshold, lockDuration: lockDuration})
+	return logic, nil
 }
 
 func (l *AuthenticateLogic) Authenticate(ctx context.Context, input AuthenticateInput) (*Authentication, error) {
@@ -101,8 +108,9 @@ func (l *AuthenticateLogic) Authenticate(ctx context.Context, input Authenticate
 		if user.Status != domain.StatusActive {
 			return nil, identityerrors.InvalidCredentials.New()
 		}
+		policy := l.policy.Load()
 		locked, recordErr := l.users.RecordLoginFailure(
-			ctx, user.ID, now, now.Add(l.lockDuration), l.failureThreshold,
+			ctx, user.ID, now, now.Add(policy.lockDuration), policy.failureThreshold,
 		)
 		if recordErr != nil {
 			return nil, fmt.Errorf("record identity login failure: %w", recordErr)
@@ -133,4 +141,12 @@ func (l *AuthenticateLogic) Authenticate(ctx context.Context, input Authenticate
 		return nil, fmt.Errorf("issue identity access token: %w", err)
 	}
 	return &Authentication{User: user, AccessToken: accessToken}, nil
+}
+
+func (l *AuthenticateLogic) SetPolicy(failureThreshold int, lockDuration time.Duration) error {
+	if l == nil || failureThreshold < 2 || lockDuration <= 0 {
+		return errors.New("set identity authentication policy: values are invalid")
+	}
+	l.policy.Store(&authenticationPolicy{failureThreshold: failureThreshold, lockDuration: lockDuration})
+	return nil
 }

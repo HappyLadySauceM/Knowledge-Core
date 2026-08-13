@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/HappyLadySauce/Knowledge-Core/services/knowledge/internal/domain"
@@ -31,7 +32,7 @@ type ObjectStore interface {
 type AttachmentLogic struct {
 	repository AttachmentRepository
 	objects    ObjectStore
-	uploadTTL  time.Duration
+	uploadTTL  atomic.Int64
 	now        func() time.Time
 }
 
@@ -49,7 +50,9 @@ func NewAttachmentLogic(repository AttachmentRepository, objects ObjectStore, up
 	if repository == nil || objects == nil || uploadTTL <= 0 {
 		return nil, errors.New("create attachment logic: repository, object storage, and positive upload TTL are required")
 	}
-	return &AttachmentLogic{repository: repository, objects: objects, uploadTTL: uploadTTL, now: time.Now}, nil
+	logic := &AttachmentLogic{repository: repository, objects: objects, now: time.Now}
+	logic.uploadTTL.Store(int64(uploadTTL))
+	return logic, nil
 }
 
 func (l *AttachmentLogic) List(ctx context.Context, documentID string, actorID int64) ([]*domain.Attachment, error) {
@@ -92,7 +95,7 @@ func (l *AttachmentLogic) Create(ctx context.Context, input CreateAttachmentInpu
 		ID: id, DocumentID: input.DocumentID, UploaderID: input.ActorID,
 		Filename: input.Filename, DeclaredType: input.MediaType, SizeBytes: input.SizeBytes,
 		SHA256: input.SHA256, ObjectKey: fmt.Sprintf("quarantine/%d/%s/%s", input.ActorID, input.DocumentID, id),
-		Status: domain.AttachmentPendingUpload, UploadExpires: now.Add(l.uploadTTL), CreatedAt: now, UpdatedAt: now,
+		Status: domain.AttachmentPendingUpload, UploadExpires: now.Add(time.Duration(l.uploadTTL.Load())), CreatedAt: now, UpdatedAt: now,
 	}
 	_, err = l.repository.CreateAttachment(ctx, attachment, input.ActorID, idempotencyValue)
 	if err != nil {
@@ -111,6 +114,12 @@ func (l *AttachmentLogic) Create(ctx context.Context, input CreateAttachmentInpu
 	return &domain.AttachmentUpload{
 		Attachment: attachment, URL: target.URL, RequiredHeaders: target.RequiredHeaders, ExpiresAt: target.ExpiresAt,
 	}, nil
+}
+
+func (l *AttachmentLogic) SetUploadTTL(ttl time.Duration) {
+	if l != nil {
+		l.uploadTTL.Store(int64(ttl))
+	}
 }
 
 func (l *AttachmentLogic) Complete(ctx context.Context, documentID, attachmentID string, actorID int64) (*domain.Attachment, error) {

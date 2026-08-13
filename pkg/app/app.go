@@ -40,6 +40,7 @@ type RuntimeOptions struct {
 	Version         string
 	LogLevel        string
 	LogAddSource    bool
+	LogHealthChecks bool
 	OTLPEndpoint    string
 	TraceSampleRate float64
 	TraceInsecure   bool
@@ -77,6 +78,7 @@ func RuntimeOptionsFrom(
 		Version:         appOptions.Version,
 		LogLevel:        logOptions.Level,
 		LogAddSource:    logOptions.AddSource,
+		LogHealthChecks: logOptions.HealthCheckRequests,
 		TraceBatch:      traceOptions.BatchTimeout,
 		TraceExport:     traceOptions.ExportTimeout,
 		StartupTimeout:  appOptions.StartupTimeout,
@@ -209,14 +211,9 @@ func execute[C any](ctx context.Context, cfg C, spec Spec[C]) (runErr error) {
 		return errors.Join(fmt.Errorf("initialize application metrics: %w", err), telemetry.Shutdown(context.Background()))
 	}
 
-	runtime := newRuntime(logger, levelControl, telemetry, metricsRegistry, opts.ShutdownTimeout)
+	runtime := newRuntime(logger, levelControl, telemetry, metricsRegistry, opts.LogHealthChecks, opts.ShutdownTimeout)
 	if err := runtime.AddCleanup("telemetry", telemetry.Shutdown); err != nil {
 		return errors.Join(err, telemetry.Shutdown(context.Background()))
-	}
-	if binder, ok := spec.Config.(RuntimeBinder); ok {
-		if err := binder.BindRuntime(ctx, runtime); err != nil {
-			return fmt.Errorf("bind %s runtime configuration: %w", spec.Name, err)
-		}
 	}
 	defer func() {
 		if runtime.closed() {
@@ -236,6 +233,12 @@ func execute[C any](ctx context.Context, cfg C, spec Spec[C]) (runErr error) {
 	if err != nil {
 		cancelStartup()
 		return fmt.Errorf("register %s application: %w", spec.Name, err)
+	}
+	if binder, ok := spec.Config.(RuntimeBinder); ok {
+		if err := binder.BindRuntime(ctx, runtime); err != nil {
+			cancelStartup()
+			return fmt.Errorf("bind %s runtime configuration: %w", spec.Name, err)
+		}
 	}
 	if err := runtime.run(ctx, startupCtx); err != nil {
 		cancelStartup()

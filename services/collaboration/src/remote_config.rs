@@ -22,13 +22,19 @@ use url::Url;
 use zeroize::Zeroizing;
 
 use crate::{
+    actor::{ActorLimits, ActorRegistry},
+    config::{ActorConfig, PublicConfig, TicketConfig, WorkerConfig},
     error::{Result, ServiceError},
     telemetry::{LogController, Metrics},
+    ticket::TicketService,
+    websocket::WebSocketServer,
 };
 
 const ENVELOPE_SCHEMA: &str = "knowledge-core.io/config-envelope/v1";
 const DYNAMIC_API_VERSION: &str = "knowledge-core.io/v1alpha1";
 const DYNAMIC_KIND: &str = "DynamicConfig";
+const APPLICATION_API_VERSION: &str = "knowledge-core.io/v1beta1";
+const APPLICATION_KIND: &str = "ApplicationConfig";
 const KEY_SIZE: usize = 32;
 const MAXIMUM_CONTENT: usize = 1 << 20;
 const ENV_PREFIX: &str = "KNOWLEDGE_CORE_NACOS_";
@@ -39,6 +45,156 @@ const NATIVE_TLS_CA_ENV: &str = "SSL_CERT_FILE";
 pub(crate) struct DynamicDocument {
     pub(crate) revision: u64,
     pub(crate) log_level: String,
+    pub(crate) health_check_requests: bool,
+    pub(crate) config: Option<ApplicationOverrides>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ApplicationOverrides {
+    pub(crate) log: Option<ApplicationLog>,
+    pub(crate) shutdown_timeout_ms: Option<u64>,
+    pub(crate) public: Option<PublicOverrides>,
+    pub(crate) rpc: Option<RpcOverrides>,
+    pub(crate) admin: Option<AdminOverrides>,
+    pub(crate) telemetry: Option<TelemetryOverrides>,
+    pub(crate) postgres: Option<PostgresOverrides>,
+    pub(crate) redis: Option<RedisOverrides>,
+    pub(crate) nats: Option<NatsOverrides>,
+    pub(crate) etcd: Option<EtcdOverrides>,
+    pub(crate) knowledge: Option<KnowledgeOverrides>,
+    pub(crate) ticket: Option<TicketOverrides>,
+    pub(crate) actor: Option<ActorOverrides>,
+    pub(crate) workers: Option<WorkerOverrides>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct RpcOverrides {
+    pub(crate) address: Option<String>,
+    pub(crate) advertised_address: Option<String>,
+    pub(crate) service_name: Option<String>,
+    pub(crate) request_timeout_ms: Option<u64>,
+}
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct AdminOverrides {
+    pub(crate) address: Option<String>,
+    pub(crate) request_timeout_ms: Option<u64>,
+}
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct TelemetryOverrides {
+    pub(crate) otlp_endpoint: Option<String>,
+    pub(crate) export_timeout_ms: Option<u64>,
+    pub(crate) shutdown_timeout_ms: Option<u64>,
+}
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct PostgresOverrides {
+    pub(crate) max_connections: Option<u32>,
+    pub(crate) connect_timeout_ms: Option<u64>,
+    pub(crate) acquire_timeout_ms: Option<u64>,
+    pub(crate) operation_timeout_ms: Option<u64>,
+}
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct RedisOverrides {
+    pub(crate) prefix: Option<String>,
+    pub(crate) operation_timeout_ms: Option<u64>,
+}
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct NatsOverrides {
+    pub(crate) servers: Option<Vec<String>>,
+    pub(crate) name: Option<String>,
+    pub(crate) stream: Option<String>,
+    pub(crate) permission_stream: Option<String>,
+    pub(crate) update_subject: Option<String>,
+    pub(crate) invalidation_subject: Option<String>,
+    pub(crate) permission_subject: Option<String>,
+    pub(crate) connect_timeout_ms: Option<u64>,
+    pub(crate) operation_timeout_ms: Option<u64>,
+}
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct EtcdOverrides {
+    pub(crate) endpoints: Option<Vec<String>>,
+    pub(crate) prefix: Option<String>,
+    pub(crate) connect_timeout_ms: Option<u64>,
+    pub(crate) request_timeout_ms: Option<u64>,
+    pub(crate) lease_ttl_ms: Option<u64>,
+}
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct KnowledgeOverrides {
+    pub(crate) service_name: Option<String>,
+    pub(crate) request_timeout_ms: Option<u64>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ApplicationLog {
+    pub(crate) level: String,
+    #[serde(default = "default_health_check_requests")]
+    pub(crate) health_check_requests: bool,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct PublicOverrides {
+    pub(crate) allowed_origins: Option<Vec<String>>,
+    pub(crate) max_frame_bytes: Option<usize>,
+    pub(crate) max_update_bytes: Option<usize>,
+    pub(crate) max_document_bytes: Option<usize>,
+    pub(crate) max_awareness_bytes: Option<usize>,
+    pub(crate) max_connections: Option<usize>,
+    pub(crate) max_connections_per_document: Option<usize>,
+    pub(crate) handshakes_per_second: Option<u32>,
+    pub(crate) handshake_burst: Option<u32>,
+    pub(crate) handshake_timeout_ms: Option<u64>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct TicketOverrides {
+    pub(crate) ttl_ms: Option<u64>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ActorOverrides {
+    pub(crate) command_capacity: Option<usize>,
+    pub(crate) outbound_capacity: Option<usize>,
+    pub(crate) idle_timeout_ms: Option<u64>,
+    pub(crate) command_timeout_ms: Option<u64>,
+    pub(crate) awareness_messages_per_second: Option<u32>,
+    pub(crate) updates_per_second: Option<u32>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct WorkerOverrides {
+    pub(crate) poll_interval_ms: Option<u64>,
+    pub(crate) operation_timeout_ms: Option<u64>,
+    pub(crate) projection_lease_ms: Option<u64>,
+    pub(crate) snapshot_update_threshold: Option<i64>,
+    pub(crate) snapshot_byte_threshold: Option<i64>,
+    pub(crate) automatic_version_interval_ms: Option<u64>,
+    pub(crate) outbox_batch_size: Option<i64>,
+}
+
+#[derive(Clone)]
+pub(crate) struct RuntimeTargets {
+    pub(crate) log: LogController,
+    pub(crate) startup_log_level: String,
+    pub(crate) tickets: TicketService,
+    pub(crate) actors: ActorRegistry,
+    pub(crate) public: Arc<WebSocketServer>,
+    pub(crate) startup_public: PublicConfig,
+    pub(crate) startup_ticket: TicketConfig,
+    pub(crate) startup_actor: ActorConfig,
+    pub(crate) startup_workers: WorkerConfig,
 }
 
 #[derive(Clone)]
@@ -97,13 +253,22 @@ struct DynamicWireDocument {
     api_version: String,
     kind: String,
     revision: u64,
+    #[serde(default)]
     log: DynamicLog,
+    service: Option<String>,
+    config: Option<ApplicationOverrides>,
 }
 
-#[derive(Deserialize)]
+#[derive(Default, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct DynamicLog {
     level: String,
+    #[serde(default = "default_health_check_requests")]
+    health_check_requests: bool,
+}
+
+fn default_health_check_requests() -> bool {
+    true
 }
 
 impl RemoteConfig {
@@ -142,25 +307,19 @@ impl RemoteConfig {
 
     pub(crate) async fn start(
         &self,
-        log_controller: LogController,
+        targets: RuntimeTargets,
         metrics: Metrics,
         cancellation: CancellationToken,
     ) -> Result<RemoteRuntime> {
         let document = fetch_document(&self.service, &self.bootstrap).await?;
-        apply_document(
-            &self.current,
-            &Mutex::new(()),
-            document,
-            &log_controller,
-            &metrics,
-        )?;
+        apply_document(&self.current, &Mutex::new(()), document, &targets, &metrics)?;
         let listener: Arc<dyn ConfigChangeListener> = Arc::new(Listener {
             binding: self.bootstrap.binding.clone(),
             key_id: self.bootstrap.key_id.clone(),
             key: Arc::clone(&self.bootstrap.key),
             current: Arc::clone(&self.current),
             update_lock: Mutex::new(()),
-            log_controller: log_controller.clone(),
+            targets: targets.clone(),
             metrics: metrics.clone(),
         });
         time::timeout(
@@ -180,7 +339,7 @@ impl RemoteConfig {
             self.service.clone(),
             self.bootstrap.clone(),
             Arc::clone(&self.current),
-            log_controller,
+            targets,
             metrics,
             cancellation.child_token(),
         ));
@@ -240,7 +399,7 @@ struct Listener {
     key: Arc<Zeroizing<Vec<u8>>>,
     current: Arc<ArcSwap<DynamicDocument>>,
     update_lock: Mutex<()>,
-    log_controller: LogController,
+    targets: RuntimeTargets,
     metrics: Metrics,
 }
 
@@ -265,7 +424,7 @@ impl ConfigChangeListener for Listener {
                 &self.current,
                 &self.update_lock,
                 document,
-                &self.log_controller,
+                &self.targets,
                 &self.metrics,
             )
         });
@@ -297,7 +456,7 @@ async fn poll(
     service: ConfigService,
     bootstrap: Bootstrap,
     current: Arc<ArcSwap<DynamicDocument>>,
-    log_controller: LogController,
+    targets: RuntimeTargets,
     metrics: Metrics,
     cancellation: CancellationToken,
 ) {
@@ -316,7 +475,7 @@ async fn poll(
                             &current,
                             &update_lock,
                             document,
-                            &log_controller,
+                            &targets,
                             &metrics,
                         ) {
                             metrics.config_rejected();
@@ -367,7 +526,7 @@ fn apply_document(
     current: &ArcSwap<DynamicDocument>,
     update_lock: &Mutex<()>,
     document: DynamicDocument,
-    log_controller: &LogController,
+    targets: &RuntimeTargets,
     metrics: &Metrics,
 ) -> Result<()> {
     let _guard = update_lock
@@ -390,10 +549,21 @@ fn apply_document(
         metrics.config_success();
         return Ok(());
     }
-    log_controller.set_level(&document.log_level)?;
+    if env::var_os("COLLABORATION_LOG_LEVEL").is_none() {
+        targets.log.set_level(&document.log_level)?;
+    } else {
+        targets.log.set_level(&targets.startup_log_level)?;
+    }
+    let restart_required = document
+        .config
+        .as_ref()
+        .is_some_and(|config| restart_required(config, targets));
+    if let Some(config) = &document.config {
+        apply_runtime_overrides(config, targets)?;
+    }
     let revision = document.revision;
     current.store(Arc::new(document));
-    metrics.config_applied();
+    metrics.config_applied(restart_required);
     tracing::info!(
         component = "config.nacos",
         event = "reload",
@@ -401,6 +571,142 @@ fn apply_document(
         "dynamic configuration applied"
     );
     Ok(())
+}
+
+fn apply_runtime_overrides(config: &ApplicationOverrides, targets: &RuntimeTargets) -> Result<()> {
+    let mut public = targets.startup_public.clone();
+    let mut ticket = targets.startup_ticket.clone();
+    let mut actor = targets.startup_actor.clone();
+    if let Some(value) = &config.public {
+        if env::var_os("COLLABORATION_ALLOWED_ORIGINS").is_none()
+            && let Some(origins) = &value.allowed_origins
+        {
+            public.allowed_origins.clone_from(origins);
+        }
+        if env::var_os("COLLABORATION_MAX_FRAME_BYTES").is_none()
+            && let Some(value) = value.max_frame_bytes
+        {
+            public.max_frame_bytes = value;
+        }
+        if env::var_os("COLLABORATION_MAX_UPDATE_BYTES").is_none()
+            && let Some(value) = value.max_update_bytes
+        {
+            public.max_update_bytes = value;
+        }
+        if env::var_os("COLLABORATION_MAX_DOCUMENT_BYTES").is_none()
+            && let Some(value) = value.max_document_bytes
+        {
+            public.max_document_bytes = value;
+        }
+        if env::var_os("COLLABORATION_MAX_AWARENESS_BYTES").is_none()
+            && let Some(value) = value.max_awareness_bytes
+        {
+            public.max_awareness_bytes = value;
+        }
+        if env::var_os("COLLABORATION_MAX_CONNECTIONS_PER_DOCUMENT").is_none()
+            && let Some(value) = value.max_connections_per_document
+        {
+            public.max_connections_per_document = value;
+        }
+        if env::var_os("COLLABORATION_HANDSHAKES_PER_SECOND").is_none()
+            && let Some(value) = value.handshakes_per_second
+        {
+            public.handshakes_per_second = value;
+        }
+        if env::var_os("COLLABORATION_HANDSHAKE_BURST").is_none()
+            && let Some(value) = value.handshake_burst
+        {
+            public.handshake_burst = value;
+        }
+        if env::var_os("COLLABORATION_HANDSHAKE_TIMEOUT_MS").is_none()
+            && let Some(value) = value.handshake_timeout_ms
+        {
+            public.handshake_timeout = Duration::from_millis(value);
+        }
+    }
+    if env::var_os("COLLABORATION_TICKET_TTL_MS").is_none()
+        && let Some(value) = &config.ticket
+        && let Some(ttl) = value.ttl_ms
+    {
+        ticket.ttl = Duration::from_millis(ttl);
+    }
+    if let Some(value) = &config.actor {
+        if env::var_os("COLLABORATION_ACTOR_COMMAND_CAPACITY").is_none()
+            && let Some(value) = value.command_capacity
+        {
+            actor.command_capacity = value;
+        }
+        if env::var_os("COLLABORATION_OUTBOUND_CAPACITY").is_none()
+            && let Some(value) = value.outbound_capacity
+        {
+            actor.outbound_capacity = value;
+        }
+        if env::var_os("COLLABORATION_ACTOR_IDLE_TIMEOUT_MS").is_none()
+            && let Some(value) = value.idle_timeout_ms
+        {
+            actor.idle_timeout = Duration::from_millis(value);
+        }
+        if env::var_os("COLLABORATION_ACTOR_COMMAND_TIMEOUT_MS").is_none()
+            && let Some(value) = value.command_timeout_ms
+        {
+            actor.command_timeout = Duration::from_millis(value);
+        }
+        if env::var_os("COLLABORATION_AWARENESS_RATE").is_none()
+            && let Some(value) = value.awareness_messages_per_second
+        {
+            actor.awareness_messages_per_second = value;
+        }
+        if env::var_os("COLLABORATION_UPDATE_RATE").is_none()
+            && let Some(value) = value.updates_per_second
+        {
+            actor.updates_per_second = value;
+        }
+    }
+    let limits = ActorLimits::from_config(&actor, &public)?;
+    targets.public.apply_dynamic(&public)?;
+    targets.tickets.set_ttl(ticket.ttl)?;
+    targets.actors.set_limits(limits);
+    Ok(())
+}
+
+fn restart_required(config: &ApplicationOverrides, targets: &RuntimeTargets) -> bool {
+    config.shutdown_timeout_ms.is_some()
+        || config.rpc.is_some()
+        || config.admin.is_some()
+        || config.telemetry.is_some()
+        || config.postgres.is_some()
+        || config.redis.is_some()
+        || config.nats.is_some()
+        || config.etcd.is_some()
+        || config.knowledge.is_some()
+        || config
+            .public
+            .as_ref()
+            .and_then(|value| value.max_connections)
+            .is_some_and(|value| value != targets.startup_public.max_connections)
+        || config.workers.as_ref().is_some_and(|value| {
+            value
+                .poll_interval_ms
+                .is_some_and(|v| Duration::from_millis(v) != targets.startup_workers.poll_interval)
+                || value.operation_timeout_ms.is_some_and(|v| {
+                    Duration::from_millis(v) != targets.startup_workers.operation_timeout
+                })
+                || value.projection_lease_ms.is_some_and(|v| {
+                    Duration::from_millis(v) != targets.startup_workers.projection_lease
+                })
+                || value
+                    .snapshot_update_threshold
+                    .is_some_and(|v| v != targets.startup_workers.snapshot_update_threshold)
+                || value
+                    .snapshot_byte_threshold
+                    .is_some_and(|v| v != targets.startup_workers.snapshot_byte_threshold)
+                || value.automatic_version_interval_ms.is_some_and(|v| {
+                    Duration::from_millis(v) != targets.startup_workers.automatic_version_interval
+                })
+                || value
+                    .outbox_batch_size
+                    .is_some_and(|v| v != targets.startup_workers.outbox_batch_size)
+        })
 }
 
 fn decrypt(
@@ -486,20 +792,123 @@ fn decode_dynamic_document(contents: &[u8]) -> Result<DynamicDocument> {
             "multiple dynamic configuration documents are not allowed",
         ));
     }
-    if document.api_version != DYNAMIC_API_VERSION {
-        return Err(invalid("dynamic configuration api_version is unsupported"));
-    }
-    if document.kind != DYNAMIC_KIND {
-        return Err(invalid("dynamic configuration kind is unsupported"));
+    let legacy = document.api_version == DYNAMIC_API_VERSION && document.kind == DYNAMIC_KIND;
+    let application =
+        document.api_version == APPLICATION_API_VERSION && document.kind == APPLICATION_KIND;
+    if !legacy && !application {
+        return Err(invalid(
+            "dynamic configuration api_version or kind is unsupported",
+        ));
     }
     if document.revision == 0 {
         return Err(invalid("dynamic configuration revision must be positive"));
     }
-    validate_log_level(&document.log.level)?;
+    let (log_level, health_check_requests) = if legacy {
+        (document.log.level, document.log.health_check_requests)
+    } else {
+        let config = document
+            .config
+            .as_ref()
+            .ok_or_else(|| invalid("application configuration config is required"))?;
+        let log = config
+            .log
+            .as_ref()
+            .ok_or_else(|| invalid("application configuration log is required"))?;
+        validate_log_level(&log.level)?;
+        (log.level.clone(), log.health_check_requests)
+    };
+    validate_log_level(&log_level)?;
+    if application && document.service.as_deref() != Some("collaboration") {
+        return Err(invalid(
+            "application configuration service must be collaboration",
+        ));
+    }
+    if let Some(config) = &document.config {
+        validate_application_overrides(config)?;
+    }
     Ok(DynamicDocument {
         revision: document.revision,
-        log_level: document.log.level,
+        log_level,
+        health_check_requests,
+        config: document.config,
     })
+}
+
+fn validate_application_overrides(config: &ApplicationOverrides) -> Result<()> {
+    if let Some(value) = config.shutdown_timeout_ms
+        && value == 0
+    {
+        return Err(invalid("shutdown timeout must be positive"));
+    }
+    if let Some(value) = &config.public {
+        if let Some(origins) = &value.allowed_origins {
+            for origin in origins {
+                let parsed = Url::parse(origin)
+                    .map_err(|error| invalid_with("parse allowed origin", error))?;
+                if !matches!(parsed.scheme(), "http" | "https")
+                    || parsed.host_str().is_none()
+                    || parsed.username() != ""
+                    || parsed.password().is_some()
+                    || parsed.path() != "/"
+                    || parsed.query().is_some()
+                    || parsed.fragment().is_some()
+                {
+                    return Err(invalid(
+                        "allowed origins must be exact HTTP origins without credentials or paths",
+                    ));
+                }
+            }
+        }
+        for value in [
+            value.max_frame_bytes,
+            value.max_update_bytes,
+            value.max_document_bytes,
+            value.max_awareness_bytes,
+            value.max_connections,
+            value.max_connections_per_document,
+        ] {
+            if value == Some(0) {
+                return Err(invalid("public limits must be positive"));
+            }
+        }
+        if value.handshakes_per_second == Some(0)
+            || value.handshake_burst == Some(0)
+            || value.handshake_timeout_ms == Some(0)
+        {
+            return Err(invalid("WebSocket handshake limits must be positive"));
+        }
+    }
+    if let Some(value) = &config.ticket
+        && value
+            .ttl_ms
+            .is_some_and(|ttl| ttl == 0 || ttl > crate::config::MAX_TICKET_TTL_MS)
+    {
+        return Err(invalid(
+            "ticket TTL must be between one millisecond and 60 seconds",
+        ));
+    }
+    if let Some(value) = &config.actor
+        && (value.command_capacity == Some(0)
+            || value.outbound_capacity == Some(0)
+            || value.idle_timeout_ms == Some(0)
+            || value.command_timeout_ms == Some(0)
+            || value.awareness_messages_per_second == Some(0)
+            || value.updates_per_second == Some(0))
+    {
+        return Err(invalid("actor limits must be positive"));
+    }
+    if let Some(value) = &config.workers
+        && (value.poll_interval_ms == Some(0)
+            || value.operation_timeout_ms == Some(0)
+            || value.projection_lease_ms == Some(0)
+            || value.automatic_version_interval_ms == Some(0)
+            || value.snapshot_update_threshold.is_some_and(|v| v <= 0)
+            || value.snapshot_byte_threshold.is_some_and(|v| v <= 0)
+            || value.outbox_batch_size.is_some_and(|v| v <= 0))
+    {
+        return Err(invalid("worker limits must be positive"));
+    }
+    Ok(())
 }
 
 pub(crate) fn validate_log_level(level: &str) -> Result<()> {
@@ -803,6 +1212,16 @@ mod tests {
             .is_err()
         );
         assert!(validate_log_level("verbose").is_err());
+    }
+
+    #[test]
+    fn application_document_is_strict_and_service_bound() {
+        let document = decode_dynamic_document(b"api_version: knowledge-core.io/v1beta1\nkind: ApplicationConfig\nservice: collaboration\nrevision: 5\nconfig:\n  log:\n    level: info\n    health_check_requests: false\n  public:\n    allowed_origins: [https://example.com]\n    handshakes_per_second: 50\n  ticket:\n    ttl_ms: 20000\n").expect("valid application document");
+        assert_eq!(document.revision, 5);
+        assert!(!document.health_check_requests);
+        assert!(document.config.is_some());
+        assert!(decode_dynamic_document(b"api_version: knowledge-core.io/v1beta1\nkind: ApplicationConfig\nservice: gateway\nrevision: 5\nconfig:\n  log:\n    level: info\n").is_err());
+        assert!(decode_dynamic_document(b"api_version: knowledge-core.io/v1beta1\nkind: ApplicationConfig\nservice: collaboration\nrevision: 5\nconfig:\n  log:\n    level: info\n  postgres:\n    url: postgres://secret\n").is_err());
     }
 
     #[test]

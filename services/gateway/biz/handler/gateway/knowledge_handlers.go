@@ -55,7 +55,7 @@ func handleGetPublishedDocument(ctx context.Context, request *app.RequestContext
 		gatewaymiddleware.WriteKnowledgeError(ctx, request, err)
 		return
 	}
-	data, err := toDocumentDetailData(detail, dependencies.Endpoints)
+	data, err := toDocumentDetailData(detail, dependencies.EndpointOptions())
 	if err != nil {
 		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidUpstreamResponse)
 		return
@@ -153,7 +153,7 @@ func handleCreateDocument(ctx context.Context, request *app.RequestContext) {
 		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidUpstreamResponse)
 		return
 	}
-	request.Header("Location", endpointURL(dependencies.Endpoints, "/api/v1/studio/documents/"+url.PathEscape(data.ID)))
+	request.Header("Location", endpointURL(dependencies.EndpointOptions(), "/api/v1/studio/documents/"+url.PathEscape(data.ID)))
 	writeDocument(ctx, request, consts.StatusCreated, data)
 }
 
@@ -350,7 +350,7 @@ func handleAddMember(ctx context.Context, request *app.RequestContext) {
 		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidUpstreamResponse)
 		return
 	}
-	request.Header("Location", endpointURL(dependencies.Endpoints, "/api/v1/studio/documents/"+url.PathEscape(documentID)+"/members/"+data.User.ID))
+	request.Header("Location", endpointURL(dependencies.EndpointOptions(), "/api/v1/studio/documents/"+url.PathEscape(documentID)+"/members/"+data.User.ID))
 	writeMember(ctx, request, consts.StatusCreated, data)
 }
 
@@ -424,7 +424,7 @@ func handleListAttachments(ctx context.Context, request *app.RequestContext) {
 		gatewaymiddleware.WriteKnowledgeError(ctx, request, err)
 		return
 	}
-	data, err := toAttachmentListData(attachments, dependencies.Endpoints)
+	data, err := toAttachmentListData(attachments, dependencies.EndpointOptions())
 	if err != nil {
 		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidUpstreamResponse)
 		return
@@ -454,12 +454,12 @@ func handleCreateAttachment(ctx context.Context, request *app.RequestContext) {
 		gatewaymiddleware.WriteKnowledgeError(ctx, request, err)
 		return
 	}
-	data, err := toAttachmentUploadData(upload, dependencies.Endpoints)
+	data, err := toAttachmentUploadData(upload, dependencies.EndpointOptions())
 	if err != nil {
 		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidUpstreamResponse)
 		return
 	}
-	request.Header("Location", endpointURL(dependencies.Endpoints, "/api/v1/studio/documents/"+url.PathEscape(documentID)+"/attachments/"+url.PathEscape(data.Attachment.ID)))
+	request.Header("Location", endpointURL(dependencies.EndpointOptions(), "/api/v1/studio/documents/"+url.PathEscape(documentID)+"/attachments/"+url.PathEscape(data.Attachment.ID)))
 	writeJSON(ctx, request, consts.StatusCreated, data)
 }
 
@@ -497,7 +497,7 @@ func mutateAttachment(ctx context.Context, request *app.RequestContext, complete
 		gatewaymiddleware.WriteKnowledgeError(ctx, request, err)
 		return
 	}
-	data, err := toAttachmentData(attachment, dependencies.Endpoints)
+	data, err := toAttachmentData(attachment, dependencies.EndpointOptions())
 	if err != nil {
 		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidUpstreamResponse)
 		return

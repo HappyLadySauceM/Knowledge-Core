@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/HappyLadySauce/Knowledge-Core/services/knowledge/internal/config"
@@ -18,19 +19,18 @@ import (
 
 type ClamAV struct {
 	address     string
-	dialTimeout time.Duration
-	scanTimeout time.Duration
-	maximum     int64
+	dialTimeout atomic.Int64
+	scanTimeout atomic.Int64
+	maximum     atomic.Int64
 }
 
 func New(options config.ScannerOptions) (*ClamAV, error) {
 	if err := options.Validate(); err != nil {
 		return nil, fmt.Errorf("create ClamAV scanner: %w", err)
 	}
-	return &ClamAV{
-		address: options.Address, dialTimeout: options.DialTimeout,
-		scanTimeout: options.ScanTimeout, maximum: options.MaximumStream,
-	}, nil
+	scanner := &ClamAV{address: options.Address}
+	scanner.SetLimits(options.DialTimeout, options.ScanTimeout, options.MaximumStream)
+	return scanner, nil
 }
 
 func (s *ClamAV) Ping(ctx context.Context) error {
@@ -75,7 +75,7 @@ func (s *ClamAV) Scan(ctx context.Context, source io.Reader) (domain.ScanResult,
 		read, readErr := buffered.Read(buffer)
 		if read > 0 {
 			total += int64(read)
-			if total > s.maximum {
+			if total > s.maximum.Load() {
 				return domain.ScanResult{}, errors.New("scan object: stream exceeds configured maximum")
 			}
 			var size [4]byte
@@ -116,8 +116,8 @@ func (s *ClamAV) dial(ctx context.Context) (net.Conn, context.CancelFunc, error)
 	if s == nil {
 		return nil, func() {}, errors.New("connect ClamAV: scanner is nil")
 	}
-	operationCtx, cancel := context.WithTimeout(ctx, s.scanTimeout)
-	connection, err := (&net.Dialer{Timeout: s.dialTimeout}).DialContext(operationCtx, "tcp", s.address)
+	operationCtx, cancel := context.WithTimeout(ctx, time.Duration(s.scanTimeout.Load()))
+	connection, err := (&net.Dialer{Timeout: time.Duration(s.dialTimeout.Load())}).DialContext(operationCtx, "tcp", s.address)
 	if err != nil {
 		cancel()
 		return nil, func() {}, fmt.Errorf("connect ClamAV: %w", err)
@@ -130,4 +130,12 @@ func (s *ClamAV) dial(ctx context.Context) (net.Conn, context.CancelFunc, error)
 		}
 	}
 	return connection, cancel, nil
+}
+
+func (s *ClamAV) SetLimits(dialTimeout, scanTimeout time.Duration, maximum int64) {
+	if s != nil {
+		s.dialTimeout.Store(int64(dialTimeout))
+		s.scanTimeout.Store(int64(scanTimeout))
+		s.maximum.Store(maximum)
+	}
 }

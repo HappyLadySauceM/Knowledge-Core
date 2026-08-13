@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/HappyLadySauce/Knowledge-Core/services/knowledge/internal/config"
@@ -25,8 +26,8 @@ type S3 struct {
 	client      *minio.Client
 	bucket      string
 	region      string
-	uploadTTL   time.Duration
-	downloadTTL time.Duration
+	uploadTTL   atomic.Int64
+	downloadTTL atomic.Int64
 }
 
 func Open(ctx context.Context, options config.ObjectStorageOptions) (*S3, error) {
@@ -57,10 +58,11 @@ func Open(ctx context.Context, options config.ObjectStorageOptions) (*S3, error)
 	if !exists {
 		return nil, fmt.Errorf("open object storage: bucket %q does not exist", options.Bucket)
 	}
-	return &S3{
+	storage := &S3{
 		client: client, bucket: options.Bucket, region: options.Region,
-		uploadTTL: options.UploadTTL, downloadTTL: options.DownloadTTL,
-	}, nil
+	}
+	storage.SetTTLs(options.UploadTTL, options.DownloadTTL)
+	return storage, nil
 }
 
 func (s *S3) Ping(ctx context.Context) error {
@@ -86,8 +88,8 @@ func (s *S3) PresignUpload(ctx context.Context, objectKey, mediaType, checksum s
 	headers.Set("X-Amz-Meta-Sha256", checksum)
 	headers.Set("X-Amz-Meta-Size", strconv.FormatInt(size, 10))
 	expires := time.Until(expiresAt)
-	if expires > s.uploadTTL {
-		expires = s.uploadTTL
+	if maximum := time.Duration(s.uploadTTL.Load()); expires > maximum {
+		expires = maximum
 	}
 	if expires < time.Second {
 		return domain.UploadTarget{}, ErrObjectMismatch
@@ -159,11 +161,19 @@ func (s *S3) PresignDownload(ctx context.Context, objectKey, filename, mediaType
 	parameters := url.Values{}
 	parameters.Set("response-content-type", mediaType)
 	parameters.Set("response-content-disposition", fmt.Sprintf("inline; filename*=UTF-8''%s", url.PathEscape(filename)))
-	u, err := s.client.PresignedGetObject(ctx, s.bucket, objectKey, s.downloadTTL, parameters)
+	downloadTTL := time.Duration(s.downloadTTL.Load())
+	u, err := s.client.PresignedGetObject(ctx, s.bucket, objectKey, downloadTTL, parameters)
 	if err != nil {
 		return "", time.Time{}, fmt.Errorf("presign object download: %w", err)
 	}
-	return u.String(), time.Now().UTC().Add(s.downloadTTL), nil
+	return u.String(), time.Now().UTC().Add(downloadTTL), nil
+}
+
+func (s *S3) SetTTLs(upload, download time.Duration) {
+	if s != nil {
+		s.uploadTTL.Store(int64(upload))
+		s.downloadTTL.Store(int64(download))
+	}
 }
 
 func (s *S3) RemoveObject(ctx context.Context, objectKey string) error {

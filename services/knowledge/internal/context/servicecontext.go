@@ -168,7 +168,7 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 			ComponentName: "knowledge-admin-http", LogComponent: "knowledge.admin",
 			Options: *cfg.AdminHTTP, TLSConfig: adminTLS,
 		},
-		runtime.Health, runtime.Metrics, runtime.Trace, runtime.Logger,
+		runtime.Health, runtime.Metrics, runtime.Trace, runtime.Logger, runtime.Requests,
 	)
 	if err != nil {
 		return nil, err
@@ -192,7 +192,7 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 		return nil, fmt.Errorf("load knowledge RPC TLS configuration: %w", err)
 	}
 	rpcServer, err := knowledgerpc.NewRPCServer(
-		ctx, *cfg.RPC, rpcTLS, rpcHandler, registry.Registry, runtime.Trace, runtime.Metrics, runtime.Logger,
+		ctx, *cfg.RPC, rpcTLS, rpcHandler, registry.Registry, runtime.Trace, runtime.Metrics, runtime.Logger, runtime.Requests,
 		map[string]string{"environment": cfg.App.Environment, "version": cfg.App.Version},
 	)
 	if err != nil {
@@ -212,6 +212,17 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 		RPCServer: rpcServer,
 		Workers:   workers, Admin: admin,
 	}, nil
+}
+
+func (s *ServiceContext) ApplyDynamicConfig(cfg config.Config) error {
+	if s == nil || s.Objects == nil || s.Scanner == nil || s.Attachments == nil || s.Workers == nil {
+		return errors.New("apply knowledge dynamic configuration: service context is required")
+	}
+	s.Objects.SetTTLs(cfg.ObjectStorage.UploadTTL, cfg.ObjectStorage.DownloadTTL)
+	s.Scanner.SetLimits(cfg.Scanner.DialTimeout, cfg.Scanner.ScanTimeout, cfg.Scanner.MaximumStream)
+	s.Attachments.SetUploadTTL(cfg.ObjectStorage.UploadTTL)
+	s.Workers.SetOptions(*cfg.Workers)
+	return nil
 }
 
 func addReadinessChecks(

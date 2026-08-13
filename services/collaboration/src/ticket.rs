@@ -1,6 +1,9 @@
 use std::{
     fmt,
-    sync::Arc,
+    sync::{
+        Arc,
+        atomic::{AtomicU64, Ordering},
+    },
     time::{Duration, Instant},
 };
 
@@ -104,7 +107,7 @@ pub trait TicketBackend: Send + Sync {
 #[derive(Clone)]
 pub struct TicketService {
     backend: Arc<dyn TicketBackend>,
-    ttl: Duration,
+    ttl_ms: Arc<AtomicU64>,
 }
 
 impl TicketService {
@@ -121,7 +124,11 @@ impl TicketService {
         }
         Ok(Self {
             backend,
-            ttl: config.ttl,
+            ttl_ms: Arc::new(AtomicU64::new(
+                u64::try_from(config.ttl.as_millis()).map_err(|_| {
+                    ServiceError::invalid_input("ticket TTL exceeds the supported range")
+                })?,
+            )),
         })
     }
 
@@ -138,7 +145,9 @@ impl TicketService {
     ) -> Result<IssuedTicket> {
         let now = OffsetDateTime::now_utc();
         let configured_expiry = now
-            .checked_add(duration_to_time(self.ttl)?)
+            .checked_add(duration_to_time(Duration::from_millis(
+                self.ttl_ms.load(Ordering::Acquire),
+            ))?)
             .ok_or_else(|| ServiceError::internal(anyhow::anyhow!("ticket expiry overflow")))?;
         let expires_at = configured_expiry.min(authorization.token_expires_at);
         if expires_at <= now {
@@ -204,6 +213,18 @@ impl TicketService {
     /// Returns an error when the backend is unavailable or returns an invalid response.
     pub async fn ping(&self) -> Result<()> {
         self.backend.ping().await
+    }
+
+    pub(crate) fn set_ttl(&self, ttl: Duration) -> Result<()> {
+        if ttl.is_zero() || ttl > Duration::from_mins(1) {
+            return Err(ServiceError::invalid_input(
+                "ticket TTL must be between one millisecond and 60 seconds",
+            ));
+        }
+        let ttl_ms = u64::try_from(ttl.as_millis())
+            .map_err(|_| ServiceError::invalid_input("ticket TTL exceeds the supported range"))?;
+        self.ttl_ms.store(ttl_ms, Ordering::Release);
+        Ok(())
     }
 }
 

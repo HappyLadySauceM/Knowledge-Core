@@ -8,5 +8,4 @@ metadata:
     app.kubernetes.io/part-of: knowledge-core
     app.kubernetes.io/managed-by: kustomize
 data:
-  GATEWAY_LOG_LEVEL: info
   GATEWAY_APP_ENVIRONMENT: development

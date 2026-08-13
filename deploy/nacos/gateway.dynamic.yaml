@@ -1,0 +1,68 @@
+api_version: knowledge-core.io/v1beta1
+kind: ApplicationConfig
+service: gateway
+revision: 1
+config:
+  app:
+    name: gateway
+    environment: development
+    startup_timeout: 30s
+    shutdown_timeout: 35s
+  log:
+    level: info
+    add_source: false
+    health_check_requests: false
+  trace:
+    enabled: false
+    endpoint: 127.0.0.1:4317
+    sample_ratio: 0.1
+    insecure: true
+    batch_timeout: 5s
+    export_timeout: 10s
+    tls: {enabled: false}
+  public_http:
+    address: :8080
+    read_timeout: 10s
+    write_timeout: 30s
+    idle_timeout: 2m
+    shutdown_timeout: 15s
+    max_request_body_size: 4194304
+    tls: {enabled: false}
+  admin_http:
+    address: :8082
+    read_timeout: 10s
+    write_timeout: 30s
+    idle_timeout: 2m
+    shutdown_timeout: 15s
+    max_request_body_size: 4194304
+    tls: {enabled: false}
+  redis:
+    address: 127.0.0.1:6379
+    db: 0
+    dial_timeout: 5s
+    read_timeout: 3s
+    write_timeout: 3s
+    pool_size: 20
+    min_idle_conns: 2
+    max_retries: 3
+    tls: {enabled: false}
+  etcd:
+    endpoints: [127.0.0.1:2379]
+    prefix: /knowledge-core/development/registry
+    dial_timeout: 5s
+    request_timeout: 3s
+    tls: {enabled: false}
+  identity_rpc: {service_name: knowledge-core.identity, connect_timeout: 500ms, request_timeout: 3s, tls: {enabled: false}}
+  knowledge_rpc: {service_name: knowledge-core.knowledge, connect_timeout: 500ms, request_timeout: 5s, tls: {enabled: false}}
+  collaboration_rpc: {service_name: knowledge-core.collaboration, connect_timeout: 500ms, request_timeout: 5s, tls: {enabled: false}}
+  endpoints:
+    public_base_url: http://localhost:8080
+    collaboration_websocket_base_url: ws://localhost:8091
+  cors:
+    allowed_origins: [http://localhost:3000]
+    trusted_proxy_cidrs: []
+  rate_limit:
+    key_prefix: knowledge-core:development:gateway:rate-limit
+    window: 1m
+    global_limit: 300
+    auth_limit: 20

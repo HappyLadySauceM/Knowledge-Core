@@ -1,3 +1,4 @@
+use arc_swap::ArcSwap;
 use std::{
     collections::{HashMap, HashSet},
     future::Future,
@@ -164,7 +165,7 @@ pub struct ActorRegistry {
 
 struct RegistryInner {
     store: Arc<dyn DocumentStore>,
-    limits: ActorLimits,
+    limits: ArcSwap<ActorLimits>,
     metrics: Metrics,
     entries: Mutex<HashMap<DocumentId, RegistryEntry>>,
     permission_revisions: Mutex<PermissionRevisionCache>,
@@ -288,7 +289,7 @@ impl ActorRegistry {
         Self {
             inner: Arc::new(RegistryInner {
                 store,
-                limits,
+                limits: ArcSwap::from_pointee(limits),
                 metrics,
                 entries: Mutex::new(HashMap::new()),
                 permission_revisions: Mutex::new(PermissionRevisionCache::new(
@@ -484,10 +485,11 @@ impl ActorRegistry {
         }
 
         let actor_id = Uuid::now_v7();
-        let (commands, receiver) = mpsc::channel(self.inner.limits.command_capacity);
+        let limits = self.inner.limits.load_full();
+        let (commands, receiver) = mpsc::channel(limits.command_capacity);
         let handle = ActorHandle {
             commands: commands.clone(),
-            command_timeout: self.inner.limits.command_timeout,
+            command_timeout: limits.command_timeout,
         };
         entries.insert(
             document_id,
@@ -507,7 +509,7 @@ impl ActorRegistry {
                 commands,
                 receiver,
                 Arc::clone(&inner.store),
-                inner.limits,
+                *inner.limits.load_full(),
                 inner.metrics.clone(),
                 initial_permission_revision,
                 inner.cancellation.child_token(),
@@ -530,6 +532,10 @@ impl ActorRegistry {
             inner.metrics.actor_stopped();
         });
         Ok(handle)
+    }
+
+    pub(crate) fn set_limits(&self, limits: ActorLimits) {
+        self.inner.limits.store(Arc::new(limits));
     }
 }
 

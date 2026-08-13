@@ -8,9 +8,9 @@ func TestManagerAppliesOnlyMonotonicUnambiguousRevisions(t *testing.T) {
 	t.Parallel()
 	manager := &Manager{}
 	applied := 0
-	manager.apply = func(DynamicDocument) error {
+	manager.apply = func(DynamicDocument) (ApplyResult, error) {
 		applied++
-		return nil
+		return ApplyResult{}, nil
 	}
 	initial := DynamicDocument{
 		APIVersion: DynamicAPIVersion,

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	coreauth "github.com/HappyLadySauce/Knowledge-Core/pkg/auth"
+	"github.com/HappyLadySauce/Knowledge-Core/pkg/configcenter"
 	"github.com/spf13/cobra"
 )
 
@@ -50,6 +51,57 @@ func TestProviderLoadsPublicKeyFromEnvironment(t *testing.T) {
 	}
 	if loaded.Auth == nil || loaded.Auth.PublicKey != keys.PublicKey {
 		t.Fatalf("loaded auth = %#v", loaded.Auth)
+	}
+}
+
+func TestApplicationDocumentRespectsEnvironmentAndRejectsSecrets(t *testing.T) {
+	keys, err := coreauth.GenerateKeyPair()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GATEWAY_AUTH_PUBLIC_KEY", keys.PublicKey)
+	t.Setenv("GATEWAY_LOG_LEVEL", "error")
+	current := New()
+	current.Auth.PublicKey = keys.PublicKey
+	document := configcenter.DynamicDocument{APIVersion: configcenter.ApplicationAPIVersion, Kind: configcenter.ApplicationKind, Service: "gateway", Revision: 2, Config: map[string]any{"log": map[string]any{"level": "debug", "health_check_requests": false}, "rate_limit": map[string]any{"global_limit": 500}}}
+	candidate, result, err := applyDocument(current, current, current, document)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if candidate.Log.Level != "error" || candidate.Log.HealthCheckRequests || candidate.RateLimit.GlobalLimit != 500 {
+		t.Fatalf("candidate = %#v", candidate)
+	}
+	if len(result.RestartRequiredFields) != 0 {
+		t.Fatalf("restart fields = %#v", result.RestartRequiredFields)
+	}
+	document.Config = map[string]any{"auth": map[string]any{"public_key": "secret"}}
+	if _, _, err := applyDocument(current, current, current, document); err == nil {
+		t.Fatal("sensitive field was accepted")
+	}
+}
+
+func TestApplicationDocumentRebuildsFromBaseline(t *testing.T) {
+	keys, err := coreauth.GenerateKeyPair()
+	if err != nil {
+		t.Fatal(err)
+	}
+	baseline := New()
+	baseline.Auth.PublicKey = keys.PublicKey
+	first := configcenter.DynamicDocument{APIVersion: configcenter.ApplicationAPIVersion, Kind: configcenter.ApplicationKind, Service: "gateway", Revision: 2, Config: map[string]any{"rate_limit": map[string]any{"global_limit": 900}}}
+	current, _, err := applyDocument(baseline, baseline, baseline, first)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second := configcenter.DynamicDocument{APIVersion: configcenter.ApplicationAPIVersion, Kind: configcenter.ApplicationKind, Service: "gateway", Revision: 3, Config: map[string]any{"log": map[string]any{"level": "debug"}}}
+	candidate, _, err := applyDocument(current, baseline, baseline, second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if candidate.RateLimit.GlobalLimit != baseline.RateLimit.GlobalLimit {
+		t.Fatalf("global limit = %d, want baseline %d", candidate.RateLimit.GlobalLimit, baseline.RateLimit.GlobalLimit)
+	}
+	if baseline.Log.Level != "info" || baseline.RateLimit.GlobalLimit != 300 {
+		t.Fatalf("baseline was mutated: %#v", baseline)
 	}
 }
 

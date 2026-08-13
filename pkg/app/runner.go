@@ -66,6 +66,7 @@ type Runtime struct {
 	Trace    *trace.Runtime
 	Health   *health.Registry
 	Metrics  *metrics.Registry
+	Requests *corelog.RequestControl
 	logLevel *slog.LevelVar
 	shutdown time.Duration
 
@@ -78,14 +79,21 @@ type Runtime struct {
 	isClosed   bool
 }
 
-func newRuntime(logger *slog.Logger, levelControl *slog.LevelVar, telemetry *trace.Runtime, metricRegistry *metrics.Registry, shutdown time.Duration) *Runtime {
+func newRuntime(logger *slog.Logger, levelControl *slog.LevelVar, telemetry *trace.Runtime, metricRegistry *metrics.Registry, healthCheckRequests bool, shutdown time.Duration) *Runtime {
 	return &Runtime{
 		Logger:   logger,
 		Trace:    telemetry,
 		Health:   health.NewRegistry(),
 		Metrics:  metricRegistry,
+		Requests: corelog.NewRequestControl(healthCheckRequests),
 		logLevel: levelControl,
 		shutdown: shutdown,
+	}
+}
+
+func (r *Runtime) SetHealthCheckRequestLogs(enabled bool) {
+	if r != nil {
+		r.Requests.SetHealthCheckRequests(enabled)
 	}
 }
 

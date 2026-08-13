@@ -46,13 +46,18 @@ func AccessLog() app.HandlerFunc {
 		if route == "" {
 			route = "unmatched"
 		}
+		_, trustedProxies, _, _ := dependencies.Dynamic()
+		status := request.Response.StatusCode()
+		if status >= 200 && status < 300 && (route == "/health/live" || route == "/health/ready") && !dependencies.RequestLogs.HealthCheckRequests() {
+			return
+		}
 		dependencies.Logger.InfoContext(ctx, "HTTP request completed",
 			slog.String("component", "gateway.public"),
 			slog.String("event", "request"),
 			slog.String("http.method", string(request.Method())),
 			slog.String("http.route", route),
 			slog.Int("http.status_code", request.Response.StatusCode()),
-			slog.String("client.address", ClientIP(request, dependencies.TrustedProxies)),
+			slog.String("client.address", ClientIP(request, trustedProxies)),
 			slog.Duration("duration", time.Since(started)),
 		)
 	}
@@ -89,7 +94,8 @@ func CORS() app.HandlerFunc {
 			WriteError(ctx, request, ErrInternal)
 			return
 		}
-		if _, allowed := dependencies.AllowedOrigins[origin]; !allowed {
+		allowedOrigins, _, _, _ := dependencies.Dynamic()
+		if _, allowed := allowedOrigins[origin]; !allowed {
 			WriteError(ctx, request, ErrPermissionDenied)
 			return
 		}
@@ -176,14 +182,15 @@ func CollaborationSessionRateLimit() app.HandlerFunc {
 		if dependencies.Now != nil {
 			now = dependencies.Now()
 		}
+		_, trustedProxies, rateLimit, _ := dependencies.Dynamic()
 		for _, subject := range []struct {
 			scope string
 			key   string
 		}{
-			{scope: "collaboration_session_ip", key: ClientIP(request, dependencies.TrustedProxies)},
+			{scope: "collaboration_session_ip", key: ClientIP(request, trustedProxies)},
 			{scope: "collaboration_session_user", key: "user:" + strconv.FormatInt(principal.UserID, 10)},
 		} {
-			if !consumeRateLimit(ctx, request, dependencies, subject.scope, subject.key, now, dependencies.RateLimit.AuthLimit) {
+			if !consumeRateLimit(ctx, request, dependencies, subject.scope, subject.key, now, rateLimit.AuthLimit, rateLimit.Window) {
 				return
 			}
 		}
@@ -207,9 +214,10 @@ func rateLimit(scope string, limit func(configRateLimit) int64) app.HandlerFunc 
 		if dependencies.Now != nil {
 			now = dependencies.Now()
 		}
+		_, trustedProxies, rateLimit, _ := dependencies.Dynamic()
 		if !consumeRateLimit(
-			ctx, request, dependencies, scope, ClientIP(request, dependencies.TrustedProxies), now,
-			limit(configRateLimit{global: dependencies.RateLimit.GlobalLimit, auth: dependencies.RateLimit.AuthLimit}),
+			ctx, request, dependencies, scope, ClientIP(request, trustedProxies), now,
+			limit(configRateLimit{global: rateLimit.GlobalLimit, auth: rateLimit.AuthLimit}), rateLimit.Window,
 		) {
 			return
 		}
@@ -225,9 +233,10 @@ func consumeRateLimit(
 	subject string,
 	now time.Time,
 	limit int64,
+	window time.Duration,
 ) bool {
 	allowed, retryAfter, err := dependencies.Limiter.Consume(
-		ctx, scope, subject, now, dependencies.RateLimit.Window, limit,
+		ctx, scope, subject, now, window, limit,
 	)
 	if err != nil {
 		dependencies.Logger.ErrorContext(ctx, "gateway rate limiter failed",

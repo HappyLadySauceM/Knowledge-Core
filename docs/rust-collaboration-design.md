@@ -215,6 +215,8 @@ snapshot worker 用单个 lateral aggregate 同时计算每个 document 自水�
 
 - Production 必须使用 `wss`、精确非空 Origin、RPC mTLS、PostgreSQL 验证 TLS、`rediss`、NATS TLS 和 Etcd TLS/认证。
 - Nacos SDK 的 HTTPS 登录与 gRPC 使用同一显式 CA，但分别受 `SSL_CERT_FILE` 与 `NACOS_CLIENT_TLS_CA_CERT` 控制；`HOME/nacos` 对齐 `KNOWLEDGE_CORE_NACOS_RUNTIME_DIR` 的有界 `emptyDir`。启动在创建 SDK 前校验 CA、路径并预建 cache 目录，SDK auth 日志被强制关闭且其余 SDK 日志不高于 warn，动态 debug 级别不能放开凭据或配置 payload。
+- Collaboration 同时接受迁移期 `v1alpha1/DynamicConfig` 与服务绑定的 `v1beta1/ApplicationConfig`。初始文档在依赖装配前合并，优先级为默认值 `<` Nacos `<` 显式 `COLLABORATION_*` 环境变量；监听器只在 ticket、actor 与 WebSocket 动态目标全部创建后启动。Origin、握手限流、frame/update/document/awareness 限制、ticket TTL 和新 actor 限制可在线替换；listener、连接、最大总连接信号量、固定 channel 容量、协议名和 worker 调度变化标记 `restart_required`。无效修订整体拒绝并保留 last-good。
+- `log.health_check_requests` 默认开启，dev Nacos 模板关闭。当前 Rust admin 与 Volo Ping/Live 不产生成功 access completion log，因此关闭开关不会隐藏错误、panic 或业务请求日志，并为后续新增 access log 保留统一契约。
 - Secret 只从环境变量或 Secret manager 注入；配置文件只保存非敏感默认值。ticket、JWT、TLS key、DSN、Redis key、payload 和 SQL 参数禁止进入日志与 telemetry。
 - Gateway 对 session route 使用认证、按用户/IP 限流和请求体空校验；Rust 对握手、连接、document、update 和 awareness 再执行独立边界。
 - Prometheus label 只使用稳定 route/RPC method、status/code、dependency 和 access；禁止 document/user/session/request ID 与原始错误。

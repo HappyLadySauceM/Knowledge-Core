@@ -12,6 +12,7 @@ import (
 
 	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/knowledge"
 	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/knowledge/knowledgeservice"
+	corelog "github.com/HappyLadySauce/Knowledge-Core/pkg/log"
 	"github.com/HappyLadySauce/Knowledge-Core/pkg/metrics"
 	"github.com/HappyLadySauce/Knowledge-Core/pkg/option"
 	coretrace "github.com/HappyLadySauce/Knowledge-Core/pkg/trace"
@@ -44,6 +45,7 @@ func NewRPCServer(
 	telemetry *coretrace.Runtime,
 	metricsRegistry *metrics.Registry,
 	logger *slog.Logger,
+	requestLogs *corelog.RequestControl,
 	tags map[string]string,
 ) (*RPCServer, error) {
 	if ctx == nil || service == nil || serviceRegistry == nil || telemetry == nil || metricsRegistry == nil || logger == nil {
@@ -78,7 +80,7 @@ func NewRPCServer(
 	}
 	serverOptions = append(serverOptions, coretrace.KitexServerOptions(telemetry)...)
 	serverOptions = append(serverOptions, kitexserver.WithMiddleware(metrics.KitexServerMiddleware(metricsRegistry)))
-	serverOptions = append(serverOptions, kitexserver.WithMiddleware(accessLogMiddleware(logger)))
+	serverOptions = append(serverOptions, kitexserver.WithMiddleware(accessLogMiddleware(logger, requestLogs)))
 	if tlsConfig != nil {
 		serverOptions = append(serverOptions,
 			kitexserver.WithTransServerFactory(gonet.NewTransServerFactory()),
@@ -146,7 +148,7 @@ func stopRPCServer(server kitexserver.Server, listener net.Listener) (err error)
 	return errors.Join(server.Stop(), closeListener(listener))
 }
 
-func accessLogMiddleware(logger *slog.Logger) endpoint.Middleware {
+func accessLogMiddleware(logger *slog.Logger, requestLogs *corelog.RequestControl) endpoint.Middleware {
 	return func(next endpoint.Endpoint) endpoint.Endpoint {
 		return func(ctx context.Context, request, response any) error {
 			started := time.Now()
@@ -164,7 +166,7 @@ func accessLogMiddleware(logger *slog.Logger) endpoint.Middleware {
 					slog.Int64("rpc.business_code", int64(businessError.BizStatusCode())),
 					slog.String("rpc.business_message", businessError.BizMessage()),
 				)...)
-			} else {
+			} else if requestLogs.HealthCheckRequests() || (methodName != "Ping" && methodName != "Live") {
 				logger.InfoContext(ctx, "RPC request completed", attributes...)
 			}
 			return err

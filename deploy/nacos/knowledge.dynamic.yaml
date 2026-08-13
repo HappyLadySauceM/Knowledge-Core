@@ -1,0 +1,19 @@
+api_version: knowledge-core.io/v1beta1
+kind: ApplicationConfig
+service: knowledge
+revision: 1
+config:
+  app: {name: knowledge, environment: development, startup_timeout: 30s, shutdown_timeout: 45s}
+  log: {level: info, add_source: false, health_check_requests: false}
+  trace: {enabled: false, endpoint: 127.0.0.1:4317, sample_ratio: 0.1, insecure: true, batch_timeout: 5s, export_timeout: 10s, tls: {enabled: false}}
+  rpc: {address: ":8882", service_name: knowledge-core.knowledge, read_write_timeout: 30s, exit_wait_timeout: 10s, max_connections: 0, tls: {enabled: false}}
+  admin_http: {address: ":8083", read_timeout: 10s, write_timeout: 30s, idle_timeout: 2m, shutdown_timeout: 15s, max_request_body_size: 4194304, tls: {enabled: false}}
+  postgres: {host: 127.0.0.1, port: 5432, user: knowledge_core, database: knowledge_core, ssl_mode: disable, time_zone: UTC, max_idle_conns: 10, max_open_conns: 100, conn_max_lifetime: 1h, conn_max_idle_time: 30m, connect_timeout: 5s, slow_threshold: 200ms, prepare_stmt: false, tls: {enabled: false}}
+  etcd: {endpoints: [127.0.0.1:2379], prefix: /knowledge-core/development/registry, dial_timeout: 5s, request_timeout: 3s, tls: {enabled: false}}
+  nats: {servers: [nats://127.0.0.1:4222], name: knowledge-core.knowledge, connect_timeout: 5s, request_timeout: 5s, max_reconnects: -1, reconnect_wait: 2s, ping_interval: 2m, max_pings_out: 2, drain_timeout: 10s, tls: {enabled: false}}
+  identity_rpc: {service_name: knowledge-core.identity, connect_timeout: 500ms, request_timeout: 3s, tls: {enabled: false}}
+  auth: {}
+  object_storage: {endpoint: 127.0.0.1:9000, region: us-east-1, bucket: knowledge-core, secure: false, auto_create_bucket: true, upload_ttl: 15m, download_ttl: 5m}
+  scanner: {address: 127.0.0.1:3310, dial_timeout: 3s, scan_timeout: 30s, maximum_stream: 67108864}
+  collaboration_rpc: {service_name: knowledge-core.collaboration, connect_timeout: 500ms, request_timeout: 5s, tls: {enabled: false}}
+  workers: {poll_interval: 30s, operation_timeout: 30s}

@@ -6,12 +6,13 @@ import (
 )
 
 type LogOptions struct {
-	Level     string `mapstructure:"level" json:"level" yaml:"level"`
-	AddSource bool   `mapstructure:"add_source" json:"add_source" yaml:"add_source"`
+	Level               string `mapstructure:"level" json:"level" yaml:"level"`
+	AddSource           bool   `mapstructure:"add_source" json:"add_source" yaml:"add_source"`
+	HealthCheckRequests bool   `mapstructure:"health_check_requests" json:"health_check_requests" yaml:"health_check_requests"`
 }
 
 func NewLogOptions() *LogOptions {
-	return &LogOptions{Level: "info"}
+	return &LogOptions{Level: "info", HealthCheckRequests: true}
 }
 
 func (o LogOptions) Validate() error {
