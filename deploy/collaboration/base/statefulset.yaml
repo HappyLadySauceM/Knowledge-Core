@@ -12,10 +12,12 @@ spec:
   replicas: 1
   revisionHistoryLimit: 3
   minReadySeconds: 5
+  # k3s 1.36 persists RollingUpdate.partition=0 and drops maxUnavailable unless MaxUnavailableStatefulSet is enabled.
+  # k3s 1.36 会持久化 partition=0；未开启 MaxUnavailableStatefulSet 时会丢弃 maxUnavailable。
   updateStrategy:
     type: RollingUpdate
     rollingUpdate:
-      maxUnavailable: 1
+      partition: 0
   selector:
     matchLabels:
       app.kubernetes.io/name: knowledge-core-collaboration
