@@ -68,15 +68,6 @@ redis:
   tls:
     enabled: false
 
-etcd:
-  endpoints:
-    - 127.0.0.1:2379
-  prefix: /knowledge-core/development/registry
-  dial_timeout: 5s
-  request_timeout: 3s
-  tls:
-    enabled: false
-
 bcrypt:
   cost: 12
 

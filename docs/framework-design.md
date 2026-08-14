@@ -1,6 +1,6 @@
 # Knowledge Core 框架设计
 
-> 状态：当前代码实现基线，更新于 2026-08-04。系统由 Gateway、Identity、Knowledge 和 Rust Collaboration 四个服务组成；Rust 切换尚未在生产环境执行，性能、完整链路和切换/回滚演练仍是发布前门禁。Identity 与 Knowledge 的真实 PostgreSQL 集成测试仍未纳入当前门禁。
+> 状态：当前代码实现基线，更新于 2026-08-14。系统由 Gateway、Identity、Knowledge 和 Rust Collaboration 四个服务组成；Rust 切换尚未在生产环境执行，性能、完整链路和切换/回滚演练仍是发布前门禁。Identity 与 Knowledge 的真实 PostgreSQL 集成测试仍未纳入当前门禁。
 >
 > Rust Collaboration 的设计决策、实现状态和未完成验证见 [`rust-collaboration-design.md`](rust-collaboration-design.md)，破坏性切换边界见 [`migrations/2026-08-rust-collaboration.md`](migrations/2026-08-rust-collaboration.md)。
 
@@ -27,10 +27,10 @@ Knowledge Core 是一个包含 Go module 与 Rust workspace 的 Monorepo。公�
 
 | 服务 | 入口 | 拥有的数据 | 必需依赖 |
 | --- | --- | --- | --- |
-| Gateway | public `:8080`，admin `:8082` | 无业务数据库 | Redis、Etcd resolver、Identity RPC、Knowledge RPC、Collaboration RPC |
-| Identity | RPC `:8881`，admin `:8081` | PostgreSQL `identity` schema | PostgreSQL、Redis、Etcd registry |
-| Knowledge | RPC `:8882`，admin `:8083` | PostgreSQL `knowledge` schema、S3 对象 | PostgreSQL、Etcd registry/resolver、NATS JetStream、Identity RPC、S3、ClamAV、Collaboration RPC |
-| Collaboration | WebSocket `:8091`，RPC `:8883`，admin `:8084` | PostgreSQL `collaboration` schema 中的 Yjs update、snapshot、version、projection job 和 outbox | PostgreSQL、Redis、NATS JetStream、Etcd registry/resolver、Knowledge RPC |
+| Gateway | public `:8080`，admin `:8082` | 无业务数据库 | Redis、Identity RPC、Knowledge RPC、Collaboration RPC |
+| Identity | RPC `:8881`，admin `:8081` | PostgreSQL `identity` schema | PostgreSQL、Redis |
+| Knowledge | RPC `:8882`，admin `:8083` | PostgreSQL `knowledge` schema、S3 对象 | PostgreSQL、NATS JetStream、Identity RPC、S3、ClamAV、Collaboration RPC |
+| Collaboration | WebSocket `:8091`，RPC `:8883`，admin `:8084` | PostgreSQL `collaboration` schema 中的 Yjs update、snapshot、version、projection job 和 outbox | PostgreSQL、Redis、NATS JetStream、Knowledge RPC |
 
 所有权规则如下：
 
@@ -50,7 +50,7 @@ pkg/
   error/        稳定错误、Kitex/Hertz 映射与 RFC 9457
   option/       可复用配置模型及校验
   log/trace/metrics/health/metadata/
-  postgres/redis/etcd/nats/
+  postgres/redis/nats/
   transport/    Hertz、Kitex 的公共传输适配
 
 services/<go-service>/
@@ -66,7 +66,7 @@ services/collaboration/
   Cargo.lock/deny.toml/rust-toolchain.toml
   src/actor.rs        文档 actor、持久化后应用与广播
   src/websocket.rs    Axum WebSocket、y-sync 与 awareness
-  src/rpc/            Volo server/client、Etcd 与 mTLS
+  src/rpc/            Volo server/client、静态 DNS 发现与 mTLS
   src/storage/        SQLx PostgreSQL repository 与 migration
   src/worker.rs       投影、快照、自动版本、outbox 与失效订阅
   interop/            最小 Node/Yjs/y-prosemirror 互操作 fixture
@@ -86,23 +86,23 @@ Go 服务使用 `pkg/app.Spec[C]` 注册配置、公共 runtime options 和 `Ser
 ```text
 Identity
   PostgreSQL -> migration -> UserRepository -> register/authenticate/get-user logic
-  Redis + Etcd registry -> Kitex RPC + Hertz admin
+  Redis -> Kitex RPC + Hertz admin
 
 Knowledge
   PostgreSQL -> versioned SQL migration -> Store -> document/member/attachment logic
-  Etcd registry/resolver -> Identity client
+  Identity Kitex client (static host:port)
   NATS JetStream + S3 + ClamAV + Collaboration Kitex client -> workers
   Kitex RPC + Hertz admin
 
 Gateway
-  Redis limiter + Etcd resolver
-  -> Identity/Knowledge/Collaboration typed Kitex clients
+  Redis limiter
+  -> Identity/Knowledge/Collaboration typed Kitex clients (static host:port)
   -> JWT verifier + HTTP middleware/handlers
   -> Hertz public + Hertz admin
 
 Collaboration
-  SQLx migration + Redis ticket store + NATS JetStream + Etcd
-  -> Knowledge Volo client + document actors
+  SQLx migration + Redis ticket store + NATS JetStream
+  -> Knowledge Volo client (static host:port) + document actors
   -> Axum WebSocket/admin + Volo RPC + version/projection/outbox workers
 ```
 
@@ -149,6 +149,8 @@ Knowledge RPC 除文档、成员和附件用例外，还提供：
 - `Live`：只证明 Knowledge RPC 进程存活，不读取 readiness。Collaboration 启动和 supervisor 使用该方法，避免 Knowledge readiness 与 Collaboration readiness 互相等待。
 
 Collaboration RPC 提供 `Ping`、`CreateSession`、版本列表/创建/详情/恢复和 `PurgeDocument`。除 `Ping` 外的六个业务 RPC 都先检查完整应用 readiness；not-ready 时统一返回 `40007 / collaboration.unavailable`，且不会调用 Knowledge、ticket、store 或 actor。Gateway 通过 `CreateSession` 获得短期 ticket；Knowledge 的清理 worker 通过 `PurgeDocument` 删除协作数据。生产 RPC 双向验证 mTLS，并通过 TTHeader 传播 deadline、request ID、W3C trace 和必要的敏感 token metadata；token 永不进入日志或 telemetry。
+
+内部 RPC 客户端使用静态 `host:port`，由系统 DNS 解析：k3s 使用 ClusterIP Service FQDN，Compose/CI 使用 Docker 服务名。Go Kitex 通过 `WithHostPorts` 拨号；Collaboration 的 Volo Knowledge 客户端用 `StaticDiscover` 在每次 discover 时解析同一地址，非法 `host:port`、DNS 失败、空结果或超时均 fail closed，且不 watch Kubernetes EndpointSlice。进程不再向注册中心报名。Collaboration RPC 走 ClusterIP；WebSocket 仍走 per-pod Service 与 Higress `/v1/instances/{n}/`。生产环境拒绝 `localhost` 与环回拨号地址。
 
 WebSocket 入口为 `/v1/instances/{ordinal}/documents/{document_id}`。`COLLABORATION_INSTANCE_COUNT=1` 时进程额外接受 `/v1/documents/{document_id}`，供 Compose 单实例直连。CreateSession 按 `document_id` 的 SHA-256 桶与 Redis 粘性映射分配实例；Gateway 用 RPC 返回的 `instance_ordinal` 和已校验的 WebSocket base URL 构造 `websocket_url`，不得使用请求 `Host`。握手必须先核对路径 ordinal 与本机一致，再 `GETDEL` ticket；错实例返回 HTTP 404 且不消费 ticket。客户端先调用 Gateway session API，再通过 `Sec-WebSocket-Protocol: knowledge-core-yjs-v1, ticket.<opaque>` 传递一次性 ticket。握手还校验 UUIDv7、精确 Origin、协议、容量与速率边界。viewer 只读，session 到期后客户端重新创建 session；不提供旧 Hocuspocus token refresh 扩展。
 
@@ -221,15 +223,15 @@ Nacos Data ID 继续使用 `<service>.dynamic.yaml`。新格式为 `knowledge-co
 
 k3s 中 Nacos 部署在 `nacos` namespace，HTTP/gRPC 使用现有 `happyladysauce-ca` 签发的 TLS 证书，并复用已有 PostgreSQL 服务中的独立 `nacos` database。唯一应用环境使用 Nacos namespace `dev`，每个服务只读自己的 `<service>.dynamic.yaml`。应用 namespace 通过只含公共证书的 ConfigMap 挂载 CA；TLS 私钥不跨 namespace 复制。发布必须使用独立运维 writer 身份，只授予 `dev/KNOWLEDGE_CORE/<service>.dynamic.yaml` 的写权限，禁止复用应用 reader 或 Nacos 管理员。明文模板位于 `deploy/nacos/`，只包含非敏感配置；`configctl validate/encrypt --service <service>` 在发布前校验服务绑定，实际凭据和 KEK 仅从受控 Secret/环境注入。
 
-k3s 的项目 PostgreSQL database 为 `knowledge_core_dev`。Identity、Knowledge、Collaboration 使用独立 role 和各自拥有的 schema；由于当前启动 migration 会幂等执行 `CREATE SCHEMA IF NOT EXISTS`，三个 role 需要该 database 的 `CONNECT,CREATE`，但不获得其他 schema 的对象权限。Etcd readiness 使用项目已授权 registry prefix 的有界 range read 验证 TLS、认证与权限，不调用只允许 root 的 Maintenance/Status。
+k3s 的项目 PostgreSQL database 为 `knowledge_core_dev`。Identity、Knowledge、Collaboration 使用独立 role 和各自拥有的 schema；由于当前启动 migration 会幂等执行 `CREATE SCHEMA IF NOT EXISTS`，三个 role 需要该 database 的 `CONNECT,CREATE`，但不获得其他 schema 的对象权限。
 
 代码当前强制的生产约束包括：
 
 - Gateway 的公开 base URL 必须与 public listener TLS 一致；production 的 Collaboration RPC client 必须使用验证开启的双向 mTLS，公开协作地址必须为 `wss`。
 - Knowledge 的非 development 环境要求 Collaboration RPC 双向 mTLS，并禁止自动创建对象存储 bucket。
-- Collaboration production 要求非空精确 Origin、RPC 双向 mTLS、PostgreSQL 验证 TLS、`rediss`、Knowledge RPC 双向 mTLS，以及 NATS 与 Etcd TLS。公开 WebSocket TLS 可由服务或明确信任的 ingress 终止。
+- Collaboration production 要求非空精确 Origin、RPC 双向 mTLS、PostgreSQL 验证 TLS、`rediss`、Knowledge RPC 双向 mTLS，以及 NATS TLS。公开 WebSocket TLS 可由服务或明确信任的 ingress 终止。
 
-公共 option 还支持 Go 服务的 PostgreSQL、Redis、Etcd、NATS、Kitex、Hertz 和 OTLP TLS。生产部署必须为实际网络边界启用 TLS/mTLS；尚未由环境模式强制的传输不能因为默认 development 配置可启动就视为生产安全。
+公共 option 还支持 Go 服务的 PostgreSQL、Redis、NATS、Kitex、Hertz 和 OTLP TLS。生产部署必须为实际网络边界启用 TLS/mTLS；尚未由环境模式强制的传输不能因为默认 development 配置可启动就视为生产安全。
 
 ## 9. 输入安全、错误和观测
 
@@ -243,26 +245,26 @@ Go 服务日志统一使用 `log/slog` JSON 和 `pkg/log` 脱敏，trace 使用 
 
 本地 Compose 与 k3s dev 都把 OTel Collector 放在应用/Higress 与 Tempo 之间。Collector 通过 OTLP (`4317/4318`) 接收 trace，过滤、采样后统一以 OTLP 写入 Tempo。Go/Rust 服务只通过环境变量注入 OTLP endpoint，生产 endpoint、TLS 和鉴权由部署平台提供。Gateway CORS 允许 `traceparent`/`tracestate`，但不允许浏览器 `baggage`；W3C baggage 在内部允许完整合法字段但总长度上限为 8 KiB，既不写入日志/span attribute，也不进入业务消息 payload。
 
-四个服务各自持有独立 Prometheus registry，并在 admin listener 的 `/metrics` 暴露。标签只使用路由模板、RPC 方法、状态码、稳定业务码和依赖名等低基数字段。Rust Collaboration 使用 `tracing` JSON、W3C TraceContext/Baggage 与可选 OTLP exporter；WebSocket、Volo、SQLx、Redis、Etcd 和 NATS 延续 request context，且不记录 ticket、token、payload、DSN 或用户/文档 ID metric label。
+四个服务各自持有独立 Prometheus registry，并在 admin listener 的 `/metrics` 暴露。标签只使用路由模板、RPC 方法、状态码、稳定业务码和依赖名等低基数字段。Rust Collaboration 使用 `tracing` JSON、W3C TraceContext/Baggage 与可选 OTLP exporter；WebSocket、Volo、SQLx、Redis 和 NATS 延续 request context，且不记录 ticket、token、payload、DSN 或用户/文档 ID metric label。
 
 面向日常排障和交接的链路追踪说明见 [`trace-architecture.md`](trace-architecture.md)。
 
 ## 10. 生命周期与 readiness
 
-Go 长运行组件实现 `Name`、`Serve`、`Ready(context.Context)` 和 `Shutdown(context.Context)`。Runtime 并发启动组件，只有 listener、Kitex Etcd 注册和 worker readiness 均完成后才把进程设为 serving。组件的长期运行 context 由组件自身持有并通过 `Shutdown` 取消，不继承只用于装配和 readiness 的 startup deadline。
+Go 长运行组件实现 `Name`、`Serve`、`Ready(context.Context)` 和 `Shutdown(context.Context)`。Runtime 并发启动组件，只有 listener 和 worker readiness 均完成后才把进程设为 serving。组件的长期运行 context 由组件自身持有并通过 `Shutdown` 取消，不继承只用于装配和 readiness 的 startup deadline。
 
 服务 readiness 证明必要依赖可用：
 
-- Identity：PostgreSQL、Redis、Etcd。
-- Knowledge：PostgreSQL、Etcd registry/resolver、NATS、Identity、S3、ClamAV、Collaboration。
-- Gateway：Redis、Etcd resolver、Identity、Knowledge、Collaboration。
-- Collaboration：PostgreSQL、Knowledge `Live`、Redis ticket backend、NATS JetStream、Etcd discovery/registration、actor/workers 和三个 listener。
+- Identity：PostgreSQL、Redis。
+- Knowledge：PostgreSQL、NATS、Identity、S3、ClamAV、Collaboration。
+- Gateway：Redis、Identity、Knowledge、Collaboration。
+- Collaboration：PostgreSQL、Knowledge `Live`、Redis ticket backend、NATS JetStream、actor/workers 和三个 listener。
 
-Collaboration 探测 Knowledge `Live`，而 Knowledge 使用 Collaboration `Ping` 检查 readiness，因此没有互相等待的 readiness 闭环。Collaboration `Ping` 与 admin ready 共用完整应用 `HealthState`，启动中或任一受监督依赖/listener 失败时返回 `not_ready`，不能只凭 Etcd 已注册判断。RPC serve task 正常返回、报错、panic 或被 abort 都会被标记为 stopped；非计划退出会立即停止 WebSocket 接入并触发进程失败。Etcd registration 除 keepalive 外还周期校验 key、value 与 lease 所有权，外部删除或覆盖会 fail closed；resolver 对注册记录中的严格 `host:port` 在 snapshot 总 deadline 内解析，非法地址、DNS 失败、空结果或超时同样 fail closed。Gateway 仍使用双方的 `Ping`。Compose 只约束依赖进程启动顺序；最终可服务状态由应用级 readiness 判定。
+Collaboration 探测 Knowledge `Live`，而 Knowledge 使用 Collaboration `Ping` 检查 readiness，因此没有互相等待的 readiness 闭环。Collaboration `Ping` 与 admin ready 共用完整应用 `HealthState`，启动中或任一受监督依赖/listener 失败时返回 `not_ready`。RPC serve task 正常返回、报错、panic 或被 abort 都会被标记为 stopped；非计划退出会立即停止 WebSocket 接入并触发进程失败。出站 RPC 地址为严格 `host:port`；非法地址、DNS 失败、空结果或超时 fail closed。Gateway 仍使用双方的 `Ping`。Compose 只约束依赖进程启动顺序；最终可服务状态由应用级 readiness 判定。
 
-退出时先把 readiness 设为失败，再按 component 注册逆序停止入口和 worker，等待在途请求，最后按逆序关闭 client、registry、消息、缓存和数据库资源，并 flush telemetry。所有启动、shutdown、cleanup 和 worker operation 都有时间上限。若组件未安全退出，Go Runtime 保留依赖而不是提前关闭底层资源。
+退出时先把 readiness 设为失败，再按 component 注册逆序停止入口和 worker，等待在途请求，最后按逆序关闭 client、消息、缓存和数据库资源，并 flush telemetry。所有启动、shutdown、cleanup 和 worker operation 都有时间上限。若组件未安全退出，Go Runtime 保留依赖而不是提前关闭底层资源。
 
-Collaboration 收到信号后先 not-ready 并撤销 Etcd 注册，再停止 RPC 与 WebSocket 接入、关闭连接和 actor、停止 worker/subscription，最后关闭 Knowledge client、Etcd、NATS、Redis、PostgreSQL 并 flush telemetry；进程级 timeout 限制整个 shutdown。NATS subscription 意外结束会 fail closed，由外部编排重启进程。
+Collaboration 收到信号后先 not-ready，再停止 RPC 与 WebSocket 接入、关闭连接和 actor、停止 worker/subscription，最后关闭 Knowledge client、NATS、Redis、PostgreSQL 并 flush telemetry；进程级 timeout 限制整个 shutdown。NATS subscription 意外结束会 fail closed，由外部编排重启进程。
 
 ## 11. 生成、验证与交付
 
@@ -278,7 +280,7 @@ make generate-check
 go run ./scripts/idlguard compat-git <merge-base> idl
 ```
 
-`make ci` 同时执行 Go/Rust format、vet、golangci-lint、Clippy `-D warnings`、无缓存测试、release build、govulncheck、cargo-deny 和 Go/Rust 生成漂移检查。`make race`、`services/collaboration/interop` 的 `npm ci && npm run ci`、真实 PostgreSQL/Redis/NATS/Etcd 测试以及 production image smoke 仍需按改动范围显式执行。真实依赖测试设置 `COLLABORATION_TEST_REQUIRE_REAL_DEPENDENCIES=1`；缺少任一连接变量时必须失败，不能静默 skip。
+`make ci` 同时执行 Go/Rust format、vet、golangci-lint、Clippy `-D warnings`、无缓存测试、release build、govulncheck、cargo-deny 和 Go/Rust 生成漂移检查。`make race`、`services/collaboration/interop` 的 `npm ci && npm run ci`、真实 PostgreSQL/Redis/NATS 测试以及 production image smoke 仍需按改动范围显式执行。真实依赖测试设置 `COLLABORATION_TEST_REQUIRE_REAL_DEPENDENCIES=1`；缺少任一连接变量时必须失败，不能静默 skip。
 
 开发交付只保留 `dev`，`main` 对开发者保持只读。`.github/workflows/pipeline.yml` 调用通用
 Python CI 控制镜像，依次执行质量门禁、变更服务镜像构建、GitOps deploy 快照提交、Argo CD
@@ -301,7 +303,7 @@ digest。`deploy/` 是应用仓库部署模板的原样快照；`dev/<service>` 
 引用服务 overlay 和连接配置，`dev/common` 统一提供运行时补丁与镜像覆盖，共享资源由
 `dev/foundation` 持有。不再使用
 集中式 `deploy/base` 与 `deploy/overlay/dev`。公共
-Nacos、NATS、Etcd、MinIO、ClamAV 位于独立 namespace，PostgreSQL 和 Redis 复用现有服务；
+Nacos、NATS、MinIO、ClamAV 位于独立 namespace，PostgreSQL 和 Redis 复用现有服务；
 应用只使用项目级账号和前缀。
 
 k3s 不保存 CI cache/PVC 或构建镜像，只保留 Argo CD；其只读 repository Secret、AppProject 和
@@ -317,7 +319,7 @@ ApplicationSet 由 GitOps 仓库声明。平台组件与四个应用服务各自
 
 ## 12. 当前验证边界
 
-当前自动化测试覆盖领域校验、用例、transport 映射、严格 HTTP 输入、JWT、配置、资源关闭，以及 Collaboration 的 commit-before-broadcast、actor 恢复、重复 update、版本恢复、投影/outbox、真实 PostgreSQL/Redis/NATS/Etcd、双向 Kitex/Volo mTLS/metadata、Yjs fixture 和多实例 JetStream fanout/redelivery。仍需明确保留以下边界：
+当前自动化测试覆盖领域校验、用例、transport 映射、严格 HTTP 输入、JWT、配置、资源关闭，以及 Collaboration 的 commit-before-broadcast、actor 恢复、重复 update、版本恢复、投影/outbox、真实 PostgreSQL/Redis/NATS、双向 Kitex/Volo mTLS/metadata、Yjs fixture 和多实例 JetStream fanout/redelivery。仍需明确保留以下边界：
 
 - Identity repository/migration 没有针对真实 PostgreSQL 的自动化集成测试。
 - Knowledge repository/migration、事务、约束和 SQL cursor 没有针对真实 PostgreSQL 的自动化集成测试。

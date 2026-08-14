@@ -44,25 +44,6 @@ services:
     volumes:
       - knowledge-core-nats-data:/data
 
-  etcd:
-    image: quay.io/coreos/etcd:v3.6.0
-    container_name: knowledge-core-etcd
-    command:
-      - /usr/local/bin/etcd
-      - --name=knowledge-core-etcd
-      - --data-dir=/etcd-data
-      - --listen-client-urls=http://0.0.0.0:2379
-      - --advertise-client-urls=http://etcd:2379
-    ports:
-      - "2379:2379"
-    healthcheck:
-      test: ["CMD", "etcdctl", "--endpoints=http://127.0.0.1:2379", "endpoint", "health"]
-      interval: 5s
-      timeout: 3s
-      retries: 20
-    volumes:
-      - knowledge-core-etcd-data:/etcd-data
-
   minio:
     image: minio/minio:RELEASE.2025-09-07T16-13-09Z
     container_name: knowledge-core-minio
@@ -96,15 +77,12 @@ services:
       IDENTITY_POSTGRES_HOST: postgres
       IDENTITY_POSTGRES_PASSWORD: ${KC_POSTGRES_PASSWORD:?KC_POSTGRES_PASSWORD is required}
       IDENTITY_REDIS_ADDRESS: redis:6379
-      IDENTITY_ETCD_ENDPOINTS: etcd:2379
       IDENTITY_AUTH_PRIVATE_KEY: ${KC_AUTH_PRIVATE_KEY:?KC_AUTH_PRIVATE_KEY is required}
       IDENTITY_AUTH_PUBLIC_KEY: ${KC_AUTH_PUBLIC_KEY:?KC_AUTH_PUBLIC_KEY is required}
     depends_on:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_healthy
-      etcd:
         condition: service_healthy
     ports:
       - "8081:8081"
@@ -122,7 +100,8 @@ services:
       KNOWLEDGE_TRACE_SAMPLE_RATIO: "1"
       KNOWLEDGE_POSTGRES_HOST: postgres
       KNOWLEDGE_POSTGRES_PASSWORD: ${KC_POSTGRES_PASSWORD:?KC_POSTGRES_PASSWORD is required}
-      KNOWLEDGE_ETCD_ENDPOINTS: etcd:2379
+      KNOWLEDGE_IDENTITY_RPC_ADDRESS: identity:8881
+      KNOWLEDGE_COLLABORATION_RPC_ADDRESS: collaboration:8883
       KNOWLEDGE_NATS_SERVERS: nats://nats:4222
       KNOWLEDGE_AUTH_PUBLIC_KEY: ${KC_AUTH_PUBLIC_KEY:?KC_AUTH_PUBLIC_KEY is required}
       KNOWLEDGE_OBJECT_STORAGE_ENDPOINT: minio:9000
@@ -131,8 +110,6 @@ services:
       KNOWLEDGE_SCANNER_ADDRESS: clamav:3310
     depends_on:
       postgres:
-        condition: service_healthy
-      etcd:
         condition: service_healthy
       nats:
         condition: service_healthy
@@ -158,16 +135,14 @@ services:
       COLLABORATION_PUBLIC_ADDRESS: 0.0.0.0:8091
       COLLABORATION_ALLOWED_ORIGINS: ${KC_ALLOWED_ORIGIN:-http://localhost:3000}
       COLLABORATION_RPC_ADDRESS: 0.0.0.0:8883
-      COLLABORATION_RPC_ADVERTISED_ADDRESS: collaboration:8883
       COLLABORATION_ADMIN_ADDRESS: 0.0.0.0:8084
       COLLABORATION_POSTGRES_URL: ${KC_COLLABORATION_POSTGRES_URL:?KC_COLLABORATION_POSTGRES_URL is required}
       COLLABORATION_REDIS_URL: redis://redis:6379/1
       COLLABORATION_NATS_SERVERS: nats://nats:4222
       COLLABORATION_NATS_STREAM: KNOWLEDGE_CORE_EVENTS
       COLLABORATION_NATS_PERMISSION_STREAM: KNOWLEDGE_CORE_PERMISSIONS
-      COLLABORATION_ETCD_ENDPOINTS: http://etcd:2379
-      COLLABORATION_ETCD_PREFIX: /knowledge-core/development/registry
       COLLABORATION_KNOWLEDGE_SERVICE_NAME: knowledge-core.knowledge
+      COLLABORATION_KNOWLEDGE_ADDRESS: knowledge:8882
       COLLABORATION_OTLP_ENDPOINT: http://otel-collector:4317
     depends_on:
       postgres:
@@ -175,8 +150,6 @@ services:
       redis:
         condition: service_healthy
       nats:
-        condition: service_healthy
-      etcd:
         condition: service_healthy
       knowledge:
         condition: service_started
@@ -196,15 +169,15 @@ services:
       GATEWAY_TRACE_ENDPOINT: otel-collector:4317
       GATEWAY_TRACE_SAMPLE_RATIO: "1"
       GATEWAY_REDIS_ADDRESS: redis:6379
-      GATEWAY_ETCD_ENDPOINTS: etcd:2379
+      GATEWAY_IDENTITY_RPC_ADDRESS: identity:8881
+      GATEWAY_KNOWLEDGE_RPC_ADDRESS: knowledge:8882
+      GATEWAY_COLLABORATION_RPC_ADDRESS: collaboration:8883
       GATEWAY_AUTH_PUBLIC_KEY: ${KC_AUTH_PUBLIC_KEY:?KC_AUTH_PUBLIC_KEY is required}
       GATEWAY_ENDPOINTS_PUBLIC_BASE_URL: http://localhost:8080
       GATEWAY_ENDPOINTS_COLLABORATION_WEBSOCKET_BASE_URL: ws://localhost:8091
       GATEWAY_CORS_ALLOWED_ORIGINS: ${KC_ALLOWED_ORIGIN:-http://localhost:3000}
     depends_on:
       redis:
-        condition: service_healthy
-      etcd:
         condition: service_healthy
       identity:
         condition: service_started
@@ -264,7 +237,6 @@ volumes:
   knowledge-core-postgres-data:
   knowledge-core-redis-data:
   knowledge-core-nats-data:
-  knowledge-core-etcd-data:
   knowledge-core-minio-data:
   knowledge-core-clamav-data:
   knowledge-core-prometheus-data:

@@ -81,11 +81,7 @@ flowchart LR
     Collaboration --> PostgreSQL
     Collaboration --> Redis
     Collaboration --> NATS
-    Collaboration --> Etcd
     Gateway --> Redis
-    Gateway --> Etcd[(Etcd)]
-    Identity --> Etcd
-    Knowledge --> Etcd
 ```
 
 Knowledge 不保存 Yjs update、快照或版本；这些数据属于 Collaboration。Collaboration 不直连 Identity 或 Knowledge 数据库，而是通过生成的 Knowledge Thrift RPC 取得文档权限并提交投影。
@@ -108,7 +104,7 @@ Knowledge 不保存 Yjs update、快照或版本；这些数据属于 Collaborat
 | Identity RPC/admin | `8881` / `8081` |
 | Knowledge RPC/admin | `8882` / `8083` |
 | Collaboration WebSocket/RPC/admin | `8091` / `8883` / `8084` |
-| PostgreSQL/Redis/Etcd/NATS | `5432` / `6379` / `2379` / `4222` |
+| PostgreSQL/Redis/NATS | `5432` / `6379` / `4222` |
 | MinIO/console/ClamAV/Prometheus/Tempo | `9000` / `9001` / `3310` / `9090` / `3200` |
 | OTel Collector (OTLP gRPC/HTTP) | `4317` / `4318` |
 
@@ -137,7 +133,7 @@ docker compose -f docker/infrastructure/docker-compose.yml up -d --build
 docker compose -f docker/infrastructure/docker-compose.yml ps
 ```
 
-ClamAV 首次启动需要初始化病毒库，Knowledge 在 ClamAV、对象存储、NATS、数据库、Etcd、Identity 和 Collaboration 均可用后才会 ready。Compose 默认启用本地 OTel Collector + Tempo；打开 `http://127.0.0.1:3200` 查询 trace。collector 的 tail sampling 保留错误、parking/DLQ、超过 1 秒的 trace，并按 10% 保留其余成功 trace。生产部署不要复用本地地址，OTLP endpoint、TLS 和鉴权由部署平台注入。检查入口：
+ClamAV 首次启动需要初始化病毒库，Knowledge 在 ClamAV、对象存储、NATS、数据库、Identity 和 Collaboration 均可用后才会 ready。Compose 默认启用本地 OTel Collector + Tempo；打开 `http://127.0.0.1:3200` 查询 trace。collector 的 tail sampling 保留错误、parking/DLQ、超过 1 秒的 trace，并按 10% 保留其余成功 trace。生产部署不要复用本地地址，OTLP endpoint、TLS 和鉴权由部署平台注入。检查入口：
 
 ```powershell
 Invoke-RestMethod http://127.0.0.1:8081/readyz
@@ -146,7 +142,7 @@ Invoke-RestMethod http://127.0.0.1:8083/readyz
 Invoke-RestMethod http://127.0.0.1:8080/health/ready
 ```
 
-Knowledge RPC 的 `Ping` 返回完整 readiness，`Live` 只返回 `knowledge/live` 且不读取 readiness；Collaboration 启动和 supervisor 使用 `Live`，避免双方 readiness 冷启动互相等待。Collaboration 的 `Ping` 与 admin ready 共用完整应用状态；其余六个 RPC 在应用 not-ready 时会先返回 `40007 / collaboration.unavailable`，不会调用 Knowledge、ticket、store 或 actor。RPC serve task 的任何非计划退出、Etcd 注册 key/value/lease 所有权丢失或 permission consumer 尚未追平启动快照都会使服务 fail closed。
+Knowledge RPC 的 `Ping` 返回完整 readiness，`Live` 只返回 `knowledge/live` 且不读取 readiness；Collaboration 启动和 supervisor 使用 `Live`，避免双方 readiness 冷启动互相等待。Collaboration 的 `Ping` 与 admin ready 共用完整应用状态；其余六个 RPC 在应用 not-ready 时会先返回 `40007 / collaboration.unavailable`，不会调用 Knowledge、ticket、store 或 actor。RPC serve task 的任何非计划退出或 permission consumer 尚未追平启动快照都会使服务 fail closed。
 
 停止后移除当前 shell 中的 Secret：
 
@@ -161,7 +157,7 @@ Remove-Item Env:KC_MINIO_SECRET_KEY
 $keys.Clear()
 ```
 
-生产环境必须使用部署平台 Secret manager，并为外部 WebSocket、Gateway/Knowledge 到 Collaboration RPC、Collaboration 到 Knowledge RPC、PostgreSQL、Redis、NATS 和 Etcd 配置代码要求的 TLS/mTLS。每个 Collaboration 副本必须配置唯一且重启后稳定的 `COLLABORATION_INSTANCE_ID`，以保持 JetStream durable consumer 的重投递语义。跨服务 subject 固定为 `collaboration.documents.updated`、`collaboration.documents.invalidated` 和 `knowledge.permissions.changed`。前两个 subject 属于默认名为 `KNOWLEDGE_CORE_EVENTS` 的 document stream，固定 24 小时/1 GiB 保留；permission subject 独占默认名为 `KNOWLEDGE_CORE_PERMISSIONS` 的 stream，`max_bytes=-1`，只按固定 24 小时 max age 清理，避免文档写入量挤掉仍覆盖 ticket TTL 的撤权事件。两个 stream 都要求 Limits retention、File storage、DiscardOld、24 小时 duplicate window 和 1 MiB max message，且名称必须不同。新 permission durable 使用 `DeliverPolicy::All`，以创建 consumer 后读取的 permission stream `last_sequence` 为启动快照；服务端 ACK floor 的 stream sequence 越过该快照后才允许 ready，retention 已清空剩余集合时要求 `num_pending` 与 `num_ack_pending` 同时为零。subject、stream 或 consumer 契约漂移都会拒绝 ready。
+生产环境必须使用部署平台 Secret manager，并为外部 WebSocket、Gateway/Knowledge 到 Collaboration RPC、Collaboration 到 Knowledge RPC、PostgreSQL、Redis 和 NATS 配置代码要求的 TLS/mTLS。每个 Collaboration 副本必须配置唯一且重启后稳定的 `COLLABORATION_INSTANCE_ID`，以保持 JetStream durable consumer 的重投递语义。跨服务 subject 固定为 `collaboration.documents.updated`、`collaboration.documents.invalidated` 和 `knowledge.permissions.changed`。前两个 subject 属于默认名为 `KNOWLEDGE_CORE_EVENTS` 的 document stream，固定 24 小时/1 GiB 保留；permission subject 独占默认名为 `KNOWLEDGE_CORE_PERMISSIONS` 的 stream，`max_bytes=-1`，只按固定 24 小时 max age 清理，避免文档写入量挤掉仍覆盖 ticket TTL 的撤权事件。两个 stream 都要求 Limits retention、File storage、DiscardOld、24 小时 duplicate window 和 1 MiB max message，且名称必须不同。新 permission durable 使用 `DeliverPolicy::All`，以创建 consumer 后读取的 permission stream `last_sequence` 为启动快照；服务端 ACK floor 的 stream sequence 越过该快照后才允许 ready，retention 已清空剩余集合时要求 `num_pending` 与 `num_ack_pending` 同时为零。subject、stream 或 consumer 契约漂移都会拒绝 ready。
 
 ## 本地开发
 
@@ -175,7 +171,7 @@ go run ./services/gateway --config services/gateway/etc/config.yaml
 ```
 
 Rust Collaboration 的配置加载器位于服务内，通过环境变量接收静态配置；先启动
-PostgreSQL、Redis、NATS、Etcd 和 Knowledge，并设置至少数据库连接后运行：
+PostgreSQL、Redis、NATS 和 Knowledge，并设置至少数据库连接后运行：
 
 ```powershell
 Set-Location services/collaboration
@@ -228,13 +224,13 @@ Dockerfile 传入 `BUILD_JOBS`（宿主机 CPU 的 3/4）；Go/Rust 构建层通
 ## k3s 与 GitOps
 
 共享基础设施的声明源是 `k3s-home-deploy/k3s`，服务器路径为 `/opt/k3s`。它复用已有
-PostgreSQL 和 Redis，并在独立 namespace 提供 Nacos、NATS、Etcd、MinIO 与 ClamAV；Nacos
+PostgreSQL 和 Redis，并在独立 namespace 提供 Nacos、NATS、MinIO 与 ClamAV；Nacos
 使用共享 PostgreSQL。项目 namespace 只接收项目级账号，平台 root/admin Secret 不进入应用。
 
 应用部署模板按服务放在 `deploy/<service>/`。每个服务自主维护 `base/`
 中的 Deployment、Service 与 Kustomization，以及 `overlay/dev/` 中的日志、运行环境、
 超时等服务行为配置；不再使用共享的 `deploy/base` 或 `deploy/overlay/dev`。PostgreSQL、
-Redis、Etcd、NATS、Nacos、MinIO 与 ClamAV 的 endpoint、账号、TLS、数据库名和前缀由私有
+Redis、NATS、Nacos、MinIO 与 ClamAV 的 endpoint、账号、TLS、数据库名和前缀由私有
 `k3s-home-deploy` 维护，并在 `Knowledge-Core/dev/<service>` 中合入对应服务 ConfigMap。
 `Knowledge-Core/dev/common` 统一提供运行时补丁和不可变镜像 digest；共享 Namespace、Secret、
 trust bundle、NetworkPolicy 和发布 RBAC 由 `knowledge-core-foundation-dev` 管理。

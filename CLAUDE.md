@@ -72,10 +72,10 @@ go run ./scripts/idlguard compat-git <merge-base> idl   # IDL 变更的兼容检
 
 | 服务 | 语言/传输 | 拥有的数据 | 外部依赖 |
 | --- | --- | --- | --- |
-| Gateway | Go / Hertz HTTP edge (`:8080`) | 无自有库 | Redis、Etcd resolver，经 typed client 调 Identity/Knowledge/Collaboration RPC |
+| Gateway | Go / Hertz HTTP edge (`:8080`) | 无自有库 | Redis，经 typed client 调 Identity/Knowledge/Collaboration RPC |
 | Identity | Go / Kitex RPC (`:8881`) | 用户、认证（PostgreSQL + Redis） | — |
 | Knowledge | Go / Kitex RPC (`:8882`) | 文档元数据、成员权限、发布投影、附件、回收站、配额、outbox（PostgreSQL `knowledge` schema；SQL 迁移在 `internal/migration/migrations/`） | S3/MinIO、ClamAV、NATS；调 Identity/Collaboration RPC |
-| Collaboration | **Rust** / Volo Thrift RPC (`:8883`) + WebSocket (`:8091`, y-sync + awareness, Yrs CRDT) | Yjs update/快照/版本/投影 job/outbox（PostgreSQL `collaboration` schema） | Redis、NATS、Etcd；经 Knowledge RPC 复核权限 |
+| Collaboration | **Rust** / Volo Thrift RPC (`:8883`) + WebSocket (`:8091`, y-sync + awareness, Yrs CRDT) | Yjs update/快照/版本/投影 job/outbox（PostgreSQL `collaboration` schema） | Redis、NATS；经 Knowledge RPC 复核权限 |
 
 关键边界：**Knowledge 不保存任何 Yjs 状态**（归 Collaboration）；**Collaboration 不直连 Identity/Knowledge 数据库**，而是通过生成的 Knowledge Thrift RPC 取权限并提交投影，session ticket 短期、单次使用。
 
@@ -86,7 +86,7 @@ go run ./scripts/idlguard compat-git <merge-base> idl   # IDL 变更的兼容检
 ## 高频硬约束速记（完整规则见 AGENTS.md）
 
 - **Git**：`dev` 是唯一开发分支，所有改动直接落 `dev`；禁止创建 `feature/*`、`fix/*` 等其它分支；`main` 对开发者只读；禁止 force-push / rebase / 改写共享历史。是否 commit/push 需当前任务明确授权。
-- **不要**在 `pkg/` 反向依赖服务、在 transport 承载业务规则、让 logic 直接依赖具体 GORM/Redis/Etcd 类型、用全局 Viper/pflag 或可变 singleton、开无 owner/无上限的后台 goroutine。
+- **不要**在 `pkg/` 反向依赖服务、在 transport 承载业务规则、让 logic 直接依赖具体 GORM/Redis 类型、用全局 Viper/pflag 或可变 singleton、开无 owner/无上限的后台 goroutine。
 - 优先复用 `pkg/{auth,error,log,metadata,trace,metrics,codec}` 现有契约；HTTP JSON 统一走 `pkg/codec/json` 并严格拒绝未知字段，不要用 `encoding/json` 绕过。
 - 构造函数返回 `(T, error)` 并校验依赖；错误用 `%w` 保留 cause、`errors.Is/As` 判断；跨 Kitex/Hertz 边界用 `pkg/error` 稳定 code/key/kind，内部错误不外泄。`os.Exit` 只允许在进程入口。
 - Secret 只经环境变量/部署平台注入，绝不写入 YAML、源码、日志、metric label 或 span attribute；metric label 只用有界低基数值。

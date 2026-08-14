@@ -1,6 +1,6 @@
 mod biz;
 mod context;
-pub mod etcd;
+pub mod discover;
 mod handler;
 mod knowledge;
 mod server;
@@ -12,9 +12,10 @@ pub use context::{
     TRACE_STATE_KEY, current_baggage, current_request_context, current_trace_id,
     current_trace_state, scope_outgoing_metadata,
 };
+pub use discover::StaticDiscover;
 pub use handler::CollaborationHandler;
 pub use knowledge::KnowledgeClient;
-pub use server::{RpcReadiness, RpcServer};
+pub use server::{AlwaysReady, RpcReadiness, RpcServer};
 
 pub(crate) use context::{
     new_request_id, valid_baggage, valid_request_id, valid_trace_parent, valid_trace_state,

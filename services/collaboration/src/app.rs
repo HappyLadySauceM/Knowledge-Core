@@ -1,5 +1,4 @@
 use std::{
-    collections::HashMap,
     future::Future,
     net::SocketAddr,
     sync::{Arc, Mutex as StdMutex},
@@ -20,8 +19,7 @@ use crate::{
     remote_config::RemoteRuntime,
     routing::{RedisRoutingStore, RoutingService, parse_instance_ordinal},
     rpc::{
-        CollaborationHandler, KnowledgeClient, RpcReadiness, RpcServer,
-        etcd::{EtcdDiscovery, EtcdRegistration},
+        AlwaysReady, CollaborationHandler, KnowledgeClient, RpcReadiness, RpcServer,
         tls::RpcIncoming,
     },
     storage::{DocumentStore, EventSubjects, PostgresStore, VersionStore, WorkerStore},
@@ -72,8 +70,6 @@ pub struct Application {
     knowledge: Arc<dyn KnowledgePort>,
     actors: ActorRegistry,
     workers: Arc<WorkerRuntime>,
-    discovery: EtcdDiscovery,
-    registration: Arc<EtcdRegistration>,
     rpc: Arc<RpcServer<CollaborationHandler>>,
     rpc_task: Mutex<Option<JoinHandle<Result<()>>>>,
     public: Arc<WebSocketServer>,
@@ -199,7 +195,7 @@ impl Application {
     ///
     /// # Errors
     ///
-    /// Returns an error when configuration, telemetry, a required dependency, registration, or a
+    /// Returns an error when configuration, telemetry, a required dependency, or a
     /// listener cannot become ready. Resources created before a failure are shut down in reverse
     /// dependency order before the error is returned.
     pub async fn start(config: Config) -> Result<Self> {
@@ -254,16 +250,7 @@ impl Application {
         let nats = Arc::new(NatsClient::connect(&config.nats, &config.instance_id).await?);
         startup.nats = Some(Arc::clone(&nats));
 
-        let etcd = crate::rpc::etcd::EtcdClient::connect(&config.etcd).await?;
-        let discovery = etcd
-            .discover(
-                &config.knowledge.service_name,
-                startup.root_cancellation.child_token(),
-            )
-            .await?;
-        startup.discovery = Some(discovery.clone());
-        let knowledge: Arc<dyn KnowledgePort> =
-            Arc::new(KnowledgeClient::new(&config.knowledge, discovery.clone())?);
+        let knowledge: Arc<dyn KnowledgePort> = Arc::new(KnowledgeClient::new(&config.knowledge)?);
         let startup_context = RequestContext::new("collaboration-startup");
         knowledge.ping(&startup_context).await?;
         startup.knowledge = Some(Arc::clone(&knowledge));
@@ -364,19 +351,7 @@ impl Application {
         startup.admin = Some(Arc::clone(&admin));
         startup.health.start();
 
-        let mut tags = HashMap::new();
-        tags.insert("instance_id".to_owned(), config.instance_id.clone());
-        let registration = Arc::new(
-            etcd.register(
-                &config.rpc.service_name,
-                &config.rpc.advertised_address,
-                tags,
-                startup.root_cancellation.child_token(),
-            )
-            .await?,
-        );
-        startup.registration = Some(Arc::clone(&registration));
-        let rpc_readiness: Arc<dyn RpcReadiness> = registration.clone();
+        let rpc_readiness: Arc<dyn RpcReadiness> = Arc::new(AlwaysReady);
         let application_readiness: Arc<dyn RpcReadiness> =
             Arc::new(ApplicationReadiness::new(startup.health.clone()));
         let versions: Arc<dyn VersionStore> = postgres.clone();
@@ -426,8 +401,6 @@ impl Application {
         startup.rpc_task = Some(rpc_task);
 
         workers.ready().await?;
-        discovery.ready().await?;
-        registration.ready().await?;
         postgres.ping().await?;
         tickets.ping().await?;
         knowledge
@@ -458,8 +431,6 @@ impl Application {
             knowledge,
             actors,
             workers,
-            discovery,
-            registration,
             rpc,
             rpc_task: Mutex::new(startup.rpc_task.take()),
             public,
@@ -485,8 +456,6 @@ impl Application {
             tickets: self.tickets.clone(),
             knowledge: Arc::clone(&self.knowledge),
             workers: Arc::clone(&self.workers),
-            discovery: self.discovery.clone(),
-            registration: Arc::clone(&self.registration),
             rpc: Arc::clone(&self.rpc),
             public: Arc::clone(&self.public),
             admin: Arc::clone(&self.admin),
@@ -544,15 +513,6 @@ impl Application {
         }
         record(
             &mut first_error,
-            bounded_cleanup(
-                remaining(deadline),
-                self.registration.shutdown(),
-                "Etcd registration",
-            )
-            .await,
-        );
-        record(
-            &mut first_error,
             bounded_cleanup(remaining(deadline), self.rpc.shutdown(), "RPC server").await,
         );
         record(
@@ -570,15 +530,6 @@ impl Application {
         record(
             &mut first_error,
             self.workers.shutdown(remaining(deadline)).await,
-        );
-        record(
-            &mut first_error,
-            bounded_cleanup(
-                remaining(deadline),
-                self.discovery.shutdown(),
-                "Etcd discovery",
-            )
-            .await,
         );
         record(
             &mut first_error,
@@ -623,8 +574,6 @@ struct SupervisedComponents {
     tickets: TicketService,
     knowledge: Arc<dyn KnowledgePort>,
     workers: Arc<WorkerRuntime>,
-    discovery: EtcdDiscovery,
-    registration: Arc<EtcdRegistration>,
     rpc: Arc<RpcServer<CollaborationHandler>>,
     public: Arc<WebSocketServer>,
     admin: Arc<AdminServer>,
@@ -665,8 +614,6 @@ async fn components_ready(components: &SupervisedComponents) -> Result<()> {
     components.postgres.ping().await?;
     components.tickets.ping().await?;
     components.workers.ready().await?;
-    components.discovery.ready().await?;
-    components.registration.ready().await?;
     components
         .knowledge
         .ping(&RequestContext::new("collaboration-readiness"))
@@ -716,8 +663,6 @@ struct Startup {
     nats: Option<Arc<NatsClient>>,
     actors: Option<ActorRegistry>,
     workers: Option<Arc<WorkerRuntime>>,
-    discovery: Option<EtcdDiscovery>,
-    registration: Option<Arc<EtcdRegistration>>,
     rpc: Option<Arc<RpcServer<CollaborationHandler>>>,
     rpc_task: Option<JoinHandle<Result<()>>>,
     public: Option<Arc<WebSocketServer>>,
@@ -741,8 +686,6 @@ impl Startup {
             nats: None,
             actors: None,
             workers: None,
-            discovery: None,
-            registration: None,
             rpc: None,
             rpc_task: None,
             public: None,
@@ -760,14 +703,6 @@ impl Startup {
         if let Some(remote) = &self.remote {
             let _ = remote.shutdown(remaining(deadline)).await;
         }
-        if let Some(registration) = &self.registration {
-            let _ = bounded_cleanup(
-                remaining(deadline),
-                registration.shutdown(),
-                "Etcd registration",
-            )
-            .await;
-        }
         if let Some(rpc) = &self.rpc {
             let _ = bounded_cleanup(remaining(deadline), rpc.shutdown(), "RPC server").await;
         }
@@ -784,10 +719,6 @@ impl Startup {
             let _ = workers.shutdown(remaining(deadline)).await;
         } else if let Some(nats) = &self.nats {
             let _ = nats.shutdown(remaining(deadline)).await;
-        }
-        if let Some(discovery) = &self.discovery {
-            let _ =
-                bounded_cleanup(remaining(deadline), discovery.shutdown(), "Etcd discovery").await;
         }
         if let Some(postgres) = &self.postgres {
             let _ = close_postgres(postgres, remaining(deadline)).await;

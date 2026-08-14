@@ -15,25 +15,29 @@ use crate::{
     generated::collaboration::{CollaborationService, CollaborationServiceServer},
 };
 
-use super::{
-    RequestContextLayer, biz::KitexBizCompatibilityLayer, etcd::EtcdRegistration, tls::RpcIncoming,
-};
+use super::{RequestContextLayer, biz::KitexBizCompatibilityLayer, tls::RpcIncoming};
 
-/// Provides the external registration handshake required for RPC readiness.
+/// Provides an extra readiness gate composed into the RPC server.
+/// 为 RPC 服务提供可组合的额外就绪检查。
 #[async_trait]
 pub trait RpcReadiness: Send + Sync {
-    /// Checks whether the RPC endpoint is externally reachable through discovery.
+    /// Checks whether the composed readiness dependency is healthy.
+    /// 检查组合进来的就绪依赖是否健康。
     ///
     /// # Errors
     ///
-    /// Returns an error while registration is absent or unhealthy.
+    /// Returns an error while the dependency is absent or unhealthy.
     async fn ready(&self) -> Result<()>;
 }
 
+/// Marks RPC listener readiness as sufficient once the server is serving.
+/// 在 listener 已开始 serving 后，不再依赖外部注册握手。
+pub struct AlwaysReady;
+
 #[async_trait]
-impl RpcReadiness for EtcdRegistration {
+impl RpcReadiness for AlwaysReady {
     async fn ready(&self) -> Result<()> {
-        self.ready().await
+        Ok(())
     }
 }
 
@@ -125,11 +129,12 @@ where
         })
     }
 
-    /// Checks listener state and the external registration handshake.
+    /// Checks listener state and the composed readiness probe.
+    /// 检查 listener 状态以及组合进来的就绪探针。
     ///
     /// # Errors
     ///
-    /// Returns an error before serving, after shutdown, or while registration is unhealthy.
+    /// Returns an error before serving, after shutdown, or while the probe is unhealthy.
     pub async fn ready(&self) -> Result<()> {
         if !self.started.load(Ordering::Acquire)
             || self.stopped.load(Ordering::Acquire)

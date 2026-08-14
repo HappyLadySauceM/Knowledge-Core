@@ -20,7 +20,6 @@ type Config struct {
 	HTTP       *option.HertzServerOptions `mapstructure:"http" json:"http" yaml:"http"`
 	PostgreSQL *option.PostgreSQLOptions  `mapstructure:"postgres" json:"postgres" yaml:"postgres"`
 	Redis      *option.RedisOptions       `mapstructure:"redis" json:"redis" yaml:"redis"`
-	Etcd       *option.EtcdOptions        `mapstructure:"etcd" json:"etcd" yaml:"etcd"`
 	Bcrypt     *BcryptOptions             `mapstructure:"bcrypt" json:"bcrypt" yaml:"bcrypt"`
 	Auth       *AuthOptions               `mapstructure:"auth" json:"auth" yaml:"auth"`
 }
@@ -37,7 +36,6 @@ func New() Config {
 		HTTP:       option.NewHertzServerOptions(),
 		PostgreSQL: option.NewPostgreSQLOptions(),
 		Redis:      option.NewRedisOptions(),
-		Etcd:       option.NewEtcdOptions(),
 		Bcrypt:     NewBcryptOptions(),
 		Auth:       NewAuthOptions(),
 	}
@@ -55,7 +53,6 @@ func (c Config) Validate() error {
 		wrapValidation("http", c.HTTP.Validate()),
 		wrapValidation("postgres", c.PostgreSQL.Validate()),
 		wrapValidation("redis", c.Redis.Validate()),
-		wrapValidation("etcd", c.Etcd.Validate()),
 		wrapValidation("bcrypt", c.Bcrypt.Validate()),
 		wrapValidation("auth", c.Auth.Validate()),
 		validateLifecycleBudgets(c),
@@ -64,12 +61,9 @@ func (c Config) Validate() error {
 
 func validateLifecycleBudgets(c Config) error {
 	var joined error
-	// Kitex intentionally waits one second before publishing its registry
-	// entry. A shorter process startup budget can never reach the RPC readiness
-	// handshake even when every dependency is healthy.
 	if c.App.StartupTimeout <= time.Second {
 		joined = errors.Join(joined, fmt.Errorf(
-			"app.startup_timeout must be greater than the Kitex registration delay of %s",
+			"app.startup_timeout must be greater than %s",
 			time.Second,
 		))
 	}
@@ -87,8 +81,8 @@ func (c Config) requireSections() error {
 	sections := map[string]any{
 		"app": c.App, "log": c.Log, "trace": c.Trace, "rpc": c.RPC,
 		"http": c.HTTP, "postgres": c.PostgreSQL, "redis": c.Redis,
-		"etcd": c.Etcd, "bcrypt": c.Bcrypt,
-		"auth": c.Auth,
+		"bcrypt": c.Bcrypt,
+		"auth":   c.Auth,
 	}
 	var joined error
 	for name, section := range sections {

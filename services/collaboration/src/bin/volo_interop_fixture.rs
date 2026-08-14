@@ -52,7 +52,6 @@ async fn run_server() -> std::result::Result<(), Box<dyn Error>> {
     };
     let config = RpcConfig {
         address,
-        advertised_address: local_address.to_string(),
         service_name: "knowledge-core.collaboration".to_owned(),
         request_timeout,
         tls,

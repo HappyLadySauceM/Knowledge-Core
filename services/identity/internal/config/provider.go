@@ -167,7 +167,7 @@ func applyDocument(current, baseline, startup Config, document configcenter.Dyna
 	if err != nil {
 		return Config{}, result, err
 	}
-	if err := document.ValidateApplication("identity", "app.version", "auth.private_key", "auth.public_key", "postgres.dsn", "postgres.password", "redis.username", "redis.password", "etcd.username", "etcd.password", "trace.headers", "trace.tls.key_file", "rpc.tls.key_file", "http.tls.key_file"); err != nil {
+	if err := document.ValidateApplication("identity", "app.version", "auth.private_key", "auth.public_key", "postgres.dsn", "postgres.password", "redis.username", "redis.password", "trace.headers", "trace.tls.key_file", "rpc.tls.key_file", "http.tls.key_file"); err != nil {
 		return Config{}, result, err
 	}
 	if document.Legacy() {

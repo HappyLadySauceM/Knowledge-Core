@@ -1,7 +1,7 @@
 api_version: knowledge-core.io/v1beta1
 kind: ApplicationConfig
 service: identity
-revision: 1
+revision: 2
 config:
   app: {name: identity, environment: development, startup_timeout: 30s, shutdown_timeout: 30s}
   log: {level: info, add_source: false, health_check_requests: false}
@@ -24,6 +24,5 @@ config:
     prepare_stmt: false
     tls: {enabled: false}
   redis: {address: 127.0.0.1:6379, db: 0, dial_timeout: 5s, read_timeout: 3s, write_timeout: 3s, pool_size: 20, min_idle_conns: 2, max_retries: 3, tls: {enabled: false}}
-  etcd: {endpoints: [127.0.0.1:2379], prefix: /knowledge-core/development/registry, dial_timeout: 5s, request_timeout: 3s, tls: {enabled: false}}
   bcrypt: {cost: 12}
   auth: {access_token_ttl: 15m, failure_threshold: 5, lock_duration: 15m}

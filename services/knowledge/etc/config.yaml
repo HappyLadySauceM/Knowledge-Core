@@ -56,15 +56,6 @@ postgres:
   tls:
     enabled: false
 
-etcd:
-  endpoints:
-    - 127.0.0.1:2379
-  prefix: /knowledge-core/development/registry
-  dial_timeout: 5s
-  request_timeout: 3s
-  tls:
-    enabled: false
-
 nats:
   servers:
     - nats://127.0.0.1:4222
@@ -81,6 +72,7 @@ nats:
 
 identity_rpc:
   service_name: knowledge-core.identity
+  address: 127.0.0.1:8881
   connect_timeout: 500ms
   request_timeout: 3s
   tls:
@@ -105,6 +97,7 @@ scanner:
 
 collaboration_rpc:
   service_name: knowledge-core.collaboration
+  address: 127.0.0.1:8883
   connect_timeout: 500ms
   request_timeout: 5s
   tls:

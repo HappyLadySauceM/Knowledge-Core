@@ -78,6 +78,26 @@ func validateEndpoint(name, address string) error {
 	return nil
 }
 
+// RejectLoopbackEndpoint rejects localhost and loopback IP dial targets.
+// 拒绝 localhost 与环回 IP 作为拨号目标。
+func RejectLoopbackEndpoint(name, address string) error {
+	if err := validateEndpoint(name, address); err != nil {
+		return err
+	}
+	host, _, err := net.SplitHostPort(address)
+	if err != nil {
+		return fmt.Errorf("%s must be a host:port address: %w", name, err)
+	}
+	if strings.EqualFold(host, "localhost") {
+		return fmt.Errorf("production %s must not use localhost", name)
+	}
+	ip := net.ParseIP(host)
+	if ip != nil && ip.IsLoopback() {
+		return fmt.Errorf("production %s must not use a loopback address", name)
+	}
+	return nil
+}
+
 func newValueError(name, expectation string, value any) error {
 	return fmt.Errorf("%s must be %s, got %v", name, expectation, value)
 }

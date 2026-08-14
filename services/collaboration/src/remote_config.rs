@@ -61,7 +61,6 @@ pub(crate) struct ApplicationOverrides {
     pub(crate) postgres: Option<PostgresOverrides>,
     pub(crate) redis: Option<RedisOverrides>,
     pub(crate) nats: Option<NatsOverrides>,
-    pub(crate) etcd: Option<EtcdOverrides>,
     pub(crate) knowledge: Option<KnowledgeOverrides>,
     pub(crate) ticket: Option<TicketOverrides>,
     pub(crate) actor: Option<ActorOverrides>,
@@ -73,7 +72,6 @@ pub(crate) struct ApplicationOverrides {
 #[serde(deny_unknown_fields)]
 pub(crate) struct RpcOverrides {
     pub(crate) address: Option<String>,
-    pub(crate) advertised_address: Option<String>,
     pub(crate) service_name: Option<String>,
     pub(crate) request_timeout_ms: Option<u64>,
 }
@@ -119,17 +117,9 @@ pub(crate) struct NatsOverrides {
 }
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct EtcdOverrides {
-    pub(crate) endpoints: Option<Vec<String>>,
-    pub(crate) prefix: Option<String>,
-    pub(crate) connect_timeout_ms: Option<u64>,
-    pub(crate) request_timeout_ms: Option<u64>,
-    pub(crate) lease_ttl_ms: Option<u64>,
-}
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
-#[serde(deny_unknown_fields)]
 pub(crate) struct KnowledgeOverrides {
     pub(crate) service_name: Option<String>,
+    pub(crate) address: Option<String>,
     pub(crate) request_timeout_ms: Option<u64>,
 }
 
@@ -685,7 +675,6 @@ fn restart_required(config: &ApplicationOverrides, targets: &RuntimeTargets) -> 
         || config.postgres.is_some()
         || config.redis.is_some()
         || config.nats.is_some()
-        || config.etcd.is_some()
         || config.knowledge.is_some()
         || config
             .public

@@ -13,6 +13,7 @@ type KitexServerOptions struct {
 
 type KitexClientOptions struct {
 	ServiceName    string        `mapstructure:"service_name" json:"service_name" yaml:"service_name"`
+	Address        string        `mapstructure:"address" json:"address" yaml:"address"`
 	ConnectTimeout time.Duration `mapstructure:"connect_timeout" json:"connect_timeout" yaml:"connect_timeout"`
 	RequestTimeout time.Duration `mapstructure:"request_timeout" json:"request_timeout" yaml:"request_timeout"`
 	TLS            TLSOptions    `mapstructure:"tls" json:"tls" yaml:"tls"`
@@ -29,6 +30,7 @@ func NewKitexClientOptions() *KitexClientOptions {
 func (o KitexClientOptions) Validate() error {
 	return join(
 		require("rpc_client.service_name", o.ServiceName),
+		validateEndpoint("rpc_client.address", o.Address),
 		positiveDuration("rpc_client.connect_timeout", o.ConnectTimeout),
 		positiveDuration("rpc_client.request_timeout", o.RequestTimeout),
 		o.TLS.Validate(),

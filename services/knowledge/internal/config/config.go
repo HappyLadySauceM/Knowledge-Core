@@ -17,7 +17,6 @@ type Config struct {
 	RPC              *option.KitexServerOptions `mapstructure:"rpc" json:"rpc" yaml:"rpc"`
 	AdminHTTP        *option.HertzServerOptions `mapstructure:"admin_http" json:"admin_http" yaml:"admin_http"`
 	PostgreSQL       *option.PostgreSQLOptions  `mapstructure:"postgres" json:"postgres" yaml:"postgres"`
-	Etcd             *option.EtcdOptions        `mapstructure:"etcd" json:"etcd" yaml:"etcd"`
 	NATS             *option.NATSOptions        `mapstructure:"nats" json:"nats" yaml:"nats"`
 	IdentityRPC      *option.KitexClientOptions `mapstructure:"identity_rpc" json:"identity_rpc" yaml:"identity_rpc"`
 	Auth             *AuthOptions               `mapstructure:"auth" json:"auth" yaml:"auth"`
@@ -37,15 +36,17 @@ func New() Config {
 	admin.Address = ":8083"
 	identity := option.NewKitexClientOptions()
 	identity.ServiceName = "knowledge-core.identity"
+	identity.Address = "127.0.0.1:8881"
 	collaboration := option.NewKitexClientOptions()
 	collaboration.ServiceName = "knowledge-core.collaboration"
+	collaboration.Address = "127.0.0.1:8883"
 	collaboration.RequestTimeout = 5 * time.Second
 	natsOptions := option.NewNATSOptions()
 	natsOptions.Name = "knowledge-core.knowledge"
 	return Config{
 		App: app, Log: option.NewLogOptions(), Trace: option.NewTraceOptions(), RPC: rpc,
 		AdminHTTP: admin, PostgreSQL: option.NewPostgreSQLOptions(),
-		Etcd: option.NewEtcdOptions(), NATS: natsOptions, IdentityRPC: identity,
+		NATS: natsOptions, IdentityRPC: identity,
 		Auth: NewAuthOptions(), ObjectStorage: NewObjectStorageOptions(), Scanner: NewScannerOptions(),
 		CollaborationRPC: collaboration, Workers: NewWorkerOptions(),
 	}
@@ -63,6 +64,8 @@ func (c Config) Validate() error {
 	if c.App.Environment != "development" {
 		productionErr = errors.Join(productionErr, requireServerMutualTLS("rpc", c.RPC.TLS))
 		productionErr = errors.Join(productionErr, requireClientMutualTLS("collaboration_rpc", c.CollaborationRPC.TLS))
+		productionErr = errors.Join(productionErr, option.RejectLoopbackEndpoint("identity_rpc.address", c.IdentityRPC.Address))
+		productionErr = errors.Join(productionErr, option.RejectLoopbackEndpoint("collaboration_rpc.address", c.CollaborationRPC.Address))
 		if c.ObjectStorage.AutoCreateBucket {
 			productionErr = errors.Join(productionErr, errors.New("production object storage must not auto-create its bucket"))
 		}
@@ -70,7 +73,7 @@ func (c Config) Validate() error {
 	transportBudget := c.RPC.ExitWaitTimeout + c.AdminHTTP.ShutdownTimeout
 	var lifecycleErr error
 	if c.App.StartupTimeout <= time.Second {
-		lifecycleErr = errors.New("app.startup_timeout must exceed the Kitex registration delay of 1s")
+		lifecycleErr = errors.New("app.startup_timeout must be greater than 1s")
 	}
 	if c.App.ShutdownTimeout < transportBudget {
 		lifecycleErr = errors.Join(lifecycleErr, fmt.Errorf("app.shutdown_timeout must be at least %s", transportBudget))
@@ -79,7 +82,7 @@ func (c Config) Validate() error {
 		wrapValidation("app", c.App.Validate()), wrapValidation("log", c.Log.Validate()),
 		wrapValidation("trace", c.Trace.Validate()), wrapValidation("rpc", c.RPC.Validate()),
 		wrapValidation("admin_http", c.AdminHTTP.Validate()),
-		wrapValidation("postgres", c.PostgreSQL.Validate()), wrapValidation("etcd", c.Etcd.Validate()),
+		wrapValidation("postgres", c.PostgreSQL.Validate()),
 		wrapValidation("nats", c.NATS.Validate()), wrapValidation("identity_rpc", c.IdentityRPC.Validate()),
 		wrapValidation("auth", c.Auth.Validate()), wrapValidation("object_storage", c.ObjectStorage.Validate()),
 		wrapValidation("scanner", c.Scanner.Validate()), wrapValidation("collaboration_rpc", c.CollaborationRPC.Validate()),
@@ -91,7 +94,7 @@ func (c Config) requireSections() error {
 	sections := map[string]any{
 		"app": c.App, "log": c.Log, "trace": c.Trace, "rpc": c.RPC,
 		"admin_http": c.AdminHTTP, "postgres": c.PostgreSQL,
-		"etcd": c.Etcd, "nats": c.NATS, "identity_rpc": c.IdentityRPC, "auth": c.Auth,
+		"nats": c.NATS, "identity_rpc": c.IdentityRPC, "auth": c.Auth,
 		"object_storage": c.ObjectStorage, "scanner": c.Scanner, "collaboration_rpc": c.CollaborationRPC, "workers": c.Workers,
 	}
 	var joined error

@@ -9,7 +9,6 @@ use crate::{
     remote_config::{RemoteConfig, validate_log_level},
 };
 
-const DEFAULT_ETCD_PREFIX: &str = "/knowledge-core/development/registry";
 pub(crate) const MAX_TICKET_TTL_MS: u64 = 60_000;
 pub const NATS_UPDATE_SUBJECT: &str = "collaboration.documents.updated";
 pub const NATS_INVALIDATION_SUBJECT: &str = "collaboration.documents.invalidated";
@@ -34,7 +33,6 @@ pub struct Config {
     pub postgres: PostgresConfig,
     pub redis: RedisConfig,
     pub nats: NatsConfig,
-    pub etcd: EtcdConfig,
     pub knowledge: KnowledgeConfig,
     pub ticket: TicketConfig,
     pub actor: ActorConfig,
@@ -66,7 +64,6 @@ pub struct PublicConfig {
 #[derive(Clone)]
 pub struct RpcConfig {
     pub address: SocketAddr,
-    pub advertised_address: String,
     pub service_name: String,
     pub request_timeout: Duration,
     pub tls: TlsConfig,
@@ -160,20 +157,9 @@ impl NatsConfig {
 }
 
 #[derive(Clone)]
-pub struct EtcdConfig {
-    pub endpoints: Vec<String>,
-    pub prefix: String,
-    pub username: Option<String>,
-    pub password: Option<String>,
-    pub connect_timeout: Duration,
-    pub request_timeout: Duration,
-    pub lease_ttl: Duration,
-    pub tls: TlsConfig,
-}
-
-#[derive(Clone)]
 pub struct KnowledgeConfig {
     pub service_name: String,
+    pub address: String,
     pub request_timeout: Duration,
     pub tls: TlsConfig,
 }
@@ -382,15 +368,6 @@ impl Config {
                         .with_source(error)
                 })?;
             }
-            if env::var_os("COLLABORATION_RPC_ADVERTISED_ADDRESS").is_none()
-                && let Some(raw) = &value.advertised_address
-            {
-                validate_socket_endpoint(raw).map_err(|error| {
-                    ServiceError::invalid_input("Nacos rpc.advertised_address must be host:port")
-                        .with_source(error)
-                })?;
-                self.rpc.advertised_address.clone_from(raw);
-            }
             if env::var_os("COLLABORATION_RPC_SERVICE_NAME").is_none()
                 && let Some(raw) = &value.service_name
             {
@@ -512,41 +489,17 @@ impl Config {
                 self.nats.operation_timeout = Duration::from_millis(v);
             }
         }
-        if let Some(value) = &overrides.etcd {
-            if env::var_os("COLLABORATION_ETCD_ENDPOINTS").is_none()
-                && let Some(endpoints) = &value.endpoints
-            {
-                for endpoint in endpoints {
-                    parse_url("Nacos etcd.endpoints", endpoint, &["http", "https"], false)?;
-                }
-                self.etcd.endpoints.clone_from(endpoints);
-            }
-            if env::var_os("COLLABORATION_ETCD_PREFIX").is_none()
-                && let Some(raw) = &value.prefix
-            {
-                self.etcd.prefix = required("Nacos etcd.prefix", raw)?;
-            }
-            if env::var_os("COLLABORATION_ETCD_CONNECT_TIMEOUT_MS").is_none()
-                && let Some(v) = value.connect_timeout_ms
-            {
-                self.etcd.connect_timeout = Duration::from_millis(v);
-            }
-            if env::var_os("COLLABORATION_ETCD_REQUEST_TIMEOUT_MS").is_none()
-                && let Some(v) = value.request_timeout_ms
-            {
-                self.etcd.request_timeout = Duration::from_millis(v);
-            }
-            if env::var_os("COLLABORATION_ETCD_LEASE_TTL_MS").is_none()
-                && let Some(v) = value.lease_ttl_ms
-            {
-                self.etcd.lease_ttl = Duration::from_millis(v);
-            }
-        }
         if let Some(value) = &overrides.knowledge {
             if env::var_os("COLLABORATION_KNOWLEDGE_SERVICE_NAME").is_none()
                 && let Some(raw) = &value.service_name
             {
                 self.knowledge.service_name = required("Nacos knowledge.service_name", raw)?;
+            }
+            if env::var_os("COLLABORATION_KNOWLEDGE_ADDRESS").is_none()
+                && let Some(raw) = &value.address
+            {
+                self.knowledge.address =
+                    parse_outbound_address("Nacos knowledge.address", raw, self.environment)?;
             }
             if env::var_os("COLLABORATION_KNOWLEDGE_REQUEST_TIMEOUT_MS").is_none()
                 && let Some(v) = value.request_timeout_ms
@@ -579,7 +532,6 @@ impl Config {
         let rpc_tls = tls_config("COLLABORATION_RPC_TLS")?;
         let postgres_tls = tls_config("COLLABORATION_POSTGRES_TLS")?;
         let nats_tls = tls_config("COLLABORATION_NATS_TLS")?;
-        let etcd_tls = tls_config("COLLABORATION_ETCD_TLS")?;
         let knowledge_tls = tls_config("COLLABORATION_KNOWLEDGE_TLS")?;
         let redis_url = parse_url(
             "COLLABORATION_REDIS_URL",
@@ -599,18 +551,6 @@ impl Config {
                 false,
             )?;
         }
-        let etcd_endpoints = comma_list(
-            "COLLABORATION_ETCD_ENDPOINTS",
-            &value("COLLABORATION_ETCD_ENDPOINTS", "http://127.0.0.1:2379"),
-        )?;
-        for endpoint in &etcd_endpoints {
-            parse_url(
-                "COLLABORATION_ETCD_ENDPOINTS",
-                endpoint,
-                &["http", "https"],
-                false,
-            )?;
-        }
         let nats_token = optional("COLLABORATION_NATS_TOKEN");
         let nats_username = optional("COLLABORATION_NATS_USERNAME");
         let nats_password = optional("COLLABORATION_NATS_PASSWORD");
@@ -624,22 +564,13 @@ impl Config {
                 "NATS username and password must be configured together",
             ));
         }
-        let etcd_username = optional("COLLABORATION_ETCD_USERNAME");
-        let etcd_password = optional("COLLABORATION_ETCD_PASSWORD");
-        if etcd_username.is_some() != etcd_password.is_some() {
-            return Err(ServiceError::invalid_input(
-                "Etcd username and password must be configured together",
-            ));
-        }
         if environment == Environment::Production {
             validate_production(
                 &redis_url,
                 &nats_servers,
-                &etcd_endpoints,
                 &rpc_tls,
                 &postgres_tls,
                 &nats_tls,
-                &etcd_tls,
                 &knowledge_tls,
             )?;
         }
@@ -659,11 +590,6 @@ impl Config {
             public,
             rpc: RpcConfig {
                 address: address("COLLABORATION_RPC_ADDRESS", "0.0.0.0:8883")?,
-                advertised_address: advertised_address(
-                    "COLLABORATION_RPC_ADVERTISED_ADDRESS",
-                    "127.0.0.1:8883",
-                    environment,
-                )?,
                 service_name: required(
                     "COLLABORATION_RPC_SERVICE_NAME",
                     &value(
@@ -782,29 +708,6 @@ impl Config {
                 password: nats_password,
                 tls: nats_tls,
             },
-            etcd: EtcdConfig {
-                endpoints: etcd_endpoints,
-                prefix: required(
-                    "COLLABORATION_ETCD_PREFIX",
-                    &value("COLLABORATION_ETCD_PREFIX", DEFAULT_ETCD_PREFIX),
-                )?,
-                username: etcd_username,
-                password: etcd_password,
-                connect_timeout: duration(
-                    "COLLABORATION_ETCD_CONNECT_TIMEOUT_MS",
-                    5_000,
-                    100,
-                    60_000,
-                )?,
-                request_timeout: duration(
-                    "COLLABORATION_ETCD_REQUEST_TIMEOUT_MS",
-                    5_000,
-                    100,
-                    60_000,
-                )?,
-                lease_ttl: duration("COLLABORATION_ETCD_LEASE_TTL_MS", 60_000, 5_000, 300_000)?,
-                tls: etcd_tls,
-            },
             knowledge: KnowledgeConfig {
                 service_name: required(
                     "COLLABORATION_KNOWLEDGE_SERVICE_NAME",
@@ -812,6 +715,11 @@ impl Config {
                         "COLLABORATION_KNOWLEDGE_SERVICE_NAME",
                         "knowledge-core.knowledge",
                     ),
+                )?,
+                address: outbound_address(
+                    "COLLABORATION_KNOWLEDGE_ADDRESS",
+                    "127.0.0.1:8882",
+                    environment,
                 )?,
                 request_timeout: duration(
                     "COLLABORATION_KNOWLEDGE_REQUEST_TIMEOUT_MS",
@@ -1035,15 +943,12 @@ fn public_config(environment: Environment) -> Result<PublicConfig> {
     })
 }
 
-#[allow(clippy::too_many_arguments)]
 fn validate_production(
     redis_url: &Url,
     nats_servers: &[String],
-    etcd_endpoints: &[String],
     rpc_tls: &TlsConfig,
     postgres_tls: &TlsConfig,
     nats_tls: &TlsConfig,
-    etcd_tls: &TlsConfig,
     knowledge_tls: &TlsConfig,
 ) -> Result<()> {
     if redis_url.scheme() != "rediss" {
@@ -1058,15 +963,6 @@ fn validate_production(
     {
         return Err(ServiceError::invalid_input(
             "production NATS connections require TLS",
-        ));
-    }
-    if etcd_endpoints
-        .iter()
-        .any(|value| !value.starts_with("https://"))
-        || !etcd_tls.enabled
-    {
-        return Err(ServiceError::invalid_input(
-            "production Etcd connections require TLS",
         ));
     }
     for (name, tls) in [
@@ -1161,9 +1057,12 @@ fn address(name: &str, fallback: &str) -> Result<SocketAddr> {
     })
 }
 
-fn advertised_address(name: &str, fallback: &str, environment: Environment) -> Result<String> {
-    let raw = value(name, fallback);
-    validate_socket_endpoint(&raw).map_err(|error| {
+fn outbound_address(name: &str, fallback: &str, environment: Environment) -> Result<String> {
+    parse_outbound_address(name, &value(name, fallback), environment)
+}
+
+fn parse_outbound_address(name: &str, raw: &str, environment: Environment) -> Result<String> {
+    validate_socket_endpoint(raw).map_err(|error| {
         ServiceError::invalid_input(format!("{name} must be host:port")).with_source(error)
     })?;
     let parsed = Url::parse(&format!("tcp://{raw}")).map_err(|error| {
@@ -1188,7 +1087,7 @@ fn advertised_address(name: &str, fallback: &str, environment: Environment) -> R
                 || (environment == Environment::Production && address.is_loopback())
             {
                 return Err(ServiceError::invalid_input(format!(
-                    "{name} is not advertisable"
+                    "{name} is not a valid outbound address"
                 )));
             }
         }
@@ -1197,19 +1096,19 @@ fn advertised_address(name: &str, fallback: &str, environment: Environment) -> R
                 || (environment == Environment::Production && address.is_loopback())
             {
                 return Err(ServiceError::invalid_input(format!(
-                    "{name} is not advertisable"
+                    "{name} is not a valid outbound address"
                 )));
             }
         }
         url::Host::Domain(domain) => {
             if environment == Environment::Production && domain.eq_ignore_ascii_case("localhost") {
                 return Err(ServiceError::invalid_input(format!(
-                    "{name} is not advertisable"
+                    "{name} is not a valid outbound address"
                 )));
             }
         }
     }
-    Ok(raw)
+    Ok(raw.to_owned())
 }
 
 fn parse_url(name: &str, value: &str, schemes: &[&str], allow_credentials: bool) -> Result<Url> {
@@ -1312,14 +1211,9 @@ fn boolean(name: &str, fallback: bool) -> Result<bool> {
 #[cfg(test)]
 mod tests {
     use super::{
-        DEFAULT_ETCD_PREFIX, Environment, NATS_INVALIDATION_SUBJECT, NATS_PERMISSION_SUBJECT,
-        NATS_UPDATE_SUBJECT, advertised_address, validate_protocol_subject,
+        Environment, NATS_INVALIDATION_SUBJECT, NATS_PERMISSION_SUBJECT, NATS_UPDATE_SUBJECT,
+        outbound_address, validate_protocol_subject,
     };
-
-    #[test]
-    fn default_etcd_prefix_matches_go_registry_contract() {
-        assert_eq!(DEFAULT_ETCD_PREFIX, "/knowledge-core/development/registry");
-    }
 
     #[test]
     fn nats_protocol_subjects_are_exact_and_reject_configuration_drift() {
@@ -1341,27 +1235,27 @@ mod tests {
     }
 
     #[test]
-    fn advertised_rpc_address_accepts_strict_ip_and_hostname_endpoints() {
-        for address in ["127.0.0.1:8883", "collaboration:8883", "[::1]:8883"] {
+    fn outbound_rpc_address_accepts_strict_ip_and_hostname_endpoints() {
+        for address in ["127.0.0.1:8882", "knowledge:8882", "[::1]:8882"] {
             assert_eq!(
-                advertised_address(
-                    "KNOWLEDGE_CORE_TEST_UNUSED_ADVERTISED_ADDRESS",
+                outbound_address(
+                    "KNOWLEDGE_CORE_TEST_UNUSED_OUTBOUND_ADDRESS",
                     address,
                     Environment::Development,
                 )
-                .expect("valid advertised address"),
+                .expect("valid outbound address"),
                 address
             );
         }
         for address in [
-            "collaboration",
-            "collaboration:0",
-            "collaboration:8883/path",
-            "user@collaboration:8883",
+            "knowledge",
+            "knowledge:0",
+            "knowledge:8882/path",
+            "user@knowledge:8882",
         ] {
             assert!(
-                advertised_address(
-                    "KNOWLEDGE_CORE_TEST_UNUSED_ADVERTISED_ADDRESS",
+                outbound_address(
+                    "KNOWLEDGE_CORE_TEST_UNUSED_OUTBOUND_ADDRESS",
                     address,
                     Environment::Development,
                 )
@@ -1372,11 +1266,11 @@ mod tests {
     }
 
     #[test]
-    fn production_advertised_rpc_address_rejects_localhost() {
+    fn production_outbound_rpc_address_rejects_localhost() {
         assert!(
-            advertised_address(
-                "KNOWLEDGE_CORE_TEST_UNUSED_ADVERTISED_ADDRESS",
-                "localhost:8883",
+            outbound_address(
+                "KNOWLEDGE_CORE_TEST_UNUSED_OUTBOUND_ADDRESS",
+                "localhost:8882",
                 Environment::Production,
             )
             .is_err()

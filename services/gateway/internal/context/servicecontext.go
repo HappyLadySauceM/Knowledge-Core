@@ -14,7 +14,6 @@ import (
 	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/knowledge/knowledgeservice"
 	coreapp "github.com/HappyLadySauce/Knowledge-Core/pkg/app"
 	coreauth "github.com/HappyLadySauce/Knowledge-Core/pkg/auth"
-	etcdresource "github.com/HappyLadySauce/Knowledge-Core/pkg/etcd"
 	"github.com/HappyLadySauce/Knowledge-Core/pkg/health"
 	redisresource "github.com/HappyLadySauce/Knowledge-Core/pkg/redis"
 	hertztransport "github.com/HappyLadySauce/Knowledge-Core/pkg/transport/hertz"
@@ -28,7 +27,6 @@ import (
 type ServiceContext struct {
 	Config        config.Config
 	Redis         *redisresource.Resource
-	Etcd          *etcdresource.ResolverResources
 	Identity      identityservice.Client
 	Knowledge     knowledgeservice.Client
 	Collaboration collaborationservice.Client
@@ -55,24 +53,16 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 		return nil, errors.Join(err, cache.Close())
 	}
 
-	resolver, err := etcdresource.OpenResolver(ctx, *cfg.Etcd, runtime.Logger)
+	identity, err := gatewayclient.NewIdentity(*cfg.IdentityRPC, runtime.Trace, runtime.Metrics)
 	if err != nil {
 		return nil, err
 	}
-	if err := runtime.AddCleanup("etcd-resolver", func(stdcontext.Context) error { return resolver.Close() }); err != nil {
-		return nil, errors.Join(err, resolver.Close())
-	}
-
-	identity, err := gatewayclient.NewIdentity(*cfg.IdentityRPC, resolver.Resolver, runtime.Trace, runtime.Metrics)
-	if err != nil {
-		return nil, err
-	}
-	knowledge, err := gatewayclient.NewKnowledge(*cfg.KnowledgeRPC, resolver.Resolver, runtime.Trace, runtime.Metrics)
+	knowledge, err := gatewayclient.NewKnowledge(*cfg.KnowledgeRPC, runtime.Trace, runtime.Metrics)
 	if err != nil {
 		return nil, err
 	}
 	collaboration, err := gatewayclient.NewCollaboration(
-		*cfg.CollaborationRPC, resolver.Resolver, runtime.Trace, runtime.Metrics,
+		*cfg.CollaborationRPC, runtime.Trace, runtime.Metrics,
 	)
 	if err != nil {
 		return nil, err
@@ -92,7 +82,7 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 	if err != nil {
 		return nil, fmt.Errorf("create gateway HTTP middleware: %w", err)
 	}
-	if err := addReadinessChecks(runtime.Health, cfg, cache, resolver, identity, knowledge, collaboration); err != nil {
+	if err := addReadinessChecks(runtime.Health, cfg, cache, identity, knowledge, collaboration); err != nil {
 		return nil, err
 	}
 
@@ -141,7 +131,7 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 		slog.String("event", "dependencies_ready"),
 	)
 	return &ServiceContext{
-		Config: cfg, Redis: cache, Etcd: resolver, Identity: identity, Knowledge: knowledge, Collaboration: collaboration, Verifier: verifier,
+		Config: cfg, Redis: cache, Identity: identity, Knowledge: knowledge, Collaboration: collaboration, Verifier: verifier,
 		Limiter: limiter, Middleware: middlewareDependencies, AdminServer: admin, PublicServer: public,
 	}, nil
 }
@@ -157,14 +147,12 @@ func addReadinessChecks(
 	registry *health.Registry,
 	cfg config.Config,
 	cache *redisresource.Resource,
-	etcd *etcdresource.ResolverResources,
 	identity identityservice.Client,
 	knowledge knowledgeservice.Client,
 	collaboration collaborationservice.Client,
 ) error {
 	return errors.Join(
 		registry.AddReadiness("redis", withTimeout(cfg.Redis.ReadTimeout, cache.Ping)),
-		registry.AddReadiness("etcd", etcd.Ping),
 		registry.AddReadiness("identity", withTimeout(cfg.IdentityRPC.RequestTimeout, func(ctx stdcontext.Context) error {
 			response, err := identity.Ping(ctx, &commonv1.PingRequest{})
 			if err != nil {

@@ -19,7 +19,7 @@ use crate::{
 };
 
 use super::{
-    context::scope_outgoing_metadata, etcd::EtcdDiscovery, knowledge_client_error,
+    context::scope_outgoing_metadata, discover::StaticDiscover, knowledge_client_error,
     tls::client_transport,
 };
 
@@ -30,21 +30,14 @@ pub struct KnowledgeClient {
 }
 
 impl KnowledgeClient {
-    /// Creates a typed Knowledge RPC client backed by Etcd discovery.
+    /// Creates a typed Knowledge RPC client that dials a static `host:port`.
+    /// 创建按静态 `host:port` 拨号的 Knowledge RPC 客户端。
     ///
     /// # Errors
     ///
     /// Returns an error for invalid RPC or TLS configuration.
-    pub fn new(config: &KnowledgeConfig, discovery: EtcdDiscovery) -> Result<Self> {
-        if config.service_name.trim() != config.service_name
-            || config.service_name.is_empty()
-            || config.service_name.contains('/')
-            || config.request_timeout.is_zero()
-        {
-            return Err(ServiceError::invalid_input(
-                "Knowledge RPC configuration is invalid",
-            ));
-        }
+    pub fn new(config: &KnowledgeConfig) -> Result<Self> {
+        let discovery = StaticDiscover::new(config)?;
         let builder = knowledge::KnowledgeServiceClientBuilder::new(&config.service_name)
             .caller_name(SERVICE_NAME)
             .connect_timeout(Some(config.request_timeout))

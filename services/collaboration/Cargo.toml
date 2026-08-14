@@ -47,7 +47,6 @@ async-trait = "=0.1.89"
 axum = { version = "=0.8.9", default-features = false, features = ["http1", "json", "tokio", "ws"] }
 base64 = "=0.22.1"
 bytes = "=1.12.1"
-etcd-client = { version = "=0.18.0", features = ["tls-roots"] }
 futures-util = "=0.3.33"
 metainfo = { version = "=0.7.14", features = ["task_local"] }
 motore = "=0.4.1"

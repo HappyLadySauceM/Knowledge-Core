@@ -11,7 +11,6 @@ use async_nats::jetstream::{
     consumer::{AckPolicy, DeliverPolicy, pull},
 };
 use bytes::Bytes;
-use etcd_client::{Client as EtcdClient, PutOptions};
 use futures_util::StreamExt as _;
 use knowledge_core_collaboration::{
     config::{
@@ -40,17 +39,15 @@ use yrs::{ReadTxn, Transact, XmlElementPrelim, XmlFragment};
 type TestResult<T = ()> = Result<T, Box<dyn Error + Send + Sync>>;
 
 const REQUIRE_REAL_DEPENDENCIES: &str = "COLLABORATION_TEST_REQUIRE_REAL_DEPENDENCIES";
-const REQUIRED_ENVIRONMENT: [&str; 4] = [
+const REQUIRED_ENVIRONMENT: [&str; 3] = [
     "COLLABORATION_TEST_POSTGRES_URL",
     "COLLABORATION_TEST_POSTGRES_PASSWORD",
     "COLLABORATION_TEST_REDIS_URL",
-    "COLLABORATION_TEST_ETCD_ENDPOINTS",
 ];
 
 struct RealEnvironment {
     postgres_url: String,
     redis_url: String,
-    etcd_endpoints: Vec<String>,
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
@@ -59,7 +56,7 @@ async fn repository_contracts_against_real_dependencies() -> TestResult {
     let Some(environment) = real_environment()? else {
         if required {
             return Err(test_error(
-                "COLLABORATION_TEST_POSTGRES_URL, COLLABORATION_TEST_POSTGRES_PASSWORD, COLLABORATION_TEST_REDIS_URL, and COLLABORATION_TEST_ETCD_ENDPOINTS are required when COLLABORATION_TEST_REQUIRE_REAL_DEPENDENCIES=1",
+                "COLLABORATION_TEST_POSTGRES_URL, COLLABORATION_TEST_POSTGRES_PASSWORD, and COLLABORATION_TEST_REDIS_URL are required when COLLABORATION_TEST_REQUIRE_REAL_DEPENDENCIES=1",
             ));
         }
         eprintln!(
@@ -77,7 +74,6 @@ async fn repository_contracts_against_real_dependencies() -> TestResult {
 async fn run_contracts(environment: RealEnvironment) -> TestResult {
     postgres_contract(&environment.postgres_url).await?;
     redis_contract(&environment.redis_url).await?;
-    etcd_contract(&environment.etcd_endpoints).await?;
     Ok(())
 }
 
@@ -625,38 +621,6 @@ async fn verify_stream_contracts(
     Ok(())
 }
 
-async fn etcd_contract(endpoints: &[String]) -> TestResult {
-    let mut client = EtcdClient::connect(endpoints, None).await?;
-    let key = format!(
-        "/knowledge-core/development/registry/tests/{}",
-        Uuid::now_v7()
-    );
-    let mut watcher = client.watch(key.clone(), None).await?;
-    let created = timeout(Duration::from_secs(5), watcher.message())
-        .await
-        .map_err(|_| test_error("Etcd watch creation timed out"))??
-        .ok_or_else(|| test_error("Etcd watch closed before creation"))?;
-    assert!(created.created());
-    let watch_id = created.watch_id();
-    let lease = client.lease_grant(10, None).await?;
-    client
-        .put(
-            key.clone(),
-            "collaboration-test",
-            Some(PutOptions::new().with_lease(lease.id())),
-        )
-        .await?;
-    let changed = timeout(Duration::from_secs(5), watcher.message())
-        .await
-        .map_err(|_| test_error("Etcd watch event timed out"))??
-        .ok_or_else(|| test_error("Etcd watch closed before event"))?;
-    assert_eq!(changed.watch_id(), watch_id);
-    assert_eq!(changed.events().len(), 1);
-    watcher.cancel(watch_id).await?;
-    client.lease_revoke(lease.id()).await?;
-    Ok(())
-}
-
 fn append_paragraph_update(state: &[u8]) -> TestResult<Vec<u8>> {
     let document = richtext::document_from_state(state)?;
     let before = document.transact().state_vector();
@@ -671,28 +635,12 @@ fn append_paragraph_update(state: &[u8]) -> TestResult<Vec<u8>> {
 fn real_environment() -> TestResult<Option<RealEnvironment>> {
     let values = REQUIRED_ENVIRONMENT
         .map(|name| env::var(name).ok().filter(|value| !value.trim().is_empty()));
-    let [
-        Some(postgres_url),
-        Some(postgres_password),
-        Some(redis_url),
-        Some(etcd),
-    ] = values
-    else {
+    let [Some(postgres_url), Some(postgres_password), Some(redis_url)] = values else {
         return Ok(None);
     };
-    let etcd_endpoints = etcd
-        .split(',')
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(ToOwned::to_owned)
-        .collect::<Vec<_>>();
-    if etcd_endpoints.is_empty() {
-        return Ok(None);
-    }
     Ok(Some(RealEnvironment {
         postgres_url: postgres_url_with_password(&postgres_url, &postgres_password)?,
         redis_url,
-        etcd_endpoints,
     }))
 }
 

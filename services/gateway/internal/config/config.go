@@ -17,7 +17,6 @@ type Config struct {
 	PublicHTTP       *option.HertzServerOptions `mapstructure:"public_http" json:"public_http" yaml:"public_http"`
 	AdminHTTP        *option.HertzServerOptions `mapstructure:"admin_http" json:"admin_http" yaml:"admin_http"`
 	Redis            *option.RedisOptions       `mapstructure:"redis" json:"redis" yaml:"redis"`
-	Etcd             *option.EtcdOptions        `mapstructure:"etcd" json:"etcd" yaml:"etcd"`
 	IdentityRPC      *option.KitexClientOptions `mapstructure:"identity_rpc" json:"identity_rpc" yaml:"identity_rpc"`
 	KnowledgeRPC     *option.KitexClientOptions `mapstructure:"knowledge_rpc" json:"knowledge_rpc" yaml:"knowledge_rpc"`
 	CollaborationRPC *option.KitexClientOptions `mapstructure:"collaboration_rpc" json:"collaboration_rpc" yaml:"collaboration_rpc"`
@@ -34,14 +33,17 @@ func New() Config {
 	adminHTTP.Address = ":8082"
 	identityRPC := option.NewKitexClientOptions()
 	identityRPC.ServiceName = "knowledge-core.identity"
+	identityRPC.Address = "127.0.0.1:8881"
 	knowledgeRPC := option.NewKitexClientOptions()
 	knowledgeRPC.ServiceName = "knowledge-core.knowledge"
+	knowledgeRPC.Address = "127.0.0.1:8882"
 	collaborationRPC := option.NewKitexClientOptions()
 	collaborationRPC.ServiceName = "knowledge-core.collaboration"
+	collaborationRPC.Address = "127.0.0.1:8883"
 	collaborationRPC.RequestTimeout = 5 * time.Second
 	return Config{
 		App: option.NewAppOptions("gateway"), Log: option.NewLogOptions(), Trace: option.NewTraceOptions(),
-		PublicHTTP: publicHTTP, AdminHTTP: adminHTTP, Redis: option.NewRedisOptions(), Etcd: option.NewEtcdOptions(),
+		PublicHTTP: publicHTTP, AdminHTTP: adminHTTP, Redis: option.NewRedisOptions(),
 		IdentityRPC: identityRPC, KnowledgeRPC: knowledgeRPC, CollaborationRPC: collaborationRPC,
 		Endpoints: NewEndpointOptions(), Auth: NewAuthOptions(), CORS: NewCORSOptions(), RateLimit: NewRateLimitOptions(),
 	}
@@ -69,12 +71,15 @@ func (c Config) Validate() error {
 	}
 	if c.App.Environment == "production" {
 		endpointErr = errors.Join(endpointErr, requireMutualTLS("collaboration", c.CollaborationRPC.TLS))
+		endpointErr = errors.Join(endpointErr, option.RejectLoopbackEndpoint("identity_rpc.address", c.IdentityRPC.Address))
+		endpointErr = errors.Join(endpointErr, option.RejectLoopbackEndpoint("knowledge_rpc.address", c.KnowledgeRPC.Address))
+		endpointErr = errors.Join(endpointErr, option.RejectLoopbackEndpoint("collaboration_rpc.address", c.CollaborationRPC.Address))
 	}
 	return errors.Join(
 		wrapValidation("app", c.App.Validate()), wrapValidation("log", c.Log.Validate()),
 		wrapValidation("trace", c.Trace.Validate()), wrapValidation("public_http", c.PublicHTTP.Validate()),
 		wrapValidation("admin_http", c.AdminHTTP.Validate()), wrapValidation("redis", c.Redis.Validate()),
-		wrapValidation("etcd", c.Etcd.Validate()), wrapValidation("identity_rpc", c.IdentityRPC.Validate()),
+		wrapValidation("identity_rpc", c.IdentityRPC.Validate()),
 		wrapValidation("knowledge_rpc", c.KnowledgeRPC.Validate()), wrapValidation("collaboration_rpc", c.CollaborationRPC.Validate()),
 		wrapValidation("endpoints", c.Endpoints.Validate()),
 		wrapValidation("auth", c.Auth.Validate()), wrapValidation("cors", c.CORS.Validate()),
@@ -85,7 +90,7 @@ func (c Config) Validate() error {
 func (c Config) requireSections() error {
 	sections := map[string]any{
 		"app": c.App, "log": c.Log, "trace": c.Trace, "public_http": c.PublicHTTP,
-		"admin_http": c.AdminHTTP, "redis": c.Redis, "etcd": c.Etcd,
+		"admin_http": c.AdminHTTP, "redis": c.Redis,
 		"identity_rpc": c.IdentityRPC, "knowledge_rpc": c.KnowledgeRPC, "collaboration_rpc": c.CollaborationRPC,
 		"endpoints": c.Endpoints, "auth": c.Auth, "cors": c.CORS, "rate_limit": c.RateLimit,
 	}

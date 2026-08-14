@@ -16,7 +16,7 @@
 - `pkg/` 只承载与业务无关、可跨服务复用的能力，绝不能导入 `services/*`。服务私有配置、领域模型、用例和传输适配必须留在对应的 `services/<service>/`。
 - 服务保持 `main/spec -> internal/config -> internal/context -> domain/logic/repository/transport` 的装配方向。`main.go` 只创建并执行应用命令，`spec.go` 只声明应用规格，不放业务逻辑。
 - `ServiceContext` 显式构造并持有服务依赖。`pkg/app.Runtime` 只负责进程级日志、追踪、健康、指标与生命周期编排，不得被扩展为服务定位器。
-- 禁止全局 Viper/pflag、可变 package singleton、隐藏式依赖注入和跨包随意取用数据库、Redis、Etcd 或 NATS client。
+- 禁止全局 Viper/pflag、可变 package singleton、隐藏式依赖注入和跨包随意取用数据库、Redis 或 NATS client。
 - 业务逻辑依赖本服务定义的小接口；repository 负责持久化、事务和存储错误映射；transport/handler 只负责协议校验、调用编排与安全的错误映射，不承载领域规则。
 
 ### Identity
@@ -28,7 +28,7 @@
 ### Gateway
 
 - Gateway 是 HTTP edge：负责严格请求校验、鉴权、安全中间件、限流、公开错误映射和对上游 typed client 的调用编排；不得直连 Identity 数据库或复制 Identity 领域规则。
-- `internal/client` 封装 Identity、Knowledge、Collaboration RPC，`internal/middleware` 承载跨路由安全策略，`internal/context` 显式装配 Redis、Etcd resolver、三个上游 client 与 HTTP components。
+- `internal/client` 封装 Identity、Knowledge、Collaboration RPC，`internal/middleware` 承载跨路由安全策略，`internal/context` 显式装配 Redis、三个上游 client 与 HTTP components。
 - Gateway handler 与 route middleware 的所有权以生成清单为准；文件头中的 generated 注释不能覆盖 `scripts/generated-files.txt` 的判定。
 
 ### Knowledge
@@ -40,7 +40,7 @@
 ### Collaboration
 
 - Rust workspace（`services/collaboration/`）：Volo Thrift RPC（`:8883`）与 WebSocket（`:8091`，y-sync + awareness，Yrs CRDT）；`src/generated/`（mod.rs、volo_gen.rs）完全由生成器拥有，禁止手改。
-- 拥有 PostgreSQL `collaboration` schema（Yjs update、snapshot、version、projection job、outbox）；依赖 Redis、NATS、Etcd 与 Knowledge RPC。不复制文档权限规则：创建 session 时经 Knowledge RPC 复核访问级别，ticket 短期、单次使用。
+- 拥有 PostgreSQL `collaboration` schema（Yjs update、snapshot、version、projection job、outbox）；依赖 Redis、NATS 与 Knowledge RPC。不复制文档权限规则：创建 session 时经 Knowledge RPC 复核访问级别，ticket 短期、单次使用。
 - Rust 门禁：rustfmt、clippy 必须 `-D warnings`、`cargo deny`（advisories/bans/licenses/sources）；工具链固定在 `rust-toolchain.toml`（1.97.1）。
 - Node 互操作 fixture 在 `services/collaboration/interop/`（yjs ↔ yrs，`npm run ci` = format:check + `node --test` + audit），不属于 Go 包发现范围（GO_PACKAGES）。
 
@@ -99,7 +99,7 @@
 
 ## 禁止的反模式
 
-- `pkg/` 反向依赖服务、transport 承载业务规则、logic 直接依赖具体 GORM/Redis/Etcd 类型。
+- `pkg/` 反向依赖服务、transport 承载业务规则、logic 直接依赖具体 GORM/Redis 类型。
 - 全局配置/连接、服务定位器、无 owner goroutine、无上限重试或等待。
 - panic/os.Exit 代替错误、丢弃 error/cause、向客户端返回内部错误细节。
 - 手改生成文件、绕过公共 JSON/error/log/trace 契约、在指标中使用高基数或敏感标签。

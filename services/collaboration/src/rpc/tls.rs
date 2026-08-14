@@ -172,7 +172,7 @@ pub fn client_transport(tls: &TlsConfig) -> Result<TlsMakeTransport> {
 /// Selects the `ring` `rustls` provider for the process before any TLS configuration is built.
 ///
 /// Calling this more than once is safe. Applications should call it before constructing any
-/// `PostgreSQL`, `Redis`, `NATS`, `Etcd`, `OTLP`, or RPC TLS client because the dependency graph
+/// `PostgreSQL`, `Redis`, `NATS`, `OTLP`, or RPC TLS client because the dependency graph
 /// enables more than one `rustls` provider feature.
 pub fn install_crypto_provider() {
     if rustls::crypto::CryptoProvider::get_default().is_none() {

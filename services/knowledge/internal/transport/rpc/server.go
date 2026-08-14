@@ -18,7 +18,6 @@ import (
 	coretrace "github.com/HappyLadySauce/Knowledge-Core/pkg/trace"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/limit"
-	"github.com/cloudwego/kitex/pkg/registry"
 	"github.com/cloudwego/kitex/pkg/remote/trans/gonet"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	kitexserver "github.com/cloudwego/kitex/server"
@@ -27,13 +26,8 @@ import (
 const rpcComponentName = "knowledge-kitex-rpc"
 
 type RPCServer struct {
-	server       kitexserver.Server
-	listener     net.Listener
-	registration registrationWaiter
-}
-
-type registrationWaiter interface {
-	WaitRegistered(context.Context) error
+	server   kitexserver.Server
+	listener net.Listener
 }
 
 func NewRPCServer(
@@ -41,25 +35,20 @@ func NewRPCServer(
 	options option.KitexServerOptions,
 	tlsConfig *tls.Config,
 	service knowledge.KnowledgeService,
-	serviceRegistry registry.Registry,
 	telemetry *coretrace.Runtime,
 	metricsRegistry *metrics.Registry,
 	logger *slog.Logger,
 	requestLogs *corelog.RequestControl,
 	tags map[string]string,
 ) (*RPCServer, error) {
-	if ctx == nil || service == nil || serviceRegistry == nil || telemetry == nil || metricsRegistry == nil || logger == nil {
-		return nil, errors.New("create knowledge RPC server: context, service, registry, tracing, metrics, and logger are required")
+	if ctx == nil || service == nil || telemetry == nil || metricsRegistry == nil || logger == nil {
+		return nil, errors.New("create knowledge RPC server: context, service, tracing, metrics, and logger are required")
 	}
 	if err := options.Validate(); err != nil {
 		return nil, fmt.Errorf("create knowledge RPC server: invalid options: %w", err)
 	}
 	if options.TLS.Enabled != (tlsConfig != nil) {
 		return nil, errors.New("create knowledge RPC server: TLS configuration does not match enabled setting")
-	}
-	registration, ok := serviceRegistry.(registrationWaiter)
-	if !ok {
-		return nil, errors.New("create knowledge RPC server: registry must expose a registration readiness handshake")
 	}
 
 	listener, err := (&net.ListenConfig{}).Listen(ctx, "tcp", options.Address)
@@ -72,7 +61,6 @@ func NewRPCServer(
 
 	serverOptions := []kitexserver.Option{
 		kitexserver.WithListener(listener),
-		kitexserver.WithRegistry(serviceRegistry),
 		kitexserver.WithServerBasicInfo(&rpcinfo.EndpointBasicInfo{ServiceName: options.ServiceName, Tags: cloneTags(tags)}),
 		kitexserver.WithReadWriteTimeout(options.ReadWriteTimeout),
 		kitexserver.WithExitWaitTime(options.ExitWaitTimeout),
@@ -96,7 +84,7 @@ func NewRPCServer(
 		_ = listener.Close()
 		return nil, fmt.Errorf("register knowledge Kitex service: %w", err)
 	}
-	return &RPCServer{server: kitex, listener: listener, registration: registration}, nil
+	return &RPCServer{server: kitex, listener: listener}, nil
 }
 
 func (s *RPCServer) Name() string { return rpcComponentName }
@@ -109,14 +97,13 @@ func (s *RPCServer) Serve() error {
 }
 
 func (s *RPCServer) Ready(ctx context.Context) error {
-	if s == nil || s.registration == nil {
-		return errors.New("wait for knowledge RPC readiness: registration handshake is nil")
+	if s == nil || s.server == nil || s.listener == nil {
+		return errors.New("wait for knowledge RPC readiness: listener is not bound")
 	}
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	if err := s.registration.WaitRegistered(ctx); err != nil {
-		return fmt.Errorf("wait for knowledge RPC registration: %w", err)
+	if ctx != nil {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 	}
 	return nil
 }

@@ -10,7 +10,6 @@ import (
 
 	coreapp "github.com/HappyLadySauce/Knowledge-Core/pkg/app"
 	coreauth "github.com/HappyLadySauce/Knowledge-Core/pkg/auth"
-	etcdresource "github.com/HappyLadySauce/Knowledge-Core/pkg/etcd"
 	"github.com/HappyLadySauce/Knowledge-Core/pkg/health"
 	"github.com/HappyLadySauce/Knowledge-Core/pkg/postgres"
 	redisresource "github.com/HappyLadySauce/Knowledge-Core/pkg/redis"
@@ -28,7 +27,6 @@ type ServiceContext struct {
 	Config       config.Config
 	Database     *gorm.DB
 	Redis        *redisresource.Resource
-	Etcd         *etcdresource.Resources
 	Register     *identitylogic.RegisterLogic
 	Authenticate *identitylogic.AuthenticateLogic
 	Hasher       *security.BcryptHasher
@@ -73,15 +71,7 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 		return nil, errors.Join(err, cache.Close())
 	}
 
-	registry, err := etcdresource.Open(ctx, *cfg.Etcd, runtime.Logger)
-	if err != nil {
-		return nil, err
-	}
-	if err := runtime.AddCleanup("etcd", func(stdcontext.Context) error { return registry.Close() }); err != nil {
-		return nil, errors.Join(err, registry.Close())
-	}
-
-	if err := addReadinessChecks(runtime.Health, cfg, db, cache, registry); err != nil {
+	if err := addReadinessChecks(runtime.Health, cfg, db, cache); err != nil {
 		return nil, err
 	}
 
@@ -142,7 +132,8 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 		return nil, err
 	}
 	// Register the admin component first so reverse-order shutdown keeps its
-	// readiness endpoint available while Kitex deregisters and drains.
+	// readiness endpoint available while Kitex drains in-flight RPC.
+	// 先注册 admin，逆序关闭时仍可在 Kitex 排空在途 RPC 期间提供 readiness。
 	if err := runtime.AddComponent(admin); err != nil {
 		return nil, err
 	}
@@ -156,7 +147,6 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 		*cfg.RPC,
 		rpcTLS,
 		handler,
-		registry.Registry,
 		runtime.Trace,
 		runtime.Metrics,
 		runtime.Logger,
@@ -181,7 +171,6 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 		Config:       cfg,
 		Database:     db,
 		Redis:        cache,
-		Etcd:         registry,
 		Register:     register,
 		Authenticate: authenticate,
 		Hasher:       hasher,
@@ -205,14 +194,12 @@ func addReadinessChecks(
 	cfg config.Config,
 	db *gorm.DB,
 	cache *redisresource.Resource,
-	etcd *etcdresource.Resources,
 ) error {
 	return errors.Join(
 		registry.AddReadiness("postgres", withTimeout(cfg.PostgreSQL.ConnectTimeout, func(ctx stdcontext.Context) error {
 			return postgres.Ping(ctx, db)
 		})),
 		registry.AddReadiness("redis", withTimeout(cfg.Redis.ReadTimeout, cache.Ping)),
-		registry.AddReadiness("etcd", etcd.Ping),
 	)
 }
 

@@ -10,27 +10,25 @@ import (
 	coretrace "github.com/HappyLadySauce/Knowledge-Core/pkg/trace"
 	transportkitex "github.com/HappyLadySauce/Knowledge-Core/pkg/transport/kitex"
 	kitexclient "github.com/cloudwego/kitex/client"
-	"github.com/cloudwego/kitex/pkg/discovery"
 )
 
 func NewKnowledge(
 	opts option.KitexClientOptions,
-	resolver discovery.Resolver,
 	telemetry *coretrace.Runtime,
 	metricsRegistry *metrics.Registry,
 ) (knowledgeservice.Client, error) {
 	if err := opts.Validate(); err != nil {
 		return nil, fmt.Errorf("create Knowledge client: invalid options: %w", err)
 	}
-	if resolver == nil || telemetry == nil || metricsRegistry == nil {
-		return nil, errors.New("create Knowledge client: resolver, tracing, and metrics are required")
+	if telemetry == nil || metricsRegistry == nil {
+		return nil, errors.New("create Knowledge client: tracing and metrics are required")
 	}
 	tlsConfig, err := opts.TLS.ClientTLSConfig()
 	if err != nil {
 		return nil, fmt.Errorf("create Knowledge client TLS: %w", err)
 	}
 	clientOptions := []kitexclient.Option{
-		kitexclient.WithResolver(resolver),
+		kitexclient.WithHostPorts(opts.Address),
 		kitexclient.WithConnectTimeout(opts.ConnectTimeout),
 		kitexclient.WithRPCTimeout(opts.RequestTimeout),
 		kitexclient.WithMiddleware(metrics.KitexClientMiddleware(metricsRegistry)),

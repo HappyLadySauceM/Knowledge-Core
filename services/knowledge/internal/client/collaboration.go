@@ -14,7 +14,6 @@ import (
 	transportkitex "github.com/HappyLadySauce/Knowledge-Core/pkg/transport/kitex"
 	"github.com/HappyLadySauce/Knowledge-Core/services/knowledge/internal/domain"
 	kitexclient "github.com/cloudwego/kitex/client"
-	"github.com/cloudwego/kitex/pkg/discovery"
 )
 
 type Collaboration struct {
@@ -23,22 +22,21 @@ type Collaboration struct {
 
 func NewCollaboration(
 	options option.KitexClientOptions,
-	resolver discovery.Resolver,
 	telemetry *coretrace.Runtime,
 	metricsRegistry *metrics.Registry,
 ) (*Collaboration, error) {
 	if err := options.Validate(); err != nil {
 		return nil, fmt.Errorf("create Collaboration client: invalid options: %w", err)
 	}
-	if resolver == nil || telemetry == nil || metricsRegistry == nil {
-		return nil, errors.New("create Collaboration client: resolver, tracing, and metrics are required")
+	if telemetry == nil || metricsRegistry == nil {
+		return nil, errors.New("create Collaboration client: tracing and metrics are required")
 	}
 	tlsConfig, err := options.TLS.ClientTLSConfig()
 	if err != nil {
 		return nil, fmt.Errorf("create Collaboration client TLS: %w", err)
 	}
 	clientOptions := []kitexclient.Option{
-		kitexclient.WithResolver(resolver),
+		kitexclient.WithHostPorts(options.Address),
 		kitexclient.WithConnectTimeout(options.ConnectTimeout),
 		kitexclient.WithRPCTimeout(options.RequestTimeout),
 		kitexclient.WithMiddleware(metrics.KitexClientMiddleware(metricsRegistry)),

@@ -143,6 +143,9 @@ func TestProductionCollaborationRequiresMutualTLS(t *testing.T) {
 	}
 
 	cfg.CollaborationRPC.TLS.InsecureSkipVerify = false
+	cfg.IdentityRPC.Address = "identity.example.svc:8881"
+	cfg.KnowledgeRPC.Address = "knowledge.example.svc:8882"
+	cfg.CollaborationRPC.Address = "collaboration.example.svc:8883"
 	if err := cfg.Validate(); err != nil {
 		t.Fatalf("Validate() error = %v", err)
 	}

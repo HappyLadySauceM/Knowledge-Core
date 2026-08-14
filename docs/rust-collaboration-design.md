@@ -1,6 +1,6 @@
 # Rust Collaboration 设计与实现记录
 
-> 状态：方案已在当前工作区实现，尚未执行生产切换。更新于 2026-08-03。
+> 状态：方案已在当前工作区实现，尚未执行生产切换。更新于 2026-08-14。
 >
 > 本文记录 Rust Collaboration 的已实现设计、验证证据和发布门禁。当前代码能力以 [`framework-design.md`](framework-design.md) 为准；性能基线、完整 Compose WebSocket E2E、依赖故障、备份及切换/回滚演练完成前，不得把代码落地描述为已生产切换或完整生产级验收。
 
@@ -10,7 +10,7 @@
 
 - 保留 Yjs/TipTap 客户端生态，服务端改用 Yrs 和标准 y-sync 语义。
 - 在确认 PostgreSQL 提交成功后才应用和广播客户端 update，依赖失败时不提供虚假成功。
-- 使用与现有 Go 服务一致的 Thrift IDL、TTHeader、Etcd、稳定业务错误和调用链元数据。
+- 使用与现有 Go 服务一致的 Thrift IDL、TTHeader、稳定业务错误和调用链元数据。
 - 用显式 owner、有限队列、超时和 join 路径管理连接、文档 actor、worker 与依赖生命周期。
 - 补齐 Collaboration 的 Prometheus、OpenTelemetry、真实依赖测试和多实例故障验证。
 - 在相同负载下不降低 update 持久化延迟，并显著降低单连接内存成本。
@@ -23,7 +23,7 @@
 - 匿名公开文档的实时 WebSocket；公开阅读继续使用 Knowledge 投影、ETag 和普通 HTTP 刷新。
 - Automerge、自研 CRDT 或正式 TypeScript 客户端 SDK。
 
-Identity 与 Knowledge 当前缺少真实 PostgreSQL 集成测试的问题不由本项目扩展处理；Rust Collaboration 自身必须具有真实 PostgreSQL、Redis、NATS 和 Etcd 测试。
+Identity 与 Knowledge 当前缺少真实 PostgreSQL 集成测试的问题不由本项目扩展处理；Rust Collaboration 自身必须具有真实 PostgreSQL、Redis 和 NATS 测试。
 
 ## 2. 已确定的技术决策
 
@@ -33,7 +33,7 @@ Identity 与 Knowledge 当前缺少真实 PostgreSQL 集成测试的问题不由
 - 异步运行时使用 Tokio，公开 WebSocket/admin HTTP 使用 Axum 与 Tower。
 - CRDT 使用 Yrs；wire 使用 Yjs update v1、y-sync v1 和 awareness，不在服务端引入 JavaScript runtime。
 - 内部 RPC 使用 Volo Thrift。基线版本为 `volo 0.12.3`、`volo-thrift 0.12.5`、`volo-build 0.12.3`；其默认 `TTHeader<Framed<Binary>>` 与 Kitex 互通。
-- PostgreSQL 使用 SQLx 和显式 SQL migration；Redis 使用异步 client；NATS 使用 `async-nats`；Etcd 使用 `etcd-client`。
+- PostgreSQL 使用 SQLx 和显式 SQL migration；Redis 使用异步 client；NATS 使用 `async-nats`。出站 Knowledge RPC 使用静态 `host:port` 与系统 DNS。
 - 日志和 trace 使用 `tracing`、OpenTelemetry 与 OTLP；指标使用 Prometheus registry。
 - 生产镜像只包含 Rust 二进制和必要 CA/运行库。Node 24 仅用于最小 Yjs 互操作测试目录，不进入生产镜像。
 
@@ -182,11 +182,11 @@ TTHeader 必须贯穿：
 - `knowledge-core-access-token`：敏感 persistent metadata，只用于可信 RPC 授权转发。
 - `x-request-id`：按公共规则生成/校验，不作为 metric label。
 - `traceparent`、`tracestate`、`baggage`：W3C trace 传播。
-- Kitex/Volo deadline：所有下游 PostgreSQL、Redis、Etcd 和 NATS 调用派生自入口 deadline。
+- Kitex/Volo deadline：所有下游 PostgreSQL、Redis 和 NATS 调用派生自入口 deadline。
 
 Rust middleware 必须显式提取并向 Knowledge Volo client 转发这些字段，且永不记录 token。业务失败使用 TTHeader BizStatus 和 `40001..40999` Collaboration code/key；Knowledge 的 `300xx` 错误先映射为 Collaboration 的稳定公开语义，未知 cause 不得穿透到 Gateway。
 
-Rust 服务以 `knowledge-core.collaboration` 注册到现有 Etcd prefix。连接与 readiness 只对已授权 registry prefix 执行 `limit=1`、keys-only 的有界 range read，不调用仅管理员可用的 Maintenance/Status。注册 value、lease、weight、tags 和 key 路径与 `pkg/etcd` 当前 Kitex 格式一致；Volo Knowledge client 实现同格式的 `Discover` 和 watch。实例地址严格使用非零端口的 `host:port`，IP literal 直接使用，hostname 在 Etcd snapshot 的总 deadline 内并发解析为排序去重后的 IP 集合；非法地址、DNS 失败、空结果或超时均 fail closed。注册 keepalive 每轮还校验 key、value 与 lease 仍属于本实例；外部删除、覆盖、keepalive 失败或 resolver watch 中止都会使 readiness 失败。
+Knowledge 客户端使用静态 `host:port`（Compose 为 Docker 服务名，k3s 为 ClusterIP Service DNS）。`StaticDiscover` 实现 Volo `Discover`：每次 discover 用现有 `resolve_socket_addresses` 解析地址，IP literal 直接使用，hostname 在 request timeout 内解析为排序去重后的 IP 集合；非法地址、DNS 失败、空结果或超时均 fail closed；`watch` 返回 `None`。进程不再向注册中心报名。RPC readiness 在 listener 已 bind 并开始 serving 后成立；WebSocket 仍走 per-pod Service 与 Higress `/v1/instances/{n}/`。生产环境拒绝 `localhost` 与环回拨号地址。
 
 ## 6. 文档 actor 与持久化
 
@@ -228,26 +228,26 @@ snapshot worker 用单个 lateral aggregate 同时计算每个 document 自水�
 
 ## 7. 安全、观测与生命周期
 
-- Production 必须使用 `wss`、精确非空 Origin、RPC mTLS、PostgreSQL 验证 TLS、`rediss`、NATS TLS 和 Etcd TLS/认证。
+- Production 必须使用 `wss`、精确非空 Origin、RPC mTLS、PostgreSQL 验证 TLS、`rediss`、NATS TLS 和 Knowledge RPC 双向 mTLS。
 - Nacos SDK 的 HTTPS 登录与 gRPC 使用同一显式 CA，但分别受 `SSL_CERT_FILE` 与 `NACOS_CLIENT_TLS_CA_CERT` 控制；`HOME/nacos` 对齐 `KNOWLEDGE_CORE_NACOS_RUNTIME_DIR` 的有界 `emptyDir`。启动在创建 SDK 前校验 CA、路径并预建 cache 目录，SDK auth 日志被强制关闭且其余 SDK 日志不高于 warn，动态 debug 级别不能放开凭据或配置 payload。
 - Collaboration 同时接受迁移期 `v1alpha1/DynamicConfig` 与服务绑定的 `v1beta1/ApplicationConfig`。初始文档在依赖装配前合并，优先级为默认值 `<` Nacos `<` 显式 `COLLABORATION_*` 环境变量；监听器只在 ticket、actor 与 WebSocket 动态目标全部创建后启动。Origin、握手限流、frame/update/document/awareness 限制、ticket TTL 和新 actor 限制可在线替换；listener、连接、最大总连接信号量、固定 channel 容量、协议名、worker 调度和 `routing.instance_count` 变化标记 `restart_required`。无效修订整体拒绝并保留 last-good。
 - `log.health_check_requests` 默认开启，dev Nacos 模板关闭。当前 Rust admin 与 Volo Ping/Live 不产生成功 access completion log，因此关闭开关不会隐藏错误、panic 或业务请求日志，并为后续新增 access log 保留统一契约。
 - Secret 只从环境变量或 Secret manager 注入；配置文件只保存非敏感默认值。ticket、JWT、TLS key、DSN、Redis key、payload 和 SQL 参数禁止进入日志与 telemetry。
 - Gateway 对 session route 使用认证、按用户/IP 限流和请求体空校验；Rust 对握手、连接、document、update 和 awareness 再执行独立边界。
 - Prometheus label 只使用稳定 route/RPC method、status/code、dependency 和 access；禁止 document/user/session/request ID 与原始错误。
-- WebSocket handshake、Volo Thrift server/client、SQLx、Redis、Etcd 和 NATS 延续同一 W3C trace；handshake context 会传给 actor/store，事件 outbox 在业务事务内保存 propagation headers，发布时只写入 NATS headers。WebSocket frame 仅保留有界操作事件，ping/pong 和 update payload 不创建或写入 span；重复 JetStream delivery 通过一次逻辑消费 span、attempt metrics 和最终 parking 事件表达。
+- WebSocket handshake、Volo Thrift server/client、SQLx、Redis 和 NATS 延续同一 W3C trace；handshake context 会传给 actor/store，事件 outbox 在业务事务内保存 propagation headers，发布时只写入 NATS headers。WebSocket frame 仅保留有界操作事件，ping/pong 和 update payload 不创建或写入 span；重复 JetStream delivery 通过一次逻辑消费 span、attempt metrics 和最终 parking 事件表达。
 - NATS permission/invalidation subscription 异常时停止接收新 session、关闭受保护连接并标记 not-ready，不为可用性静默放行；当前恢复策略是由外部编排重启进程，不在进程内无界重连。
 - 每个副本的 `COLLABORATION_INSTANCE_ID` 必须唯一且重启后稳定；它用于派生各角色的 JetStream durable consumer identity，使副本间 fanout 与同一副本的未 ACK redelivery 同时成立。
 - update、document invalidation 与 permission subject 分别固定为 `collaboration.documents.updated`、`collaboration.documents.invalidated` 和 `knowledge.permissions.changed`；相关环境变量只能等于协议值，不能用于部署级改名。document 与 permission stream 名称可配置但必须不同；两者的 max age 与 duplicate window 都固定为 24 小时并做严格漂移校验。
 - document stream 只拥有 update/invalidation subject，并以 1 GiB `max_bytes` 限制历史；permission stream 只拥有 permission subject，`max_bytes=-1`，只按 24 小时 max age 驱逐。permission event 必须包含正 revision；新 durable 使用 `DeliverPolicy::All` 回放全部时间保留历史，以 consumer 创建后读取的 permission stream `last_sequence` 为启动目标，并等待服务端连续 ACK floor 的 stream sequence 越过目标。若 retention 在投递前收缩，只有 consumer 同时没有 pending 和 ack-pending 消息时才视为空集合追平。actor 只关闭 revision 更旧的 session，并用保留时间不短于最大 ticket TTL 的 registry watermark 拒绝事件到达前签发、到达后才消费的旧 ticket。重复或延迟事件不得关闭同 revision/更新授权连接。
 
-所有 background task 必须由 `CancellationToken`、`JoinSet`/task tracker 和 Runtime 统一拥有。启动顺序为配置校验、telemetry、数据库 migration、Redis/NATS/Etcd、Knowledge client、actor/workers、listener、Etcd 注册；每个成功资源立即注册逆序 cleanup。RPC serve task 的返回、错误、panic 与 abort 都必须撤销 listener readiness；只有显式 shutdown/rollback 才标记为计划内退出。RPC task exit 与最终 readiness commit 通过同一同步 gate 串行化，最终 commit 前再次验证 RPC listener，不能在 task 已退出后重新置 ready。
+所有 background task 必须由 `CancellationToken`、`JoinSet`/task tracker 和 Runtime 统一拥有。启动顺序为配置校验、telemetry、数据库 migration、Redis/NATS、Knowledge client、actor/workers、listener；每个成功资源立即注册逆序 cleanup。RPC serve task 的返回、错误、panic 与 abort 都必须撤销 listener readiness；只有显式 shutdown/rollback 才标记为计划内退出。RPC task exit 与最终 readiness commit 通过同一同步 gate 串行化，最终 commit 前再次验证 RPC listener，不能在 task 已退出后重新置 ready。
 
-Shutdown 顺序为：先 not-ready 并撤销 Etcd 注册，停止创建 session 和新 WebSocket，等待在途 RPC/update 到上限，关闭连接与 actor，停止 worker/subscription，最后关闭 Knowledge client、Etcd、NATS、Redis、PostgreSQL 并 flush telemetry。任何等待都必须有上限且可测试。
+Shutdown 顺序为：先 not-ready，停止创建 session 和新 WebSocket，等待在途 RPC/update 到上限，关闭连接与 actor，停止 worker/subscription，最后关闭 Knowledge client、NATS、Redis、PostgreSQL 并 flush telemetry。任何等待都必须有上限且可测试。
 
 ## 8. 配置、仓库和交付
 
-保留 `COLLABORATION_*` 前缀，但不保留旧字段兼容。删除 internal HTTP 和 Knowledge base URL 配置，增加 RPC/admin/Etcd/Knowledge service discovery 与各网络边界 TLS 配置。Gateway 和 Knowledge 的 Collaboration 配置改为 Kitex client + Etcd resolver；Gateway 仍单独持有受信任的 public WebSocket base URL。
+保留 `COLLABORATION_*` 前缀，但不保留旧字段兼容。删除 internal HTTP 和 Knowledge base URL 配置，增加 RPC/admin 与静态 Knowledge `host:port` 以及各网络边界 TLS 配置。Gateway 和 Knowledge 的 Collaboration 配置改为 Kitex client + 静态地址；Gateway 仍单独持有受信任的 public WebSocket base URL。
 
 当前仓库结构：
 
@@ -265,7 +265,7 @@ services/collaboration/
 idl/rpc/v1/collaboration.thrift
 ```
 
-`docker/collaboration/Dockerfile` 使用锁定 Rust 基础镜像构建 release artifact，最终以固定无特权 UID/GID `10001:10001` 运行且不包含 Rust toolchain、Node/npm。Compose 使用 RPC `:8883`、admin `:8084` 和 Etcd discovery，并已移除 `:8092`。
+`docker/collaboration/Dockerfile` 使用锁定 Rust 基础镜像构建 release artifact，最终以固定无特权 UID/GID `10001:10001` 运行且不包含 Rust toolchain、Node/npm。Compose 使用 RPC `:8883`、admin `:8084` 和 Docker 服务名 `knowledge:8882`，并已移除 `:8092`。
 
 当前没有远端自动 CI；提交前至少显式执行：
 
@@ -278,7 +278,7 @@ cargo build --workspace --release --locked
 cargo deny check advisories bans licenses sources
 ```
 
-Node 24 只运行 `services/collaboration/interop` 的 `npm ci && npm run ci`。生成脚本、`make generate`、`make ci` 和 generated drift check 同时覆盖 Go 与 Rust Thrift 输出。真实依赖测试设置 `COLLABORATION_TEST_REQUIRE_REAL_DEPENDENCIES=1`；PostgreSQL、Redis、NATS 或 Etcd 的对应连接变量缺失时测试直接失败，不允许把 skip 当成通过。
+Node 24 只运行 `services/collaboration/interop` 的 `npm ci && npm run ci`。生成脚本、`make generate`、`make ci` 和 generated drift check 同时覆盖 Go 与 Rust Thrift 输出。真实依赖测试设置 `COLLABORATION_TEST_REQUIRE_REAL_DEPENDENCIES=1`；PostgreSQL、Redis 或 NATS 的对应连接变量缺失时测试直接失败，不允许把 skip 当成通过。
 
 ## 9. 测试与验收门禁
 
@@ -287,7 +287,7 @@ Node 24 只运行 `services/collaboration/interop` 的 `npm ci && npm run ci`。
 - 单元与 runtime：配置边界、UUIDv7、ticket、错误映射、close code、projection codec、plain text、actor queue、update 去重、恢复与 shutdown。
 - PostgreSQL：migration、锁与 sequence、并发 update、snapshot/version、恢复冲突、幂等、projection job、outbox、purge 和 rollback 的真实依赖测试。
 - Redis：ticket TTL、hash key、原子单次消费、两个独立连接并发重放和不可用时 fail closed。
-- NATS/Etcd：注册/发现、lease/watch、两个不同 instance durable consumer fanout、稳定 instance 重连后的未 ACK redelivery、actor 回收恢复、重复事件与失效路由。
+- NATS：两个不同 instance durable consumer fanout、稳定 instance 重连后的未 ACK redelivery、actor 回收恢复、重复事件与失效路由。
 - Kitex/Volo：Go client 调 Rust server、Rust client 调 Go Knowledge，覆盖 TTHeader、Binary、BizStatus、deadline、request ID、trace、token metadata、`Live` 与双向 mTLS。
 - Yjs：Node fixture 与 Rust runtime 覆盖 y-sync/awareness、只读 viewer、完整 y-prosemirror schema、投影 JSON、断线重连和恢复。
 - 供应链与镜像：固定 lockfile、Clippy、RustSec/license/source，以及 production image 的 UID/GID、无 Node/npm 和配置 fail-fast smoke。
@@ -309,7 +309,7 @@ Rust 在相同负载下必须同时满足：
 
 | 阶段 | 状态 | 当前结果 |
 | --- | --- | --- |
-| 互操作探针 | 代码与自动化完成 | Kitex/Volo TTHeader、BizStatus、metadata、mTLS、Etcd 和 `Live` wire 已覆盖；Node 性能基线待补 |
+| 互操作探针 | 代码与自动化完成 | Kitex/Volo TTHeader、BizStatus、metadata、mTLS 和 `Live` wire 已覆盖；Node 性能基线待补 |
 | Rust 骨架与数据层 | 完成 | pinned workspace、配置、telemetry、runtime、migration、repository、真实依赖测试和 admin health 已落地 |
 | session 与 WebSocket | 完成 | Gateway session API、Redis ticket、document_id Hash 路由、实例路径握手、Yrs actor、y-sync/awareness、边界和 commit-before-broadcast 已落地 |
 | 版本、投影与多实例 | 完成 | codec、snapshot/version/restore、outbox、JetStream fanout/redelivery/gap recovery 和失效关闭已落地 |
@@ -325,7 +325,7 @@ Rust 在相同负载下必须同时满足：
 1. 禁止创建新 collaboration session，等待现有 Node 连接和 worker 在上限内排空。
 2. 备份现有 schema 以支持整栈回滚，然后删除并由 Rust migration 重建 `collaboration` schema；不执行数据转换。
 3. 在同一窗口部署 Rust Collaboration、更新后的 Gateway/Knowledge 和新 Web 客户端。
-4. 验证 migration、Etcd 注册、Thrift mTLS、session、双客户端编辑、投影、版本、恢复、失效、metrics 和 shutdown。
+4. 验证 migration、静态 Service DNS 拨号、Thrift mTLS、session、双客户端编辑、投影、版本、恢复、失效、metrics 和 shutdown。
 5. smoke 与 readiness 全部通过后重新开放 session route。
 
 回滚必须先关闭 session route，再整体回滚客户端、Gateway、Knowledge 和 Node Collaboration，并恢复备份或重建旧 schema。Rust 切换后产生的数据不保证回迁，发布公告必须明确这一 RPO。
