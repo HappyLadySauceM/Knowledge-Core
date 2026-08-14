@@ -88,7 +88,7 @@ Knowledge 不保存 Yjs update、快照或版本；这些数据属于 Collaborat
 
 ## 环境要求
 
-- Go `1.26.5`
+- Go `1.26.6`
 - Rust `1.97.1`（由 `services/collaboration/rust-toolchain.toml` 固定）
 - cargo-deny `0.20.2`（本地执行供应链门禁）
 - Node.js `24.18.1`（仅 `services/collaboration/interop` 互操作 fixture）

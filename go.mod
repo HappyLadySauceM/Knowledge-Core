@@ -1,6 +1,6 @@
 module github.com/HappyLadySauce/Knowledge-Core
 
-go 1.26.5
+go 1.26.6
 
 // Hertz's Thrift model generator still emits the pre-context Apache Thrift API.
 replace github.com/apache/thrift => github.com/apache/thrift v0.13.0

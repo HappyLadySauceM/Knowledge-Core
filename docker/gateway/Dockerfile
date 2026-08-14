@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-ARG GO_BASE_IMAGE=harbor.happyladysauce.local/knowledge-core/base/golang:1.26.5-alpine
+ARG GO_BASE_IMAGE=harbor.happyladysauce.local/knowledge-core/base/golang:1.26.6-alpine
 ARG RUNTIME_BASE_IMAGE=harbor.happyladysauce.local/knowledge-core/base/distroless-static-debian12:nonroot
 FROM --platform=$BUILDPLATFORM ${GO_BASE_IMAGE} AS build
 ARG GOPROXY=https://goproxy.cn,direct
