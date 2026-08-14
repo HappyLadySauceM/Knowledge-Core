@@ -8,6 +8,9 @@ metadata:
     app.kubernetes.io/part-of: knowledge-core
     app.kubernetes.io/managed-by: kustomize
 spec:
+  # RPC clients probe these pods before HTTP readiness; include not-ready endpoints.
+  # RPC 客户端会在 HTTP Ready 之前探活，需要把未 Ready 的 Pod 也加入 Endpoints。
+  publishNotReadyAddresses: true
   selector:
     app.kubernetes.io/name: knowledge-core-knowledge
   ports:
