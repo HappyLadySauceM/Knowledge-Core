@@ -115,5 +115,9 @@
 - Invoke `$design-distributed-transactions` for cross-service state changes, MQ publishing or
   consumption, compensation, or MQ selection, and do not complete while its reliability gates fail.
 - Continue until the post-task status is `ready`, even when the host's Stop hook is advisory.
-- Never edit generated project-skill files, or stage or commit harness updates automatically.
+- Keep `.skill-constructor/manifest.json` and the generated project Skill directory under version
+  control, and include their synchronized updates with the related engineering commit unless this
+  repository records a verified manifest exception.
+- Never edit generated project-skill files or stage, commit, or push harness updates without an
+  explicit user request.
 <!-- skill-constructor:end -->
