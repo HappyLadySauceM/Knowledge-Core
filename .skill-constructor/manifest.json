@@ -595,11 +595,11 @@
     "profile": "generic",
     "slug": "knowledge-core"
   },
-  "revision": 114,
+  "revision": 115,
   "scan": {
-    "fingerprint": "fd5f8da3e40883c0a4a8121dfec53281bcc25002f7b62ba84d9581f5e62f5ca1",
+    "fingerprint": "081334e92c7501d23e293f5725b96b938be00b75609f3d1e5f8add6bffaaf1dc",
     "inventoryCount": 336
   },
   "schemaVersion": 1,
-  "updatedAt": "2026-08-14T17:01:48Z"
+  "updatedAt": "2026-08-15T06:21:07Z"
 }
