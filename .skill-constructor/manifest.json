@@ -436,7 +436,7 @@
     },
     {
       "id": "workflows.scripts",
-      "revision": 19,
+      "revision": 116,
       "section": "workflows",
       "sources": [
         {
@@ -445,7 +445,7 @@
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-08-08T09:29:19Z",
+      "updatedAt": "2026-08-15T11:07:49Z",
       "value": {
         "make:build": {
           "command": "make build",
@@ -487,6 +487,10 @@
           "command": "make go-ci",
           "source": "Makefile"
         },
+        "make:go-release": {
+          "command": "make go-release",
+          "source": "Makefile"
+        },
         "make:help": {
           "command": "make help",
           "source": "Makefile"
@@ -505,6 +509,10 @@
         },
         "make:rust-ci": {
           "command": "make rust-ci",
+          "source": "Makefile"
+        },
+        "make:rust-release": {
+          "command": "make rust-release",
           "source": "Makefile"
         },
         "make:smoke-ci": {
@@ -595,11 +603,11 @@
     "profile": "generic",
     "slug": "knowledge-core"
   },
-  "revision": 115,
+  "revision": 116,
   "scan": {
-    "fingerprint": "081334e92c7501d23e293f5725b96b938be00b75609f3d1e5f8add6bffaaf1dc",
+    "fingerprint": "c5c1a0d7bf04d1200ce55f8e9de097afded7a32d134cad8c9e68c03ff7bea2ce",
     "inventoryCount": 336
   },
   "schemaVersion": 1,
-  "updatedAt": "2026-08-15T06:21:07Z"
+  "updatedAt": "2026-08-15T11:07:49Z"
 }

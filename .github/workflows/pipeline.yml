@@ -10,105 +10,249 @@ permissions:
   contents: write
   statuses: write
 
-concurrency:
-  group: knowledge-core-dev-release
-  cancel-in-progress: false
-
 env:
-  CI_IMAGE: harbor.happyladysauce.local/knowledge-core/ci-templates@sha256:a96fe31cba35d4189672a85e4ccd5eb67463d45a7e14bdb8792db5318c1ee82a # v1.1.6
+  CI_IMAGE: harbor.happyladysauce.local/knowledge-core/ci-templates:v1.1.7
+  KC_CACHE_ROOT: /opt/actions-runner/_cache/knowledge-core
   CI_PROJECT_CONFIG_JSON: >-
-    {"project":"Knowledge-Core","source_repo":"HappyLadySauceM/Knowledge-Core","gitops_repo":"https://github.com/HappyLadySauceM/k3s-home-deploy.git","gitops_path":"Knowledge-Core","gitops_kustomization":"dev/common/kustomization.yaml","gitops_branch":"main","shared_paths":["pkg","idl","kitex_gen","services/collaboration/interop","Makefile","go.mod","go.sum"],"harbor_registry":"harbor.happyladysauce.local","harbor_project":"knowledge-core","argocd_server":"argocd.happyladysauce.local","argocd_application":"knowledge-core-gateway-dev","smoke_command":["make","smoke-ci"],"release_model":"git-independent-service-aggregate","aggregate_release_prefix":"knowledge-core","aggregate_version_file":"VERSION","release_language":"zh-CN","deepseek_model":"deepseek-v4-flash","base_images":[{"source":"docker.m.daocloud.io/library/golang:1.26.6-alpine@sha256:af8d6740070b8906d12eae1c3e3ea0957fb63f492051ea05e354c38ef9fe88df","destination":"harbor.happyladysauce.local/knowledge-core/base/golang:1.26.6-alpine"},{"source":"gcr.io/distroless/static-debian12:nonroot@sha256:f5b485ea962d9bd1186b2f6b3a061191539b905b82ec395de78cbfae51f20e35","destination":"harbor.happyladysauce.local/knowledge-core/base/distroless-static-debian12:nonroot"},{"source":"docker.m.daocloud.io/library/rust:1.97.1-bookworm@sha256:77fac8b98f9f46062bb680b6d25d5bcaabfc400143952ebc572e924bcbedc3fa","destination":"harbor.happyladysauce.local/knowledge-core/base/rust:1.97.1-bookworm"},{"source":"docker.m.daocloud.io/library/debian:bookworm-slim@sha256:7b140f374b289a7c2befc338f42ebe6441b7ea838a042bbd5acbfca6ec875818","destination":"harbor.happyladysauce.local/knowledge-core/base/debian:bookworm-slim"}],"services":[{"name":"gateway","source_path":"services/gateway","version_file":"services/gateway/VERSION","dockerfile":"docker/gateway/Dockerfile","context":".","image_repository":"harbor.happyladysauce.local/knowledge-core/gateway","deploy_snapshot":"deploy/gateway"},{"name":"identity","source_path":"services/identity","version_file":"services/identity/VERSION","dockerfile":"docker/identity/Dockerfile","context":".","image_repository":"harbor.happyladysauce.local/knowledge-core/identity","deploy_snapshot":"deploy/identity"},{"name":"knowledge","source_path":"services/knowledge","version_file":"services/knowledge/VERSION","dockerfile":"docker/knowledge/Dockerfile","context":".","image_repository":"harbor.happyladysauce.local/knowledge-core/knowledge","deploy_snapshot":"deploy/knowledge"},{"name":"collaboration","source_path":"services/collaboration","version_file":"services/collaboration/VERSION","dockerfile":"docker/collaboration/Dockerfile","context":".","image_repository":"harbor.happyladysauce.local/knowledge-core/collaboration","deploy_snapshot":"deploy/collaboration"}]}
+    {"project":"Knowledge-Core","source_repo":"HappyLadySauceM/Knowledge-Core","gitops_repo":"https://github.com/HappyLadySauceM/k3s-home-deploy.git","gitops_path":"Knowledge-Core","gitops_kustomization":"dev/common/kustomization.yaml","gitops_branch":"main","shared_paths":[".github","pkg","idl","kitex_gen","scripts","services/collaboration/interop","Makefile","go.mod","go.sum"],"harbor_registry":"harbor.happyladysauce.local","harbor_project":"knowledge-core","argocd_server":"argocd.happyladysauce.local","argocd_application":"knowledge-core-gateway-dev","smoke_command":["make","smoke-ci"],"release_model":"git-independent-service-aggregate","aggregate_release_prefix":"knowledge-core","aggregate_version_file":"VERSION","release_language":"zh-CN","deepseek_model":"deepseek-v4-flash","base_images":[{"source":"gcr.io/distroless/static-debian12:nonroot@sha256:f5b485ea962d9bd1186b2f6b3a061191539b905b82ec395de78cbfae51f20e35","destination":"harbor.happyladysauce.local/knowledge-core/base/distroless-static-debian12:nonroot"},{"source":"docker.m.daocloud.io/library/debian:bookworm-slim@sha256:7b140f374b289a7c2befc338f42ebe6441b7ea838a042bbd5acbfca6ec875818","destination":"harbor.happyladysauce.local/knowledge-core/base/debian:bookworm-slim"}],"services":[{"name":"gateway","source_path":"services/gateway","version_file":"services/gateway/VERSION","dockerfile":"docker/gateway/Dockerfile","context":".","image_repository":"harbor.happyladysauce.local/knowledge-core/gateway","deploy_snapshot":"deploy/gateway"},{"name":"identity","source_path":"services/identity","version_file":"services/identity/VERSION","dockerfile":"docker/identity/Dockerfile","context":".","image_repository":"harbor.happyladysauce.local/knowledge-core/identity","deploy_snapshot":"deploy/identity"},{"name":"knowledge","source_path":"services/knowledge","version_file":"services/knowledge/VERSION","dockerfile":"docker/knowledge/Dockerfile","context":".","image_repository":"harbor.happyladysauce.local/knowledge-core/knowledge","deploy_snapshot":"deploy/knowledge"},{"name":"collaboration","source_path":"services/collaboration","version_file":"services/collaboration/VERSION","dockerfile":"docker/collaboration/Dockerfile","context":".","image_repository":"harbor.happyladysauce.local/knowledge-core/collaboration","deploy_snapshot":"deploy/collaboration"}]}
 
 jobs:
-  quality:
+  plan:
     runs-on: [self-hosted, Linux, X64]
-    env:
-      CARGO_INCREMENTAL: "0"
-      CARGO_PROFILE_DEV_DEBUG: "0"
-      CARGO_PROFILE_TEST_DEBUG: "0"
-      CARGO_TARGET_DIR: ${{ github.workspace }}/services/collaboration/target
+    concurrency:
+      group: knowledge-core-dev-plan
+      cancel-in-progress: true
+    outputs:
+      state_dir: ${{ steps.plan.outputs.state_dir }}
+      services: ${{ steps.plan.outputs.services }}
+      has_changes: ${{ steps.plan.outputs.has_changes }}
+      rust_required: ${{ steps.plan.outputs.rust_required }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - name: Cap compile jobs at three quarters of host CPUs
+      - name: Plan affected services
+        id: plan
         run: |
           set -euo pipefail
-          jobs="$(nproc | awk '{v=int($1*3/4); if (v<1) v=1; print v}')"
-          echo "BUILD_JOBS=$jobs" >> "$GITHUB_ENV"
-          echo "CARGO_BUILD_JOBS=$jobs" >> "$GITHUB_ENV"
-          echo "GOMAXPROCS=$jobs" >> "$GITHUB_ENV"
-          echo "Compile jobs capped at $jobs"
+          state_dir="$KC_CACHE_ROOT/runs/${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          install -d -m 0700 "$state_dir"
+          base="$(git rev-parse origin/main)"
+          docker run --rm --network host \
+            -v "$GITHUB_WORKSPACE:/workspace" \
+            -v "$state_dir:/state" \
+            -e CI_PROJECT_CONFIG_JSON -w /workspace "$CI_IMAGE" validate
+          changes=$(docker run --rm --network host \
+            -v "$GITHUB_WORKSPACE:/workspace" \
+            -v "$state_dir:/state" \
+            -e CI_PROJECT_CONFIG_JSON -w /workspace "$CI_IMAGE" changes \
+            --base "$base" --details-file /state/changes.json)
+          echo "$changes"
+          services=$(echo "$changes" | jq -r '.services | join(",")')
+          rust_required=false
+          if jq -e '.services | index("collaboration")' "$state_dir/changes.json" >/dev/null; then
+            rust_required=true
+          elif jq -r '.paths[]' "$state_dir/changes.json" | rg -q '(^services/collaboration/|^idl/|^scripts/codegen|^Makefile$|^\.github/)'; then
+            rust_required=true
+          fi
+          has_changes=false
+          if [ -n "$services" ]; then has_changes=true; fi
+          echo "state_dir=$state_dir" >> "$GITHUB_OUTPUT"
+          echo "services=$services" >> "$GITHUB_OUTPUT"
+          echo "has_changes=$has_changes" >> "$GITHUB_OUTPUT"
+          echo "rust_required=$rust_required" >> "$GITHUB_OUTPUT"
+
+  go-verify-build:
+    needs: plan
+    if: needs.plan.outputs.has_changes == 'true'
+    runs-on: [self-hosted, Linux, X64]
+    concurrency:
+      group: knowledge-core-dev-go
+      cancel-in-progress: true
+    env:
+      KC_RUST_GATE: "0"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
           cache: false
-      - name: Determine Rust quality scope
-        id: rust-scope
+      - name: Run Go gates and build artifacts
+        env:
+          STATE_DIR: ${{ needs.plan.outputs.state_dir }}
         run: |
           set -euo pipefail
-          rust_gate=false
-          while IFS= read -r path; do
-            case "$path" in
-              services/collaboration/*|docker/collaboration/Dockerfile|idl/*|Makefile|scripts/codegen.sh|scripts/codegen.ps1|scripts/generated-files.txt|.github/workflows/pipeline.yml)
-                rust_gate=true
-                break
-                ;;
-            esac
-          done < <(git diff --name-only origin/main...HEAD)
-          if [ "$rust_gate" = true ]; then
-            echo "KC_RUST_GATE=1" >> "$GITHUB_ENV"
-            echo "enabled=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "KC_RUST_GATE=0" >> "$GITHUB_ENV"
-            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          go_services=$(jq -r '.services[] | select(. != "collaboration")' "$STATE_DIR/changes.json" | tr '\n' ' ')
+          make go-ci generate-go-check KC_RUST_GATE=0
+          if [ -n "$go_services" ]; then
+            make go-release GO_RELEASE_SERVICES="$go_services" GO_ARTIFACT_DIR="$STATE_DIR/artifacts" KC_RUST_GATE=0
           fi
-          echo "Rust gate enabled: $rust_gate"
+
+  rust-verify-build:
+    needs: [plan, go-verify-build]
+    if: needs.plan.outputs.has_changes == 'true' && needs.go-verify-build.result == 'success' && needs.plan.outputs.rust_required == 'true'
+    runs-on: [self-hosted, Linux, X64]
+    concurrency:
+      group: knowledge-core-dev-rust
+      cancel-in-progress: true
+    env:
+      CARGO_INCREMENTAL: "0"
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      CARGO_PROFILE_TEST_DEBUG: "0"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+      - name: Select bounded Rust target cache
+        run: |
+          set -euo pipefail
+          lock_key=$(sha256sum services/collaboration/Cargo.lock services/collaboration/rust-toolchain.toml | sha256sum | cut -c1-16)
+          target_root="$KC_CACHE_ROOT/cargo-target"
+          target_dir="$target_root/$lock_key"
+          install -d -m 0700 "$target_root" "$target_dir"
+          find "$target_root" -mindepth 1 -maxdepth 1 -type d ! -name "$lock_key" -exec rm -rf -- {} +
+          echo "CARGO_TARGET_DIR=$target_dir" >> "$GITHUB_ENV"
       - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772
-        if: steps.rust-scope.outputs.enabled == 'true'
         with:
           toolchain: 1.97.1
           components: clippy, rustfmt
       - uses: taiki-e/install-action@583939ec0c8ee9c523cc60342d3d979ce6730f38
-        if: steps.rust-scope.outputs.enabled == 'true'
         with:
           tool: cargo-deny@0.20.2
           fallback: none
-      - uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
-        if: steps.rust-scope.outputs.enabled == 'true'
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-knowledge-core-rust-${{ hashFiles('services/collaboration/Cargo.lock', 'services/collaboration/rust-toolchain.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-knowledge-core-rust-
-      - name: Run repository quality gates
-        run: make ci
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        if: steps.rust-scope.outputs.enabled == 'true'
         with:
           node-version: 24.18.1
           cache: npm
           cache-dependency-path: services/collaboration/interop/package-lock.json
-      - name: Run collaboration interop gates
-        if: steps.rust-scope.outputs.enabled == 'true'
-        working-directory: services/collaboration/interop
-        run: npm ci && npm run ci
-      - name: Clean Rust build artifacts
-        if: always() && steps.rust-scope.outputs.enabled == 'true'
-        run: cargo clean --manifest-path services/collaboration/Cargo.toml
+      - name: Run Rust and interoperability gates
+        env:
+          STATE_DIR: ${{ needs.plan.outputs.state_dir }}
+        run: |
+          set -euo pipefail
+          make rust-ci generate-rust-check
+          make rust-release RUST_ARTIFACT_DIR="$STATE_DIR/artifacts"
+          npm --prefix services/collaboration/interop ci
+          npm --prefix services/collaboration/interop run ci
 
-  build-promote:
-    needs: quality
+  package-candidates:
+    needs: [plan, go-verify-build, rust-verify-build]
+    if: always() && needs.plan.outputs.has_changes == 'true' && needs.go-verify-build.result == 'success' && (needs.rust-verify-build.result == 'success' || needs.rust-verify-build.result == 'skipped')
+    runs-on: [self-hosted, Linux, X64]
+    concurrency:
+      group: knowledge-core-dev-package
+      cancel-in-progress: true
+    outputs:
+      overrides: ${{ steps.candidates.outputs.overrides }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+      - name: Prepare registry credentials
+        env:
+          HARBOR_DOCKER_CONFIG_JSON: ${{ secrets.HARBOR_DOCKER_CONFIG_JSON }}
+          HARBOR_CA_PEM: ${{ secrets.HARBOR_CA_PEM }}
+          STATE_DIR: ${{ needs.plan.outputs.state_dir }}
+        run: |
+          set -euo pipefail
+          umask 077
+          install -d "$STATE_DIR/harbor"
+          printf '%s' "$HARBOR_DOCKER_CONFIG_JSON" > "$STATE_DIR/harbor/config.json"
+          printf '%s' "$HARBOR_CA_PEM" > "$STATE_DIR/harbor/ca.crt"
+          test -s "$STATE_DIR/harbor/config.json" && test -s "$STATE_DIR/harbor/ca.crt"
+          echo "DOCKER_CONFIG=$STATE_DIR/harbor" >> "$GITHUB_ENV"
+          echo "HARBOR_CA_FILE=$STATE_DIR/harbor/ca.crt" >> "$GITHUB_ENV"
+      - name: Assemble artifact manifest and build candidates
+        env:
+          STATE_DIR: ${{ needs.plan.outputs.state_dir }}
+          SERVICES: ${{ needs.plan.outputs.services }}
+        run: |
+          set -euo pipefail
+          rm -rf .ci-artifacts
+          mkdir -m 0700 .ci-artifacts
+          manifest="$STATE_DIR/artifact-manifest.json"
+          jq -n --arg sha "$GITHUB_SHA" '{source_sha:$sha,services:{}}' > "$manifest"
+          IFS=',' read -r -a selected <<< "$SERVICES"
+          for service in "${selected[@]}"; do
+            test -f "$STATE_DIR/artifacts/$service"
+            cp -- "$STATE_DIR/artifacts/$service" ".ci-artifacts/$service"
+            chmod 0755 ".ci-artifacts/$service"
+            digest=$(sha256sum ".ci-artifacts/$service" | awk '{print $1}')
+            tmp=$(mktemp)
+            jq --arg service "$service" --arg path ".ci-artifacts/$service" --arg digest "$digest" \
+              '.services[$service]={path:$path,sha256:$digest}' "$manifest" > "$tmp"
+            mv "$tmp" "$manifest"
+          done
+          candidate="sha-$GITHUB_SHA"
+          candidate_manifest="$STATE_DIR/candidates.json"
+          jq -n --arg sha "$GITHUB_SHA" --arg tag "$candidate" '{source_sha:$sha,candidate_tag:$tag,services:{}}' > "$candidate_manifest"
+          docker_socket="${DOCKER_HOST:-unix:///var/run/docker.sock}"
+          socket="${docker_socket#unix://}"
+          ci() {
+            docker run --rm --network host \
+              -v "$GITHUB_WORKSPACE:/workspace" \
+              -v "$STATE_DIR:/state" \
+              -v "$socket:/var/run/docker.sock" \
+              -v "$DOCKER_CONFIG:/root/.docker:ro" \
+              -v "$HARBOR_CA_FILE:/etc/harbor-ca/ca.crt:ro" \
+              -v "$KC_CACHE_ROOT/buildx:/buildx" \
+              -e CI_PROJECT_CONFIG_JSON -e DOCKER_HOST=unix:///var/run/docker.sock \
+              -e DOCKER_CONFIG=/root/.docker -e BUILDX_CONFIG=/buildx \
+              -e CI_REGISTRY_CA_FILE=/etc/harbor-ca/ca.crt -e SSL_CERT_FILE=/etc/harbor-ca/ca.crt \
+              -w /workspace "$CI_IMAGE" "$@"
+          }
+          for service in "${selected[@]}"; do
+            result=$(ci build --service "$service" --tag "$candidate" --artifact-manifest /state/artifact-manifest.json)
+            tmp=$(mktemp)
+            jq --arg service "$service" --argjson result "$result" \
+              '.services[$service]=$result' "$candidate_manifest" > "$tmp"
+            mv "$tmp" "$candidate_manifest"
+          done
+          jq . "$candidate_manifest"
+          echo "overrides=$(jq -c '[.services[] | {kustomize_name, image_repo:(.image|split(":")[0]), digest}] | map({key:.kustomize_name,value:{newName:.image_repo,digest:.digest}}) | from_entries' "$candidate_manifest")" >> "$GITHUB_OUTPUT"
+        id: candidates
+
+  release-notes:
+    needs: [plan, package-candidates]
+    if: needs.package-candidates.result == 'success'
+    runs-on: [self-hosted, Linux, X64]
+    concurrency:
+      group: knowledge-core-dev-release-notes
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Generate one release summary
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          STATE_DIR: ${{ needs.plan.outputs.state_dir }}
+          SERVICES: ${{ needs.plan.outputs.services }}
+        run: |
+          set -euo pipefail
+          docker run --rm --network host \
+            -v "$GITHUB_WORKSPACE:/workspace" \
+            -v "$STATE_DIR:/state" \
+            -e CI_PROJECT_CONFIG_JSON -e DEEPSEEK_API_KEY \
+            -w /workspace "$CI_IMAGE" summarize --services "$SERVICES" \
+            --changes-file /state/changes.json --output /state/release.md
+
+  deploy-release:
+    needs: [plan, package-candidates, release-notes]
+    if: needs.package-candidates.result == 'success' && needs.release-notes.result == 'success'
     environment: release
     runs-on: [self-hosted, Linux, X64]
+    concurrency:
+      group: knowledge-core-dev-deploy
+      cancel-in-progress: false
     steps:
       - name: Mint GitHub App token
         id: app-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
-          app-id: ${{ secrets.GH_APP_ID }}
+          client-id: ${{ vars.GH_APP_CLIENT_ID }}
           private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
           owner: HappyLadySauceM
           repositories: Knowledge-Core,k3s-home-deploy
@@ -116,82 +260,38 @@ jobs:
         with:
           fetch-depth: 0
           token: ${{ steps.app-token.outputs.token }}
-      - name: Prepare release credentials
+      - name: Prepare deployment credentials
         env:
           HARBOR_DOCKER_CONFIG_JSON: ${{ secrets.HARBOR_DOCKER_CONFIG_JSON }}
           HARBOR_CA_PEM: ${{ secrets.HARBOR_CA_PEM }}
           K3S_RELEASE_KUBECONFIG: ${{ secrets.K3S_RELEASE_KUBECONFIG }}
+          STATE_DIR: ${{ needs.plan.outputs.state_dir }}
         run: |
           set -euo pipefail
           umask 077
-          install -d "$RUNNER_TEMP/knowledge-core-release/harbor"
-          printf '%s' "$HARBOR_DOCKER_CONFIG_JSON" > "$RUNNER_TEMP/knowledge-core-release/harbor/config.json"
-          printf '%s' "$HARBOR_CA_PEM" > "$RUNNER_TEMP/knowledge-core-release/harbor/ca.crt"
-          printf '%s' "$K3S_RELEASE_KUBECONFIG" > "$RUNNER_TEMP/knowledge-core-release/kubeconfig"
-          test -s "$RUNNER_TEMP/knowledge-core-release/harbor/config.json"
-          test -s "$RUNNER_TEMP/knowledge-core-release/harbor/ca.crt"
-          test -s "$RUNNER_TEMP/knowledge-core-release/kubeconfig"
-          echo "DOCKER_CONFIG=$RUNNER_TEMP/knowledge-core-release/harbor" >> "$GITHUB_ENV"
-          echo "HARBOR_CA_FILE=$RUNNER_TEMP/knowledge-core-release/harbor/ca.crt" >> "$GITHUB_ENV"
-          echo "KUBECONFIG=$RUNNER_TEMP/knowledge-core-release/kubeconfig" >> "$GITHUB_ENV"
-      - name: Validate and build affected services
-        id: build
-        run: |
-          docker_socket="${DOCKER_HOST:-unix:///var/run/docker.sock}"
-          socket="${docker_socket#unix://}"
-          docker run --rm --network host -v "$GITHUB_WORKSPACE:/workspace" -v "$socket:/var/run/docker.sock" \
-            -v "$DOCKER_CONFIG:/root/.docker:ro" -v "$HARBOR_CA_FILE:/etc/harbor-ca/ca.crt:ro" \
-            -e CI_PROJECT_CONFIG_JSON -e DOCKER_HOST=unix:///var/run/docker.sock -e DOCKER_CONFIG=/root/.docker -e SSL_CERT_FILE=/etc/harbor-ca/ca.crt -w /workspace "$CI_IMAGE" validate
-          base="$(git rev-parse origin/main)"
-          details_file="$RUNNER_TEMP/knowledge-core-release/changes.json"
-          changes=$(docker run --rm --network host -v "$GITHUB_WORKSPACE:/workspace" -v "$socket:/var/run/docker.sock" \
-            -v "$DOCKER_CONFIG:/root/.docker:ro" -v "$HARBOR_CA_FILE:/etc/harbor-ca/ca.crt:ro" \
-            -v "$RUNNER_TEMP/knowledge-core-release:/release-tmp" \
-            -e CI_PROJECT_CONFIG_JSON -w /workspace "$CI_IMAGE" changes --base "$base" --details-file /release-tmp/changes.json)
-          echo "$changes"
-          test -s "$details_file"
-          affected=$(echo "$changes" | jq -r '.services | join(",")')
-          echo "services=$affected" >> "$GITHUB_OUTPUT"
-          overrides='{}'
-          if [ -n "$affected" ]; then
-            docker run --rm --network host -v "$GITHUB_WORKSPACE:/workspace" -v "$socket:/var/run/docker.sock" \
-              -v "$DOCKER_CONFIG:/root/.docker:ro" -v "$HARBOR_CA_FILE:/etc/harbor-ca/ca.crt:ro" \
-              -e CI_PROJECT_CONFIG_JSON -e DOCKER_HOST=unix:///var/run/docker.sock -e DOCKER_CONFIG=/root/.docker -e SSL_CERT_FILE=/etc/harbor-ca/ca.crt -w /workspace "$CI_IMAGE" prewarm
-          fi
-          for service in gateway identity knowledge collaboration; do
-            if echo "$changes" | jq -e --arg service "$service" '.services | index($service)' >/dev/null; then
-              result=$(docker run --rm --network host -v "$GITHUB_WORKSPACE:/workspace" -v "$socket:/var/run/docker.sock" \
-                -v "$DOCKER_CONFIG:/root/.docker:ro" -v "$HARBOR_CA_FILE:/etc/harbor-ca/ca.crt:ro" \
-                -e CI_PROJECT_CONFIG_JSON -e DOCKER_HOST=unix:///var/run/docker.sock -e DOCKER_CONFIG=/root/.docker \
-                -e BUILDX_CONFIG=/tmp/buildx -e SSL_CERT_FILE=/etc/harbor-ca/ca.crt -e CI_REGISTRY_CA_FILE=/etc/harbor-ca/ca.crt \
-                -w /workspace "$CI_IMAGE" build --service "$service"
-              )
-              image_name=$(echo "$result" | jq -r '.kustomize_name')
-              image_repo=$(echo "$result" | jq -r '.image' | cut -d: -f1)
-              image_digest=$(echo "$result" | jq -r '.digest')
-              overrides=$(echo "$overrides" | jq --arg name "$image_name" --arg repo "$image_repo" --arg digest "$image_digest" '. + {($name): {newName: $repo, digest: $digest}}')
-            fi
-          done
-          {
-            echo 'overrides<<EOF'
-            echo "$overrides"
-            echo EOF
-          } >> "$GITHUB_OUTPUT"
-      - name: Promote deploy snapshot to GitOps
+          install -d "$STATE_DIR/harbor"
+          printf '%s' "$HARBOR_DOCKER_CONFIG_JSON" > "$STATE_DIR/harbor/config.json"
+          printf '%s' "$HARBOR_CA_PEM" > "$STATE_DIR/harbor/ca.crt"
+          printf '%s' "$K3S_RELEASE_KUBECONFIG" > "$STATE_DIR/kubeconfig"
+          test -s "$STATE_DIR/harbor/config.json" && test -s "$STATE_DIR/harbor/ca.crt" && test -s "$STATE_DIR/kubeconfig"
+          echo "DOCKER_CONFIG=$STATE_DIR/harbor" >> "$GITHUB_ENV"
+          echo "HARBOR_CA_FILE=$STATE_DIR/harbor/ca.crt" >> "$GITHUB_ENV"
+          echo "KUBECONFIG=$STATE_DIR/kubeconfig" >> "$GITHUB_ENV"
+      - name: Promote candidate to GitOps
         id: gitops
-        if: steps.build.outputs.services != ''
         env:
           GITOPS_TOKEN: ${{ steps.app-token.outputs.token }}
-          CI_GITOPS_IMAGE_OVERRIDES_JSON: ${{ steps.build.outputs.overrides }}
+          STATE_DIR: ${{ needs.plan.outputs.state_dir }}
         run: |
+          set -euo pipefail
+          overrides=$(jq -c '[.services[] | {kustomize_name, image_repo:(.image|split(":")[0]), digest}] | map({key:.kustomize_name,value:{newName:.image_repo,digest:.digest}}) | from_entries' "$STATE_DIR/candidates.json")
           result=$(docker run --rm --network host -v "$GITHUB_WORKSPACE:/workspace" \
-            -e CI_PROJECT_CONFIG_JSON -e CI_GITOPS_IMAGE_OVERRIDES_JSON -e GITOPS_TOKEN -w /workspace "$CI_IMAGE" promote-snapshot --source-sha "$GITHUB_SHA")
-          revision=$(echo "$result" | jq -r '.gitops_revision')
-          test -n "$revision" && echo "gitops_revision=$revision" >> "$GITHUB_OUTPUT"
-          base_revision=$(echo "$result" | jq -r '.gitops_base_revision')
-          test -n "$base_revision" && echo "gitops_base_revision=$base_revision" >> "$GITHUB_OUTPUT"
+            -e CI_PROJECT_CONFIG_JSON -e CI_GITOPS_IMAGE_OVERRIDES_JSON="$overrides" -e GITOPS_TOKEN \
+            -w /workspace "$CI_IMAGE" promote-snapshot --source-sha "$GITHUB_SHA")
+          echo "$result"
+          echo "gitops_revision=$(echo "$result" | jq -r '.gitops_revision')" >> "$GITHUB_OUTPUT"
+          echo "gitops_base_revision=$(echo "$result" | jq -r '.gitops_base_revision')" >> "$GITHUB_OUTPUT"
       - name: Mark dev deployment pending
-        if: steps.build.outputs.services != ''
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
@@ -199,72 +299,89 @@ jobs:
             -e CI_PROJECT_CONFIG_JSON -e GITHUB_TOKEN -w /workspace "$CI_IMAGE" status --sha "$GITHUB_SHA" --state pending \
             --description "Knowledge Core dev deployment started" --target-url "https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
       - name: Wait for Argo
-        if: steps.build.outputs.services != ''
         env:
-          CI_GITOPS_IMAGE_OVERRIDES_JSON: ${{ steps.build.outputs.overrides }}
+          CI_GITOPS_IMAGE_OVERRIDES_JSON: ${{ needs.package-candidates.outputs.overrides }}
+          STATE_DIR: ${{ needs.plan.outputs.state_dir }}
         run: |
+          set -euo pipefail
           docker run --rm --network host -v "$GITHUB_WORKSPACE:/workspace" -v "$KUBECONFIG:/secrets/kubeconfig:ro" \
             -e CI_PROJECT_CONFIG_JSON -e CI_GITOPS_IMAGE_OVERRIDES_JSON -e KUBECONFIG=/secrets/kubeconfig \
             -w /workspace "$CI_IMAGE" argo-wait --revision "${{ steps.gitops.outputs.gitops_revision }}" \
-            --services "${{ steps.build.outputs.services }}"
+            --services "${{ needs.plan.outputs.services }}"
       - name: Run post-deploy smoke test
-        if: steps.build.outputs.services != ''
         run: |
           docker run --rm --network host -v "$GITHUB_WORKSPACE:/workspace" -v "$KUBECONFIG:/secrets/kubeconfig:ro" \
             -e CI_PROJECT_CONFIG_JSON -e KUBECONFIG=/secrets/kubeconfig -w /workspace "$CI_IMAGE" smoke
+          touch "${{ needs.plan.outputs.state_dir }}/smoke.ok"
       - name: Mark dev smoke successful
-        if: steps.build.outputs.services != ''
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           docker run --rm --network host -v "$GITHUB_WORKSPACE:/workspace" \
             -e CI_PROJECT_CONFIG_JSON -e GITHUB_TOKEN -w /workspace "$CI_IMAGE" status --sha "$GITHUB_SHA" --state success \
             --description "Knowledge Core dev smoke passed" --target-url "https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+      - name: Promote candidate tags and create release
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          STATE_DIR: ${{ needs.plan.outputs.state_dir }}
+        run: |
+          set -euo pipefail
+          docker_socket="${DOCKER_HOST:-unix:///var/run/docker.sock}"
+          socket="${docker_socket#unix://}"
+          IFS=',' read -r -a selected <<< "${{ needs.plan.outputs.services }}"
+          for service in "${selected[@]}"; do
+            docker run --rm --network host \
+              -v "$GITHUB_WORKSPACE:/workspace" \
+              -v "$socket:/var/run/docker.sock" \
+              -v "$DOCKER_CONFIG:/root/.docker:ro" \
+              -v "$HARBOR_CA_FILE:/etc/harbor-ca/ca.crt:ro" \
+              -e CI_PROJECT_CONFIG_JSON -e DOCKER_HOST=unix:///var/run/docker.sock \
+              -e DOCKER_CONFIG=/root/.docker -e CI_REGISTRY_CA_FILE=/etc/harbor-ca/ca.crt \
+              -e SSL_CERT_FILE=/etc/harbor-ca/ca.crt -w /workspace "$CI_IMAGE" \
+              promote-candidate --service "$service" --tag "sha-$GITHUB_SHA"
+          done
+          docker run --rm --network host -v "$GITHUB_WORKSPACE:/workspace" -v "$STATE_DIR:/state" \
+            -e CI_PROJECT_CONFIG_JSON -e GITHUB_TOKEN -e CI_RELEASE_CHANGES_FILE=/state/changes.json \
+            -e DEEPSEEK_API_KEY -w /workspace "$CI_IMAGE" release --services "${{ needs.plan.outputs.services }}" \
+            --changes-file /state/changes.json --summary-file /state/release.md
+          for service in "${selected[@]}"; do
+            docker run --rm --network host -v "$GITHUB_WORKSPACE:/workspace" -v "$STATE_DIR:/state" \
+              -v "$DOCKER_CONFIG:/root/.docker:ro" -v "$HARBOR_CA_FILE:/etc/harbor-ca/ca.crt:ro" \
+              -e CI_PROJECT_CONFIG_JSON -e DOCKER_CONFIG=/root/.docker -e SSL_CERT_FILE=/etc/harbor-ca/ca.crt -w /workspace "$CI_IMAGE" \
+              cleanup-candidate --service "$service" --tag "sha-$GITHUB_SHA"
+          done
       - name: Roll back failed deployment
         if: failure() && steps.gitops.outputs.gitops_revision != '' && steps.gitops.outputs.gitops_revision != steps.gitops.outputs.gitops_base_revision
         env:
           GITOPS_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
-          docker_socket="${DOCKER_HOST:-unix:///var/run/docker.sock}"
-          socket="${docker_socket#unix://}"
+          if [ -f "${{ needs.plan.outputs.state_dir }}/smoke.ok" ]; then
+            echo "Smoke already passed; keep the verified deployment for an idempotent release retry."
+            exit 0
+          fi
           docker run --rm --network host -v "$GITHUB_WORKSPACE:/workspace" \
-            -e CI_PROJECT_CONFIG_JSON -e GITOPS_TOKEN -w /workspace "$CI_IMAGE" rollback-snapshot --revision "${{ steps.gitops.outputs.gitops_revision }}"
-          IFS=',' read -r -a services <<< "${{ steps.build.outputs.services }}"
-          for service in "${services[@]}"; do
-            test -n "$service" || continue
-            docker run --rm --network host -v "$GITHUB_WORKSPACE:/workspace" -v "$socket:/var/run/docker.sock" \
-              -v "$DOCKER_CONFIG:/root/.docker:ro" -v "$HARBOR_CA_FILE:/etc/harbor-ca/ca.crt:ro" \
-              -e CI_PROJECT_CONFIG_JSON -e DOCKER_HOST=unix:///var/run/docker.sock -e DOCKER_CONFIG=/root/.docker -e SSL_CERT_FILE=/etc/harbor-ca/ca.crt \
-              -w /workspace "$CI_IMAGE" restore-previous --service "$service"
-          done
-      - name: Mark dev smoke failed
-        if: failure() && steps.build.outputs.services != '' && steps.build.outcome == 'success'
+            -e CI_PROJECT_CONFIG_JSON -e GITOPS_TOKEN -w /workspace "$CI_IMAGE" rollback-snapshot \
+            --revision "${{ steps.gitops.outputs.gitops_revision }}"
+      - name: Mark dev deployment failed
+        if: failure() && steps.gitops.outputs.gitops_revision != ''
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           docker run --rm --network host -v "$GITHUB_WORKSPACE:/workspace" \
             -e CI_PROJECT_CONFIG_JSON -e GITHUB_TOKEN -w /workspace "$CI_IMAGE" status --sha "$GITHUB_SHA" --state failure \
             --description "Knowledge Core dev deployment failed" --target-url "https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
-      - name: Remove previous image tags after smoke
-        if: steps.build.outputs.services != ''
+
+  cleanup:
+    needs: [plan, go-verify-build, rust-verify-build, package-candidates, release-notes, deploy-release]
+    if: always()
+    runs-on: [self-hosted, Linux, X64]
+    steps:
+      - name: Prune only stale runner state and unused local images
         run: |
-          docker_socket="${DOCKER_HOST:-unix:///var/run/docker.sock}"
-          socket="${docker_socket#unix://}"
-          IFS=',' read -r -a services <<< "${{ steps.build.outputs.services }}"
-          for service in "${services[@]}"; do
-            test -n "$service" || continue
-            docker run --rm --network host -v "$GITHUB_WORKSPACE:/workspace" -v "$socket:/var/run/docker.sock" \
-              -v "$DOCKER_CONFIG:/root/.docker:ro" -v "$HARBOR_CA_FILE:/etc/harbor-ca/ca.crt:ro" \
-              -e CI_PROJECT_CONFIG_JSON -e DOCKER_HOST=unix:///var/run/docker.sock -e DOCKER_CONFIG=/root/.docker -e SSL_CERT_FILE=/etc/harbor-ca/ca.crt -w /workspace "$CI_IMAGE" cleanup-previous --service "$service"
-          done
-      - name: DeepSeek summary, main promotion and service releases
-        if: steps.build.outputs.services != ''
-        env:
-          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
-          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
-          CI_RELEASE_CHANGES_FILE: /run/knowledge-core/changes.json
-        run: |
-          docker run --rm --network host -v "$GITHUB_WORKSPACE:/workspace" \
-            -v "$RUNNER_TEMP/knowledge-core-release/changes.json:/run/knowledge-core/changes.json:ro" \
-            -e CI_PROJECT_CONFIG_JSON -e GITHUB_TOKEN -e DEEPSEEK_API_KEY -e CI_RELEASE_CHANGES_FILE \
-            -w /workspace "$CI_IMAGE" release --services "${{ steps.build.outputs.services }}"
+          set -euo pipefail
+          install -d -m 0700 "$KC_CACHE_ROOT/runs"
+          find "$KC_CACHE_ROOT/runs" -mindepth 1 -maxdepth 1 -type d -mmin +1440 -exec rm -rf -- {} +
+          docker container prune --force --filter until=24h
+          docker image prune --force --filter until=24h
+          docker buildx prune --force --builder ci-templates --max-used-space 8gb --min-free-space 50gb --reserved-space 2gb || true

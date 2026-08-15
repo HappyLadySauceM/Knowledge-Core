@@ -70,16 +70,20 @@ owned_files() {
 }
 
 generate_rust() {
-  local root="$1" actual cargo_target rust_workspace
+  local root="$1" actual cargo_target rust_workspace generator_binary
   rust_workspace="$root/services/collaboration"
-  cd "$rust_workspace"
   actual="$(rustc --version)"
   if [[ "$actual" != "rustc $rust_version "* ]]; then
     echo "rustc version does not match required $rust_version: $actual" >&2
     return 1
   fi
   cargo_target="${CARGO_TARGET_DIR:-$repository_root/services/collaboration/target/codegen}"
-  CARGO_TARGET_DIR="$cargo_target" cargo run --locked -p knowledge-core-rust-codegen -- --root "$root"
+  cd "$repository_root/services/collaboration"
+  CARGO_TARGET_DIR="$cargo_target" cargo build --locked -p knowledge-core-rust-codegen
+  generator_binary="$cargo_target/debug/knowledge-core-rust-codegen"
+  [[ -x "$generator_binary" ]] || { echo "Rust codegen binary is missing: $generator_binary" >&2; return 1; }
+  "$generator_binary" --root "$root"
+  cd "$rust_workspace"
   rustfmt --edition 2024 src/generated/mod.rs src/generated/volo_gen.rs
 }
 

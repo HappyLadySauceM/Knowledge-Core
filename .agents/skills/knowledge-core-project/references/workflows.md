@@ -73,11 +73,13 @@ Status: `verified`
 - **make:generate-go-check**: `{"command":"make generate-go-check","source":"Makefile"}`
 - **make:generate-rust-check**: `{"command":"make generate-rust-check","source":"Makefile"}`
 - **make:go-ci**: `{"command":"make go-ci","source":"Makefile"}`
+- **make:go-release**: `{"command":"make go-release","source":"Makefile"}`
 - **make:help**: `{"command":"make help","source":"Makefile"}`
 - **make:line**: `{"command":"make line","source":"Makefile"}`
 - **make:lint**: `{"command":"make lint","source":"Makefile"}`
 - **make:race**: `{"command":"make race","source":"Makefile"}`
 - **make:rust-ci**: `{"command":"make rust-ci","source":"Makefile"}`
+- **make:rust-release**: `{"command":"make rust-release","source":"Makefile"}`
 - **make:smoke-ci**: `{"command":"make smoke-ci","source":"Makefile"}`
 - **make:supply-chain**: `{"command":"make supply-chain","source":"Makefile"}`
 - **make:test**: `{"command":"make test","source":"Makefile"}`

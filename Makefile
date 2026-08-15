@@ -7,9 +7,13 @@ CARGO_DENY ?= cargo deny
 RUST_ROOT ?= services/collaboration
 IDL_COMPAT_BASE ?= HEAD^
 KC_RUST_GATE ?= 1
-# Cap local/CI compile parallelism at three quarters of host CPUs.
-# 将本地/CI 编译并行度限制为宿主机 CPU 的四分之三。
-BUILD_JOBS ?= $(shell nproc 2>/dev/null | awk '{v=int($$1*3/4); if (v<1) v=1; print v}')
+# Cap local/CI compile parallelism at three CPUs and respect cgroup affinity.
+# 将本地/CI 编译并行度限制为三个 CPU，并尊重 cgroup affinity。
+BUILD_JOBS ?= $(shell nproc 2>/dev/null | awk '{v=$$1; if (v>3) v=3; if (v<1) v=1; print v}')
+GO_RELEASE_SERVICES ?= gateway identity knowledge
+GO_ARTIFACT_DIR ?= .ci-artifacts
+RUST_ARTIFACT_DIR ?= .ci-artifacts
+RUST_TARGET_DIR ?= $(if $(CARGO_TARGET_DIR),$(CARGO_TARGET_DIR),$(RUST_ROOT)/target)
 
 # Keep the Node interoperability fixture and its dependency tree out of Go discovery.
 GO_PACKAGES ?= \
@@ -34,7 +38,7 @@ endif
 
 .DEFAULT_GOAL := help
 
-.PHONY: help fmt fmt-check vet lint line test race build vuln supply-chain tidy generate generate-check generate-go-check generate-rust-check check go-ci rust-ci ci smoke-ci
+.PHONY: help fmt fmt-check vet lint line test race build go-release rust-release vuln supply-chain tidy generate generate-check generate-go-check generate-rust-check check go-ci rust-ci ci smoke-ci
 
 help:
 	@echo Knowledge Core development targets:
@@ -78,9 +82,27 @@ test:
 race:
 	GOMAXPROCS=$(BUILD_JOBS) go test -race -count=1 $(GO_PACKAGES)
 
-build:
-	GOMAXPROCS=$(BUILD_JOBS) go build $(GO_PACKAGES)
-	cd $(RUST_ROOT) && CARGO_BUILD_JOBS=$(BUILD_JOBS) $(CARGO) build --workspace --release --locked -j $(BUILD_JOBS)
+build: go-release
+ifeq ($(KC_RUST_GATE),0)
+	@true
+else
+build: rust-release
+endif
+
+go-release:
+	@set -eu; mkdir -p "$(GO_ARTIFACT_DIR)"; \
+	for service in $(GO_RELEASE_SERVICES); do \
+		case "$$service" in \
+			gateway|identity|knowledge) ;; \
+			*) echo "unsupported Go service: $$service" >&2; exit 2 ;; \
+		esac; \
+		CGO_ENABLED=0 GOOS=linux GOMAXPROCS=$(BUILD_JOBS) go build -mod=readonly -trimpath -buildvcs=false -ldflags="-s -w" -o "$(GO_ARTIFACT_DIR)/$$service" "./services/$$service"; \
+	done
+
+rust-release:
+	@set -eu; mkdir -p "$(RUST_ARTIFACT_DIR)"; \
+	CARGO_BUILD_JOBS=$(BUILD_JOBS) $(CARGO) build --manifest-path $(RUST_ROOT)/Cargo.toml --workspace --release --locked -j $(BUILD_JOBS); \
+	cp "$(RUST_TARGET_DIR)/release/knowledge-core-collaboration" "$(RUST_ARTIFACT_DIR)/collaboration"
 
 vuln:
 	GOMAXPROCS=$(BUILD_JOBS) $(GOVULNCHECK) $(GO_PACKAGES)
@@ -113,7 +135,6 @@ go-ci:
 	GOMAXPROCS=$(BUILD_JOBS) go vet $(GO_PACKAGES)
 	GOMAXPROCS=$(BUILD_JOBS) $(GOLANGCI_LINT) run $(GO_PACKAGES)
 	GOMAXPROCS=$(BUILD_JOBS) go test -count=1 $(GO_PACKAGES)
-	GOMAXPROCS=$(BUILD_JOBS) go build $(GO_PACKAGES)
 	GOMAXPROCS=$(BUILD_JOBS) $(GOVULNCHECK) $(GO_PACKAGES)
 
 rust-ci:
@@ -128,7 +149,7 @@ else
 check: go-ci rust-ci
 endif
 
-ci: check generate-check
+ci: check generate-check build
 
 smoke-ci:
 	@test -n "$(KC_SMOKE_BASE_URL)" || (echo "KC_SMOKE_BASE_URL is required" >&2; exit 1)

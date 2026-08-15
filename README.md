@@ -96,6 +96,10 @@ Knowledge 不保存 Yjs update、快照或版本；这些数据属于 Collaborat
 - GNU Make
 - 修改 IDL 时使用 Kitex `v0.16.2`、Hertz `v0.9.7`、thriftgo `0.4.5`
 
+## CI 构建路径
+
+`.github/workflows/pipeline.yml` 按 `plan → Go/Rust 门禁 → candidates → release summary → Argo 部署` 拆分任务。质量检查直接生成 `.ci-artifacts/` 二进制；镜像阶段只做运行时打包并校验 artifact SHA256，不再重复编译。候选镜像使用提交 SHA 标签，Smoke 通过后才提升为 `dev`；失败时只回滚尚未通过 Smoke 的 GitOps 修订。
+
 主要端口：
 
 | 服务 | 端口 |

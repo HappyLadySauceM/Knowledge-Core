@@ -101,15 +101,27 @@ function Invoke-RustGeneration {
     if ([string]::IsNullOrWhiteSpace($previousCargoTarget)) {
         $env:CARGO_TARGET_DIR = Join-Path $repositoryRoot "services/collaboration/target/codegen"
     }
-    Push-Location (Join-Path $Root "services/collaboration")
+    $generatorRoot = Join-Path $repositoryRoot "services/collaboration"
+    Push-Location $generatorRoot
     try {
         $versionOutput = (& rustc --version 2>&1 | Out-String).Trim()
         Assert-NativeSuccess -Operation "read rustc version"
         if ($versionOutput -notmatch "^rustc $([regex]::Escape($rustVersion)) ") {
             throw "rustc version does not match required $rustVersion`: $versionOutput"
         }
-        & cargo run --locked -p knowledge-core-rust-codegen -- --root $Root
+        & cargo build --locked -p knowledge-core-rust-codegen
         Assert-NativeSuccess -Operation "Rust Thrift generation"
+        $generatorBinary = Join-Path $env:CARGO_TARGET_DIR "debug/knowledge-core-rust-codegen.exe"
+        if (-not (Test-Path -LiteralPath $generatorBinary)) {
+            $generatorBinary = Join-Path $env:CARGO_TARGET_DIR "debug/knowledge-core-rust-codegen"
+        }
+        if (-not (Test-Path -LiteralPath $generatorBinary)) {
+            throw "Rust codegen binary is missing: $generatorBinary"
+        }
+        & $generatorBinary --root $Root
+        Assert-NativeSuccess -Operation "Rust Thrift generation"
+        Pop-Location
+        Push-Location (Join-Path $Root "services/collaboration")
         & rustfmt --edition 2024 src/generated/mod.rs src/generated/volo_gen.rs
         Assert-NativeSuccess -Operation "format Rust generated code"
     } finally {
