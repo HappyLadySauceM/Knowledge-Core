@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/HappyLadySauce/Knowledge-Core/pkg/circuit"
 	"github.com/HappyLadySauce/Knowledge-Core/pkg/metrics"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/kerrors"
@@ -22,6 +23,7 @@ func TestKitexMiddlewareClassifiesOutcomes(t *testing.T) {
 		{name: "success", outcome: "ok", businessCode: "0"},
 		{name: "business", err: kerrors.NewBizStatusError(20002, "conflict"), outcome: "business_error", businessCode: "20002"},
 		{name: "transport", err: errors.New("connection failed"), outcome: "error", businessCode: "transport"},
+		{name: "circuit", err: circuit.ErrOpen, outcome: "circuit_open", businessCode: "open"},
 	}
 	for _, test := range tests {
 		invocation := rpcinfo.NewInvocation("identity.IdentityService", "Register")

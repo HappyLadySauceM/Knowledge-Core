@@ -22,11 +22,11 @@
     },
     {
       "id": "architecture.summary",
-      "revision": 112,
+      "revision": 114,
       "section": "architecture",
       "sources": [
         {
-          "detail": "evidence-sha256:32f21b3bd70202cce58672d26151ba18f6767999a57560bb1c170d66d21e348e",
+          "detail": "evidence-sha256:9f7b97b81dbcf0f4c023eb458123254f6813e9160827639e1a8fbdd7c8471095",
           "kind": "documented",
           "reference": "README.md#knowledge-core"
         },
@@ -36,17 +36,17 @@
           "reference": "deploy/overlay/dev/README.md#development-overlay"
         },
         {
-          "detail": "evidence-sha256:32f21b3bd70202cce58672d26151ba18f6767999a57560bb1c170d66d21e348e",
+          "detail": "evidence-sha256:9f7b97b81dbcf0f4c023eb458123254f6813e9160827639e1a8fbdd7c8471095",
           "kind": "documented",
           "reference": "docs/framework-design.md#9"
         },
         {
-          "detail": "evidence-sha256:32f21b3bd70202cce58672d26151ba18f6767999a57560bb1c170d66d21e348e",
+          "detail": "evidence-sha256:9f7b97b81dbcf0f4c023eb458123254f6813e9160827639e1a8fbdd7c8471095",
           "kind": "documented",
           "reference": "docs/framework-design.md#knowledge-core"
         },
         {
-          "detail": "evidence-sha256:32f21b3bd70202cce58672d26151ba18f6767999a57560bb1c170d66d21e348e",
+          "detail": "evidence-sha256:9f7b97b81dbcf0f4c023eb458123254f6813e9160827639e1a8fbdd7c8471095",
           "kind": "documented",
           "reference": "docs/rust-collaboration-design.md#rust-collaboration"
         },
@@ -60,7 +60,7 @@
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-08-14T14:34:48Z",
+      "updatedAt": "2026-08-14T17:01:48Z",
       "value": "Knowledge Core contains four explicitly composed services: Go Gateway, Identity, and Knowledge services plus a Rust Collaboration service. Go assembly flows main/spec -> internal/config -> internal/context -> domain/logic/repository/transport. ServiceContext owns service dependencies, while pkg/app.Runtime is limited to process-level observability, health, metrics, and lifecycle orchestration. Business logic depends on service-local small interfaces; repositories own persistence and storage error mapping; transports validate and adapt protocols without domain rules."
     },
     {
@@ -223,21 +223,21 @@
     },
     {
       "id": "security.secrets-and-config",
-      "revision": 112,
+      "revision": 114,
       "section": "conventions",
       "sources": [
         {
-          "detail": "evidence-sha256:850f84ed54e82cf500462baf33f7f1fa0a7bb722a5560c35d5e4a41860183ae2",
+          "detail": "evidence-sha256:3c37e096e15a5a47a1d0c4bbac2ebaf4ba556341521eae88ac3ada52425f4d3e",
           "kind": "documented",
           "reference": "README.md#compose"
         },
         {
-          "detail": "evidence-sha256:850f84ed54e82cf500462baf33f7f1fa0a7bb722a5560c35d5e4a41860183ae2",
+          "detail": "evidence-sha256:3c37e096e15a5a47a1d0c4bbac2ebaf4ba556341521eae88ac3ada52425f4d3e",
           "kind": "documented",
           "reference": "README.md#k3s-gitops"
         },
         {
-          "detail": "evidence-sha256:850f84ed54e82cf500462baf33f7f1fa0a7bb722a5560c35d5e4a41860183ae2",
+          "detail": "evidence-sha256:3c37e096e15a5a47a1d0c4bbac2ebaf4ba556341521eae88ac3ada52425f4d3e",
           "kind": "documented",
           "reference": "README.md#section"
         },
@@ -247,7 +247,7 @@
           "reference": "deploy/base/README.md#application-deployment-base"
         },
         {
-          "detail": "evidence-sha256:850f84ed54e82cf500462baf33f7f1fa0a7bb722a5560c35d5e4a41860183ae2",
+          "detail": "evidence-sha256:3c37e096e15a5a47a1d0c4bbac2ebaf4ba556341521eae88ac3ada52425f4d3e",
           "kind": "documented",
           "reference": "deploy/nacos/README.md#nacos-application-configuration"
         },
@@ -257,32 +257,32 @@
           "reference": "deploy/overlay/dev/README.md#development-overlay"
         },
         {
-          "detail": "evidence-sha256:850f84ed54e82cf500462baf33f7f1fa0a7bb722a5560c35d5e4a41860183ae2",
+          "detail": "evidence-sha256:3c37e096e15a5a47a1d0c4bbac2ebaf4ba556341521eae88ac3ada52425f4d3e",
           "kind": "documented",
           "reference": "docs/framework-design.md#11"
         },
         {
-          "detail": "evidence-sha256:850f84ed54e82cf500462baf33f7f1fa0a7bb722a5560c35d5e4a41860183ae2",
+          "detail": "evidence-sha256:3c37e096e15a5a47a1d0c4bbac2ebaf4ba556341521eae88ac3ada52425f4d3e",
           "kind": "documented",
           "reference": "docs/framework-design.md#12"
         },
         {
-          "detail": "evidence-sha256:850f84ed54e82cf500462baf33f7f1fa0a7bb722a5560c35d5e4a41860183ae2",
+          "detail": "evidence-sha256:3c37e096e15a5a47a1d0c4bbac2ebaf4ba556341521eae88ac3ada52425f4d3e",
           "kind": "documented",
           "reference": "docs/framework-design.md#8-secret-tls"
         },
         {
-          "detail": "evidence-sha256:850f84ed54e82cf500462baf33f7f1fa0a7bb722a5560c35d5e4a41860183ae2",
+          "detail": "evidence-sha256:3c37e096e15a5a47a1d0c4bbac2ebaf4ba556341521eae88ac3ada52425f4d3e",
           "kind": "documented",
           "reference": "docs/rust-collaboration-design.md#2-1"
         },
         {
-          "detail": "evidence-sha256:850f84ed54e82cf500462baf33f7f1fa0a7bb722a5560c35d5e4a41860183ae2",
+          "detail": "evidence-sha256:3c37e096e15a5a47a1d0c4bbac2ebaf4ba556341521eae88ac3ada52425f4d3e",
           "kind": "documented",
           "reference": "docs/rust-collaboration-design.md#7"
         },
         {
-          "detail": "evidence-sha256:850f84ed54e82cf500462baf33f7f1fa0a7bb722a5560c35d5e4a41860183ae2",
+          "detail": "evidence-sha256:3c37e096e15a5a47a1d0c4bbac2ebaf4ba556341521eae88ac3ada52425f4d3e",
           "kind": "documented",
           "reference": "docs/trace-architecture.md#7-collector-tempo"
         },
@@ -296,7 +296,7 @@
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-08-14T14:34:48Z",
+      "updatedAt": "2026-08-14T17:01:48Z",
       "value": "Secrets are injected only through environment variables, Kubernetes Secrets, or SOPS-encrypted GitOps manifests. Sensitive values must not be stored in plaintext source, configuration, logs, metrics, spans, or release metadata."
     },
     {
@@ -320,16 +320,16 @@
     },
     {
       "id": "validation.definition-of-done",
-      "revision": 112,
+      "revision": 114,
       "section": "workflows",
       "sources": [
         {
-          "detail": "evidence-sha256:411333a635cffe35d2687b054bb24326318f58fd57065633baf67ee0e41d8339",
+          "detail": "evidence-sha256:3d35d53689b5d521238a6f5e9887fce229f3418dd15ac3e48d1f2f0eba2da2ff",
           "kind": "documented",
           "reference": "docs/migrations/2026-08-rust-collaboration.md#section"
         },
         {
-          "detail": "evidence-sha256:411333a635cffe35d2687b054bb24326318f58fd57065633baf67ee0e41d8339",
+          "detail": "evidence-sha256:3d35d53689b5d521238a6f5e9887fce229f3418dd15ac3e48d1f2f0eba2da2ff",
           "kind": "documented",
           "reference": "docs/rust-collaboration-design.md#7"
         },
@@ -343,7 +343,7 @@
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-08-14T14:34:48Z",
+      "updatedAt": "2026-08-14T17:01:48Z",
       "value": "Run make ci after each change; it covers check plus generate-check, including Go and Rust formatting, vet/clippy, lint, uncached tests, build, vulnerability/supply-chain checks, and generated drift. Add make race for Go concurrency, goroutine, orchestration, or lifecycle work. Run npm ci && npm run ci under services/collaboration/interop for Node fixture changes. For IDL changes, also regenerate, review wire/API compatibility, and run go run ./scripts/idlguard compat-git <merge-base> idl."
     },
     {
@@ -595,11 +595,11 @@
     "profile": "generic",
     "slug": "knowledge-core"
   },
-  "revision": 113,
+  "revision": 114,
   "scan": {
-    "fingerprint": "822b6f3ad1924c44fd74145e8feb5a6d53b1294773a2f16cf76dad97e8a5179e",
-    "inventoryCount": 328
+    "fingerprint": "fd5f8da3e40883c0a4a8121dfec53281bcc25002f7b62ba84d9581f5e62f5ca1",
+    "inventoryCount": 336
   },
   "schemaVersion": 1,
-  "updatedAt": "2026-08-14T15:20:28Z"
+  "updatedAt": "2026-08-14T17:01:48Z"
 }

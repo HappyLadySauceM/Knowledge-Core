@@ -31,9 +31,8 @@ func NewIdentity(
 		kitexclient.WithHostPorts(options.Address),
 		kitexclient.WithConnectTimeout(options.ConnectTimeout),
 		kitexclient.WithRPCTimeout(options.RequestTimeout),
-		kitexclient.WithMiddleware(metrics.KitexClientMiddleware(metricsRegistry)),
 	}
-	clientOptions = append(clientOptions, transportkitex.ClientOptions(telemetry, tlsConfig)...)
+	clientOptions = append(clientOptions, transportkitex.OutboundOptions(telemetry, tlsConfig, metricsRegistry, "identity")...)
 	result, err := identityservice.NewClient(options.ServiceName, clientOptions...)
 	if err != nil {
 		return nil, fmt.Errorf("create Identity client: %w", err)

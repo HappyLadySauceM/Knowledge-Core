@@ -133,7 +133,7 @@ docker compose -f docker/infrastructure/docker-compose.yml up -d --build
 docker compose -f docker/infrastructure/docker-compose.yml ps
 ```
 
-ClamAV 首次启动需要初始化病毒库，Knowledge 在 ClamAV、对象存储、NATS、数据库、Identity 和 Collaboration 均可用后才会 ready。Compose 默认启用本地 OTel Collector + Tempo；打开 `http://127.0.0.1:3200` 查询 trace。collector 的 tail sampling 保留错误、parking/DLQ、超过 1 秒的 trace，并按 10% 保留其余成功 trace。生产部署不要复用本地地址，OTLP endpoint、TLS 和鉴权由部署平台注入。检查入口：
+ClamAV 首次启动需要初始化病毒库，Knowledge 在 ClamAV、对象存储、NATS 和数据库均可用后才会 ready；对端 Identity/Collaboration 不可用时本进程保持 Ready，相关 RPC 走熔断与既有 unavailable 错误码。Compose 默认启用本地 OTel Collector + Tempo；打开 `http://127.0.0.1:3200` 查询 trace。collector 的 tail sampling 保留错误、parking/DLQ、超过 1 秒的 trace，并按 10% 保留其余成功 trace。生产部署不要复用本地地址，OTLP endpoint、TLS 和鉴权由部署平台注入。检查入口：
 
 ```powershell
 Invoke-RestMethod http://127.0.0.1:8081/readyz
@@ -142,7 +142,7 @@ Invoke-RestMethod http://127.0.0.1:8083/readyz
 Invoke-RestMethod http://127.0.0.1:8080/health/ready
 ```
 
-Knowledge RPC 的 `Ping` 返回完整 readiness，`Live` 只返回 `knowledge/live` 且不读取 readiness；Collaboration 启动和 supervisor 使用 `Live`，避免双方 readiness 冷启动互相等待。Collaboration 的 `Ping` 与 admin ready 共用完整应用状态；其余六个 RPC 在应用 not-ready 时会先返回 `40007 / collaboration.unavailable`，不会调用 Knowledge、ticket、store 或 actor。RPC serve task 的任何非计划退出或 permission consumer 尚未追平启动快照都会使服务 fail closed。
+Knowledge RPC 的 `Ping` 返回本进程 readiness，`Live` 只返回 `knowledge/live` 且不读取 readiness。Gateway/Knowledge Ready 不再 Ping 对端 RPC；Collaboration 启动和 supervisor 也不再因 Knowledge `Live` 失败而 not-ready 或退出。出站 RPC 使用连续失败熔断，打开时 Gateway 返回 `gateway.dependency_unavailable`（503），Collaboration 鉴权仍 fail-closed（`40007 / collaboration.unavailable`）。Collaboration 的 `Ping` 与 admin ready 共用完整应用状态；其余六个 RPC 在应用 not-ready 时会先返回 `40007 / collaboration.unavailable`，不会调用 Knowledge、ticket、store 或 actor。RPC serve task 的任何非计划退出或 permission consumer 尚未追平启动快照都会使服务 fail closed。
 
 停止后移除当前 shell 中的 Secret：
 

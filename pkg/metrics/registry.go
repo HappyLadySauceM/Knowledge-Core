@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/HappyLadySauce/Knowledge-Core/pkg/circuit"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -28,6 +29,7 @@ type Registry struct {
 	rpcClientRequests *prometheus.CounterVec
 	rpcClientDuration *prometheus.HistogramVec
 	rpcClientInFlight *prometheus.GaugeVec
+	circuitState      *prometheus.GaugeVec
 	handler           http.Handler
 }
 
@@ -118,6 +120,12 @@ func NewRegistry(config Config) (*Registry, error) {
 		Name:      "requests_in_flight",
 		Help:      "Current number of outbound RPC requests.",
 	}, []string{"rpc_service", "rpc_method"})
+	circuitState := prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "knowledge_core",
+		Subsystem: "rpc_client",
+		Name:      "circuit_state",
+		Help:      "Outbound RPC circuit breaker state (1 is the active state).",
+	}, []string{"dependency", "state"})
 
 	registeredCollectors := []prometheus.Collector{
 		collectors.NewGoCollector(),
@@ -133,6 +141,7 @@ func NewRegistry(config Config) (*Registry, error) {
 		rpcClientRequests,
 		rpcClientDuration,
 		rpcClientInFlight,
+		circuitState,
 	}
 	for _, collector := range registeredCollectors {
 		if err := registry.Register(collector); err != nil {
@@ -153,6 +162,7 @@ func NewRegistry(config Config) (*Registry, error) {
 		rpcClientRequests: rpcClientRequests,
 		rpcClientDuration: rpcClientDuration,
 		rpcClientInFlight: rpcClientInFlight,
+		circuitState:      circuitState,
 	}
 	result.handler = promhttp.InstrumentMetricHandler(
 		result.Registerer(),
@@ -184,6 +194,32 @@ func (r *Registry) Handler() http.Handler {
 		return promhttp.Handler()
 	}
 	return r.handler
+}
+
+func (r *Registry) SetCircuitState(dependency string, state circuit.State) {
+	if r == nil || r.circuitState == nil {
+		return
+	}
+	dependency = strings.TrimSpace(dependency)
+	if dependency == "" {
+		return
+	}
+	for _, candidate := range []circuit.State{circuit.StateClosed, circuit.StateHalfOpen, circuit.StateOpen} {
+		value := 0.0
+		if candidate == state {
+			value = 1
+		}
+		r.circuitState.WithLabelValues(dependency, candidate.String()).Set(value)
+	}
+}
+
+func (r *Registry) ObserveCircuit(dependency string) circuit.StateObserver {
+	return func(state circuit.State) {
+		if r == nil {
+			return
+		}
+		r.SetCircuitState(dependency, state)
+	}
 }
 
 func (r *Registry) SetReady(ready bool) {

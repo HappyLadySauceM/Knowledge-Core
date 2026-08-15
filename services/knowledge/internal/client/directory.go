@@ -67,5 +67,5 @@ func mapDirectoryError(err error) error {
 			return fmt.Errorf("call identity directory: %w", ErrDirectoryUnavailable)
 		}
 	}
-	return fmt.Errorf("call identity directory: %w", ErrDirectoryUnavailable)
+	return fmt.Errorf("call identity directory: %w: %w", ErrDirectoryUnavailable, err)
 }

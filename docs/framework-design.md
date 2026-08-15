@@ -145,8 +145,8 @@ Knowledge RPC 除文档、成员和附件用例外，还提供：
 
 - `AuthorizeCollaboration`：从可信 metadata 中取得 access token，返回 actor、`viewer|editor|owner`、permission revision 和 token expiry。
 - `ProjectCollaboration`：按 document generation 与单调 sequence 更新公开 rich-text 投影。
-- `Ping`：返回 readiness；会检查 Knowledge 的必要依赖，包括 Collaboration。
-- `Live`：只证明 Knowledge RPC 进程存活，不读取 readiness。Collaboration 启动和 supervisor 使用该方法，避免 Knowledge readiness 与 Collaboration readiness 互相等待。
+- `Ping`：返回 Knowledge 本进程 readiness（PostgreSQL、NATS、S3、ClamAV），不探活 Identity 或 Collaboration。
+- `Live`：只证明 Knowledge RPC 进程存活，不读取 readiness。Collaboration 不再把它当作启动或 supervisor 的 Ready 门闩。
 
 Collaboration RPC 提供 `Ping`、`CreateSession`、版本列表/创建/详情/恢复和 `PurgeDocument`。除 `Ping` 外的六个业务 RPC 都先检查完整应用 readiness；not-ready 时统一返回 `40007 / collaboration.unavailable`，且不会调用 Knowledge、ticket、store 或 actor。Gateway 通过 `CreateSession` 获得短期 ticket；Knowledge 的清理 worker 通过 `PurgeDocument` 删除协作数据。生产 RPC 双向验证 mTLS，并通过 TTHeader 传播 deadline、request ID、W3C trace 和必要的敏感 token metadata；token 永不进入日志或 telemetry。
 
@@ -245,7 +245,7 @@ Go 服务日志统一使用 `log/slog` JSON 和 `pkg/log` 脱敏，trace 使用 
 
 本地 Compose 与 k3s dev 都把 OTel Collector 放在应用/Higress 与 Tempo 之间。Collector 通过 OTLP (`4317/4318`) 接收 trace，过滤、采样后统一以 OTLP 写入 Tempo。Go/Rust 服务只通过环境变量注入 OTLP endpoint，生产 endpoint、TLS 和鉴权由部署平台提供。Gateway CORS 允许 `traceparent`/`tracestate`，但不允许浏览器 `baggage`；W3C baggage 在内部允许完整合法字段但总长度上限为 8 KiB，既不写入日志/span attribute，也不进入业务消息 payload。
 
-四个服务各自持有独立 Prometheus registry，并在 admin listener 的 `/metrics` 暴露。标签只使用路由模板、RPC 方法、状态码、稳定业务码和依赖名等低基数字段。Rust Collaboration 使用 `tracing` JSON、W3C TraceContext/Baggage 与可选 OTLP exporter；WebSocket、Volo、SQLx、Redis 和 NATS 延续 request context，且不记录 ticket、token、payload、DSN 或用户/文档 ID metric label。
+四个服务各自持有独立 Prometheus registry，并在 admin listener 的 `/metrics` 暴露。标签只使用路由模板、RPC 方法、状态码、稳定业务码和依赖名等低基数字段。Go 出站 RPC 熔断暴露低基数 `knowledge_core_rpc_client_circuit_state{dependency,state}`，`state` 仅为 `closed`/`open`/`half_open`。Rust Collaboration 使用 `tracing` JSON、W3C TraceContext/Baggage 与可选 OTLP exporter；WebSocket、Volo、SQLx、Redis 和 NATS 延续 request context，且不记录 ticket、token、payload、DSN 或用户/文档 ID metric label。
 
 面向日常排障和交接的链路追踪说明见 [`trace-architecture.md`](trace-architecture.md)。
 
@@ -253,14 +253,14 @@ Go 服务日志统一使用 `log/slog` JSON 和 `pkg/log` 脱敏，trace 使用 
 
 Go 长运行组件实现 `Name`、`Serve`、`Ready(context.Context)` 和 `Shutdown(context.Context)`。Runtime 并发启动组件，只有 listener 和 worker readiness 均完成后才把进程设为 serving。组件的长期运行 context 由组件自身持有并通过 `Shutdown` 取消，不继承只用于装配和 readiness 的 startup deadline。
 
-服务 readiness 证明必要依赖可用：
+服务 readiness 只证明本进程能接自己的活：本地 listener 加上本服务数据面。不对端 RPC 做 Ready 门闩。
 
 - Identity：PostgreSQL、Redis。
-- Knowledge：PostgreSQL、NATS、Identity、S3、ClamAV、Collaboration。
-- Gateway：Redis、Identity、Knowledge、Collaboration。
-- Collaboration：PostgreSQL、Knowledge `Live`、Redis ticket backend、NATS JetStream、actor/workers 和三个 listener。
+- Knowledge：PostgreSQL、NATS、S3、ClamAV。
+- Gateway：Redis。
+- Collaboration：PostgreSQL、Redis ticket backend、NATS JetStream、actor/workers 和三个 listener。
 
-Collaboration 探测 Knowledge `Live`，而 Knowledge 使用 Collaboration `Ping` 检查 readiness，因此没有互相等待的 readiness 闭环。Collaboration `Ping` 与 admin ready 共用完整应用 `HealthState`，启动中或任一受监督依赖/listener 失败时返回 `not_ready`。RPC serve task 正常返回、报错、panic 或被 abort 都会被标记为 stopped；非计划退出会立即停止 WebSocket 接入并触发进程失败。出站 RPC 地址为严格 `host:port`；非法地址、DNS 失败、空结果或超时 fail closed。Gateway 仍使用双方的 `Ping`。Compose 只约束依赖进程启动顺序；最终可服务状态由应用级 readiness 判定。
+出站 RPC 使用连续失败熔断（阈值 5、打开 5 秒、半开探测 1）：打开时 fail-fast 且不拨号；超时与连接错误记失败，业务码不记失败。Gateway 将熔断打开映射为 `gateway.dependency_unavailable`（503）；Knowledge 将 Identity/Collaboration 出站失败映射为 `knowledge.unavailable`；Collaboration 的 `authorize`/`project` 在熔断打开时返回 `40007 / collaboration.unavailable`，会话创建 fail-closed，Knowledge 不可用时不得放行未授权会话。Collaboration 启动和 supervisor 不再因 Knowledge `Live` 失败而 not-ready 或退出进程。Collaboration `Ping` 与 admin ready 共用完整应用 `HealthState`，启动中或任一受监督依赖/listener 失败时返回 `not_ready`。RPC serve task 正常返回、报错、panic 或被 abort 都会被标记为 stopped；非计划退出会立即停止 WebSocket 接入并触发进程失败。出站 RPC 地址为严格 `host:port`；非法地址、DNS 失败、空结果或超时 fail closed。Compose 只约束依赖进程启动顺序；最终可服务状态由应用级 readiness 判定。
 
 退出时先把 readiness 设为失败，再按 component 注册逆序停止入口和 worker，等待在途请求，最后按逆序关闭 client、消息、缓存和数据库资源，并 flush telemetry。所有启动、shutdown、cleanup 和 worker operation 都有时间上限。若组件未安全退出，Go Runtime 保留依赖而不是提前关闭底层资源。
 

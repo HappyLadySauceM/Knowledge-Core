@@ -2,9 +2,11 @@ package metrics
 
 import (
 	"context"
+	"errors"
 	"strconv"
 	"time"
 
+	"github.com/HappyLadySauce/Knowledge-Core/pkg/circuit"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -56,6 +58,9 @@ func kitexRPCOutcome(ctx context.Context, err error) (string, string) {
 		if businessError := info.Invocation().BizStatusErr(); businessError != nil {
 			return "business_error", strconv.FormatInt(int64(businessError.BizStatusCode()), 10)
 		}
+	}
+	if errors.Is(err, circuit.ErrOpen) {
+		return "circuit_open", "open"
 	}
 	if err != nil {
 		return "error", "transport"

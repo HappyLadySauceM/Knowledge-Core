@@ -175,7 +175,7 @@ Kubernetes 使用无 PVC 的 StatefulSet：`COLLABORATION_INSTANCE_ID` 取 `meta
 
 授权响应必须包含 document ID、actor、`owner|editor|viewer` access、permission revision 和 access-token expiry。公开协作已取消，因此 actor 与 token expiry 都是 required；Collaboration 不复制 Knowledge 权限规则。
 
-Knowledge 的 `Ping` 保持 readiness 语义，`Live` 只返回 `knowledge/live` 且不读取 readiness。Collaboration 启动与 supervisor 使用 `Live`，Gateway 和其他 readiness consumer 继续使用 `Ping`，从而避免 Knowledge 等待 Collaboration ready、Collaboration 又等待 Knowledge ready 的冷启动环。Collaboration 的 `Ping` 与 admin ready 读取同一个完整应用 `HealthState`；其余六个 RPC 都在参数解析和任何 Knowledge、ticket、store 或 actor 副作用之前执行 readiness gate，not-ready 时统一返回 `40007 / collaboration.unavailable`。
+Knowledge 的 `Ping` 返回本进程 readiness（PostgreSQL、NATS、S3、ClamAV），不探活 Collaboration；`Live` 只返回 `knowledge/live` 且不读取 readiness。Gateway 与 Knowledge 的 HTTP/admin Ready 也不再 Ping 对端 RPC。Collaboration 启动与 supervisor 不再把 Knowledge `Live` 当作 Ready 门闩；出站 Knowledge 调用使用与 Go 相同的连续失败熔断（阈值 5、打开 5 秒、半开探测 1），打开时 `authorize`/`project` 返回 `40007 / collaboration.unavailable`，会话创建 fail-closed，不得在 Knowledge 不可用时放行。Collaboration 的 `Ping` 与 admin ready 读取同一个完整应用 `HealthState`；其余六个 RPC 都在参数解析和任何 Knowledge、ticket、store 或 actor 副作用之前执行 readiness gate，not-ready 时统一返回 `40007 / collaboration.unavailable`。
 
 TTHeader 必须贯穿：
 
@@ -237,6 +237,7 @@ snapshot worker 用单个 lateral aggregate 同时计算每个 document 自水�
 - Prometheus label 只使用稳定 route/RPC method、status/code、dependency 和 access；禁止 document/user/session/request ID 与原始错误。
 - WebSocket handshake、Volo Thrift server/client、SQLx、Redis 和 NATS 延续同一 W3C trace；handshake context 会传给 actor/store，事件 outbox 在业务事务内保存 propagation headers，发布时只写入 NATS headers。WebSocket frame 仅保留有界操作事件，ping/pong 和 update payload 不创建或写入 span；重复 JetStream delivery 通过一次逻辑消费 span、attempt metrics 和最终 parking 事件表达。
 - NATS permission/invalidation subscription 异常时停止接收新 session、关闭受保护连接并标记 not-ready，不为可用性静默放行；当前恢复策略是由外部编排重启进程，不在进程内无界重连。
+- Knowledge 出站 RPC 使用连续失败熔断；打开时 `authorize`/`project` 返回 `40007 / collaboration.unavailable`，不得降级为匿名可写。启动与 supervisor 不以 Knowledge `Live` 作为 Ready 门闩。
 - 每个副本的 `COLLABORATION_INSTANCE_ID` 必须唯一且重启后稳定；它用于派生各角色的 JetStream durable consumer identity，使副本间 fanout 与同一副本的未 ACK redelivery 同时成立。
 - update、document invalidation 与 permission subject 分别固定为 `collaboration.documents.updated`、`collaboration.documents.invalidated` 和 `knowledge.permissions.changed`；相关环境变量只能等于协议值，不能用于部署级改名。document 与 permission stream 名称可配置但必须不同；两者的 max age 与 duplicate window 都固定为 24 小时并做严格漂移校验。
 - document stream 只拥有 update/invalidation subject，并以 1 GiB `max_bytes` 限制历史；permission stream 只拥有 permission subject，`max_bytes=-1`，只按 24 小时 max age 驱逐。permission event 必须包含正 revision；新 durable 使用 `DeliverPolicy::All` 回放全部时间保留历史，以 consumer 创建后读取的 permission stream `last_sequence` 为启动目标，并等待服务端连续 ACK floor 的 stream sequence 越过目标。若 retention 在投递前收缩，只有 consumer 同时没有 pending 和 ack-pending 消息时才视为空集合追平。actor 只关闭 revision 更旧的 session，并用保留时间不短于最大 ticket TTL 的 registry watermark 拒绝事件到达前签发、到达后才消费的旧 ticket。重复或延迟事件不得关闭同 revision/更新授权连接。

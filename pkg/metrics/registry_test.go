@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/HappyLadySauce/Knowledge-Core/pkg/circuit"
 	"github.com/HappyLadySauce/Knowledge-Core/pkg/metrics"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
@@ -56,6 +57,23 @@ func TestRegistryExportsApplicationIdentityAndReadiness(t *testing.T) {
 	registry.SetReady(false)
 	if got := gaugeValue(gatherFamily(t, registry, "knowledge_core_app_ready"), nil); got != 0 {
 		t.Fatalf("ready metric = %v, want 0", got)
+	}
+}
+
+func TestRegistryExportsCircuitState(t *testing.T) {
+	registry := newRegistry(t, "gateway")
+	registry.SetCircuitState("collaboration", circuit.StateOpen)
+	family := gatherFamily(t, registry, "knowledge_core_rpc_client_circuit_state")
+	if got := gaugeValue(family, map[string]string{"dependency": "collaboration", "state": "open"}); got != 1 {
+		t.Fatalf("open state = %v, want 1", got)
+	}
+	if got := gaugeValue(family, map[string]string{"dependency": "collaboration", "state": "closed"}); got != 0 {
+		t.Fatalf("closed state = %v, want 0", got)
+	}
+	registry.SetCircuitState("collaboration", circuit.StateClosed)
+	family = gatherFamily(t, registry, "knowledge_core_rpc_client_circuit_state")
+	if got := gaugeValue(family, map[string]string{"dependency": "collaboration", "state": "closed"}); got != 1 {
+		t.Fatalf("closed state after reset = %v, want 1", got)
 	}
 }
 

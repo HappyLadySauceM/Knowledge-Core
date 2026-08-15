@@ -13,7 +13,6 @@ use crate::{
     actor::{ActorLimits, ActorRegistry},
     admin::{AdminServer, HealthState},
     config::Config,
-    domain::RequestContext,
     error::{Result, ServiceError},
     ports::KnowledgePort,
     remote_config::RemoteRuntime,
@@ -67,7 +66,6 @@ pub struct Application {
     remote: Option<RemoteRuntime>,
     postgres: Arc<PostgresStore>,
     tickets: TicketService,
-    knowledge: Arc<dyn KnowledgePort>,
     actors: ActorRegistry,
     workers: Arc<WorkerRuntime>,
     rpc: Arc<RpcServer<CollaborationHandler>>,
@@ -251,9 +249,6 @@ impl Application {
         startup.nats = Some(Arc::clone(&nats));
 
         let knowledge: Arc<dyn KnowledgePort> = Arc::new(KnowledgeClient::new(&config.knowledge)?);
-        let startup_context = RequestContext::new("collaboration-startup");
-        knowledge.ping(&startup_context).await?;
-        startup.knowledge = Some(Arc::clone(&knowledge));
 
         let document_store: Arc<dyn DocumentStore> = postgres.clone();
         let actor_limits = ActorLimits::from_config(&config.actor, &config.public)?;
@@ -403,9 +398,6 @@ impl Application {
         workers.ready().await?;
         postgres.ping().await?;
         tickets.ping().await?;
-        knowledge
-            .ping(&RequestContext::new("collaboration-startup-readiness"))
-            .await?;
         if !admin.is_running() {
             return Err(ServiceError::unavailable(anyhow::anyhow!(
                 "admin listener stopped during startup"
@@ -428,7 +420,6 @@ impl Application {
             remote: startup.remote.take(),
             postgres,
             tickets,
-            knowledge,
             actors,
             workers,
             rpc,
@@ -454,7 +445,6 @@ impl Application {
             health: self.health.clone(),
             postgres: Arc::clone(&self.postgres),
             tickets: self.tickets.clone(),
-            knowledge: Arc::clone(&self.knowledge),
             workers: Arc::clone(&self.workers),
             rpc: Arc::clone(&self.rpc),
             public: Arc::clone(&self.public),
@@ -572,7 +562,6 @@ struct SupervisedComponents {
     health: HealthState,
     postgres: Arc<PostgresStore>,
     tickets: TicketService,
-    knowledge: Arc<dyn KnowledgePort>,
     workers: Arc<WorkerRuntime>,
     rpc: Arc<RpcServer<CollaborationHandler>>,
     public: Arc<WebSocketServer>,
@@ -614,10 +603,6 @@ async fn components_ready(components: &SupervisedComponents) -> Result<()> {
     components.postgres.ping().await?;
     components.tickets.ping().await?;
     components.workers.ready().await?;
-    components
-        .knowledge
-        .ping(&RequestContext::new("collaboration-readiness"))
-        .await?;
     components.rpc.ready().await?;
     components.public.ready().await
 }
@@ -659,7 +644,6 @@ struct Startup {
     health: HealthState,
     postgres: Option<Arc<PostgresStore>>,
     tickets: Option<TicketService>,
-    knowledge: Option<Arc<dyn KnowledgePort>>,
     nats: Option<Arc<NatsClient>>,
     actors: Option<ActorRegistry>,
     workers: Option<Arc<WorkerRuntime>>,
@@ -682,7 +666,6 @@ impl Startup {
             health: HealthState::default(),
             postgres: None,
             tickets: None,
-            knowledge: None,
             nats: None,
             actors: None,
             workers: None,

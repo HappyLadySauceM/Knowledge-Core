@@ -8,7 +8,6 @@ import (
 	"log/slog"
 	"time"
 
-	commonv1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/common"
 	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/identity/identityservice"
 	coreapp "github.com/HappyLadySauce/Knowledge-Core/pkg/app"
 	coreauth "github.com/HappyLadySauce/Knowledge-Core/pkg/auth"
@@ -130,7 +129,7 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 		return nil, err
 	}
 
-	if err := addReadinessChecks(runtime.Health, cfg, db, events, identity, objects, malwareScanner, collaboration); err != nil {
+	if err := addReadinessChecks(runtime.Health, cfg, db, events, objects, malwareScanner); err != nil {
 		return nil, err
 	}
 	rpcHandler, err := knowledgerpc.NewHandler(
@@ -212,29 +211,16 @@ func addReadinessChecks(
 	cfg config.Config,
 	db *gorm.DB,
 	events *natsresource.DurableBroker,
-	identity identityservice.Client,
 	objects *storage.S3,
 	malwareScanner *scanner.ClamAV,
-	collaboration *knowledgeclient.Collaboration,
 ) error {
 	return errors.Join(
 		registry.AddReadiness("postgres", withTimeout(cfg.PostgreSQL.ConnectTimeout, func(ctx stdcontext.Context) error {
 			return postgres.Ping(ctx, db)
 		})),
 		registry.AddReadiness("nats", withTimeout(cfg.NATS.RequestTimeout, events.Ping)),
-		registry.AddReadiness("identity", withTimeout(cfg.IdentityRPC.RequestTimeout, func(ctx stdcontext.Context) error {
-			response, err := identity.Ping(ctx, &commonv1.PingRequest{})
-			if err != nil {
-				return fmt.Errorf("ping Identity: %w", err)
-			}
-			if response == nil || response.Service != "identity" || response.Status != "ready" {
-				return errors.New("ping Identity: service is not ready")
-			}
-			return nil
-		})),
 		registry.AddReadiness("object-storage", withTimeout(cfg.ObjectStorage.DownloadTTL, objects.Ping)),
 		registry.AddReadiness("clamav", withTimeout(cfg.Scanner.DialTimeout+cfg.Scanner.ScanTimeout, malwareScanner.Ping)),
-		registry.AddReadiness("collaboration", withTimeout(cfg.CollaborationRPC.RequestTimeout, collaboration.Ping)),
 	)
 }
 

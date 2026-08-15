@@ -445,7 +445,7 @@ mod tests {
     use std::{
         sync::{
             Arc,
-            atomic::{AtomicUsize, Ordering},
+            atomic::{AtomicBool, AtomicUsize, Ordering},
         },
         time::Duration,
     };
@@ -572,6 +572,23 @@ mod tests {
         .expect_err("missing token must fail closed");
         assert_biz_code(error, 40_002);
         assert_eq!(knowledge.calls.load(Ordering::Relaxed), 1);
+    }
+
+    #[tokio::test]
+    async fn session_fails_closed_when_knowledge_is_unavailable() {
+        let (handler, _, knowledge, tickets, document_id) = handler(Access::Viewer);
+        knowledge.fail_unavailable.store(true, Ordering::Relaxed);
+        let error = scope_request_context_for_test(
+            authenticated_context(),
+            handler.create_session(collaboration::CreateSessionRequest {
+                document_id: document_id.to_string().into(),
+            }),
+        )
+        .await
+        .expect_err("Knowledge unavailable must fail closed");
+        assert_unavailable(error);
+        assert_eq!(knowledge.calls.load(Ordering::Relaxed), 1);
+        assert_eq!(tickets.put_calls.load(Ordering::Relaxed), 0);
     }
 
     #[tokio::test]
@@ -831,6 +848,7 @@ mod tests {
                 permission_revision: 1,
                 token_expires_at: OffsetDateTime::now_utc() + time::Duration::minutes(5),
             },
+            fail_unavailable: AtomicBool::new(false),
             calls: AtomicUsize::new(0),
         });
         let ticket = TicketConfig {
@@ -897,6 +915,7 @@ mod tests {
 
     struct KnowledgeStub {
         authorization: Authorization,
+        fail_unavailable: AtomicBool,
         calls: AtomicUsize,
     }
 
@@ -908,6 +927,11 @@ mod tests {
             _document_id: DocumentId,
         ) -> Result<Authorization> {
             self.calls.fetch_add(1, Ordering::Relaxed);
+            if self.fail_unavailable.load(Ordering::Relaxed) {
+                return Err(ServiceError::unavailable(anyhow::anyhow!(
+                    "circuit breaker is open"
+                )));
+            }
             Ok(self.authorization.clone())
         }
 

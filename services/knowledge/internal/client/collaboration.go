@@ -39,9 +39,8 @@ func NewCollaboration(
 		kitexclient.WithHostPorts(options.Address),
 		kitexclient.WithConnectTimeout(options.ConnectTimeout),
 		kitexclient.WithRPCTimeout(options.RequestTimeout),
-		kitexclient.WithMiddleware(metrics.KitexClientMiddleware(metricsRegistry)),
 	}
-	clientOptions = append(clientOptions, transportkitex.ClientOptions(telemetry, tlsConfig)...)
+	clientOptions = append(clientOptions, transportkitex.OutboundOptions(telemetry, tlsConfig, metricsRegistry, "collaboration")...)
 	result, err := collaborationservice.NewClient(options.ServiceName, clientOptions...)
 	if err != nil {
 		return nil, fmt.Errorf("create Collaboration client: %w", err)

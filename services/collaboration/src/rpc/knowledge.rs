@@ -19,14 +19,15 @@ use crate::{
 };
 
 use super::{
-    context::scope_outgoing_metadata, discover::StaticDiscover, knowledge_client_error,
-    tls::client_transport,
+    circuit::Breaker, context::scope_outgoing_metadata, discover::StaticDiscover,
+    knowledge_client_error, tls::client_transport,
 };
 
 #[derive(Clone)]
 pub struct KnowledgeClient {
     client: knowledge::KnowledgeServiceClient,
     request_timeout: Duration,
+    breaker: Breaker,
 }
 
 impl KnowledgeClient {
@@ -56,7 +57,16 @@ impl KnowledgeClient {
         Ok(Self {
             client,
             request_timeout: config.request_timeout,
+            breaker: Breaker::new(),
         })
+    }
+
+    fn protect<T>(&self, result: Result<T>) -> Result<T> {
+        match &result {
+            Err(error) if error.code() == ErrorCode::Unavailable => self.breaker.failure(),
+            _ => self.breaker.success(),
+        }
+        result
     }
 
     async fn authorize_call(
@@ -65,6 +75,7 @@ impl KnowledgeClient {
         request: knowledge::AuthorizeCollaborationRequest,
     ) -> Result<knowledge::CollaborationAuthorization> {
         let (option, timeout) = call_option(context, self.request_timeout)?;
+        self.breaker.allow()?;
         let call = self
             .client
             .clone()
@@ -82,8 +93,9 @@ impl KnowledgeClient {
             scope_outgoing_metadata(context, call).instrument(span),
         )
         .await
-        .map_err(|_| deadline_error())?;
-        result.map_err(knowledge_client_error)
+        .map_err(|_| deadline_error())
+        .and_then(|result| result.map_err(knowledge_client_error));
+        self.protect(result)
     }
 
     async fn project_call(
@@ -92,6 +104,7 @@ impl KnowledgeClient {
         request: knowledge::ProjectCollaborationRequest,
     ) -> Result<()> {
         let (option, timeout) = call_option(context, self.request_timeout)?;
+        self.breaker.allow()?;
         let call = self
             .client
             .clone()
@@ -109,12 +122,14 @@ impl KnowledgeClient {
             scope_outgoing_metadata(context, call).instrument(span),
         )
         .await
-        .map_err(|_| deadline_error())?;
-        result.map_err(knowledge_client_error)
+        .map_err(|_| deadline_error())
+        .and_then(|result| result.map_err(knowledge_client_error));
+        self.protect(result)
     }
 
     async fn live_call(&self, context: &RequestContext) -> Result<common::PingResponse> {
         let (option, timeout) = call_option(context, self.request_timeout)?;
+        self.breaker.allow()?;
         let call = self
             .client
             .clone()
@@ -122,8 +137,9 @@ impl KnowledgeClient {
             .live(common::PingRequest { message: None });
         let result = tokio::time::timeout(timeout, scope_outgoing_metadata(context, call))
             .await
-            .map_err(|_| deadline_error())?;
-        result.map_err(knowledge_client_error)
+            .map_err(|_| deadline_error())
+            .and_then(|result| result.map_err(knowledge_client_error));
+        self.protect(result)
     }
 }
 

@@ -1,4 +1,5 @@
 mod biz;
+mod circuit;
 mod context;
 pub mod discover;
 mod handler;

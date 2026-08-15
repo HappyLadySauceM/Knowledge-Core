@@ -31,9 +31,8 @@ func NewKnowledge(
 		kitexclient.WithHostPorts(opts.Address),
 		kitexclient.WithConnectTimeout(opts.ConnectTimeout),
 		kitexclient.WithRPCTimeout(opts.RequestTimeout),
-		kitexclient.WithMiddleware(metrics.KitexClientMiddleware(metricsRegistry)),
 	}
-	clientOptions = append(clientOptions, transportkitex.ClientOptions(telemetry, tlsConfig)...)
+	clientOptions = append(clientOptions, transportkitex.OutboundOptions(telemetry, tlsConfig, metricsRegistry, "knowledge")...)
 	result, err := knowledgeservice.NewClient(opts.ServiceName, clientOptions...)
 	if err != nil {
 		return nil, fmt.Errorf("create Knowledge client: %w", err)

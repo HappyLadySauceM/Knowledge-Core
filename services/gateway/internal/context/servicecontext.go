@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/collaboration/collaborationservice"
-	commonv1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/common"
 	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/identity/identityservice"
 	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/knowledge/knowledgeservice"
 	coreapp "github.com/HappyLadySauce/Knowledge-Core/pkg/app"
@@ -82,7 +81,7 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 	if err != nil {
 		return nil, fmt.Errorf("create gateway HTTP middleware: %w", err)
 	}
-	if err := addReadinessChecks(runtime.Health, cfg, cache, identity, knowledge, collaboration); err != nil {
+	if err := addReadinessChecks(runtime.Health, cfg.Redis.ReadTimeout, cache.Ping); err != nil {
 		return nil, err
 	}
 
@@ -143,47 +142,11 @@ func (s *ServiceContext) ApplyDynamicConfig(cfg config.Config) error {
 	return s.Middleware.ApplyDynamic(*cfg.CORS, *cfg.RateLimit, *cfg.Endpoints)
 }
 
-func addReadinessChecks(
-	registry *health.Registry,
-	cfg config.Config,
-	cache *redisresource.Resource,
-	identity identityservice.Client,
-	knowledge knowledgeservice.Client,
-	collaboration collaborationservice.Client,
-) error {
-	return errors.Join(
-		registry.AddReadiness("redis", withTimeout(cfg.Redis.ReadTimeout, cache.Ping)),
-		registry.AddReadiness("identity", withTimeout(cfg.IdentityRPC.RequestTimeout, func(ctx stdcontext.Context) error {
-			response, err := identity.Ping(ctx, &commonv1.PingRequest{})
-			if err != nil {
-				return fmt.Errorf("ping Identity: %w", err)
-			}
-			if response == nil || response.Service != "identity" || response.Status != "ready" {
-				return errors.New("ping Identity: service is not ready")
-			}
-			return nil
-		})),
-		registry.AddReadiness("knowledge", withTimeout(cfg.KnowledgeRPC.RequestTimeout, func(ctx stdcontext.Context) error {
-			response, err := knowledge.Ping(ctx, &commonv1.PingRequest{})
-			if err != nil {
-				return fmt.Errorf("ping Knowledge: %w", err)
-			}
-			if response == nil || response.Service != "knowledge" || response.Status != "ready" {
-				return errors.New("ping Knowledge: service is not ready")
-			}
-			return nil
-		})),
-		registry.AddReadiness("collaboration", withTimeout(cfg.CollaborationRPC.RequestTimeout, func(ctx stdcontext.Context) error {
-			response, err := collaboration.Ping(ctx, &commonv1.PingRequest{})
-			if err != nil {
-				return fmt.Errorf("ping Collaboration: %w", err)
-			}
-			if response == nil || response.Service != "collaboration" || response.Status != "ready" {
-				return errors.New("ping Collaboration: service is not ready")
-			}
-			return nil
-		})),
-	)
+func addReadinessChecks(registry *health.Registry, timeout time.Duration, redisCheck health.Check) error {
+	if redisCheck == nil {
+		return errors.New("add readiness checks: redis check is required")
+	}
+	return registry.AddReadiness("redis", withTimeout(timeout, redisCheck))
 }
 
 func withTimeout(timeout time.Duration, check health.Check) health.Check {
