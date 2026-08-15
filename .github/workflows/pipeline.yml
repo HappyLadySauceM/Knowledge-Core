@@ -335,7 +335,7 @@ jobs:
             docker run --rm --network host \
               -v "$GITHUB_WORKSPACE:/workspace" \
               -v "$socket:/var/run/docker.sock" \
-              -v "$DOCKER_CONFIG:/root/.docker:ro" \
+              -v "$DOCKER_CONFIG:/root/.docker" \
               -v "$HARBOR_CA_FILE:/etc/harbor-ca/ca.crt:ro" \
               -e CI_PROJECT_CONFIG_JSON -e DOCKER_HOST=unix:///var/run/docker.sock \
               -e DOCKER_CONFIG=/root/.docker -e CI_REGISTRY_CA_FILE=/etc/harbor-ca/ca.crt \
