@@ -50,9 +50,8 @@ jobs:
           echo "$changes"
           services=$(echo "$changes" | jq -r '.services | join(",")')
           rust_required=false
-          if jq -e '.services | index("collaboration")' "$state_dir/changes.json" >/dev/null; then
-            rust_required=true
-          elif jq -r '.paths[]' "$state_dir/changes.json" | rg -q '(^services/collaboration/|^idl/|^scripts/codegen|^Makefile$|^\.github/)'; then
+          if jq -r '[.shared.paths[]?, (.services[]?.paths[]?)][]' "$state_dir/changes.json" \
+            | rg -q '(^services/collaboration/|^idl/|^scripts/codegen|^Makefile$|^\.github/)'; then
             rust_required=true
           fi
           has_changes=false
@@ -82,9 +81,10 @@ jobs:
       - name: Run Go gates and build artifacts
         env:
           STATE_DIR: ${{ needs.plan.outputs.state_dir }}
+          SERVICES: ${{ needs.plan.outputs.services }}
         run: |
           set -euo pipefail
-          go_services=$(jq -r '.services[] | select(. != "collaboration")' "$STATE_DIR/changes.json" | tr '\n' ' ')
+          go_services=$(printf '%s' "$SERVICES" | tr ',' '\n' | rg -v '^collaboration$' | tr '\n' ' ' || true)
           make go-ci generate-go-check KC_RUST_GATE=0
           if [ -n "$go_services" ]; then
             make go-release GO_RELEASE_SERVICES="$go_services" GO_ARTIFACT_DIR="$STATE_DIR/artifacts" KC_RUST_GATE=0
