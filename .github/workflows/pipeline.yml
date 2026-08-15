@@ -51,7 +51,7 @@ jobs:
           services=$(echo "$changes" | jq -r '.services | join(",")')
           rust_required=false
           if jq -r '[.shared.paths[]?, (.services[]?.paths[]?)][]' "$state_dir/changes.json" \
-            | rg -q '(^services/collaboration/|^idl/|^scripts/codegen|^Makefile$|^\.github/)'; then
+            | grep -Eq '(^services/collaboration/|^idl/|^scripts/codegen|^Makefile$|^\.github/)'; then
             rust_required=true
           fi
           has_changes=false
@@ -84,7 +84,7 @@ jobs:
           SERVICES: ${{ needs.plan.outputs.services }}
         run: |
           set -euo pipefail
-          go_services=$(printf '%s' "$SERVICES" | tr ',' '\n' | rg -v '^collaboration$' | tr '\n' ' ' || true)
+          go_services=$(printf '%s' "$SERVICES" | tr ',' '\n' | grep -Ev '^collaboration$' | tr '\n' ' ' || true)
           make go-ci generate-go-check KC_RUST_GATE=0
           if [ -n "$go_services" ]; then
             make go-release GO_RELEASE_SERVICES="$go_services" GO_ARTIFACT_DIR="$STATE_DIR/artifacts" KC_RUST_GATE=0
