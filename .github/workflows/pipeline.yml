@@ -214,34 +214,9 @@ jobs:
           echo "overrides=$(jq -c '[.services[] | {kustomize_name, image_repo:(.image|split(":")[0]), digest}] | map({key:.kustomize_name,value:{newName:.image_repo,digest:.digest}}) | from_entries' "$candidate_manifest")" >> "$GITHUB_OUTPUT"
         id: candidates
 
-  release-notes:
+  deploy-release:
     needs: [plan, package-candidates]
     if: needs.package-candidates.result == 'success'
-    runs-on: [self-hosted, Linux, X64]
-    concurrency:
-      group: knowledge-core-dev-release-notes
-      cancel-in-progress: true
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-      - name: Generate one release summary
-        env:
-          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
-          STATE_DIR: ${{ needs.plan.outputs.state_dir }}
-          SERVICES: ${{ needs.plan.outputs.services }}
-        run: |
-          set -euo pipefail
-          docker run --rm --network host \
-            -v "$GITHUB_WORKSPACE:/workspace" \
-            -v "$STATE_DIR:/state" \
-            -e CI_PROJECT_CONFIG_JSON -e DEEPSEEK_API_KEY \
-            -w /workspace "$CI_IMAGE" summarize --services "$SERVICES" \
-            --changes-file /state/changes.json --output /state/release.md
-
-  deploy-release:
-    needs: [plan, package-candidates, release-notes]
-    if: needs.package-candidates.result == 'success' && needs.release-notes.result == 'success'
     environment: release
     runs-on: [self-hosted, Linux, X64]
     concurrency:
@@ -277,6 +252,19 @@ jobs:
           echo "DOCKER_CONFIG=$STATE_DIR/harbor" >> "$GITHUB_ENV"
           echo "HARBOR_CA_FILE=$STATE_DIR/harbor/ca.crt" >> "$GITHUB_ENV"
           echo "KUBECONFIG=$STATE_DIR/kubeconfig" >> "$GITHUB_ENV"
+      - name: Generate one release summary
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          STATE_DIR: ${{ needs.plan.outputs.state_dir }}
+          SERVICES: ${{ needs.plan.outputs.services }}
+        run: |
+          set -euo pipefail
+          docker run --rm --network host \
+            -v "$GITHUB_WORKSPACE:/workspace" \
+            -v "$STATE_DIR:/state" \
+            -e CI_PROJECT_CONFIG_JSON -e DEEPSEEK_API_KEY \
+            -w /workspace "$CI_IMAGE" summarize --services "$SERVICES" \
+            --changes-file /state/changes.json --output /state/release.md
       - name: Promote candidate to GitOps
         id: gitops
         env:
@@ -373,7 +361,7 @@ jobs:
             --description "Knowledge Core dev deployment failed" --target-url "https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
 
   cleanup:
-    needs: [plan, go-verify-build, rust-verify-build, package-candidates, release-notes, deploy-release]
+    needs: [plan, go-verify-build, rust-verify-build, package-candidates, deploy-release]
     if: always()
     runs-on: [self-hosted, Linux, X64]
     steps:
