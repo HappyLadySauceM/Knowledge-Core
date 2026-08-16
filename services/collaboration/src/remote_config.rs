@@ -280,6 +280,7 @@ impl RemoteConfig {
             .server_addr(bootstrap.servers.clone())
             .namespace(bootstrap.binding.namespace.clone())
             .app_name(service_name)
+            .tls_enabled(bootstrap.tls_enabled)
             .auth_username(bootstrap.username.clone())
             .auth_password(bootstrap.password.clone())
             .auth_ext(
