@@ -118,16 +118,24 @@ jobs:
         run: |
           set -euo pipefail
           toolchain=1.97.1
-          if ! rustup toolchain list | grep -Eq "^${toolchain}-"; then
+          cargo_home="${CARGO_HOME:-$HOME/.cargo}"
+          rustup_bin="$cargo_home/bin/rustup"
+          if [[ ! -x "$rustup_bin" ]]; then
+            echo "rustup is not available at $rustup_bin on this self-hosted runner" >&2
+            exit 1
+          fi
+          export PATH="$cargo_home/bin:$PATH"
+          if ! "$rustup_bin" toolchain list | grep -Eq "^${toolchain}-"; then
             echo "Rust ${toolchain} is not preinstalled on this self-hosted runner" >&2
             exit 1
           fi
           for component in clippy rustfmt; do
-            if ! rustup component list --toolchain "$toolchain" | grep -Eq "^${component}-.* \(installed\)$"; then
+            if ! "$rustup_bin" component list --toolchain "$toolchain" | grep -Eq "^${component}-.* \(installed\)$"; then
               echo "Rust component ${component} is missing from ${toolchain}" >&2
               exit 1
             fi
           done
+          echo "$cargo_home/bin" >> "$GITHUB_PATH"
           echo "RUSTUP_TOOLCHAIN=$toolchain" >> "$GITHUB_ENV"
           rustc --version
           cargo --version
