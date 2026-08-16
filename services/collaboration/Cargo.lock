@@ -1905,8 +1905,6 @@ dependencies = [
 [[package]]
 name = "nacos-sdk"
 version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "afbe05734fd268eb1116e6df21edc107cb60a8170c82a8e1dcd47f9d087561a4"
 dependencies = [
  "arc-swap",
  "async-stream",

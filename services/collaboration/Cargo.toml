@@ -83,3 +83,6 @@ zeroize = "=1.9.0"
 
 [lints]
 workspace = true
+
+[patch.crates-io]
+nacos-sdk = { path = "../../vendor/nacos-sdk-0.8.0" }

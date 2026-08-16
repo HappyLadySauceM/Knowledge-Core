@@ -7,7 +7,7 @@ import (
 
 func TestParseEndpointsIsStrictAndCanonical(t *testing.T) {
 	t.Parallel()
-	endpoints, err := parseEndpoints("https://nacos:8848,https://[::1]:8848")
+	endpoints, err := parseEndpoints("https://nacos:8848,https://[::1]:8848", true)
 	if err != nil {
 		t.Fatalf("parse endpoints: %v", err)
 	}
@@ -23,9 +23,16 @@ func TestParseEndpointsIsStrictAndCanonical(t *testing.T) {
 		"http://nacos:8848/path",
 		"http://nacos:8848,http://nacos:8848",
 	} {
-		if _, err := parseEndpoints(value); err == nil {
+		if _, err := parseEndpoints(value, true); err == nil {
 			t.Fatalf("invalid endpoints accepted: %q", value)
 		}
+	}
+	endpoints, err = parseEndpoints("http://nacos:8848,http://[::1]:8848", false)
+	if err != nil || len(endpoints) != 2 {
+		t.Fatalf("plaintext endpoints rejected: %#v, %v", endpoints, err)
+	}
+	if _, err := parseEndpoints("https://nacos:8848", false); err == nil {
+		t.Fatal("TLS endpoint accepted when TLS is disabled")
 	}
 }
 

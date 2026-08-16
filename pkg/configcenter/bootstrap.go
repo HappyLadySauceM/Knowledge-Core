@@ -26,6 +26,7 @@ func (e Endpoint) Address() string {
 
 type Bootstrap struct {
 	Enabled      bool
+	TLSEnabled   bool
 	Service      string
 	Endpoints    []Endpoint
 	Binding      Binding
@@ -48,11 +49,15 @@ func BootstrapFromEnvironment(service string) (Bootstrap, error) {
 	if service == "" {
 		return Bootstrap{}, errors.New("configure Nacos: service name is required")
 	}
-	bootstrap := Bootstrap{Enabled: enabled, Service: service}
+	bootstrap := Bootstrap{Enabled: enabled, Service: service, TLSEnabled: true}
 	if !enabled {
 		return bootstrap, nil
 	}
-	endpoints, err := parseEndpoints(os.Getenv(envPrefix + "SERVERS"))
+	bootstrap.TLSEnabled, err = environmentBoolean(envPrefix+"TLS_ENABLED", true)
+	if err != nil {
+		return Bootstrap{}, err
+	}
+	endpoints, err := parseEndpoints(os.Getenv(envPrefix+"SERVERS"), bootstrap.TLSEnabled)
 	if err != nil {
 		return Bootstrap{}, err
 	}
@@ -71,8 +76,11 @@ func BootstrapFromEnvironment(service string) (Bootstrap, error) {
 		return Bootstrap{}, errors.New("configure Nacos: username and password are required when remote configuration is enabled")
 	}
 	bootstrap.CAFile = strings.TrimSpace(os.Getenv(envPrefix + "CA_FILE"))
-	if !filepath.IsAbs(bootstrap.CAFile) {
+	if bootstrap.TLSEnabled && !filepath.IsAbs(bootstrap.CAFile) {
 		return Bootstrap{}, errors.New("configure Nacos: CA file must be an absolute path")
+	}
+	if !bootstrap.TLSEnabled && bootstrap.CAFile != "" {
+		return Bootstrap{}, errors.New("configure Nacos: CA file must be empty when TLS is disabled")
 	}
 	bootstrap.KeyID = strings.TrimSpace(os.Getenv(envPrefix + "KEY_ID"))
 	if bootstrap.KeyID == "" {
@@ -97,7 +105,7 @@ func BootstrapFromEnvironment(service string) (Bootstrap, error) {
 	return bootstrap, nil
 }
 
-func parseEndpoints(raw string) ([]Endpoint, error) {
+func parseEndpoints(raw string, tlsEnabled bool) ([]Endpoint, error) {
 	parts := strings.Split(raw, ",")
 	if strings.TrimSpace(raw) == "" {
 		return nil, errors.New("configure Nacos: at least one server is required")
@@ -110,8 +118,12 @@ func parseEndpoints(raw string) ([]Endpoint, error) {
 		if err != nil || parsed.Scheme == "" || parsed.Host == "" {
 			return nil, fmt.Errorf("configure Nacos: server %q must be an absolute HTTP URL", part)
 		}
-		if parsed.Scheme != "https" {
-			return nil, fmt.Errorf("configure Nacos: server %q must use https", part)
+		expectedScheme := "http"
+		if tlsEnabled {
+			expectedScheme = "https"
+		}
+		if parsed.Scheme != expectedScheme {
+			return nil, fmt.Errorf("configure Nacos: server %q must use %s", part, expectedScheme)
 		}
 		if parsed.User != nil || (parsed.Path != "" && parsed.Path != "/") || parsed.RawQuery != "" || parsed.Fragment != "" {
 			return nil, fmt.Errorf("configure Nacos: server %q must not contain credentials, path, query, or fragment", part)

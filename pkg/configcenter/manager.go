@@ -394,7 +394,7 @@ func newNacosClient(bootstrap Bootstrap) (configclient.IConfigClient, error) {
 		options := []constant.ServerOption{constant.WithScheme(endpoint.Scheme)}
 		serverConfigs = append(serverConfigs, *constant.NewServerConfig(endpoint.Host, endpoint.Port, options...))
 	}
-	clientConfig := *constant.NewClientConfig(
+	clientOptions := []constant.ClientOption{
 		constant.WithAppName(bootstrap.Service),
 		constant.WithNamespaceId(bootstrap.Binding.Namespace),
 		constant.WithUsername(bootstrap.Username),
@@ -405,8 +405,11 @@ func newNacosClient(bootstrap Bootstrap) (configclient.IConfigClient, error) {
 		constant.WithCacheDir(filepath.Join(bootstrap.RuntimeDir, "cache")),
 		constant.WithLogDir(filepath.Join(bootstrap.RuntimeDir, "log")),
 		constant.WithLogLevel("warn"),
-		constant.WithTLS(*constant.NewTLSConfig(constant.WithCA(bootstrap.CAFile, ""))),
-	)
+	}
+	if bootstrap.TLSEnabled {
+		clientOptions = append(clientOptions, constant.WithTLS(*constant.NewTLSConfig(constant.WithCA(bootstrap.CAFile, ""))))
+	}
+	clientConfig := *constant.NewClientConfig(clientOptions...)
 	client, err := clients.CreateConfigClient(map[string]interface{}{
 		constant.KEY_SERVER_CONFIGS: serverConfigs,
 		constant.KEY_CLIENT_CONFIG:  clientConfig,

@@ -40,6 +40,7 @@ const MAXIMUM_CONTENT: usize = 1 << 20;
 const ENV_PREFIX: &str = "KNOWLEDGE_CORE_NACOS_";
 const SDK_CA_ENV: &str = "NACOS_CLIENT_TLS_CA_CERT";
 const NATIVE_TLS_CA_ENV: &str = "SSL_CERT_FILE";
+const SDK_TLS_ENABLED_AUTH_PARAM: &str = "nacos_tls_enabled";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct DynamicDocument {
@@ -213,6 +214,7 @@ pub(crate) struct RemoteRuntime {
 #[derive(Clone)]
 struct Bootstrap {
     servers: String,
+    tls_enabled: bool,
     binding: Binding,
     username: String,
     password: String,
@@ -280,6 +282,10 @@ impl RemoteConfig {
             .app_name(service_name)
             .auth_username(bootstrap.username.clone())
             .auth_password(bootstrap.password.clone())
+            .auth_ext(
+                SDK_TLS_ENABLED_AUTH_PARAM,
+                bootstrap.tls_enabled.to_string(),
+            )
             .load_cache_at_start(false)
             .env_first(false);
         let service = time::timeout(
@@ -950,22 +956,39 @@ impl Bootstrap {
             data_id,
         };
         binding.validate()?;
-        let servers = parse_servers(&required(&format!("{ENV_PREFIX}SERVERS"))?)?;
+        let tls_enabled = boolean(&format!("{ENV_PREFIX}TLS_ENABLED"), true)?;
+        let servers = parse_servers(&required(&format!("{ENV_PREFIX}SERVERS"))?, tls_enabled)?;
         let username = required(&format!("{ENV_PREFIX}USERNAME"))?;
         let password = required(&format!("{ENV_PREFIX}PASSWORD"))?;
-        let ca_file = required(&format!("{ENV_PREFIX}CA_FILE"))?;
-        let sdk_ca_file = required(SDK_CA_ENV)?;
-        let native_tls_ca_file = required(NATIVE_TLS_CA_ENV)?;
         let runtime_dir = required(&format!("{ENV_PREFIX}RUNTIME_DIR"))?;
         let home_dir = required("HOME")?;
-        prepare_sdk_environment(
-            Path::new(&ca_file),
-            Path::new(&sdk_ca_file),
-            Path::new(&native_tls_ca_file),
-            Path::new(&runtime_dir),
-            Path::new(&home_dir),
-            &binding.namespace,
-        )?;
+        if tls_enabled {
+            let ca_file = required(&format!("{ENV_PREFIX}CA_FILE"))?;
+            let sdk_ca_file = required(SDK_CA_ENV)?;
+            let native_tls_ca_file = required(NATIVE_TLS_CA_ENV)?;
+            prepare_sdk_environment(
+                Path::new(&ca_file),
+                Path::new(&sdk_ca_file),
+                Path::new(&native_tls_ca_file),
+                Path::new(&runtime_dir),
+                Path::new(&home_dir),
+                &binding.namespace,
+            )?;
+        } else {
+            if optional_value(&format!("{ENV_PREFIX}CA_FILE")).is_some()
+                || optional_value(SDK_CA_ENV).is_some()
+                || optional_value(NATIVE_TLS_CA_ENV).is_some()
+            {
+                return Err(invalid(
+                    "Nacos CA environment variables must be unset when TLS is disabled",
+                ));
+            }
+            prepare_sdk_runtime(
+                Path::new(&runtime_dir),
+                Path::new(&home_dir),
+                &binding.namespace,
+            )?;
+        }
         let key_id = required(&format!("{ENV_PREFIX}KEY_ID"))?;
         if key_id.contains(['\r', '\n', '|']) {
             return Err(invalid(
@@ -980,6 +1003,7 @@ impl Bootstrap {
         }
         Ok(Some(Self {
             servers,
+            tls_enabled,
             binding,
             username,
             password,
@@ -1049,6 +1073,19 @@ fn prepare_sdk_environment(
         .map_err(|error| invalid_with("prepare Nacos client cache directory", error))
 }
 
+fn prepare_sdk_runtime(runtime_dir: &Path, home_dir: &Path, namespace: &str) -> Result<()> {
+    if !runtime_dir.is_absolute()
+        || !home_dir.is_absolute()
+        || runtime_dir != home_dir.join("nacos")
+    {
+        return Err(invalid(
+            "Nacos runtime directory must be absolute and equal HOME/nacos",
+        ));
+    }
+    fs::create_dir_all(runtime_dir.join("config").join(namespace))
+        .map_err(|error| invalid_with("prepare Nacos client cache directory", error))
+}
+
 fn sdk_cache_directory(
     ca_file: &Path,
     sdk_ca_file: &Path,
@@ -1073,13 +1110,14 @@ fn sdk_cache_directory(
     Ok(runtime_dir.join("config").join(namespace))
 }
 
-fn parse_servers(raw: &str) -> Result<String> {
+fn parse_servers(raw: &str, tls_enabled: bool) -> Result<String> {
     let mut servers = Vec::new();
+    let expected_scheme = if tls_enabled { "https" } else { "http" };
     for value in raw.split(',') {
         let value = value.trim();
         let parsed =
             Url::parse(value).map_err(|error| invalid_with("parse Nacos server URL", error))?;
-        if parsed.scheme() != "https"
+        if parsed.scheme() != expected_scheme
             || parsed.host_str().is_none()
             || parsed.port().is_none()
             || parsed.username() != ""
@@ -1088,9 +1126,9 @@ fn parse_servers(raw: &str) -> Result<String> {
             || parsed.query().is_some()
             || parsed.fragment().is_some()
         {
-            return Err(invalid(
-                "Nacos servers must be absolute https://host:port URLs without credentials or paths",
-            ));
+            return Err(invalid(format!(
+                "Nacos servers must be absolute {expected_scheme}://host:port URLs without credentials or paths"
+            )));
         }
         let host = parsed
             .host()
@@ -1236,7 +1274,7 @@ mod tests {
     #[test]
     fn server_addresses_are_normalized_for_the_native_client() {
         assert_eq!(
-            parse_servers("https://nacos:8848,https://[::1]:8848").expect("servers"),
+            parse_servers("https://nacos:8848,https://[::1]:8848", true).expect("servers"),
             "nacos:8848,[::1]:8848"
         );
         for invalid in [
@@ -1246,8 +1284,13 @@ mod tests {
             "http://user@nacos:8848",
             "http://nacos:8848/path",
         ] {
-            assert!(parse_servers(invalid).is_err(), "{invalid}");
+            assert!(parse_servers(invalid, true).is_err(), "{invalid}");
         }
+        assert_eq!(
+            parse_servers("http://nacos:8848,http://[::1]:8848", false).expect("servers"),
+            "nacos:8848,[::1]:8848"
+        );
+        assert!(parse_servers("https://nacos:8848", false).is_err());
     }
 
     #[test]
