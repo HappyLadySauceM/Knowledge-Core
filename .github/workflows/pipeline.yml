@@ -11,7 +11,7 @@ permissions:
   statuses: write
 
 env:
-  CI_IMAGE: harbor.happyladysauce.local/knowledge-core/ci-templates:v1.1.7
+  CI_IMAGE: harbor.happyladysauce.local/knowledge-core/ci-templates:v1.1.8@sha256:ee631cead221e78aec08a77263787a34fc80eca0bdae308cf8214c3ad385c26f
   KC_CACHE_ROOT: /opt/actions-runner/_cache/knowledge-core
   CI_PROJECT_CONFIG_JSON: >-
     {"project":"Knowledge-Core","source_repo":"HappyLadySauceM/Knowledge-Core","gitops_repo":"https://github.com/HappyLadySauceM/k3s-home-deploy.git","gitops_path":"Knowledge-Core","gitops_kustomization":"dev/common/kustomization.yaml","gitops_branch":"main","shared_paths":[".github","pkg","idl","kitex_gen","scripts","services/collaboration/interop","Makefile","go.mod","go.sum"],"harbor_registry":"harbor.happyladysauce.local","harbor_project":"knowledge-core","argocd_server":"argocd.happyladysauce.local","argocd_application":"knowledge-core-gateway-dev","smoke_command":["make","smoke-ci"],"release_model":"git-independent-service-aggregate","aggregate_release_prefix":"knowledge-core","aggregate_version_file":"VERSION","release_language":"zh-CN","deepseek_model":"deepseek-v4-flash","base_images":[{"source":"gcr.io/distroless/static-debian12:nonroot@sha256:f5b485ea962d9bd1186b2f6b3a061191539b905b82ec395de78cbfae51f20e35","destination":"harbor.happyladysauce.local/knowledge-core/base/distroless-static-debian12:nonroot"},{"source":"docker.m.daocloud.io/library/debian:bookworm-slim@sha256:7b140f374b289a7c2befc338f42ebe6441b7ea838a042bbd5acbfca6ec875818","destination":"harbor.happyladysauce.local/knowledge-core/base/debian:bookworm-slim"}],"services":[{"name":"gateway","source_path":"services/gateway","version_file":"services/gateway/VERSION","dockerfile":"docker/gateway/Dockerfile","context":".","image_repository":"harbor.happyladysauce.local/knowledge-core/gateway","deploy_snapshot":"deploy/gateway"},{"name":"identity","source_path":"services/identity","version_file":"services/identity/VERSION","dockerfile":"docker/identity/Dockerfile","context":".","image_repository":"harbor.happyladysauce.local/knowledge-core/identity","deploy_snapshot":"deploy/identity"},{"name":"knowledge","source_path":"services/knowledge","version_file":"services/knowledge/VERSION","dockerfile":"docker/knowledge/Dockerfile","context":".","image_repository":"harbor.happyladysauce.local/knowledge-core/knowledge","deploy_snapshot":"deploy/knowledge"},{"name":"collaboration","source_path":"services/collaboration","version_file":"services/collaboration/VERSION","dockerfile":"docker/collaboration/Dockerfile","context":".","image_repository":"harbor.happyladysauce.local/knowledge-core/collaboration","deploy_snapshot":"deploy/collaboration"}]}
@@ -138,8 +138,8 @@ jobs:
           npm --prefix services/collaboration/interop run ci
 
   package-candidates:
-    needs: [plan, go-verify-build, rust-verify-build]
-    if: always() && needs.plan.outputs.has_changes == 'true' && needs.go-verify-build.result == 'success' && (needs.rust-verify-build.result == 'success' || needs.rust-verify-build.result == 'skipped')
+    needs: [plan, go-verify-build, rust-verify-build, release-notes]
+    if: always() && needs.plan.outputs.has_changes == 'true' && needs.go-verify-build.result == 'success' && (needs.rust-verify-build.result == 'success' || needs.rust-verify-build.result == 'skipped') && needs.release-notes.result == 'success'
     runs-on: [self-hosted, Linux, X64]
     concurrency:
       group: knowledge-core-dev-package
@@ -215,8 +215,8 @@ jobs:
         id: candidates
 
   release-notes:
-    needs: [plan, package-candidates]
-    if: needs.package-candidates.result == 'success'
+    needs: [plan]
+    if: needs.plan.outputs.has_changes == 'true'
     environment: release
     runs-on: [self-hosted, Linux, X64]
     concurrency:
@@ -233,6 +233,10 @@ jobs:
           SERVICES: ${{ needs.plan.outputs.services }}
         run: |
           set -euo pipefail
+          test -n "${DEEPSEEK_API_KEY:-}" || {
+            echo "::error::DEEPSEEK_API_KEY is required for the remote release summary"
+            exit 1
+          }
           docker run --rm --network host \
             -v "$GITHUB_WORKSPACE:/workspace" \
             -v "$STATE_DIR:/state" \
@@ -324,7 +328,6 @@ jobs:
       - name: Promote candidate tags and create release
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
-          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           STATE_DIR: ${{ needs.plan.outputs.state_dir }}
         run: |
           set -euo pipefail
@@ -344,7 +347,7 @@ jobs:
           done
           docker run --rm --network host -v "$GITHUB_WORKSPACE:/workspace" -v "$STATE_DIR:/state" \
             -e CI_PROJECT_CONFIG_JSON -e GITHUB_TOKEN -e CI_RELEASE_CHANGES_FILE=/state/changes.json \
-            -e DEEPSEEK_API_KEY -w /workspace "$CI_IMAGE" release --services "${{ needs.plan.outputs.services }}" \
+            -w /workspace "$CI_IMAGE" release --services "${{ needs.plan.outputs.services }}" \
             --changes-file /state/changes.json --summary-file /state/release.md
           for service in "${selected[@]}"; do
             docker run --rm --network host -v "$GITHUB_WORKSPACE:/workspace" -v "$STATE_DIR:/state" \
