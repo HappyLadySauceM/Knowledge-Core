@@ -7,6 +7,11 @@ CARGO_DENY ?= cargo deny
 RUST_ROOT ?= services/collaboration
 IDL_COMPAT_BASE ?= HEAD^
 KC_RUST_GATE ?= 1
+# The checked-in vendor tree is intentionally not authoritative in CI; resolve
+# Go dependencies from go.mod/go.sum instead of failing on stale vendor metadata.
+# CI 中以 go.mod/go.sum 为准，避免旧 vendor/modules.txt 阻断验证流水线。
+GOFLAGS ?= -mod=mod
+export GOFLAGS
 # Cap local/CI compile parallelism at three CPUs and respect cgroup affinity.
 # 将本地/CI 编译并行度限制为三个 CPU，并尊重 cgroup affinity。
 BUILD_JOBS ?= $(shell nproc 2>/dev/null | awk '{v=$$1; if (v>3) v=3; if (v<1) v=1; print v}')
@@ -96,7 +101,7 @@ go-release:
 			gateway|identity|knowledge) ;; \
 			*) echo "unsupported Go service: $$service" >&2; exit 2 ;; \
 		esac; \
-		CGO_ENABLED=0 GOOS=linux GOMAXPROCS=$(BUILD_JOBS) go build -mod=readonly -trimpath -buildvcs=false -ldflags="-s -w" -o "$(GO_ARTIFACT_DIR)/$$service" "./services/$$service"; \
+			CGO_ENABLED=0 GOOS=linux GOMAXPROCS=$(BUILD_JOBS) go build -mod=mod -trimpath -buildvcs=false -ldflags="-s -w" -o "$(GO_ARTIFACT_DIR)/$$service" "./services/$$service"; \
 	done
 
 rust-release:
