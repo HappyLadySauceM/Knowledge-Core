@@ -21,6 +21,7 @@ type Config struct {
 	PostgreSQL *option.PostgreSQLOptions  `mapstructure:"postgres" json:"postgres" yaml:"postgres"`
 	Redis      *option.RedisOptions       `mapstructure:"redis" json:"redis" yaml:"redis"`
 	Bcrypt     *BcryptOptions             `mapstructure:"bcrypt" json:"bcrypt" yaml:"bcrypt"`
+	SMTP       *SMTPOptions               `mapstructure:"smtp" json:"smtp" yaml:"smtp"`
 	Auth       *AuthOptions               `mapstructure:"auth" json:"auth" yaml:"auth"`
 }
 
@@ -37,6 +38,7 @@ func New() Config {
 		PostgreSQL: option.NewPostgreSQLOptions(),
 		Redis:      option.NewRedisOptions(),
 		Bcrypt:     NewBcryptOptions(),
+		SMTP:       NewSMTPOptions(),
 		Auth:       NewAuthOptions(),
 	}
 }
@@ -54,6 +56,7 @@ func (c Config) Validate() error {
 		wrapValidation("postgres", c.PostgreSQL.Validate()),
 		wrapValidation("redis", c.Redis.Validate()),
 		wrapValidation("bcrypt", c.Bcrypt.Validate()),
+		wrapValidation("smtp", c.SMTP.Validate()),
 		wrapValidation("auth", c.Auth.Validate()),
 		validateLifecycleBudgets(c),
 	)
@@ -81,8 +84,8 @@ func (c Config) requireSections() error {
 	sections := map[string]any{
 		"app": c.App, "log": c.Log, "trace": c.Trace, "rpc": c.RPC,
 		"http": c.HTTP, "postgres": c.PostgreSQL, "redis": c.Redis,
-		"bcrypt": c.Bcrypt,
-		"auth":   c.Auth,
+		"bcrypt": c.Bcrypt, "smtp": c.SMTP,
+		"auth": c.Auth,
 	}
 	var joined error
 	for name, section := range sections {

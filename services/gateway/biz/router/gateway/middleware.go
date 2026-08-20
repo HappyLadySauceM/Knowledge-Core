@@ -241,3 +241,58 @@ func _restoredeleteddocumentMw() []app.HandlerFunc {
 func _createcollaborationsessionMw() []app.HandlerFunc {
 	return []app.HandlerFunc{gatewaymiddleware.CollaborationSessionRateLimit()}
 }
+
+func _sessionsMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _refreshsessionMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _requestemailverificationMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _verifyemailMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _requestpasswordresetMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _resetpasswordMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _revokeallsessionsMw() []app.HandlerFunc {
+	return []app.HandlerFunc{gatewaymiddleware.RequireAuthenticated()}
+}
+
+func _listsessionsMw() []app.HandlerFunc {
+	return []app.HandlerFunc{gatewaymiddleware.RequireAuthenticated()}
+}
+
+func _logoutMw() []app.HandlerFunc {
+	return []app.HandlerFunc{gatewaymiddleware.RequireAuthenticated()}
+}
+
+func _revokesessionMw() []app.HandlerFunc {
+	return []app.HandlerFunc{gatewaymiddleware.RequireAuthenticated()}
+}
+
+func _meMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _deactivateaccountMw() []app.HandlerFunc {
+	return []app.HandlerFunc{gatewaymiddleware.RequireAuthenticated()}
+}

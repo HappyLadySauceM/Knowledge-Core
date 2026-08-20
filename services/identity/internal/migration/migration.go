@@ -22,7 +22,7 @@ type constraint struct {
 var userConstraints = []constraint{
 	{name: "users_username_length_check", expression: "char_length(username) BETWEEN 3 AND 32"},
 	{name: "users_role_check", expression: "role IN ('admin', 'user')"},
-	{name: "users_status_check", expression: "status IN ('active', 'disabled')"},
+	{name: "users_status_check", expression: "status IN ('active', 'pending_verification', 'disabled')"},
 	{name: "users_token_version_check", expression: "token_version >= 1"},
 	{name: "users_failed_login_attempts_check", expression: "failed_login_attempts >= 0"},
 }
@@ -44,8 +44,8 @@ func AutoMigrate(ctx context.Context, db *gorm.DB) error {
 		if err := tx.Exec("CREATE SCHEMA IF NOT EXISTS identity").Error; err != nil {
 			return fmt.Errorf("create identity schema: %w", err)
 		}
-		if err := tx.AutoMigrate(&model.User{}); err != nil {
-			return fmt.Errorf("auto-migrate identity users: %w", err)
+		if err := tx.AutoMigrate(&model.User{}, &model.Session{}, &model.ActionToken{}, &model.EmailOutbox{}); err != nil {
+			return fmt.Errorf("auto-migrate identity schema: %w", err)
 		}
 		for _, item := range userConstraints {
 			if err := ensureConstraint(tx, item); err != nil {
@@ -56,6 +56,7 @@ func AutoMigrate(ctx context.Context, db *gorm.DB) error {
 			"CREATE UNIQUE INDEX IF NOT EXISTS users_username_lower_uidx ON identity.users (lower(username))",
 			"CREATE UNIQUE INDEX IF NOT EXISTS users_email_lower_uidx ON identity.users (lower(email))",
 			"CREATE INDEX IF NOT EXISTS users_status_created_at_idx ON identity.users (status, created_at DESC)",
+			"CREATE INDEX IF NOT EXISTS sessions_user_active_idx ON identity.sessions (user_id, last_seen_at DESC) WHERE revoked_at IS NULL",
 		}
 		for _, statement := range statements {
 			if err := tx.Exec(statement).Error; err != nil {
@@ -77,7 +78,13 @@ SELECT EXISTS (
 		return fmt.Errorf("check identity constraint %q: %w", item.name, err)
 	}
 	if exists {
-		return nil
+		if item.name == "users_status_check" {
+			if err := tx.Exec("ALTER TABLE identity.users DROP CONSTRAINT IF EXISTS users_status_check").Error; err != nil {
+				return fmt.Errorf("replace identity constraint %q: %w", item.name, err)
+			}
+		} else {
+			return nil
+		}
 	}
 	statement := fmt.Sprintf(
 		"ALTER TABLE identity.users ADD CONSTRAINT %s CHECK (%s)",

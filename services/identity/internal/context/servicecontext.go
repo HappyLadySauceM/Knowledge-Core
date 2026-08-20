@@ -15,6 +15,7 @@ import (
 	redisresource "github.com/HappyLadySauce/Knowledge-Core/pkg/redis"
 	hertztransport "github.com/HappyLadySauce/Knowledge-Core/pkg/transport/hertz"
 	"github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/config"
+	identityemail "github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/email"
 	identitylogic "github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/logic"
 	"github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/migration"
 	identityrepository "github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/repository"
@@ -29,6 +30,8 @@ type ServiceContext struct {
 	Redis        *redisresource.Resource
 	Register     *identitylogic.RegisterLogic
 	Authenticate *identitylogic.AuthenticateLogic
+	Sessions     *identitylogic.SessionLogic
+	Actions      *identitylogic.ActionLogic
 	Hasher       *security.BcryptHasher
 	Issuer       *coreauth.Issuer
 	GetUser      *identitylogic.GetUserLogic
@@ -79,6 +82,18 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 	if err != nil {
 		return nil, err
 	}
+	sessions, err := identityrepository.NewSessionRepository(db)
+	if err != nil {
+		return nil, err
+	}
+	actionsRepo, err := identityrepository.NewActionRepository(db, identitylogic.SessionPepper(cfg.Auth.PrivateKey))
+	if err != nil {
+		return nil, err
+	}
+	outbox, err := identityrepository.NewEmailOutboxRepository(db, identitylogic.SessionPepper(cfg.Auth.PrivateKey))
+	if err != nil {
+		return nil, err
+	}
 	hasher, err := security.NewBcryptHasher(cfg.Bcrypt.Cost)
 	if err != nil {
 		return nil, err
@@ -95,8 +110,16 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 	if err != nil {
 		return nil, fmt.Errorf("create identity access-token verifier: %w", err)
 	}
-	authenticate, err := identitylogic.NewAuthenticateLogic(
-		users, hasher, issuer, cfg.Auth.FailureThreshold, cfg.Auth.LockDuration,
+	sessionLogic, err := identitylogic.NewSessionLogic(users, sessions, issuer, identitylogic.SessionPepper(cfg.Auth.PrivateKey), cfg.Auth.RefreshTokenTTL, cfg.Auth.SessionIdleTTL)
+	if err != nil {
+		return nil, err
+	}
+	actionLogic, err := identitylogic.NewActionLogic(users, actionsRepo, sessions, hasher, identitylogic.SessionPepper(cfg.Auth.PrivateKey), cfg.Auth.ActionTokenTTL, outbox.Enqueue)
+	if err != nil {
+		return nil, err
+	}
+	authenticate, err := identitylogic.NewAuthenticateLogicWithSessions(
+		users, hasher, issuer, sessionLogic, cfg.Auth.FailureThreshold, cfg.Auth.LockDuration,
 	)
 	if err != nil {
 		return nil, err
@@ -105,9 +128,18 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 	if err != nil {
 		return nil, err
 	}
-	handler, err := identityrpc.NewHandler(register, authenticate, getUser, verifier, runtime.Health, runtime.Logger)
+	handler, err := identityrpc.NewHandler(register, authenticate, sessionLogic, actionLogic, getUser, verifier, runtime.Health, runtime.Logger)
 	if err != nil {
 		return nil, err
+	}
+	worker, err := identityemail.NewWorker(*cfg.SMTP, outbox, identitylogic.SessionPepper(cfg.Auth.PrivateKey), runtime.Logger)
+	if err != nil {
+		return nil, err
+	}
+	if worker != nil {
+		if err := runtime.AddComponent(worker); err != nil {
+			return nil, err
+		}
 	}
 
 	httpTLS, err := cfg.HTTP.TLS.ServerTLSConfig()
@@ -173,6 +205,8 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 		Redis:        cache,
 		Register:     register,
 		Authenticate: authenticate,
+		Sessions:     sessionLogic,
+		Actions:      actionLogic,
 		Hasher:       hasher,
 		Issuer:       issuer,
 		GetUser:      getUser,

@@ -29,6 +29,7 @@ type Principal struct {
 	UserID       int64
 	Role         string
 	TokenVersion int64
+	SessionID    string
 	ExpiresAt    time.Time
 }
 
@@ -72,6 +73,7 @@ func ValidateKeyPair(encodedPrivateKey, encodedPublicKey string) error {
 type Claims struct {
 	Role         string `json:"role"`
 	TokenVersion int64  `json:"token_version"`
+	SessionID    string `json:"session_id,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -129,6 +131,7 @@ func (i *Issuer) Issue(principal Principal) (IssuedToken, error) {
 	claims := Claims{
 		Role:         principal.Role,
 		TokenVersion: principal.TokenVersion,
+		SessionID:    principal.SessionID,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    IssuerName,
 			Subject:   strconv.FormatInt(principal.UserID, 10),
@@ -202,7 +205,7 @@ func (v *Verifier) Verify(value string) (Principal, error) {
 		return Principal{}, errors.New("verify access token: subject is invalid")
 	}
 	return Principal{
-		UserID: userID, Role: claims.Role, TokenVersion: claims.TokenVersion,
+		UserID: userID, Role: claims.Role, TokenVersion: claims.TokenVersion, SessionID: claims.SessionID,
 		ExpiresAt: claims.ExpiresAt.UTC(),
 	}, nil
 }

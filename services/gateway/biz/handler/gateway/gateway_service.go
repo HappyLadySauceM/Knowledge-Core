@@ -8,12 +8,14 @@ import (
 	"strconv"
 	"time"
 
+	commonv1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/common"
 	identityv1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/identity"
 	coreauth "github.com/HappyLadySauce/Knowledge-Core/pkg/auth"
 	gatewaymodel "github.com/HappyLadySauce/Knowledge-Core/services/gateway/biz/model/gateway"
 	gatewaymiddleware "github.com/HappyLadySauce/Knowledge-Core/services/gateway/internal/middleware"
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
+	"github.com/cloudwego/kitex/client/callopt"
 )
 
 const gatewayServiceName = "gateway"
@@ -103,6 +105,14 @@ func Login(ctx context.Context, request *app.RequestContext) {
 	}
 	data := &gatewaymodel.SessionData{
 		User: user, AccessToken: authentication.AccessToken, TokenType: "Bearer", ExpiresAt: authentication.ExpiresAt,
+	}
+	if authentication.RefreshToken != nil {
+		value := *authentication.RefreshToken
+		data.RefreshToken = &value
+	}
+	if authentication.SessionId != nil {
+		value := *authentication.SessionId
+		data.SessionID = &value
 	}
 	gatewaymiddleware.ResponseMetadata(ctx, request)
 	gatewaymiddleware.WriteJSON(request, consts.StatusOK, data)
@@ -262,4 +272,288 @@ func RestoreDeletedDocument(ctx context.Context, request *app.RequestContext) {
 
 func CreateCollaborationSession(ctx context.Context, request *app.RequestContext) {
 	handleCreateCollaborationSession(ctx, request)
+}
+
+// RefreshSession rotates an opaque refresh token and returns a new session.
+// @router /api/v1/sessions/refresh [POST]
+func RefreshSession(ctx context.Context, request *app.RequestContext) {
+	var input gatewaymodel.RefreshSessionRequest
+	if err := decodeJSONBody(request, &input); err != nil || input.RefreshToken == "" {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidRequest)
+		return
+	}
+	dependencies, ok := gatewaymiddleware.FromRequest(request)
+	if !ok {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInternal)
+		return
+	}
+	client, ok := dependencies.Identity.(interface {
+		RefreshSession(context.Context, *identityv1.RefreshSessionRequest, ...callopt.Option) (*identityv1.Authentication, error)
+	})
+	if !ok {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInternal)
+		return
+	}
+	authentication, err := client.RefreshSession(ctx, &identityv1.RefreshSessionRequest{RefreshToken: input.RefreshToken})
+	if err != nil {
+		gatewaymiddleware.WriteIdentityError(ctx, request, err)
+		return
+	}
+	if authentication == nil || authentication.AccessToken == "" || authentication.RefreshToken == nil || *authentication.RefreshToken == "" || authentication.SessionId == nil || *authentication.SessionId == "" || !validRFC3339(authentication.ExpiresAt) {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidUpstreamResponse)
+		return
+	}
+	user, err := toUserData(authentication.User)
+	if err != nil {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidUpstreamResponse)
+		return
+	}
+	refreshToken, sessionID := *authentication.RefreshToken, *authentication.SessionId
+	data := &gatewaymodel.SessionData{
+		User: user, AccessToken: authentication.AccessToken, TokenType: "Bearer", ExpiresAt: authentication.ExpiresAt,
+		RefreshToken: &refreshToken, SessionID: &sessionID,
+	}
+	gatewaymiddleware.ResponseMetadata(ctx, request)
+	gatewaymiddleware.WriteJSON(request, consts.StatusOK, data)
+}
+
+func authenticatedIdentityContext(ctx context.Context, request *app.RequestContext) context.Context {
+	token, ok := gatewaymiddleware.AccessToken(request)
+	if !ok {
+		return ctx
+	}
+	return coreauth.WithAccessToken(ctx, token)
+}
+
+func writeEmpty(ctx context.Context, request *app.RequestContext) {
+	gatewaymiddleware.ResponseMetadata(ctx, request)
+	gatewaymiddleware.WriteJSON(request, consts.StatusOK, &gatewaymodel.EmptyResponse{})
+}
+
+func Logout(ctx context.Context, request *app.RequestContext) {
+	dependencies, ok := gatewaymiddleware.FromRequest(request)
+	if !ok {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInternal)
+		return
+	}
+	client, ok := dependencies.Identity.(interface {
+		RevokeSession(context.Context, *identityv1.SessionRequest, ...callopt.Option) (*commonv1.EmptyResponse, error)
+	})
+	if !ok {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInternal)
+		return
+	}
+	principal, ok := gatewaymiddleware.Principal(request)
+	if !ok || principal.SessionID == "" {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrAuthenticationRequired)
+		return
+	}
+	if _, err := client.RevokeSession(authenticatedIdentityContext(ctx, request), &identityv1.SessionRequest{SessionId: principal.SessionID}); err != nil {
+		gatewaymiddleware.WriteIdentityError(ctx, request, err)
+		return
+	}
+	writeEmpty(ctx, request)
+}
+
+func ListSessions(ctx context.Context, request *app.RequestContext) {
+	dependencies, ok := gatewaymiddleware.FromRequest(request)
+	if !ok {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInternal)
+		return
+	}
+	client, ok := dependencies.Identity.(interface {
+		ListSessions(context.Context, *identityv1.CurrentUserRequest, ...callopt.Option) (*identityv1.SessionList, error)
+	})
+	if !ok {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInternal)
+		return
+	}
+	result, err := client.ListSessions(authenticatedIdentityContext(ctx, request), &identityv1.CurrentUserRequest{})
+	if err != nil {
+		gatewaymiddleware.WriteIdentityError(ctx, request, err)
+		return
+	}
+	if result == nil {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidUpstreamResponse)
+		return
+	}
+	items := make([]*gatewaymodel.SessionDataItem, 0, len(result.Items))
+	for _, item := range result.Items {
+		if item == nil {
+			continue
+		}
+		items = append(items, &gatewaymodel.SessionDataItem{ID: item.Id, DeviceLabel: item.DeviceLabel, CreatedAt: item.CreatedAt, LastSeenAt: item.LastSeenAt, ExpiresAt: item.ExpiresAt, Current: item.Current})
+	}
+	gatewaymiddleware.ResponseMetadata(ctx, request)
+	gatewaymiddleware.WriteJSON(request, consts.StatusOK, &gatewaymodel.SessionListData{Items: items})
+}
+
+func RevokeSession(ctx context.Context, request *app.RequestContext) {
+	id := request.Param("session_id")
+	if id == "" {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidRequest)
+		return
+	}
+	dependencies, ok := gatewaymiddleware.FromRequest(request)
+	if !ok {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInternal)
+		return
+	}
+	client, ok := dependencies.Identity.(interface {
+		RevokeSession(context.Context, *identityv1.SessionRequest, ...callopt.Option) (*commonv1.EmptyResponse, error)
+	})
+	if !ok {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInternal)
+		return
+	}
+	if _, err := client.RevokeSession(authenticatedIdentityContext(ctx, request), &identityv1.SessionRequest{SessionId: id}); err != nil {
+		gatewaymiddleware.WriteIdentityError(ctx, request, err)
+		return
+	}
+	writeEmpty(ctx, request)
+}
+
+func RevokeAllSessions(ctx context.Context, request *app.RequestContext) {
+	dependencies, ok := gatewaymiddleware.FromRequest(request)
+	if !ok {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInternal)
+		return
+	}
+	client, ok := dependencies.Identity.(interface {
+		RevokeAllSessions(context.Context, *identityv1.CurrentUserRequest, ...callopt.Option) (*commonv1.EmptyResponse, error)
+	})
+	if !ok {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInternal)
+		return
+	}
+	if _, err := client.RevokeAllSessions(authenticatedIdentityContext(ctx, request), &identityv1.CurrentUserRequest{}); err != nil {
+		gatewaymiddleware.WriteIdentityError(ctx, request, err)
+		return
+	}
+	writeEmpty(ctx, request)
+}
+
+func RequestEmailVerification(ctx context.Context, request *app.RequestContext) {
+	var input gatewaymodel.EmailRequest
+	if err := decodeJSONBody(request, &input); err != nil || input.Email == "" {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidRequest)
+		return
+	}
+	dependencies, ok := gatewaymiddleware.FromRequest(request)
+	if !ok {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInternal)
+		return
+	}
+	client, ok := dependencies.Identity.(interface {
+		RequestEmailVerification(context.Context, *identityv1.EmailRequest, ...callopt.Option) (*commonv1.EmptyResponse, error)
+	})
+	if !ok {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInternal)
+		return
+	}
+	if _, err := client.RequestEmailVerification(ctx, &identityv1.EmailRequest{Email: input.Email}); err != nil {
+		gatewaymiddleware.WriteIdentityError(ctx, request, err)
+		return
+	}
+	writeEmpty(ctx, request)
+}
+
+func VerifyEmail(ctx context.Context, request *app.RequestContext) {
+	var input gatewaymodel.EmailTokenRequest
+	if err := decodeJSONBody(request, &input); err != nil || input.Token == "" {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidRequest)
+		return
+	}
+	dependencies, ok := gatewaymiddleware.FromRequest(request)
+	if !ok {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInternal)
+		return
+	}
+	client, ok := dependencies.Identity.(interface {
+		VerifyEmail(context.Context, *identityv1.EmailTokenRequest, ...callopt.Option) (*commonv1.EmptyResponse, error)
+	})
+	if !ok {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInternal)
+		return
+	}
+	if _, err := client.VerifyEmail(ctx, &identityv1.EmailTokenRequest{Token: input.Token}); err != nil {
+		gatewaymiddleware.WriteIdentityError(ctx, request, err)
+		return
+	}
+	writeEmpty(ctx, request)
+}
+
+func RequestPasswordReset(ctx context.Context, request *app.RequestContext) {
+	var input gatewaymodel.PasswordResetRequestRequest
+	if err := decodeJSONBody(request, &input); err != nil || input.Identifier == "" {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidRequest)
+		return
+	}
+	dependencies, ok := gatewaymiddleware.FromRequest(request)
+	if !ok {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInternal)
+		return
+	}
+	client, ok := dependencies.Identity.(interface {
+		RequestPasswordReset(context.Context, *identityv1.PasswordResetRequestRequest, ...callopt.Option) (*commonv1.EmptyResponse, error)
+	})
+	if !ok {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInternal)
+		return
+	}
+	if _, err := client.RequestPasswordReset(ctx, &identityv1.PasswordResetRequestRequest{Identifier: input.Identifier}); err != nil {
+		gatewaymiddleware.WriteIdentityError(ctx, request, err)
+		return
+	}
+	writeEmpty(ctx, request)
+}
+
+func ResetPassword(ctx context.Context, request *app.RequestContext) {
+	var input gatewaymodel.PasswordResetRequest
+	if err := decodeJSONBody(request, &input); err != nil || input.Token == "" || input.Password == "" {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidRequest)
+		return
+	}
+	dependencies, ok := gatewaymiddleware.FromRequest(request)
+	if !ok {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInternal)
+		return
+	}
+	client, ok := dependencies.Identity.(interface {
+		ResetPassword(context.Context, *identityv1.PasswordResetRequest, ...callopt.Option) (*commonv1.EmptyResponse, error)
+	})
+	if !ok {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInternal)
+		return
+	}
+	if _, err := client.ResetPassword(ctx, &identityv1.PasswordResetRequest{Token: input.Token, Password: input.Password}); err != nil {
+		gatewaymiddleware.WriteIdentityError(ctx, request, err)
+		return
+	}
+	writeEmpty(ctx, request)
+}
+
+func DeactivateAccount(ctx context.Context, request *app.RequestContext) {
+	var input gatewaymodel.DeactivateAccountRequest
+	if err := decodeJSONBody(request, &input); err != nil || input.Password == "" {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidRequest)
+		return
+	}
+	dependencies, ok := gatewaymiddleware.FromRequest(request)
+	if !ok {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInternal)
+		return
+	}
+	client, ok := dependencies.Identity.(interface {
+		DeactivateAccount(context.Context, *identityv1.DeactivateAccountRequest, ...callopt.Option) (*commonv1.EmptyResponse, error)
+	})
+	if !ok {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInternal)
+		return
+	}
+	if _, err := client.DeactivateAccount(authenticatedIdentityContext(ctx, request), &identityv1.DeactivateAccountRequest{Password: input.Password}); err != nil {
+		gatewaymiddleware.WriteIdentityError(ctx, request, err)
+		return
+	}
+	writeEmpty(ctx, request)
 }

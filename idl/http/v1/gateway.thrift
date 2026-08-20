@@ -55,7 +55,32 @@ struct SessionData {
   2: required string access_token (api.body="access_token")
   3: required string token_type (api.body="token_type")
   4: required string expires_at (api.body="expires_at")
+  5: optional string refresh_token (api.body="refresh_token")
+  6: optional string session_id (api.body="session_id")
 }
+
+struct RefreshSessionRequest {
+  1: required string refresh_token (api.body="refresh_token")
+}
+
+struct EmailTokenRequest { 1: required string token (api.body="token") }
+struct EmailRequest { 1: required string email (api.body="email") }
+struct PasswordResetRequest {
+  1: required string token (api.body="token")
+  2: required string password (api.body="password")
+}
+struct PasswordResetRequestRequest { 1: required string identifier (api.body="identifier") }
+struct SessionRequest { 1: required string session_id (api.path="session_id") }
+struct DeactivateAccountRequest { 1: required string password (api.body="password") }
+struct SessionDataItem {
+  1: required string id (api.body="id")
+  2: required string device_label (api.body="device_label")
+  3: required string created_at (api.body="created_at")
+  4: required string last_seen_at (api.body="last_seen_at")
+  5: required string expires_at (api.body="expires_at")
+  6: required bool current (api.body="current")
+}
+struct SessionListData { 1: required list<SessionDataItem> items (api.body="items") }
 
 struct RichTextAttrsData {
   1: optional i32 level (api.body="level")
@@ -285,6 +310,16 @@ service GatewayService {
   HealthData Ready(1: EmptyRequest request) (api.get="/health/ready")
   UserData Register(1: RegisterRequest request) (api.post="/api/v1/users")
   SessionData Login(1: LoginRequest request) (api.post="/api/v1/sessions")
+  SessionData RefreshSession(1: RefreshSessionRequest request) (api.post="/api/v1/sessions/refresh")
+  EmptyResponse Logout(1: EmptyRequest request) (api.delete="/api/v1/sessions/current")
+  SessionListData ListSessions(1: EmptyRequest request) (api.get="/api/v1/sessions")
+  EmptyResponse RevokeSession(1: SessionRequest request) (api.delete="/api/v1/sessions/:session_id")
+  EmptyResponse RevokeAllSessions(1: EmptyRequest request) (api.delete="/api/v1/sessions")
+  EmptyResponse RequestEmailVerification(1: EmailRequest request) (api.post="/api/v1/email-verification-requests")
+  EmptyResponse VerifyEmail(1: EmailTokenRequest request) (api.post="/api/v1/email-verifications")
+  EmptyResponse RequestPasswordReset(1: PasswordResetRequestRequest request) (api.post="/api/v1/password-reset-requests")
+  EmptyResponse ResetPassword(1: PasswordResetRequest request) (api.post="/api/v1/password-resets")
+  EmptyResponse DeactivateAccount(1: DeactivateAccountRequest request) (api.post="/api/v1/users/me/deactivation")
   UserData CurrentUser(1: EmptyRequest request) (api.get="/api/v1/users/me")
   DocumentPageData ListPublishedDocuments(1: ListDocumentsRequest request) (api.get="/api/v1/documents")
   DocumentDetailData GetPublishedDocument(1: SlugRequest request) (api.get="/api/v1/documents/:slug")

@@ -32,6 +32,71 @@ type UserRepository interface {
 	FindByLogin(context.Context, string) (*domain.User, error)
 	RecordLoginFailure(context.Context, int64, time.Time, time.Time, int) (bool, error)
 	CompleteLoginSuccess(context.Context, int64, time.Time) (*domain.User, error)
+	MarkEmailVerified(context.Context, int64, time.Time) (*domain.User, error)
+	UpdatePassword(context.Context, int64, string, time.Time) (*domain.User, error)
+	Deactivate(context.Context, int64, time.Time) error
+}
+
+func (r *postgresUserRepository) MarkEmailVerified(ctx context.Context, id int64, verifiedAt time.Time) (*domain.User, error) {
+	var record model.User
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&record, "id = ?", id).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrUserNotFound
+			}
+			return fmt.Errorf("lock identity user for email verification: %w", err)
+		}
+		if record.EmailVerifiedAt == nil {
+			when := verifiedAt.UTC()
+			if err := tx.Model(&record).Updates(map[string]any{"email_verified_at": when, "status": domain.StatusActive, "updated_at": when}).Error; err != nil {
+				return fmt.Errorf("mark identity email verified: %w", err)
+			}
+			record.EmailVerifiedAt = &when
+			record.Status = domain.StatusActive
+			record.UpdatedAt = when
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return fromModel(&record), nil
+}
+
+func (r *postgresUserRepository) UpdatePassword(ctx context.Context, id int64, passwordHash string, updatedAt time.Time) (*domain.User, error) {
+	var record model.User
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&record, "id = ?", id).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrUserNotFound
+			}
+			return fmt.Errorf("lock identity user for password reset: %w", err)
+		}
+		if err := tx.Model(&record).Updates(map[string]any{"password_hash": passwordHash, "token_version": gorm.Expr("token_version + 1"), "failed_login_attempts": 0, "locked_until": nil, "updated_at": updatedAt.UTC()}).Error; err != nil {
+			return fmt.Errorf("update identity password: %w", err)
+		}
+		record.PasswordHash = passwordHash
+		record.TokenVersion++
+		record.FailedLoginAttempts = 0
+		record.LockedUntil = nil
+		record.UpdatedAt = updatedAt.UTC()
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return fromModel(&record), nil
+}
+
+func (r *postgresUserRepository) Deactivate(ctx context.Context, id int64, at time.Time) error {
+	result := r.db.WithContext(ctx).Model(&model.User{}).Where("id = ? AND status <> ?", id, domain.StatusDisabled).Updates(map[string]any{"status": domain.StatusDisabled, "token_version": gorm.Expr("token_version + 1"), "updated_at": at.UTC()})
+	if result.Error != nil {
+		return fmt.Errorf("deactivate identity user: %w", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return ErrUserNotFound
+	}
+	return nil
 }
 
 func (r *postgresUserRepository) FindByUsername(ctx context.Context, username string) (*domain.User, error) {
@@ -196,6 +261,7 @@ func toModel(user *domain.User) *model.User {
 		Bio:                 user.Bio,
 		FailedLoginAttempts: user.FailedLoginAttempts,
 		LockedUntil:         user.LockedUntil,
+		EmailVerifiedAt:     user.EmailVerifiedAt,
 		CreatedAt:           user.CreatedAt,
 		UpdatedAt:           user.UpdatedAt,
 	}
@@ -214,7 +280,8 @@ func fromModel(record *model.User) *domain.User {
 		PasswordHash: record.PasswordHash, Role: record.Role, Status: record.Status,
 		TokenVersion: record.TokenVersion, Avatar: record.Avatar, Bio: record.Bio,
 		FailedLoginAttempts: record.FailedLoginAttempts, LockedUntil: record.LockedUntil,
-		CreatedAt: record.CreatedAt, UpdatedAt: record.UpdatedAt,
+		EmailVerifiedAt: record.EmailVerifiedAt,
+		CreatedAt:       record.CreatedAt, UpdatedAt: record.UpdatedAt,
 	}
 }
 

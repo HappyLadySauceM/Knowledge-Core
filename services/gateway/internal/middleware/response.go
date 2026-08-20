@@ -49,6 +49,7 @@ var identityErrors = []rpcErrorMapping{
 	{identityv1.CodeUserNotFound, "identity.user_not_found", responseError(identityv1.CodeUserNotFound, "identity.user_not_found", apperror.KindNotFound, "user not found")},
 	{identityv1.CodeUnauthenticated, "identity.unauthenticated", responseError(identityv1.CodeUnauthenticated, "identity.unauthenticated", apperror.KindUnauthenticated, "authentication is required")},
 	{identityv1.CodeForbidden, "identity.forbidden", responseError(identityv1.CodeForbidden, "identity.forbidden", apperror.KindPermissionDenied, "access is forbidden")},
+	{identityv1.CodeEmailNotVerified, "identity.email_not_verified", responseError(identityv1.CodeEmailNotVerified, "identity.email_not_verified", apperror.KindPermissionDenied, "email verification is required")},
 	{identityv1.CodeInternal, "identity.internal", responseErrorWithStatus(identityv1.CodeInternal, http.StatusBadGateway, "identity.internal", apperror.KindUnavailable, "identity service unavailable")},
 }
 

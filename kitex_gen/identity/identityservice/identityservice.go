@@ -35,6 +35,69 @@ var serviceMethods = map[string]kitex.MethodInfo{
 		false,
 		kitex.WithStreamingMode(kitex.StreamingNone),
 	),
+	"RefreshSession": kitex.NewMethodInfo(
+		refreshSessionHandler,
+		newIdentityServiceRefreshSessionArgs,
+		newIdentityServiceRefreshSessionResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
+	"RequestEmailVerification": kitex.NewMethodInfo(
+		requestEmailVerificationHandler,
+		newIdentityServiceRequestEmailVerificationArgs,
+		newIdentityServiceRequestEmailVerificationResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
+	"VerifyEmail": kitex.NewMethodInfo(
+		verifyEmailHandler,
+		newIdentityServiceVerifyEmailArgs,
+		newIdentityServiceVerifyEmailResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
+	"RequestPasswordReset": kitex.NewMethodInfo(
+		requestPasswordResetHandler,
+		newIdentityServiceRequestPasswordResetArgs,
+		newIdentityServiceRequestPasswordResetResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
+	"ResetPassword": kitex.NewMethodInfo(
+		resetPasswordHandler,
+		newIdentityServiceResetPasswordArgs,
+		newIdentityServiceResetPasswordResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
+	"ListSessions": kitex.NewMethodInfo(
+		listSessionsHandler,
+		newIdentityServiceListSessionsArgs,
+		newIdentityServiceListSessionsResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
+	"RevokeSession": kitex.NewMethodInfo(
+		revokeSessionHandler,
+		newIdentityServiceRevokeSessionArgs,
+		newIdentityServiceRevokeSessionResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
+	"RevokeAllSessions": kitex.NewMethodInfo(
+		revokeAllSessionsHandler,
+		newIdentityServiceRevokeAllSessionsArgs,
+		newIdentityServiceRevokeAllSessionsResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
+	"DeactivateAccount": kitex.NewMethodInfo(
+		deactivateAccountHandler,
+		newIdentityServiceDeactivateAccountArgs,
+		newIdentityServiceDeactivateAccountResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
 	"GetCurrentUser": kitex.NewMethodInfo(
 		getCurrentUserHandler,
 		newIdentityServiceGetCurrentUserArgs,
@@ -169,6 +232,168 @@ func newIdentityServiceAuthenticateResult() interface{} {
 	return identity.NewIdentityServiceAuthenticateResult()
 }
 
+func refreshSessionHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*identity.IdentityServiceRefreshSessionArgs)
+	realResult := result.(*identity.IdentityServiceRefreshSessionResult)
+	success, err := handler.(identity.IdentityService).RefreshSession(ctx, realArg.Request)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newIdentityServiceRefreshSessionArgs() interface{} {
+	return identity.NewIdentityServiceRefreshSessionArgs()
+}
+
+func newIdentityServiceRefreshSessionResult() interface{} {
+	return identity.NewIdentityServiceRefreshSessionResult()
+}
+
+func requestEmailVerificationHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*identity.IdentityServiceRequestEmailVerificationArgs)
+	realResult := result.(*identity.IdentityServiceRequestEmailVerificationResult)
+	success, err := handler.(identity.IdentityService).RequestEmailVerification(ctx, realArg.Request)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newIdentityServiceRequestEmailVerificationArgs() interface{} {
+	return identity.NewIdentityServiceRequestEmailVerificationArgs()
+}
+
+func newIdentityServiceRequestEmailVerificationResult() interface{} {
+	return identity.NewIdentityServiceRequestEmailVerificationResult()
+}
+
+func verifyEmailHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*identity.IdentityServiceVerifyEmailArgs)
+	realResult := result.(*identity.IdentityServiceVerifyEmailResult)
+	success, err := handler.(identity.IdentityService).VerifyEmail(ctx, realArg.Request)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newIdentityServiceVerifyEmailArgs() interface{} {
+	return identity.NewIdentityServiceVerifyEmailArgs()
+}
+
+func newIdentityServiceVerifyEmailResult() interface{} {
+	return identity.NewIdentityServiceVerifyEmailResult()
+}
+
+func requestPasswordResetHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*identity.IdentityServiceRequestPasswordResetArgs)
+	realResult := result.(*identity.IdentityServiceRequestPasswordResetResult)
+	success, err := handler.(identity.IdentityService).RequestPasswordReset(ctx, realArg.Request)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newIdentityServiceRequestPasswordResetArgs() interface{} {
+	return identity.NewIdentityServiceRequestPasswordResetArgs()
+}
+
+func newIdentityServiceRequestPasswordResetResult() interface{} {
+	return identity.NewIdentityServiceRequestPasswordResetResult()
+}
+
+func resetPasswordHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*identity.IdentityServiceResetPasswordArgs)
+	realResult := result.(*identity.IdentityServiceResetPasswordResult)
+	success, err := handler.(identity.IdentityService).ResetPassword(ctx, realArg.Request)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newIdentityServiceResetPasswordArgs() interface{} {
+	return identity.NewIdentityServiceResetPasswordArgs()
+}
+
+func newIdentityServiceResetPasswordResult() interface{} {
+	return identity.NewIdentityServiceResetPasswordResult()
+}
+
+func listSessionsHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*identity.IdentityServiceListSessionsArgs)
+	realResult := result.(*identity.IdentityServiceListSessionsResult)
+	success, err := handler.(identity.IdentityService).ListSessions(ctx, realArg.Request)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newIdentityServiceListSessionsArgs() interface{} {
+	return identity.NewIdentityServiceListSessionsArgs()
+}
+
+func newIdentityServiceListSessionsResult() interface{} {
+	return identity.NewIdentityServiceListSessionsResult()
+}
+
+func revokeSessionHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*identity.IdentityServiceRevokeSessionArgs)
+	realResult := result.(*identity.IdentityServiceRevokeSessionResult)
+	success, err := handler.(identity.IdentityService).RevokeSession(ctx, realArg.Request)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newIdentityServiceRevokeSessionArgs() interface{} {
+	return identity.NewIdentityServiceRevokeSessionArgs()
+}
+
+func newIdentityServiceRevokeSessionResult() interface{} {
+	return identity.NewIdentityServiceRevokeSessionResult()
+}
+
+func revokeAllSessionsHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*identity.IdentityServiceRevokeAllSessionsArgs)
+	realResult := result.(*identity.IdentityServiceRevokeAllSessionsResult)
+	success, err := handler.(identity.IdentityService).RevokeAllSessions(ctx, realArg.Request)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newIdentityServiceRevokeAllSessionsArgs() interface{} {
+	return identity.NewIdentityServiceRevokeAllSessionsArgs()
+}
+
+func newIdentityServiceRevokeAllSessionsResult() interface{} {
+	return identity.NewIdentityServiceRevokeAllSessionsResult()
+}
+
+func deactivateAccountHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*identity.IdentityServiceDeactivateAccountArgs)
+	realResult := result.(*identity.IdentityServiceDeactivateAccountResult)
+	success, err := handler.(identity.IdentityService).DeactivateAccount(ctx, realArg.Request)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newIdentityServiceDeactivateAccountArgs() interface{} {
+	return identity.NewIdentityServiceDeactivateAccountArgs()
+}
+
+func newIdentityServiceDeactivateAccountResult() interface{} {
+	return identity.NewIdentityServiceDeactivateAccountResult()
+}
+
 func getCurrentUserHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
 	realArg := arg.(*identity.IdentityServiceGetCurrentUserArgs)
 	realResult := result.(*identity.IdentityServiceGetCurrentUserResult)
@@ -240,6 +465,96 @@ func (p *kClient) Authenticate(ctx context.Context, request *identity.Authentica
 	_args.Request = request
 	var _result identity.IdentityServiceAuthenticateResult
 	if err = p.c.Call(ctx, "Authenticate", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) RefreshSession(ctx context.Context, request *identity.RefreshSessionRequest) (r *identity.Authentication, err error) {
+	var _args identity.IdentityServiceRefreshSessionArgs
+	_args.Request = request
+	var _result identity.IdentityServiceRefreshSessionResult
+	if err = p.c.Call(ctx, "RefreshSession", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) RequestEmailVerification(ctx context.Context, request *identity.EmailRequest) (r *common.EmptyResponse, err error) {
+	var _args identity.IdentityServiceRequestEmailVerificationArgs
+	_args.Request = request
+	var _result identity.IdentityServiceRequestEmailVerificationResult
+	if err = p.c.Call(ctx, "RequestEmailVerification", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) VerifyEmail(ctx context.Context, request *identity.EmailTokenRequest) (r *common.EmptyResponse, err error) {
+	var _args identity.IdentityServiceVerifyEmailArgs
+	_args.Request = request
+	var _result identity.IdentityServiceVerifyEmailResult
+	if err = p.c.Call(ctx, "VerifyEmail", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) RequestPasswordReset(ctx context.Context, request *identity.PasswordResetRequestRequest) (r *common.EmptyResponse, err error) {
+	var _args identity.IdentityServiceRequestPasswordResetArgs
+	_args.Request = request
+	var _result identity.IdentityServiceRequestPasswordResetResult
+	if err = p.c.Call(ctx, "RequestPasswordReset", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) ResetPassword(ctx context.Context, request *identity.PasswordResetRequest) (r *common.EmptyResponse, err error) {
+	var _args identity.IdentityServiceResetPasswordArgs
+	_args.Request = request
+	var _result identity.IdentityServiceResetPasswordResult
+	if err = p.c.Call(ctx, "ResetPassword", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) ListSessions(ctx context.Context, request *identity.CurrentUserRequest) (r *identity.SessionList, err error) {
+	var _args identity.IdentityServiceListSessionsArgs
+	_args.Request = request
+	var _result identity.IdentityServiceListSessionsResult
+	if err = p.c.Call(ctx, "ListSessions", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) RevokeSession(ctx context.Context, request *identity.SessionRequest) (r *common.EmptyResponse, err error) {
+	var _args identity.IdentityServiceRevokeSessionArgs
+	_args.Request = request
+	var _result identity.IdentityServiceRevokeSessionResult
+	if err = p.c.Call(ctx, "RevokeSession", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) RevokeAllSessions(ctx context.Context, request *identity.CurrentUserRequest) (r *common.EmptyResponse, err error) {
+	var _args identity.IdentityServiceRevokeAllSessionsArgs
+	_args.Request = request
+	var _result identity.IdentityServiceRevokeAllSessionsResult
+	if err = p.c.Call(ctx, "RevokeAllSessions", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) DeactivateAccount(ctx context.Context, request *identity.DeactivateAccountRequest) (r *common.EmptyResponse, err error) {
+	var _args identity.IdentityServiceDeactivateAccountArgs
+	_args.Request = request
+	var _result identity.IdentityServiceDeactivateAccountResult
+	if err = p.c.Call(ctx, "DeactivateAccount", &_args, &_result); err != nil {
 		return
 	}
 	return _result.GetSuccess(), nil

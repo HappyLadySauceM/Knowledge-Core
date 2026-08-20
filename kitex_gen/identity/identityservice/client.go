@@ -15,6 +15,15 @@ type Client interface {
 	Ping(ctx context.Context, request *common.PingRequest, callOptions ...callopt.Option) (r *common.PingResponse, err error)
 	Register(ctx context.Context, request *identity.RegisterRequest, callOptions ...callopt.Option) (r *identity.User, err error)
 	Authenticate(ctx context.Context, request *identity.AuthenticateRequest, callOptions ...callopt.Option) (r *identity.Authentication, err error)
+	RefreshSession(ctx context.Context, request *identity.RefreshSessionRequest, callOptions ...callopt.Option) (r *identity.Authentication, err error)
+	RequestEmailVerification(ctx context.Context, request *identity.EmailRequest, callOptions ...callopt.Option) (r *common.EmptyResponse, err error)
+	VerifyEmail(ctx context.Context, request *identity.EmailTokenRequest, callOptions ...callopt.Option) (r *common.EmptyResponse, err error)
+	RequestPasswordReset(ctx context.Context, request *identity.PasswordResetRequestRequest, callOptions ...callopt.Option) (r *common.EmptyResponse, err error)
+	ResetPassword(ctx context.Context, request *identity.PasswordResetRequest, callOptions ...callopt.Option) (r *common.EmptyResponse, err error)
+	ListSessions(ctx context.Context, request *identity.CurrentUserRequest, callOptions ...callopt.Option) (r *identity.SessionList, err error)
+	RevokeSession(ctx context.Context, request *identity.SessionRequest, callOptions ...callopt.Option) (r *common.EmptyResponse, err error)
+	RevokeAllSessions(ctx context.Context, request *identity.CurrentUserRequest, callOptions ...callopt.Option) (r *common.EmptyResponse, err error)
+	DeactivateAccount(ctx context.Context, request *identity.DeactivateAccountRequest, callOptions ...callopt.Option) (r *common.EmptyResponse, err error)
 	GetCurrentUser(ctx context.Context, request *identity.CurrentUserRequest, callOptions ...callopt.Option) (r *identity.User, err error)
 	ResolveUser(ctx context.Context, request *identity.ResolveUserRequest, callOptions ...callopt.Option) (r *identity.PublicUser, err error)
 }
@@ -61,6 +70,51 @@ func (p *kIdentityServiceClient) Register(ctx context.Context, request *identity
 func (p *kIdentityServiceClient) Authenticate(ctx context.Context, request *identity.AuthenticateRequest, callOptions ...callopt.Option) (r *identity.Authentication, err error) {
 	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
 	return p.kClient.Authenticate(ctx, request)
+}
+
+func (p *kIdentityServiceClient) RefreshSession(ctx context.Context, request *identity.RefreshSessionRequest, callOptions ...callopt.Option) (r *identity.Authentication, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.RefreshSession(ctx, request)
+}
+
+func (p *kIdentityServiceClient) RequestEmailVerification(ctx context.Context, request *identity.EmailRequest, callOptions ...callopt.Option) (r *common.EmptyResponse, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.RequestEmailVerification(ctx, request)
+}
+
+func (p *kIdentityServiceClient) VerifyEmail(ctx context.Context, request *identity.EmailTokenRequest, callOptions ...callopt.Option) (r *common.EmptyResponse, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.VerifyEmail(ctx, request)
+}
+
+func (p *kIdentityServiceClient) RequestPasswordReset(ctx context.Context, request *identity.PasswordResetRequestRequest, callOptions ...callopt.Option) (r *common.EmptyResponse, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.RequestPasswordReset(ctx, request)
+}
+
+func (p *kIdentityServiceClient) ResetPassword(ctx context.Context, request *identity.PasswordResetRequest, callOptions ...callopt.Option) (r *common.EmptyResponse, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.ResetPassword(ctx, request)
+}
+
+func (p *kIdentityServiceClient) ListSessions(ctx context.Context, request *identity.CurrentUserRequest, callOptions ...callopt.Option) (r *identity.SessionList, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.ListSessions(ctx, request)
+}
+
+func (p *kIdentityServiceClient) RevokeSession(ctx context.Context, request *identity.SessionRequest, callOptions ...callopt.Option) (r *common.EmptyResponse, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.RevokeSession(ctx, request)
+}
+
+func (p *kIdentityServiceClient) RevokeAllSessions(ctx context.Context, request *identity.CurrentUserRequest, callOptions ...callopt.Option) (r *common.EmptyResponse, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.RevokeAllSessions(ctx, request)
+}
+
+func (p *kIdentityServiceClient) DeactivateAccount(ctx context.Context, request *identity.DeactivateAccountRequest, callOptions ...callopt.Option) (r *common.EmptyResponse, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.DeactivateAccount(ctx, request)
 }
 
 func (p *kIdentityServiceClient) GetCurrentUser(ctx context.Context, request *identity.CurrentUserRequest, callOptions ...callopt.Option) (r *identity.User, err error) {

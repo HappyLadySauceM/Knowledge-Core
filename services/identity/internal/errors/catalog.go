@@ -58,7 +58,8 @@ var (
 		apperror.KindPermissionDenied,
 		"access is forbidden",
 	)
-	Unimplemented = apperror.MustDefine(
+	EmailNotVerified = apperror.MustDefine(20010, "identity.email_not_verified", apperror.KindPermissionDenied, "email verification is required")
+	Unimplemented    = apperror.MustDefine(
 		20009,
 		"identity.unimplemented",
 		apperror.KindUnimplemented,

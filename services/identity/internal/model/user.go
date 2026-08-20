@@ -16,6 +16,7 @@ type User struct {
 	Bio                 string     `gorm:"size:500;not null;default:''"`
 	FailedLoginAttempts int        `gorm:"not null;default:0"`
 	LockedUntil         *time.Time `gorm:"type:timestamptz"`
+	EmailVerifiedAt     *time.Time `gorm:"type:timestamptz"`
 	CreatedAt           time.Time  `gorm:"type:timestamptz;not null;autoCreateTime"`
 	UpdatedAt           time.Time  `gorm:"type:timestamptz;not null;autoCreateTime;autoUpdateTime"`
 }

@@ -90,3 +90,22 @@ var fieldIDToName_PingResponse = map[int16]string{
 	2: "status",
 	3: "unix_time",
 }
+
+type EmptyResponse struct {
+}
+
+func NewEmptyResponse() *EmptyResponse {
+	return &EmptyResponse{}
+}
+
+func (p *EmptyResponse) InitDefault() {
+}
+
+func (p *EmptyResponse) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("EmptyResponse(%+v)", *p)
+}
+
+var fieldIDToName_EmptyResponse = map[int16]string{}

@@ -17,8 +17,10 @@ import (
 const dummyPassword = "identity-dummy-password-value"
 
 type Authentication struct {
-	User        *domain.User
-	AccessToken coreauth.IssuedToken
+	User         *domain.User
+	AccessToken  coreauth.IssuedToken
+	RefreshToken string
+	SessionID    string
 }
 
 type AuthenticateInput struct {
@@ -48,6 +50,9 @@ type AuthenticateLogic struct {
 	dummyHash string
 	policy    atomic.Pointer[authenticationPolicy]
 	now       func() time.Time
+	sessions  interface {
+		Create(context.Context, *domain.User, string) (*SessionAuthentication, error)
+	}
 }
 
 type authenticationPolicy struct {
@@ -59,6 +64,32 @@ func NewAuthenticateLogic(
 	users authenticateUsers,
 	passwords PasswordVerifier,
 	tokens AccessTokenIssuer,
+	failureThreshold int,
+	lockDuration time.Duration,
+) (*AuthenticateLogic, error) {
+	return newAuthenticateLogic(users, passwords, tokens, nil, failureThreshold, lockDuration)
+}
+
+func NewAuthenticateLogicWithSessions(
+	users authenticateUsers,
+	passwords PasswordVerifier,
+	tokens AccessTokenIssuer,
+	sessions interface {
+		Create(context.Context, *domain.User, string) (*SessionAuthentication, error)
+	},
+	failureThreshold int,
+	lockDuration time.Duration,
+) (*AuthenticateLogic, error) {
+	return newAuthenticateLogic(users, passwords, tokens, sessions, failureThreshold, lockDuration)
+}
+
+func newAuthenticateLogic(
+	users authenticateUsers,
+	passwords PasswordVerifier,
+	tokens AccessTokenIssuer,
+	sessions interface {
+		Create(context.Context, *domain.User, string) (*SessionAuthentication, error)
+	},
 	failureThreshold int,
 	lockDuration time.Duration,
 ) (*AuthenticateLogic, error) {
@@ -74,7 +105,8 @@ func NewAuthenticateLogic(
 	}
 	logic := &AuthenticateLogic{
 		users: users, passwords: passwords, tokens: tokens, dummyHash: dummyHash,
-		now: time.Now,
+		sessions: sessions,
+		now:      time.Now,
 	}
 	logic.policy.Store(&authenticationPolicy{failureThreshold: failureThreshold, lockDuration: lockDuration})
 	return logic, nil
@@ -129,14 +161,22 @@ func (l *AuthenticateLogic) Authenticate(ctx context.Context, input Authenticate
 		return nil, errors.New("complete identity login returned no user")
 	}
 	if user.Status != domain.StatusActive {
+		if user.Status == domain.StatusPending || user.EmailVerifiedAt == nil {
+			return nil, identityerrors.EmailNotVerified.New()
+		}
 		return nil, identityerrors.UserDisabled.New()
 	}
 	if user.IsLocked(now) {
 		return nil, identityerrors.AccountLocked.New()
 	}
-	accessToken, err := l.tokens.Issue(coreauth.Principal{
-		UserID: user.ID, Role: user.Role, TokenVersion: user.TokenVersion,
-	})
+	if l.sessions != nil {
+		issued, err := l.sessions.Create(ctx, user, "")
+		if err != nil {
+			return nil, fmt.Errorf("create identity session: %w", err)
+		}
+		return &Authentication{User: user, AccessToken: issued.AccessToken, RefreshToken: issued.RefreshToken, SessionID: issued.SessionID}, nil
+	}
+	accessToken, err := l.tokens.Issue(coreauth.Principal{UserID: user.ID, Role: user.Role, TokenVersion: user.TokenVersion})
 	if err != nil {
 		return nil, fmt.Errorf("issue identity access token: %w", err)
 	}

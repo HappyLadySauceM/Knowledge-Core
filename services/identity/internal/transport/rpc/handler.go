@@ -30,6 +30,21 @@ type AuthenticateService interface {
 	Authenticate(context.Context, identitylogic.AuthenticateInput) (*identitylogic.Authentication, error)
 }
 
+type SessionService interface {
+	Refresh(context.Context, string) (*identitylogic.SessionAuthentication, error)
+	List(context.Context, int64) ([]*domain.Session, error)
+	Revoke(context.Context, int64, string, string) error
+	RevokeAll(context.Context, int64, string) error
+}
+
+type ActionService interface {
+	RequestEmailVerification(context.Context, string) error
+	VerifyEmail(context.Context, string) error
+	RequestPasswordReset(context.Context, string) error
+	ResetPassword(context.Context, string, string) error
+	Deactivate(context.Context, int64, string) error
+}
+
 type GetUserService interface {
 	GetUser(context.Context, int64) (*domain.User, error)
 	ResolveUser(context.Context, string) (*domain.User, error)
@@ -46,6 +61,8 @@ type Readiness interface {
 type Handler struct {
 	register     RegisterService
 	authenticate AuthenticateService
+	sessions     SessionService
+	actions      ActionService
 	users        GetUserService
 	verifier     TokenVerifier
 	readiness    Readiness
@@ -56,16 +73,56 @@ type Handler struct {
 func NewHandler(
 	register RegisterService,
 	authenticate AuthenticateService,
-	users GetUserService,
-	verifier TokenVerifier,
-	readiness Readiness,
-	logger *slog.Logger,
+	args ...any,
 ) (*Handler, error) {
+	var sessions SessionService
+	var actions ActionService
+	var users GetUserService
+	var verifier TokenVerifier
+	var readiness Readiness
+	var logger *slog.Logger
+	if len(args) == 6 {
+		if args[0] != nil {
+			var ok bool
+			sessions, ok = args[0].(SessionService)
+			if !ok {
+				return nil, errors.New("create identity RPC handler: invalid session service")
+			}
+		}
+		args = args[1:]
+		if args[0] != nil {
+			var ok bool
+			actions, ok = args[0].(ActionService)
+			if !ok {
+				return nil, errors.New("create identity RPC handler: invalid action service")
+			}
+		}
+		args = args[1:]
+	}
+	if len(args) == 4 {
+		var ok bool
+		users, ok = args[0].(GetUserService)
+		if !ok {
+			return nil, errors.New("create identity RPC handler: invalid user service")
+		}
+		verifier, ok = args[1].(TokenVerifier)
+		if !ok {
+			return nil, errors.New("create identity RPC handler: invalid token verifier")
+		}
+		readiness, ok = args[2].(Readiness)
+		if !ok {
+			return nil, errors.New("create identity RPC handler: invalid readiness service")
+		}
+		logger, ok = args[3].(*slog.Logger)
+		if !ok {
+			return nil, errors.New("create identity RPC handler: invalid logger")
+		}
+	}
 	if register == nil || authenticate == nil || users == nil || verifier == nil || readiness == nil || logger == nil {
 		return nil, errors.New("create identity RPC handler: use cases, verifier, readiness, and logger are required")
 	}
 	return &Handler{
-		register: register, authenticate: authenticate, users: users, verifier: verifier,
+		register: register, authenticate: authenticate, sessions: sessions, actions: actions, users: users, verifier: verifier,
 		readiness: readiness,
 		logger:    logger,
 		now:       time.Now,
@@ -121,6 +178,11 @@ func (h *Handler) Register(ctx context.Context, request *identityv1.RegisterRequ
 		)
 		return nil, apperror.ToKitexBizStatus(ctx, mapped)
 	}
+	if h.actions != nil {
+		if err := h.actions.RequestEmailVerification(ctx, user.Email); err != nil {
+			return nil, h.transportError(ctx, "queue_email_verification_failed", err)
+		}
+	}
 
 	return toTransportUser(user), nil
 }
@@ -172,10 +234,156 @@ func (h *Handler) Authenticate(ctx context.Context, request *identityv1.Authenti
 		return nil, h.transportError(ctx, "authenticate_failed", errors.New("identity authentication returned an incomplete result"))
 	}
 	return &identityv1.Authentication{
-		User:        toTransportUser(authentication.User),
-		AccessToken: authentication.AccessToken.Value,
-		ExpiresAt:   authentication.AccessToken.ExpiresAt.UTC().Format(time.RFC3339Nano),
+		User:         toTransportUser(authentication.User),
+		AccessToken:  authentication.AccessToken.Value,
+		ExpiresAt:    authentication.AccessToken.ExpiresAt.UTC().Format(time.RFC3339Nano),
+		RefreshToken: optionalString(authentication.RefreshToken),
+		SessionId:    optionalString(authentication.SessionID),
+		TokenType:    optionalString("Bearer"),
 	}, nil
+}
+
+func (h *Handler) RefreshSession(ctx context.Context, request *identityv1.RefreshSessionRequest) (*identityv1.Authentication, error) {
+	ctx = metadata.EnsureRequestID(ctx)
+	if request == nil || request.RefreshToken == "" || h.sessions == nil {
+		return nil, apperror.ToKitexBizStatus(ctx, identityerrors.InvalidInput.New())
+	}
+	authentication, err := h.sessions.Refresh(ctx, request.RefreshToken)
+	if err != nil {
+		return nil, h.transportError(ctx, "refresh_session_failed", err)
+	}
+	if authentication == nil || authentication.User == nil || authentication.AccessToken.Value == "" || authentication.AccessToken.ExpiresAt.IsZero() || authentication.RefreshToken == "" || authentication.SessionID == "" {
+		return nil, h.transportError(ctx, "refresh_session_failed", errors.New("identity refresh returned an incomplete result"))
+	}
+	return &identityv1.Authentication{
+		User:         toTransportUser(authentication.User),
+		AccessToken:  authentication.AccessToken.Value,
+		ExpiresAt:    authentication.AccessToken.ExpiresAt.UTC().Format(time.RFC3339Nano),
+		RefreshToken: optionalString(authentication.RefreshToken),
+		SessionId:    optionalString(authentication.SessionID),
+		TokenType:    optionalString("Bearer"),
+	}, nil
+}
+
+func optionalString(value string) *string {
+	if value == "" {
+		return nil
+	}
+	return &value
+}
+
+func emptyResponse() *commonv1.EmptyResponse { return &commonv1.EmptyResponse{} }
+
+func (h *Handler) RequestEmailVerification(ctx context.Context, request *identityv1.EmailRequest) (*commonv1.EmptyResponse, error) {
+	ctx = metadata.EnsureRequestID(ctx)
+	if request == nil || request.Email == "" || h.actions == nil {
+		return nil, apperror.ToKitexBizStatus(ctx, identityerrors.InvalidInput.New())
+	}
+	if err := h.actions.RequestEmailVerification(ctx, request.Email); err != nil {
+		return nil, h.transportError(ctx, "request_email_verification_failed", err)
+	}
+	return emptyResponse(), nil
+}
+
+func (h *Handler) VerifyEmail(ctx context.Context, request *identityv1.EmailTokenRequest) (*commonv1.EmptyResponse, error) {
+	ctx = metadata.EnsureRequestID(ctx)
+	if request == nil || request.Token == "" || h.actions == nil {
+		return nil, apperror.ToKitexBizStatus(ctx, identityerrors.InvalidInput.New())
+	}
+	if err := h.actions.VerifyEmail(ctx, request.Token); err != nil {
+		return nil, h.transportError(ctx, "verify_email_failed", err)
+	}
+	return emptyResponse(), nil
+}
+
+func (h *Handler) RequestPasswordReset(ctx context.Context, request *identityv1.PasswordResetRequestRequest) (*commonv1.EmptyResponse, error) {
+	ctx = metadata.EnsureRequestID(ctx)
+	if request == nil || request.Identifier == "" || h.actions == nil {
+		return nil, apperror.ToKitexBizStatus(ctx, identityerrors.InvalidInput.New())
+	}
+	if err := h.actions.RequestPasswordReset(ctx, request.Identifier); err != nil {
+		return nil, h.transportError(ctx, "request_password_reset_failed", err)
+	}
+	return emptyResponse(), nil
+}
+
+func (h *Handler) ResetPassword(ctx context.Context, request *identityv1.PasswordResetRequest) (*commonv1.EmptyResponse, error) {
+	ctx = metadata.EnsureRequestID(ctx)
+	if request == nil || request.Token == "" || request.Password == "" || h.actions == nil {
+		return nil, apperror.ToKitexBizStatus(ctx, identityerrors.InvalidInput.New())
+	}
+	if err := h.actions.ResetPassword(ctx, request.Token, request.Password); err != nil {
+		return nil, h.transportError(ctx, "reset_password_failed", err)
+	}
+	return emptyResponse(), nil
+}
+
+func (h *Handler) ListSessions(ctx context.Context, request *identityv1.CurrentUserRequest) (*identityv1.SessionList, error) {
+	ctx = metadata.EnsureRequestID(ctx)
+	if request == nil || h.sessions == nil {
+		return nil, apperror.ToKitexBizStatus(ctx, identityerrors.InvalidInput.New())
+	}
+	principal, _, err := h.authenticateRequest(ctx)
+	if err != nil {
+		return nil, err
+	}
+	sessions, err := h.sessions.List(ctx, principal.UserID)
+	if err != nil {
+		return nil, h.transportError(ctx, "list_sessions_failed", err)
+	}
+	result := &identityv1.SessionList{Items: make([]*identityv1.Session, 0, len(sessions))}
+	for _, session := range sessions {
+		if session == nil {
+			continue
+		}
+		result.Items = append(result.Items, &identityv1.Session{Id: session.ID, DeviceLabel: session.DeviceLabel, CreatedAt: session.CreatedAt.UTC().Format(time.RFC3339Nano), LastSeenAt: session.LastSeenAt.UTC().Format(time.RFC3339Nano), ExpiresAt: session.ExpiresAt.UTC().Format(time.RFC3339Nano), Current: session.ID == principal.SessionID})
+	}
+	return result, nil
+}
+
+func (h *Handler) RevokeSession(ctx context.Context, request *identityv1.SessionRequest) (*commonv1.EmptyResponse, error) {
+	ctx = metadata.EnsureRequestID(ctx)
+	if request == nil || request.SessionId == "" || h.sessions == nil {
+		return nil, apperror.ToKitexBizStatus(ctx, identityerrors.InvalidInput.New())
+	}
+	principal, _, err := h.authenticateRequest(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := h.sessions.Revoke(ctx, principal.UserID, request.SessionId, "user_revoked"); err != nil {
+		return nil, h.transportError(ctx, "revoke_session_failed", err)
+	}
+	return emptyResponse(), nil
+}
+
+func (h *Handler) RevokeAllSessions(ctx context.Context, request *identityv1.CurrentUserRequest) (*commonv1.EmptyResponse, error) {
+	ctx = metadata.EnsureRequestID(ctx)
+	if request == nil || h.sessions == nil {
+		return nil, apperror.ToKitexBizStatus(ctx, identityerrors.InvalidInput.New())
+	}
+	principal, _, err := h.authenticateRequest(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := h.sessions.RevokeAll(ctx, principal.UserID, "user_revoked_all"); err != nil {
+		return nil, h.transportError(ctx, "revoke_all_sessions_failed", err)
+	}
+	return emptyResponse(), nil
+}
+
+func (h *Handler) DeactivateAccount(ctx context.Context, request *identityv1.DeactivateAccountRequest) (*commonv1.EmptyResponse, error) {
+	ctx = metadata.EnsureRequestID(ctx)
+	if request == nil || request.Password == "" || h.actions == nil {
+		return nil, apperror.ToKitexBizStatus(ctx, identityerrors.InvalidInput.New())
+	}
+	principal, _, err := h.authenticateRequest(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := h.actions.Deactivate(ctx, principal.UserID, request.Password); err != nil {
+		return nil, h.transportError(ctx, "deactivate_account_failed", err)
+	}
+	return emptyResponse(), nil
 }
 
 func (h *Handler) GetCurrentUser(ctx context.Context, request *identityv1.CurrentUserRequest) (*identityv1.User, error) {

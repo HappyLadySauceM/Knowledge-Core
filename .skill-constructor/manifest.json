@@ -603,11 +603,11 @@
     "profile": "generic",
     "slug": "knowledge-core"
   },
-  "revision": 119,
+  "revision": 120,
   "scan": {
-    "fingerprint": "2a646f1c02aef36f8c399a7f60db562842a474ad68544bb0e39b6c5241a98d67",
-    "inventoryCount": 336
+    "fingerprint": "c318abba562a001d349668e5a1cd99e84387cfad006104a3b3f0bf095ee90cfa",
+    "inventoryCount": 351
   },
   "schemaVersion": 1,
-  "updatedAt": "2026-08-20T01:43:44Z"
+  "updatedAt": "2026-08-20T14:40:08Z"
 }

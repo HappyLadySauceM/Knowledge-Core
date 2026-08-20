@@ -25,6 +25,8 @@ const (
 
 	CodeForbidden = 20008
 
+	CodeEmailNotVerified = 20010
+
 	CodeInternal = 20999
 )
 
@@ -271,9 +273,12 @@ var fieldIDToName_AuthenticateRequest = map[int16]string{
 }
 
 type Authentication struct {
-	User        *User  `thrift:"user,1,required" frugal:"1,required,User" json:"user"`
-	AccessToken string `thrift:"access_token,2,required" frugal:"2,required,string" json:"access_token"`
-	ExpiresAt   string `thrift:"expires_at,3,required" frugal:"3,required,string" json:"expires_at"`
+	User         *User   `thrift:"user,1,required" frugal:"1,required,User" json:"user"`
+	AccessToken  string  `thrift:"access_token,2,required" frugal:"2,required,string" json:"access_token"`
+	ExpiresAt    string  `thrift:"expires_at,3,required" frugal:"3,required,string" json:"expires_at"`
+	RefreshToken *string `thrift:"refresh_token,4,optional" frugal:"4,optional,string" json:"refresh_token,omitempty"`
+	SessionId    *string `thrift:"session_id,5,optional" frugal:"5,optional,string" json:"session_id,omitempty"`
+	TokenType    *string `thrift:"token_type,6,optional" frugal:"6,optional,string" json:"token_type,omitempty"`
 }
 
 func NewAuthentication() *Authentication {
@@ -299,6 +304,33 @@ func (p *Authentication) GetAccessToken() (v string) {
 func (p *Authentication) GetExpiresAt() (v string) {
 	return p.ExpiresAt
 }
+
+var Authentication_RefreshToken_DEFAULT string
+
+func (p *Authentication) GetRefreshToken() (v string) {
+	if !p.IsSetRefreshToken() {
+		return Authentication_RefreshToken_DEFAULT
+	}
+	return *p.RefreshToken
+}
+
+var Authentication_SessionId_DEFAULT string
+
+func (p *Authentication) GetSessionId() (v string) {
+	if !p.IsSetSessionId() {
+		return Authentication_SessionId_DEFAULT
+	}
+	return *p.SessionId
+}
+
+var Authentication_TokenType_DEFAULT string
+
+func (p *Authentication) GetTokenType() (v string) {
+	if !p.IsSetTokenType() {
+		return Authentication_TokenType_DEFAULT
+	}
+	return *p.TokenType
+}
 func (p *Authentication) SetUser(val *User) {
 	p.User = val
 }
@@ -308,9 +340,30 @@ func (p *Authentication) SetAccessToken(val string) {
 func (p *Authentication) SetExpiresAt(val string) {
 	p.ExpiresAt = val
 }
+func (p *Authentication) SetRefreshToken(val *string) {
+	p.RefreshToken = val
+}
+func (p *Authentication) SetSessionId(val *string) {
+	p.SessionId = val
+}
+func (p *Authentication) SetTokenType(val *string) {
+	p.TokenType = val
+}
 
 func (p *Authentication) IsSetUser() bool {
 	return p.User != nil
+}
+
+func (p *Authentication) IsSetRefreshToken() bool {
+	return p.RefreshToken != nil
+}
+
+func (p *Authentication) IsSetSessionId() bool {
+	return p.SessionId != nil
+}
+
+func (p *Authentication) IsSetTokenType() bool {
+	return p.TokenType != nil
 }
 
 func (p *Authentication) String() string {
@@ -324,6 +377,324 @@ var fieldIDToName_Authentication = map[int16]string{
 	1: "user",
 	2: "access_token",
 	3: "expires_at",
+	4: "refresh_token",
+	5: "session_id",
+	6: "token_type",
+}
+
+type RefreshSessionRequest struct {
+	RefreshToken string `thrift:"refresh_token,1,required" frugal:"1,required,string" json:"refresh_token"`
+}
+
+func NewRefreshSessionRequest() *RefreshSessionRequest {
+	return &RefreshSessionRequest{}
+}
+
+func (p *RefreshSessionRequest) InitDefault() {
+}
+
+func (p *RefreshSessionRequest) GetRefreshToken() (v string) {
+	return p.RefreshToken
+}
+func (p *RefreshSessionRequest) SetRefreshToken(val string) {
+	p.RefreshToken = val
+}
+
+func (p *RefreshSessionRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("RefreshSessionRequest(%+v)", *p)
+}
+
+var fieldIDToName_RefreshSessionRequest = map[int16]string{
+	1: "refresh_token",
+}
+
+type EmailTokenRequest struct {
+	Token string `thrift:"token,1,required" frugal:"1,required,string" json:"token"`
+}
+
+func NewEmailTokenRequest() *EmailTokenRequest {
+	return &EmailTokenRequest{}
+}
+
+func (p *EmailTokenRequest) InitDefault() {
+}
+
+func (p *EmailTokenRequest) GetToken() (v string) {
+	return p.Token
+}
+func (p *EmailTokenRequest) SetToken(val string) {
+	p.Token = val
+}
+
+func (p *EmailTokenRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("EmailTokenRequest(%+v)", *p)
+}
+
+var fieldIDToName_EmailTokenRequest = map[int16]string{
+	1: "token",
+}
+
+type EmailRequest struct {
+	Email string `thrift:"email,1,required" frugal:"1,required,string" json:"email"`
+}
+
+func NewEmailRequest() *EmailRequest {
+	return &EmailRequest{}
+}
+
+func (p *EmailRequest) InitDefault() {
+}
+
+func (p *EmailRequest) GetEmail() (v string) {
+	return p.Email
+}
+func (p *EmailRequest) SetEmail(val string) {
+	p.Email = val
+}
+
+func (p *EmailRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("EmailRequest(%+v)", *p)
+}
+
+var fieldIDToName_EmailRequest = map[int16]string{
+	1: "email",
+}
+
+type PasswordResetRequest struct {
+	Token    string `thrift:"token,1,required" frugal:"1,required,string" json:"token"`
+	Password string `thrift:"password,2,required" frugal:"2,required,string" json:"password"`
+}
+
+func NewPasswordResetRequest() *PasswordResetRequest {
+	return &PasswordResetRequest{}
+}
+
+func (p *PasswordResetRequest) InitDefault() {
+}
+
+func (p *PasswordResetRequest) GetToken() (v string) {
+	return p.Token
+}
+
+func (p *PasswordResetRequest) GetPassword() (v string) {
+	return p.Password
+}
+func (p *PasswordResetRequest) SetToken(val string) {
+	p.Token = val
+}
+func (p *PasswordResetRequest) SetPassword(val string) {
+	p.Password = val
+}
+
+func (p *PasswordResetRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("PasswordResetRequest(%+v)", *p)
+}
+
+var fieldIDToName_PasswordResetRequest = map[int16]string{
+	1: "token",
+	2: "password",
+}
+
+type PasswordResetRequestRequest struct {
+	Identifier string `thrift:"identifier,1,required" frugal:"1,required,string" json:"identifier"`
+}
+
+func NewPasswordResetRequestRequest() *PasswordResetRequestRequest {
+	return &PasswordResetRequestRequest{}
+}
+
+func (p *PasswordResetRequestRequest) InitDefault() {
+}
+
+func (p *PasswordResetRequestRequest) GetIdentifier() (v string) {
+	return p.Identifier
+}
+func (p *PasswordResetRequestRequest) SetIdentifier(val string) {
+	p.Identifier = val
+}
+
+func (p *PasswordResetRequestRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("PasswordResetRequestRequest(%+v)", *p)
+}
+
+var fieldIDToName_PasswordResetRequestRequest = map[int16]string{
+	1: "identifier",
+}
+
+type SessionRequest struct {
+	SessionId string `thrift:"session_id,1,required" frugal:"1,required,string" json:"session_id"`
+}
+
+func NewSessionRequest() *SessionRequest {
+	return &SessionRequest{}
+}
+
+func (p *SessionRequest) InitDefault() {
+}
+
+func (p *SessionRequest) GetSessionId() (v string) {
+	return p.SessionId
+}
+func (p *SessionRequest) SetSessionId(val string) {
+	p.SessionId = val
+}
+
+func (p *SessionRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("SessionRequest(%+v)", *p)
+}
+
+var fieldIDToName_SessionRequest = map[int16]string{
+	1: "session_id",
+}
+
+type DeactivateAccountRequest struct {
+	Password string `thrift:"password,1,required" frugal:"1,required,string" json:"password"`
+}
+
+func NewDeactivateAccountRequest() *DeactivateAccountRequest {
+	return &DeactivateAccountRequest{}
+}
+
+func (p *DeactivateAccountRequest) InitDefault() {
+}
+
+func (p *DeactivateAccountRequest) GetPassword() (v string) {
+	return p.Password
+}
+func (p *DeactivateAccountRequest) SetPassword(val string) {
+	p.Password = val
+}
+
+func (p *DeactivateAccountRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("DeactivateAccountRequest(%+v)", *p)
+}
+
+var fieldIDToName_DeactivateAccountRequest = map[int16]string{
+	1: "password",
+}
+
+type Session struct {
+	Id          string `thrift:"id,1,required" frugal:"1,required,string" json:"id"`
+	DeviceLabel string `thrift:"device_label,2,required" frugal:"2,required,string" json:"device_label"`
+	CreatedAt   string `thrift:"created_at,3,required" frugal:"3,required,string" json:"created_at"`
+	LastSeenAt  string `thrift:"last_seen_at,4,required" frugal:"4,required,string" json:"last_seen_at"`
+	ExpiresAt   string `thrift:"expires_at,5,required" frugal:"5,required,string" json:"expires_at"`
+	Current     bool   `thrift:"current,6,required" frugal:"6,required,bool" json:"current"`
+}
+
+func NewSession() *Session {
+	return &Session{}
+}
+
+func (p *Session) InitDefault() {
+}
+
+func (p *Session) GetId() (v string) {
+	return p.Id
+}
+
+func (p *Session) GetDeviceLabel() (v string) {
+	return p.DeviceLabel
+}
+
+func (p *Session) GetCreatedAt() (v string) {
+	return p.CreatedAt
+}
+
+func (p *Session) GetLastSeenAt() (v string) {
+	return p.LastSeenAt
+}
+
+func (p *Session) GetExpiresAt() (v string) {
+	return p.ExpiresAt
+}
+
+func (p *Session) GetCurrent() (v bool) {
+	return p.Current
+}
+func (p *Session) SetId(val string) {
+	p.Id = val
+}
+func (p *Session) SetDeviceLabel(val string) {
+	p.DeviceLabel = val
+}
+func (p *Session) SetCreatedAt(val string) {
+	p.CreatedAt = val
+}
+func (p *Session) SetLastSeenAt(val string) {
+	p.LastSeenAt = val
+}
+func (p *Session) SetExpiresAt(val string) {
+	p.ExpiresAt = val
+}
+func (p *Session) SetCurrent(val bool) {
+	p.Current = val
+}
+
+func (p *Session) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("Session(%+v)", *p)
+}
+
+var fieldIDToName_Session = map[int16]string{
+	1: "id",
+	2: "device_label",
+	3: "created_at",
+	4: "last_seen_at",
+	5: "expires_at",
+	6: "current",
+}
+
+type SessionList struct {
+	Items []*Session `thrift:"items,1,required" frugal:"1,required,list<Session>" json:"items"`
+}
+
+func NewSessionList() *SessionList {
+	return &SessionList{}
+}
+
+func (p *SessionList) InitDefault() {
+}
+
+func (p *SessionList) GetItems() (v []*Session) {
+	return p.Items
+}
+func (p *SessionList) SetItems(val []*Session) {
+	p.Items = val
+}
+
+func (p *SessionList) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("SessionList(%+v)", *p)
+}
+
+var fieldIDToName_SessionList = map[int16]string{
+	1: "items",
 }
 
 type CurrentUserRequest struct {
@@ -380,6 +751,24 @@ type IdentityService interface {
 	Register(ctx context.Context, request *RegisterRequest) (r *User, err error)
 
 	Authenticate(ctx context.Context, request *AuthenticateRequest) (r *Authentication, err error)
+
+	RefreshSession(ctx context.Context, request *RefreshSessionRequest) (r *Authentication, err error)
+
+	RequestEmailVerification(ctx context.Context, request *EmailRequest) (r *common.EmptyResponse, err error)
+
+	VerifyEmail(ctx context.Context, request *EmailTokenRequest) (r *common.EmptyResponse, err error)
+
+	RequestPasswordReset(ctx context.Context, request *PasswordResetRequestRequest) (r *common.EmptyResponse, err error)
+
+	ResetPassword(ctx context.Context, request *PasswordResetRequest) (r *common.EmptyResponse, err error)
+
+	ListSessions(ctx context.Context, request *CurrentUserRequest) (r *SessionList, err error)
+
+	RevokeSession(ctx context.Context, request *SessionRequest) (r *common.EmptyResponse, err error)
+
+	RevokeAllSessions(ctx context.Context, request *CurrentUserRequest) (r *common.EmptyResponse, err error)
+
+	DeactivateAccount(ctx context.Context, request *DeactivateAccountRequest) (r *common.EmptyResponse, err error)
 
 	GetCurrentUser(ctx context.Context, request *CurrentUserRequest) (r *User, err error)
 
@@ -611,6 +1000,690 @@ func (p *IdentityServiceAuthenticateResult) String() string {
 }
 
 var fieldIDToName_IdentityServiceAuthenticateResult = map[int16]string{
+	0: "success",
+}
+
+type IdentityServiceRefreshSessionArgs struct {
+	Request *RefreshSessionRequest `thrift:"request,1" frugal:"1,default,RefreshSessionRequest" json:"request"`
+}
+
+func NewIdentityServiceRefreshSessionArgs() *IdentityServiceRefreshSessionArgs {
+	return &IdentityServiceRefreshSessionArgs{}
+}
+
+func (p *IdentityServiceRefreshSessionArgs) InitDefault() {
+}
+
+var IdentityServiceRefreshSessionArgs_Request_DEFAULT *RefreshSessionRequest
+
+func (p *IdentityServiceRefreshSessionArgs) GetRequest() (v *RefreshSessionRequest) {
+	if !p.IsSetRequest() {
+		return IdentityServiceRefreshSessionArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+func (p *IdentityServiceRefreshSessionArgs) SetRequest(val *RefreshSessionRequest) {
+	p.Request = val
+}
+
+func (p *IdentityServiceRefreshSessionArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *IdentityServiceRefreshSessionArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("IdentityServiceRefreshSessionArgs(%+v)", *p)
+}
+
+var fieldIDToName_IdentityServiceRefreshSessionArgs = map[int16]string{
+	1: "request",
+}
+
+type IdentityServiceRefreshSessionResult struct {
+	Success *Authentication `thrift:"success,0,optional" frugal:"0,optional,Authentication" json:"success,omitempty"`
+}
+
+func NewIdentityServiceRefreshSessionResult() *IdentityServiceRefreshSessionResult {
+	return &IdentityServiceRefreshSessionResult{}
+}
+
+func (p *IdentityServiceRefreshSessionResult) InitDefault() {
+}
+
+var IdentityServiceRefreshSessionResult_Success_DEFAULT *Authentication
+
+func (p *IdentityServiceRefreshSessionResult) GetSuccess() (v *Authentication) {
+	if !p.IsSetSuccess() {
+		return IdentityServiceRefreshSessionResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *IdentityServiceRefreshSessionResult) SetSuccess(x interface{}) {
+	p.Success = x.(*Authentication)
+}
+
+func (p *IdentityServiceRefreshSessionResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *IdentityServiceRefreshSessionResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("IdentityServiceRefreshSessionResult(%+v)", *p)
+}
+
+var fieldIDToName_IdentityServiceRefreshSessionResult = map[int16]string{
+	0: "success",
+}
+
+type IdentityServiceRequestEmailVerificationArgs struct {
+	Request *EmailRequest `thrift:"request,1" frugal:"1,default,EmailRequest" json:"request"`
+}
+
+func NewIdentityServiceRequestEmailVerificationArgs() *IdentityServiceRequestEmailVerificationArgs {
+	return &IdentityServiceRequestEmailVerificationArgs{}
+}
+
+func (p *IdentityServiceRequestEmailVerificationArgs) InitDefault() {
+}
+
+var IdentityServiceRequestEmailVerificationArgs_Request_DEFAULT *EmailRequest
+
+func (p *IdentityServiceRequestEmailVerificationArgs) GetRequest() (v *EmailRequest) {
+	if !p.IsSetRequest() {
+		return IdentityServiceRequestEmailVerificationArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+func (p *IdentityServiceRequestEmailVerificationArgs) SetRequest(val *EmailRequest) {
+	p.Request = val
+}
+
+func (p *IdentityServiceRequestEmailVerificationArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *IdentityServiceRequestEmailVerificationArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("IdentityServiceRequestEmailVerificationArgs(%+v)", *p)
+}
+
+var fieldIDToName_IdentityServiceRequestEmailVerificationArgs = map[int16]string{
+	1: "request",
+}
+
+type IdentityServiceRequestEmailVerificationResult struct {
+	Success *common.EmptyResponse `thrift:"success,0,optional" frugal:"0,optional,common.EmptyResponse" json:"success,omitempty"`
+}
+
+func NewIdentityServiceRequestEmailVerificationResult() *IdentityServiceRequestEmailVerificationResult {
+	return &IdentityServiceRequestEmailVerificationResult{}
+}
+
+func (p *IdentityServiceRequestEmailVerificationResult) InitDefault() {
+}
+
+var IdentityServiceRequestEmailVerificationResult_Success_DEFAULT *common.EmptyResponse
+
+func (p *IdentityServiceRequestEmailVerificationResult) GetSuccess() (v *common.EmptyResponse) {
+	if !p.IsSetSuccess() {
+		return IdentityServiceRequestEmailVerificationResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *IdentityServiceRequestEmailVerificationResult) SetSuccess(x interface{}) {
+	p.Success = x.(*common.EmptyResponse)
+}
+
+func (p *IdentityServiceRequestEmailVerificationResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *IdentityServiceRequestEmailVerificationResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("IdentityServiceRequestEmailVerificationResult(%+v)", *p)
+}
+
+var fieldIDToName_IdentityServiceRequestEmailVerificationResult = map[int16]string{
+	0: "success",
+}
+
+type IdentityServiceVerifyEmailArgs struct {
+	Request *EmailTokenRequest `thrift:"request,1" frugal:"1,default,EmailTokenRequest" json:"request"`
+}
+
+func NewIdentityServiceVerifyEmailArgs() *IdentityServiceVerifyEmailArgs {
+	return &IdentityServiceVerifyEmailArgs{}
+}
+
+func (p *IdentityServiceVerifyEmailArgs) InitDefault() {
+}
+
+var IdentityServiceVerifyEmailArgs_Request_DEFAULT *EmailTokenRequest
+
+func (p *IdentityServiceVerifyEmailArgs) GetRequest() (v *EmailTokenRequest) {
+	if !p.IsSetRequest() {
+		return IdentityServiceVerifyEmailArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+func (p *IdentityServiceVerifyEmailArgs) SetRequest(val *EmailTokenRequest) {
+	p.Request = val
+}
+
+func (p *IdentityServiceVerifyEmailArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *IdentityServiceVerifyEmailArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("IdentityServiceVerifyEmailArgs(%+v)", *p)
+}
+
+var fieldIDToName_IdentityServiceVerifyEmailArgs = map[int16]string{
+	1: "request",
+}
+
+type IdentityServiceVerifyEmailResult struct {
+	Success *common.EmptyResponse `thrift:"success,0,optional" frugal:"0,optional,common.EmptyResponse" json:"success,omitempty"`
+}
+
+func NewIdentityServiceVerifyEmailResult() *IdentityServiceVerifyEmailResult {
+	return &IdentityServiceVerifyEmailResult{}
+}
+
+func (p *IdentityServiceVerifyEmailResult) InitDefault() {
+}
+
+var IdentityServiceVerifyEmailResult_Success_DEFAULT *common.EmptyResponse
+
+func (p *IdentityServiceVerifyEmailResult) GetSuccess() (v *common.EmptyResponse) {
+	if !p.IsSetSuccess() {
+		return IdentityServiceVerifyEmailResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *IdentityServiceVerifyEmailResult) SetSuccess(x interface{}) {
+	p.Success = x.(*common.EmptyResponse)
+}
+
+func (p *IdentityServiceVerifyEmailResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *IdentityServiceVerifyEmailResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("IdentityServiceVerifyEmailResult(%+v)", *p)
+}
+
+var fieldIDToName_IdentityServiceVerifyEmailResult = map[int16]string{
+	0: "success",
+}
+
+type IdentityServiceRequestPasswordResetArgs struct {
+	Request *PasswordResetRequestRequest `thrift:"request,1" frugal:"1,default,PasswordResetRequestRequest" json:"request"`
+}
+
+func NewIdentityServiceRequestPasswordResetArgs() *IdentityServiceRequestPasswordResetArgs {
+	return &IdentityServiceRequestPasswordResetArgs{}
+}
+
+func (p *IdentityServiceRequestPasswordResetArgs) InitDefault() {
+}
+
+var IdentityServiceRequestPasswordResetArgs_Request_DEFAULT *PasswordResetRequestRequest
+
+func (p *IdentityServiceRequestPasswordResetArgs) GetRequest() (v *PasswordResetRequestRequest) {
+	if !p.IsSetRequest() {
+		return IdentityServiceRequestPasswordResetArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+func (p *IdentityServiceRequestPasswordResetArgs) SetRequest(val *PasswordResetRequestRequest) {
+	p.Request = val
+}
+
+func (p *IdentityServiceRequestPasswordResetArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *IdentityServiceRequestPasswordResetArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("IdentityServiceRequestPasswordResetArgs(%+v)", *p)
+}
+
+var fieldIDToName_IdentityServiceRequestPasswordResetArgs = map[int16]string{
+	1: "request",
+}
+
+type IdentityServiceRequestPasswordResetResult struct {
+	Success *common.EmptyResponse `thrift:"success,0,optional" frugal:"0,optional,common.EmptyResponse" json:"success,omitempty"`
+}
+
+func NewIdentityServiceRequestPasswordResetResult() *IdentityServiceRequestPasswordResetResult {
+	return &IdentityServiceRequestPasswordResetResult{}
+}
+
+func (p *IdentityServiceRequestPasswordResetResult) InitDefault() {
+}
+
+var IdentityServiceRequestPasswordResetResult_Success_DEFAULT *common.EmptyResponse
+
+func (p *IdentityServiceRequestPasswordResetResult) GetSuccess() (v *common.EmptyResponse) {
+	if !p.IsSetSuccess() {
+		return IdentityServiceRequestPasswordResetResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *IdentityServiceRequestPasswordResetResult) SetSuccess(x interface{}) {
+	p.Success = x.(*common.EmptyResponse)
+}
+
+func (p *IdentityServiceRequestPasswordResetResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *IdentityServiceRequestPasswordResetResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("IdentityServiceRequestPasswordResetResult(%+v)", *p)
+}
+
+var fieldIDToName_IdentityServiceRequestPasswordResetResult = map[int16]string{
+	0: "success",
+}
+
+type IdentityServiceResetPasswordArgs struct {
+	Request *PasswordResetRequest `thrift:"request,1" frugal:"1,default,PasswordResetRequest" json:"request"`
+}
+
+func NewIdentityServiceResetPasswordArgs() *IdentityServiceResetPasswordArgs {
+	return &IdentityServiceResetPasswordArgs{}
+}
+
+func (p *IdentityServiceResetPasswordArgs) InitDefault() {
+}
+
+var IdentityServiceResetPasswordArgs_Request_DEFAULT *PasswordResetRequest
+
+func (p *IdentityServiceResetPasswordArgs) GetRequest() (v *PasswordResetRequest) {
+	if !p.IsSetRequest() {
+		return IdentityServiceResetPasswordArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+func (p *IdentityServiceResetPasswordArgs) SetRequest(val *PasswordResetRequest) {
+	p.Request = val
+}
+
+func (p *IdentityServiceResetPasswordArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *IdentityServiceResetPasswordArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("IdentityServiceResetPasswordArgs(%+v)", *p)
+}
+
+var fieldIDToName_IdentityServiceResetPasswordArgs = map[int16]string{
+	1: "request",
+}
+
+type IdentityServiceResetPasswordResult struct {
+	Success *common.EmptyResponse `thrift:"success,0,optional" frugal:"0,optional,common.EmptyResponse" json:"success,omitempty"`
+}
+
+func NewIdentityServiceResetPasswordResult() *IdentityServiceResetPasswordResult {
+	return &IdentityServiceResetPasswordResult{}
+}
+
+func (p *IdentityServiceResetPasswordResult) InitDefault() {
+}
+
+var IdentityServiceResetPasswordResult_Success_DEFAULT *common.EmptyResponse
+
+func (p *IdentityServiceResetPasswordResult) GetSuccess() (v *common.EmptyResponse) {
+	if !p.IsSetSuccess() {
+		return IdentityServiceResetPasswordResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *IdentityServiceResetPasswordResult) SetSuccess(x interface{}) {
+	p.Success = x.(*common.EmptyResponse)
+}
+
+func (p *IdentityServiceResetPasswordResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *IdentityServiceResetPasswordResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("IdentityServiceResetPasswordResult(%+v)", *p)
+}
+
+var fieldIDToName_IdentityServiceResetPasswordResult = map[int16]string{
+	0: "success",
+}
+
+type IdentityServiceListSessionsArgs struct {
+	Request *CurrentUserRequest `thrift:"request,1" frugal:"1,default,CurrentUserRequest" json:"request"`
+}
+
+func NewIdentityServiceListSessionsArgs() *IdentityServiceListSessionsArgs {
+	return &IdentityServiceListSessionsArgs{}
+}
+
+func (p *IdentityServiceListSessionsArgs) InitDefault() {
+}
+
+var IdentityServiceListSessionsArgs_Request_DEFAULT *CurrentUserRequest
+
+func (p *IdentityServiceListSessionsArgs) GetRequest() (v *CurrentUserRequest) {
+	if !p.IsSetRequest() {
+		return IdentityServiceListSessionsArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+func (p *IdentityServiceListSessionsArgs) SetRequest(val *CurrentUserRequest) {
+	p.Request = val
+}
+
+func (p *IdentityServiceListSessionsArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *IdentityServiceListSessionsArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("IdentityServiceListSessionsArgs(%+v)", *p)
+}
+
+var fieldIDToName_IdentityServiceListSessionsArgs = map[int16]string{
+	1: "request",
+}
+
+type IdentityServiceListSessionsResult struct {
+	Success *SessionList `thrift:"success,0,optional" frugal:"0,optional,SessionList" json:"success,omitempty"`
+}
+
+func NewIdentityServiceListSessionsResult() *IdentityServiceListSessionsResult {
+	return &IdentityServiceListSessionsResult{}
+}
+
+func (p *IdentityServiceListSessionsResult) InitDefault() {
+}
+
+var IdentityServiceListSessionsResult_Success_DEFAULT *SessionList
+
+func (p *IdentityServiceListSessionsResult) GetSuccess() (v *SessionList) {
+	if !p.IsSetSuccess() {
+		return IdentityServiceListSessionsResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *IdentityServiceListSessionsResult) SetSuccess(x interface{}) {
+	p.Success = x.(*SessionList)
+}
+
+func (p *IdentityServiceListSessionsResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *IdentityServiceListSessionsResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("IdentityServiceListSessionsResult(%+v)", *p)
+}
+
+var fieldIDToName_IdentityServiceListSessionsResult = map[int16]string{
+	0: "success",
+}
+
+type IdentityServiceRevokeSessionArgs struct {
+	Request *SessionRequest `thrift:"request,1" frugal:"1,default,SessionRequest" json:"request"`
+}
+
+func NewIdentityServiceRevokeSessionArgs() *IdentityServiceRevokeSessionArgs {
+	return &IdentityServiceRevokeSessionArgs{}
+}
+
+func (p *IdentityServiceRevokeSessionArgs) InitDefault() {
+}
+
+var IdentityServiceRevokeSessionArgs_Request_DEFAULT *SessionRequest
+
+func (p *IdentityServiceRevokeSessionArgs) GetRequest() (v *SessionRequest) {
+	if !p.IsSetRequest() {
+		return IdentityServiceRevokeSessionArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+func (p *IdentityServiceRevokeSessionArgs) SetRequest(val *SessionRequest) {
+	p.Request = val
+}
+
+func (p *IdentityServiceRevokeSessionArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *IdentityServiceRevokeSessionArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("IdentityServiceRevokeSessionArgs(%+v)", *p)
+}
+
+var fieldIDToName_IdentityServiceRevokeSessionArgs = map[int16]string{
+	1: "request",
+}
+
+type IdentityServiceRevokeSessionResult struct {
+	Success *common.EmptyResponse `thrift:"success,0,optional" frugal:"0,optional,common.EmptyResponse" json:"success,omitempty"`
+}
+
+func NewIdentityServiceRevokeSessionResult() *IdentityServiceRevokeSessionResult {
+	return &IdentityServiceRevokeSessionResult{}
+}
+
+func (p *IdentityServiceRevokeSessionResult) InitDefault() {
+}
+
+var IdentityServiceRevokeSessionResult_Success_DEFAULT *common.EmptyResponse
+
+func (p *IdentityServiceRevokeSessionResult) GetSuccess() (v *common.EmptyResponse) {
+	if !p.IsSetSuccess() {
+		return IdentityServiceRevokeSessionResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *IdentityServiceRevokeSessionResult) SetSuccess(x interface{}) {
+	p.Success = x.(*common.EmptyResponse)
+}
+
+func (p *IdentityServiceRevokeSessionResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *IdentityServiceRevokeSessionResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("IdentityServiceRevokeSessionResult(%+v)", *p)
+}
+
+var fieldIDToName_IdentityServiceRevokeSessionResult = map[int16]string{
+	0: "success",
+}
+
+type IdentityServiceRevokeAllSessionsArgs struct {
+	Request *CurrentUserRequest `thrift:"request,1" frugal:"1,default,CurrentUserRequest" json:"request"`
+}
+
+func NewIdentityServiceRevokeAllSessionsArgs() *IdentityServiceRevokeAllSessionsArgs {
+	return &IdentityServiceRevokeAllSessionsArgs{}
+}
+
+func (p *IdentityServiceRevokeAllSessionsArgs) InitDefault() {
+}
+
+var IdentityServiceRevokeAllSessionsArgs_Request_DEFAULT *CurrentUserRequest
+
+func (p *IdentityServiceRevokeAllSessionsArgs) GetRequest() (v *CurrentUserRequest) {
+	if !p.IsSetRequest() {
+		return IdentityServiceRevokeAllSessionsArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+func (p *IdentityServiceRevokeAllSessionsArgs) SetRequest(val *CurrentUserRequest) {
+	p.Request = val
+}
+
+func (p *IdentityServiceRevokeAllSessionsArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *IdentityServiceRevokeAllSessionsArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("IdentityServiceRevokeAllSessionsArgs(%+v)", *p)
+}
+
+var fieldIDToName_IdentityServiceRevokeAllSessionsArgs = map[int16]string{
+	1: "request",
+}
+
+type IdentityServiceRevokeAllSessionsResult struct {
+	Success *common.EmptyResponse `thrift:"success,0,optional" frugal:"0,optional,common.EmptyResponse" json:"success,omitempty"`
+}
+
+func NewIdentityServiceRevokeAllSessionsResult() *IdentityServiceRevokeAllSessionsResult {
+	return &IdentityServiceRevokeAllSessionsResult{}
+}
+
+func (p *IdentityServiceRevokeAllSessionsResult) InitDefault() {
+}
+
+var IdentityServiceRevokeAllSessionsResult_Success_DEFAULT *common.EmptyResponse
+
+func (p *IdentityServiceRevokeAllSessionsResult) GetSuccess() (v *common.EmptyResponse) {
+	if !p.IsSetSuccess() {
+		return IdentityServiceRevokeAllSessionsResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *IdentityServiceRevokeAllSessionsResult) SetSuccess(x interface{}) {
+	p.Success = x.(*common.EmptyResponse)
+}
+
+func (p *IdentityServiceRevokeAllSessionsResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *IdentityServiceRevokeAllSessionsResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("IdentityServiceRevokeAllSessionsResult(%+v)", *p)
+}
+
+var fieldIDToName_IdentityServiceRevokeAllSessionsResult = map[int16]string{
+	0: "success",
+}
+
+type IdentityServiceDeactivateAccountArgs struct {
+	Request *DeactivateAccountRequest `thrift:"request,1" frugal:"1,default,DeactivateAccountRequest" json:"request"`
+}
+
+func NewIdentityServiceDeactivateAccountArgs() *IdentityServiceDeactivateAccountArgs {
+	return &IdentityServiceDeactivateAccountArgs{}
+}
+
+func (p *IdentityServiceDeactivateAccountArgs) InitDefault() {
+}
+
+var IdentityServiceDeactivateAccountArgs_Request_DEFAULT *DeactivateAccountRequest
+
+func (p *IdentityServiceDeactivateAccountArgs) GetRequest() (v *DeactivateAccountRequest) {
+	if !p.IsSetRequest() {
+		return IdentityServiceDeactivateAccountArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+func (p *IdentityServiceDeactivateAccountArgs) SetRequest(val *DeactivateAccountRequest) {
+	p.Request = val
+}
+
+func (p *IdentityServiceDeactivateAccountArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *IdentityServiceDeactivateAccountArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("IdentityServiceDeactivateAccountArgs(%+v)", *p)
+}
+
+var fieldIDToName_IdentityServiceDeactivateAccountArgs = map[int16]string{
+	1: "request",
+}
+
+type IdentityServiceDeactivateAccountResult struct {
+	Success *common.EmptyResponse `thrift:"success,0,optional" frugal:"0,optional,common.EmptyResponse" json:"success,omitempty"`
+}
+
+func NewIdentityServiceDeactivateAccountResult() *IdentityServiceDeactivateAccountResult {
+	return &IdentityServiceDeactivateAccountResult{}
+}
+
+func (p *IdentityServiceDeactivateAccountResult) InitDefault() {
+}
+
+var IdentityServiceDeactivateAccountResult_Success_DEFAULT *common.EmptyResponse
+
+func (p *IdentityServiceDeactivateAccountResult) GetSuccess() (v *common.EmptyResponse) {
+	if !p.IsSetSuccess() {
+		return IdentityServiceDeactivateAccountResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *IdentityServiceDeactivateAccountResult) SetSuccess(x interface{}) {
+	p.Success = x.(*common.EmptyResponse)
+}
+
+func (p *IdentityServiceDeactivateAccountResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *IdentityServiceDeactivateAccountResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("IdentityServiceDeactivateAccountResult(%+v)", *p)
+}
+
+var fieldIDToName_IdentityServiceDeactivateAccountResult = map[int16]string{
 	0: "success",
 }
 

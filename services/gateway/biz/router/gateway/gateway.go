@@ -22,6 +22,12 @@ func Register(r *server.Hertz) {
 		{
 			_v1 := _api.Group("/v1", _v1Mw()...)
 			_v1.GET("/documents", append(_listpublisheddocumentsMw(), gateway.ListPublishedDocuments)...)
+			_v1.POST("/email-verification-requests", append(_requestemailverificationMw(), gateway.RequestEmailVerification)...)
+			_v1.POST("/email-verifications", append(_verifyemailMw(), gateway.VerifyEmail)...)
+			_v1.POST("/password-reset-requests", append(_requestpasswordresetMw(), gateway.RequestPasswordReset)...)
+			_v1.POST("/password-resets", append(_resetpasswordMw(), gateway.ResetPassword)...)
+			_v1.DELETE("/sessions", append(_revokeallsessionsMw(), gateway.RevokeAllSessions)...)
+			_v1.GET("/sessions", append(_listsessionsMw(), gateway.ListSessions)...)
 			_v1.POST("/sessions", append(_loginMw(), gateway.Login)...)
 			_v1.POST("/users", append(_registerMw(), gateway.Register)...)
 			{
@@ -34,6 +40,12 @@ func Register(r *server.Hertz) {
 			{
 				_documents := _v1.Group("/documents", _documentsMw()...)
 				_documents.GET("/:slug", append(_getpublisheddocumentMw(), gateway.GetPublishedDocument)...)
+			}
+			{
+				_sessions := _v1.Group("/sessions", _sessionsMw()...)
+				_sessions.DELETE("/current", append(_logoutMw(), gateway.Logout)...)
+				_sessions.POST("/refresh", append(_refreshsessionMw(), gateway.RefreshSession)...)
+				_sessions.DELETE("/:session_id", append(_revokesessionMw(), gateway.RevokeSession)...)
 			}
 			{
 				_studio := _v1.Group("/studio", _studioMw()...)
@@ -90,6 +102,10 @@ func Register(r *server.Hertz) {
 			{
 				_users := _v1.Group("/users", _usersMw()...)
 				_users.GET("/me", append(_currentuserMw(), gateway.CurrentUser)...)
+				{
+					_me := _users.Group("/me", _meMw()...)
+					_me.POST("/deactivation", append(_deactivateaccountMw(), gateway.DeactivateAccount)...)
+				}
 			}
 		}
 	}

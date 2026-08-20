@@ -10,3 +10,5 @@ struct PingResponse {
   2: required string status
   3: required i64 unix_time
 }
+
+struct EmptyResponse {}

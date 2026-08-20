@@ -13,6 +13,7 @@ const (
 	RoleUser  = "user"
 
 	StatusActive   = "active"
+	StatusPending  = "pending_verification"
 	StatusDisabled = "disabled"
 )
 
@@ -30,6 +31,7 @@ type User struct {
 	Bio                 string
 	FailedLoginAttempts int
 	LockedUntil         *time.Time
+	EmailVerifiedAt     *time.Time
 	CreatedAt           time.Time
 	UpdatedAt           time.Time
 }
@@ -56,7 +58,7 @@ func NewUser(username, email string) (*User, error) {
 		Username:     username,
 		Email:        email,
 		Role:         RoleUser,
-		Status:       StatusActive,
+		Status:       StatusPending,
 		TokenVersion: 1,
 	}, nil
 }

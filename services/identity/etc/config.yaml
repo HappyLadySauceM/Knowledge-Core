@@ -73,5 +73,8 @@ bcrypt:
 
 auth:
   access_token_ttl: 15m
+  refresh_token_ttl: 720h
+  session_idle_ttl: 168h
+  action_token_ttl: 30m
   failure_threshold: 5
   lock_duration: 15m
