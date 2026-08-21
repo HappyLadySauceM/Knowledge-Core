@@ -22,11 +22,11 @@
     },
     {
       "id": "architecture.summary",
-      "revision": 114,
+      "revision": 121,
       "section": "architecture",
       "sources": [
         {
-          "detail": "evidence-sha256:9f7b97b81dbcf0f4c023eb458123254f6813e9160827639e1a8fbdd7c8471095",
+          "detail": "evidence-sha256:57db899a6e013d5ecb2f141957cfbcd4f84f19fe3a52cabd23880321ae6542e3",
           "kind": "documented",
           "reference": "README.md#knowledge-core"
         },
@@ -36,17 +36,17 @@
           "reference": "deploy/overlay/dev/README.md#development-overlay"
         },
         {
-          "detail": "evidence-sha256:9f7b97b81dbcf0f4c023eb458123254f6813e9160827639e1a8fbdd7c8471095",
+          "detail": "evidence-sha256:57db899a6e013d5ecb2f141957cfbcd4f84f19fe3a52cabd23880321ae6542e3",
           "kind": "documented",
           "reference": "docs/framework-design.md#9"
         },
         {
-          "detail": "evidence-sha256:9f7b97b81dbcf0f4c023eb458123254f6813e9160827639e1a8fbdd7c8471095",
+          "detail": "evidence-sha256:57db899a6e013d5ecb2f141957cfbcd4f84f19fe3a52cabd23880321ae6542e3",
           "kind": "documented",
           "reference": "docs/framework-design.md#knowledge-core"
         },
         {
-          "detail": "evidence-sha256:9f7b97b81dbcf0f4c023eb458123254f6813e9160827639e1a8fbdd7c8471095",
+          "detail": "evidence-sha256:57db899a6e013d5ecb2f141957cfbcd4f84f19fe3a52cabd23880321ae6542e3",
           "kind": "documented",
           "reference": "docs/rust-collaboration-design.md#rust-collaboration"
         },
@@ -60,7 +60,7 @@
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-08-14T17:01:48Z",
+      "updatedAt": "2026-08-21T15:08:00Z",
       "value": "Knowledge Core contains four explicitly composed services: Go Gateway, Identity, and Knowledge services plus a Rust Collaboration service. Go assembly flows main/spec -> internal/config -> internal/context -> domain/logic/repository/transport. ServiceContext owns service dependencies, while pkg/app.Runtime is limited to process-level observability, health, metrics, and lifecycle orchestration. Business logic depends on service-local small interfaces; repositories own persistence and storage error mapping; transports validate and adapt protocols without domain rules."
     },
     {
@@ -223,21 +223,21 @@
     },
     {
       "id": "security.secrets-and-config",
-      "revision": 114,
+      "revision": 121,
       "section": "conventions",
       "sources": [
         {
-          "detail": "evidence-sha256:3c37e096e15a5a47a1d0c4bbac2ebaf4ba556341521eae88ac3ada52425f4d3e",
+          "detail": "evidence-sha256:0c1137198d9ad6f7822c524defc0dacdbf512f400fb63bb11a2f5adb14defa5a",
           "kind": "documented",
           "reference": "README.md#compose"
         },
         {
-          "detail": "evidence-sha256:3c37e096e15a5a47a1d0c4bbac2ebaf4ba556341521eae88ac3ada52425f4d3e",
+          "detail": "evidence-sha256:0c1137198d9ad6f7822c524defc0dacdbf512f400fb63bb11a2f5adb14defa5a",
           "kind": "documented",
           "reference": "README.md#k3s-gitops"
         },
         {
-          "detail": "evidence-sha256:3c37e096e15a5a47a1d0c4bbac2ebaf4ba556341521eae88ac3ada52425f4d3e",
+          "detail": "evidence-sha256:0c1137198d9ad6f7822c524defc0dacdbf512f400fb63bb11a2f5adb14defa5a",
           "kind": "documented",
           "reference": "README.md#section"
         },
@@ -247,7 +247,7 @@
           "reference": "deploy/base/README.md#application-deployment-base"
         },
         {
-          "detail": "evidence-sha256:3c37e096e15a5a47a1d0c4bbac2ebaf4ba556341521eae88ac3ada52425f4d3e",
+          "detail": "evidence-sha256:0c1137198d9ad6f7822c524defc0dacdbf512f400fb63bb11a2f5adb14defa5a",
           "kind": "documented",
           "reference": "deploy/nacos/README.md#nacos-application-configuration"
         },
@@ -257,32 +257,37 @@
           "reference": "deploy/overlay/dev/README.md#development-overlay"
         },
         {
-          "detail": "evidence-sha256:3c37e096e15a5a47a1d0c4bbac2ebaf4ba556341521eae88ac3ada52425f4d3e",
+          "detail": "evidence-sha256:0c1137198d9ad6f7822c524defc0dacdbf512f400fb63bb11a2f5adb14defa5a",
           "kind": "documented",
           "reference": "docs/framework-design.md#11"
         },
         {
-          "detail": "evidence-sha256:3c37e096e15a5a47a1d0c4bbac2ebaf4ba556341521eae88ac3ada52425f4d3e",
+          "detail": "evidence-sha256:0c1137198d9ad6f7822c524defc0dacdbf512f400fb63bb11a2f5adb14defa5a",
           "kind": "documented",
           "reference": "docs/framework-design.md#12"
         },
         {
-          "detail": "evidence-sha256:3c37e096e15a5a47a1d0c4bbac2ebaf4ba556341521eae88ac3ada52425f4d3e",
+          "detail": "evidence-sha256:0c1137198d9ad6f7822c524defc0dacdbf512f400fb63bb11a2f5adb14defa5a",
           "kind": "documented",
           "reference": "docs/framework-design.md#8-secret-tls"
         },
         {
-          "detail": "evidence-sha256:3c37e096e15a5a47a1d0c4bbac2ebaf4ba556341521eae88ac3ada52425f4d3e",
+          "detail": "evidence-sha256:0c1137198d9ad6f7822c524defc0dacdbf512f400fb63bb11a2f5adb14defa5a",
+          "kind": "documented",
+          "reference": "docs/migrations/2026-08-auth-productionization.md#section"
+        },
+        {
+          "detail": "evidence-sha256:0c1137198d9ad6f7822c524defc0dacdbf512f400fb63bb11a2f5adb14defa5a",
           "kind": "documented",
           "reference": "docs/rust-collaboration-design.md#2-1"
         },
         {
-          "detail": "evidence-sha256:3c37e096e15a5a47a1d0c4bbac2ebaf4ba556341521eae88ac3ada52425f4d3e",
+          "detail": "evidence-sha256:0c1137198d9ad6f7822c524defc0dacdbf512f400fb63bb11a2f5adb14defa5a",
           "kind": "documented",
           "reference": "docs/rust-collaboration-design.md#7"
         },
         {
-          "detail": "evidence-sha256:3c37e096e15a5a47a1d0c4bbac2ebaf4ba556341521eae88ac3ada52425f4d3e",
+          "detail": "evidence-sha256:0c1137198d9ad6f7822c524defc0dacdbf512f400fb63bb11a2f5adb14defa5a",
           "kind": "documented",
           "reference": "docs/trace-architecture.md#7-collector-tempo"
         },
@@ -296,7 +301,7 @@
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-08-14T17:01:48Z",
+      "updatedAt": "2026-08-21T15:08:00Z",
       "value": "Secrets are injected only through environment variables, Kubernetes Secrets, or SOPS-encrypted GitOps manifests. Sensitive values must not be stored in plaintext source, configuration, logs, metrics, spans, or release metadata."
     },
     {
@@ -603,11 +608,11 @@
     "profile": "generic",
     "slug": "knowledge-core"
   },
-  "revision": 120,
+  "revision": 121,
   "scan": {
-    "fingerprint": "c318abba562a001d349668e5a1cd99e84387cfad006104a3b3f0bf095ee90cfa",
-    "inventoryCount": 351
+    "fingerprint": "b657ada02dae729291cc11a09c51c06123d633c86bddaa8a26ef839a60ee1a64",
+    "inventoryCount": 354
   },
   "schemaVersion": 1,
-  "updatedAt": "2026-08-20T14:40:08Z"
+  "updatedAt": "2026-08-21T15:08:00Z"
 }

@@ -195,7 +195,7 @@ func applyDocument(current, baseline, startup Config, document configcenter.Dyna
 		return Config{}, result, fmt.Errorf("validate identity dynamic configuration: %w", err)
 	}
 	result.RestartRequiredFields = configcenter.RestartRequiredFields(startup, candidate,
-		"log.level", "log.health_check_requests", "bcrypt.cost", "auth.access_token_ttl", "auth.refresh_token_ttl", "auth.session_idle_ttl", "auth.action_token_ttl", "auth.failure_threshold", "auth.lock_duration")
+		"log.level", "log.health_check_requests", "bcrypt.cost", "auth.access_token_ttl", "auth.refresh_token_ttl", "auth.session_idle_ttl", "auth.action_token_ttl", "auth.failure_threshold", "auth.lock_duration", "auth.action_token_pepper", "auth.refresh_token_pepper", "auth.refresh_token_encryption_key", "auth.email_encryption_key", "smtp.host", "smtp.port", "smtp.username", "smtp.password", "smtp.from", "smtp.frontend_base_url")
 	return candidate, result, nil
 }
 

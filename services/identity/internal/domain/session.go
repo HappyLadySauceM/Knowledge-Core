@@ -8,12 +8,15 @@ type Session struct {
 	DeviceLabel    string
 	RefreshDigest  []byte
 	PreviousDigest []byte
-	CreatedAt      time.Time
-	LastSeenAt     time.Time
-	ExpiresAt      time.Time
-	RotatedAt      *time.Time
-	RevokedAt      *time.Time
-	RevokedReason  string
+	// CurrentRefreshToken is transient and is only returned for a refresh
+	// request that reuses the previous token during the grace window.
+	CurrentRefreshToken string
+	CreatedAt           time.Time
+	LastSeenAt          time.Time
+	ExpiresAt           time.Time
+	RotatedAt           *time.Time
+	RevokedAt           *time.Time
+	RevokedReason       string
 }
 
 func (s *Session) IsActive(now time.Time) bool {

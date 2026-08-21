@@ -9,6 +9,7 @@ import (
 
 	"github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/domain"
 	"github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/model"
+	"github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/security"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -28,25 +29,95 @@ type SessionRepository interface {
 	List(context.Context, int64) ([]*domain.Session, error)
 }
 
-type postgresSessionRepository struct{ db *gorm.DB }
+type postgresSessionRepository struct {
+	db  *gorm.DB
+	key string
+}
 
-func NewSessionRepository(db *gorm.DB) (SessionRepository, error) {
+func NewSessionRepository(db *gorm.DB, encryptionKey ...string) (SessionRepository, error) {
 	if db == nil {
 		return nil, errors.New("create postgres session repository: database is required")
 	}
-	return &postgresSessionRepository{db: db}, nil
+	key := ""
+	if len(encryptionKey) > 0 {
+		key = encryptionKey[0]
+	}
+	return &postgresSessionRepository{db: db, key: key}, nil
 }
 
 func (r *postgresSessionRepository) Create(ctx context.Context, session *domain.Session) error {
 	if session == nil || session.ID == "" || session.UserID <= 0 || len(session.RefreshDigest) == 0 {
 		return errors.New("create identity session: session is invalid")
 	}
-	record := &model.Session{ID: session.ID, UserID: session.UserID, DeviceLabel: session.DeviceLabel, RefreshDigest: session.RefreshDigest, CreatedAt: session.CreatedAt.UTC(), LastSeenAt: session.LastSeenAt.UTC(), ExpiresAt: session.ExpiresAt.UTC()}
+	var cipherText []byte
+	if session.CurrentRefreshToken != "" && r.key != "" {
+		sealed, err := security.SealEmailToken(session.CurrentRefreshToken, r.key)
+		if err != nil {
+			return fmt.Errorf("seal identity refresh token: %w", err)
+		}
+		cipherText = sealed
+	}
+	record := &model.Session{ID: session.ID, UserID: session.UserID, DeviceLabel: session.DeviceLabel, RefreshDigest: session.RefreshDigest, RefreshTokenCipher: cipherText, CreatedAt: session.CreatedAt.UTC(), LastSeenAt: session.LastSeenAt.UTC(), ExpiresAt: session.ExpiresAt.UTC()}
 	if err := r.db.WithContext(ctx).Create(record).Error; err != nil {
 		return fmt.Errorf("insert identity session: %w", err)
 	}
 	applySessionModel(session, record)
 	return nil
+}
+
+// RotateWithGrace performs strict rotation while allowing a concurrent request
+// to reuse the previous token for a short, bounded window. The current token
+// is encrypted at rest and only returned to the caller that owns the request.
+func (r *postgresSessionRepository) RotateWithGrace(ctx context.Context, id string, currentDigest, nextDigest []byte, nextToken string, now, expires time.Time, grace time.Duration) (*domain.Session, error) {
+	var session *domain.Session
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var record model.Session
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&record, "id = ?", id).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrSessionNotFound
+			}
+			return fmt.Errorf("lock identity session: %w", err)
+		}
+		if record.RevokedAt != nil || !record.ExpiresAt.After(now.UTC()) {
+			return ErrSessionInvalid
+		}
+		if subtle.ConstantTimeCompare(record.RefreshDigest, currentDigest) != 1 {
+			if record.RotatedAt != nil && now.UTC().Sub(record.RotatedAt.UTC()) <= grace && subtle.ConstantTimeCompare(record.PreviousDigest, currentDigest) == 1 && len(record.RefreshTokenCipher) > 0 && r.key != "" {
+				current, err := security.OpenEmailToken(record.RefreshTokenCipher, r.key)
+				if err != nil {
+					return fmt.Errorf("open rotated identity refresh token: %w", err)
+				}
+				result := fromSessionModel(&record)
+				result.CurrentRefreshToken = current
+				session = result
+				return nil
+			}
+			revokeAt := now.UTC()
+			if err := tx.Model(&record).Updates(map[string]any{"revoked_at": revokeAt, "revoked_reason": "refresh_replay"}).Error; err != nil {
+				return fmt.Errorf("revoke replayed identity session: %w", err)
+			}
+			return ErrSessionReplay
+		}
+		var cipherText []byte
+		if r.key != "" {
+			sealed, err := security.SealEmailToken(nextToken, r.key)
+			if err != nil {
+				return fmt.Errorf("seal rotated identity refresh token: %w", err)
+			}
+			cipherText = sealed
+		}
+		rotatedAt := now.UTC()
+		if err := tx.Model(&record).Updates(map[string]any{"previous_digest": record.RefreshDigest, "refresh_digest": nextDigest, "refresh_token_cipher": cipherText, "last_seen_at": rotatedAt, "expires_at": expires.UTC(), "rotated_at": rotatedAt}).Error; err != nil {
+			return fmt.Errorf("rotate identity session: %w", err)
+		}
+		record.PreviousDigest, record.RefreshDigest, record.RefreshTokenCipher, record.LastSeenAt, record.ExpiresAt, record.RotatedAt = record.RefreshDigest, nextDigest, cipherText, rotatedAt, expires.UTC(), &rotatedAt
+		session = fromSessionModel(&record)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return session, nil
 }
 
 func (r *postgresSessionRepository) Find(ctx context.Context, id string) (*domain.Session, error) {

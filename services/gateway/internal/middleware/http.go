@@ -170,6 +170,14 @@ func AuthRateLimit() app.HandlerFunc {
 	return rateLimit("auth", func(options configRateLimit) int64 { return options.auth })
 }
 
+// ActionRateLimit protects verification and password-reset endpoints, which
+// are intentionally unauthenticated and therefore must not rely on the login
+// bucket. The request identifier is never logged; the IP bucket is a safe
+// baseline and can be tightened by the edge proxy as well.
+func ActionRateLimit() app.HandlerFunc {
+	return rateLimit("auth_action", func(options configRateLimit) int64 { return options.auth })
+}
+
 func CollaborationSessionRateLimit() app.HandlerFunc {
 	return func(ctx context.Context, request *app.RequestContext) {
 		dependencies, ok := FromRequest(request)

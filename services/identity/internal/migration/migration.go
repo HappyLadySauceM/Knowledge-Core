@@ -57,6 +57,8 @@ func AutoMigrate(ctx context.Context, db *gorm.DB) error {
 			"CREATE UNIQUE INDEX IF NOT EXISTS users_email_lower_uidx ON identity.users (lower(email))",
 			"CREATE INDEX IF NOT EXISTS users_status_created_at_idx ON identity.users (status, created_at DESC)",
 			"CREATE INDEX IF NOT EXISTS sessions_user_active_idx ON identity.sessions (user_id, last_seen_at DESC) WHERE revoked_at IS NULL",
+			"CREATE INDEX IF NOT EXISTS action_tokens_user_kind_active_idx ON identity.action_tokens (user_id, kind, created_at DESC) WHERE used_at IS NULL",
+			"CREATE INDEX IF NOT EXISTS email_outbox_pending_idx ON identity.email_outbox (next_attempt_at, created_at) WHERE sent_at IS NULL AND parked_at IS NULL",
 		}
 		for _, statement := range statements {
 			if err := tx.Exec(statement).Error; err != nil {
@@ -78,12 +80,17 @@ SELECT EXISTS (
 		return fmt.Errorf("check identity constraint %q: %w", item.name, err)
 	}
 	if exists {
-		if item.name == "users_status_check" {
-			if err := tx.Exec("ALTER TABLE identity.users DROP CONSTRAINT IF EXISTS users_status_check").Error; err != nil {
-				return fmt.Errorf("replace identity constraint %q: %w", item.name, err)
-			}
-		} else {
+		var definition string
+		if err := tx.Raw("SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname = ? AND conrelid = 'identity.users'::regclass", item.name).Scan(&definition).Error; err != nil {
+			return fmt.Errorf("read identity constraint %q: %w", item.name, err)
+		}
+		// Existing constraints are left untouched when they already encode the
+		// same invariant. This avoids a destructive drop/recreate on every boot.
+		if item.name != "users_status_check" || (strings.Contains(definition, "pending_verification") && strings.Contains(definition, "disabled") && strings.Contains(definition, "active")) {
 			return nil
+		}
+		if err := tx.Exec("ALTER TABLE identity.users DROP CONSTRAINT IF EXISTS users_status_check").Error; err != nil {
+			return fmt.Errorf("replace identity constraint %q: %w", item.name, err)
 		}
 	}
 	statement := fmt.Sprintf(

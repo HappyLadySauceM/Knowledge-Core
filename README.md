@@ -5,7 +5,7 @@ Knowledge Core 是一个支持文档元数据、权限、附件、实时协作�
 当前实现包含四个服务：
 
 - Gateway：公网 HTTP edge，负责严格输入校验、JWT、CORS、安全头、限流、错误映射和上游编排。
-- Identity：用户注册、密码认证、账户锁定、Ed25519 JWT 签发与用户状态复核。
+- Identity：用户注册、密码认证、邮箱验证、密码重置、账户锁定、Refresh Token 轮换、会话撤销、Ed25519 JWT 签发与用户状态复核。
 - Knowledge：文档元数据、成员权限、发布、附件、回收站、投影、配额和 outbox。
 - Collaboration：Yrs/y-sync WebSocket、一次性 session ticket、持久化 update、快照、版本、恢复和多实例同步。
 

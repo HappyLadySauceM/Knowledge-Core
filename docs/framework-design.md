@@ -1,6 +1,6 @@
 # Knowledge Core 框架设计
 
-> 状态：当前代码实现基线，更新于 2026-08-14。系统由 Gateway、Identity、Knowledge 和 Rust Collaboration 四个服务组成；Rust 切换尚未在生产环境执行，性能、完整链路和切换/回滚演练仍是发布前门禁。Identity 与 Knowledge 的真实 PostgreSQL 集成测试仍未纳入当前门禁。
+> 状态：当前代码实现基线，更新于 2026-08-21。系统由 Gateway、Identity、Knowledge 和 Rust Collaboration 四个服务组成；Rust 切换尚未在生产环境执行，性能、完整链路和切换/回滚演练仍是发布前门禁。Identity 与 Knowledge 的真实 PostgreSQL 集成测试仍未纳入当前门禁。
 >
 > Rust Collaboration 的设计决策、实现状态和未完成验证见 [`rust-collaboration-design.md`](rust-collaboration-design.md)，破坏性切换边界见 [`migrations/2026-08-rust-collaboration.md`](migrations/2026-08-rust-collaboration.md)。
 
@@ -18,7 +18,7 @@ Knowledge Core 是一个包含 Go module 与 Rust workspace 的 Monorepo。公�
 
 当前明确不提供：
 
-- refresh token、logout、JWT cookie、JWKS 或在线密钥轮换。
+- JWKS、JWT 在线密钥轮换和多区域会话复制。
 - 跨服务数据库事务、exactly-once 消息或同步的全局强一致性。
 - 配置热更新；连接、证书和 provider 变化通过滚动重启生效。
 - 任意服务共享数据库模型或绕过公开/内部契约直连其他服务的 schema。
@@ -177,7 +177,9 @@ Gateway 先做本地验签，再把原始 access token 通过 Kitex metadata 传
 
 ### 7.1 Identity
 
-Identity 启动时在 PostgreSQL advisory transaction lock 内创建/校验 `identity` schema，执行 GORM `AutoMigrate`，并补齐大小写不敏感唯一索引和命名 check constraint。所有 repository 查询使用 `db.WithContext(ctx)`。
+Identity 启动时在 PostgreSQL advisory transaction lock 内创建/校验 `identity` schema，执行增量 GORM migration，并补齐大小写不敏感唯一索引、命名 check constraint、会话刷新密文和邮件 outbox 字段。已有等价约束不会被重复删除；所有 repository 查询使用 `db.WithContext(ctx)`。
+
+注册、邮箱验证、密码重置和账户停用的用户状态、一次性令牌、会话撤销及邮件 outbox 写入在 Identity 数据库内保持事务边界。Refresh Token 严格轮换，并对并发请求提供 10 秒前序令牌宽限；宽限外复用会撤销会话。
 
 AutoMigrate 只适用于当前增量阶段，不替代破坏性 schema 演进的 expand/migrate/contract 流程。
 

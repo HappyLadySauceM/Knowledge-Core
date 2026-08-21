@@ -26,12 +26,13 @@ type SessionLogic struct {
 	users interface {
 		FindByID(context.Context, int64) (*domain.User, error)
 	}
-	sessions    repository.SessionRepository
-	issuer      AccessTokenIssuer
-	pepper      []byte
-	absoluteTTL time.Duration
-	idleTTL     time.Duration
-	now         func() time.Time
+	sessions     repository.SessionRepository
+	issuer       AccessTokenIssuer
+	pepper       []byte
+	absoluteTTL  time.Duration
+	idleTTL      time.Duration
+	refreshGrace time.Duration
+	now          func() time.Time
 }
 
 func NewSessionLogic(users interface {
@@ -40,7 +41,7 @@ func NewSessionLogic(users interface {
 	if users == nil || sessions == nil || issuer == nil || len(pepper) < 16 || absoluteTTL <= 0 || idleTTL <= 0 {
 		return nil, errors.New("create identity session logic: dependencies and TTLs are required")
 	}
-	return &SessionLogic{users: users, sessions: sessions, issuer: issuer, pepper: []byte(pepper), absoluteTTL: absoluteTTL, idleTTL: idleTTL, now: time.Now}, nil
+	return &SessionLogic{users: users, sessions: sessions, issuer: issuer, pepper: []byte(pepper), absoluteTTL: absoluteTTL, idleTTL: idleTTL, refreshGrace: 10 * time.Second, now: time.Now}, nil
 }
 
 func (l *SessionLogic) Create(ctx context.Context, user *domain.User, deviceLabel string) (*SessionAuthentication, error) {
@@ -60,7 +61,7 @@ func (l *SessionLogic) Create(ctx context.Context, user *domain.User, deviceLabe
 	if idle := now.Add(l.idleTTL); idle.Before(expires) {
 		expires = idle
 	}
-	session := &domain.Session{ID: refresh.SessionID, UserID: user.ID, DeviceLabel: normalizeDeviceLabel(deviceLabel), RefreshDigest: security.DigestRefreshSecret(refresh.Secret, l.pepper), CreatedAt: now, LastSeenAt: now, ExpiresAt: expires}
+	session := &domain.Session{ID: refresh.SessionID, UserID: user.ID, DeviceLabel: normalizeDeviceLabel(deviceLabel), RefreshDigest: security.DigestRefreshSecret(refresh.Secret, l.pepper), CurrentRefreshToken: encoded, CreatedAt: now, LastSeenAt: now, ExpiresAt: expires}
 	if err := l.sessions.Create(ctx, session); err != nil {
 		return nil, fmt.Errorf("persist identity session: %w", err)
 	}
@@ -84,6 +85,13 @@ func (l *SessionLogic) Refresh(ctx context.Context, encoded string) (*SessionAut
 	if session == nil || session.UserID <= 0 || !session.IsActive(now) {
 		return nil, identityerrors.Unauthenticated.New()
 	}
+	user, err := l.users.FindByID(ctx, session.UserID)
+	if err != nil {
+		return nil, identityerrors.Unauthenticated.Wrap(err)
+	}
+	if user == nil || user.Status != domain.StatusActive {
+		return nil, identityerrors.UserDisabled.New()
+	}
 	next, err := security.NewRefreshToken(nil)
 	if err != nil {
 		return nil, fmt.Errorf("rotate identity refresh token: %w", err)
@@ -96,25 +104,29 @@ func (l *SessionLogic) Refresh(ctx context.Context, encoded string) (*SessionAut
 	if idle := now.Add(l.idleTTL); idle.Before(nextExpires) {
 		nextExpires = idle
 	}
-	rotated, err := l.sessions.Rotate(ctx, session.ID, security.DigestRefreshSecret(refresh.Secret, l.pepper), security.DigestRefreshSecret(next.Secret, l.pepper), now, nextExpires)
+	var rotated *domain.Session
+	if graceful, ok := l.sessions.(interface {
+		RotateWithGrace(context.Context, string, []byte, []byte, string, time.Time, time.Time, time.Duration) (*domain.Session, error)
+	}); ok {
+		rotated, err = graceful.RotateWithGrace(ctx, session.ID, security.DigestRefreshSecret(refresh.Secret, l.pepper), security.DigestRefreshSecret(next.Secret, l.pepper), nextEncoded, now, nextExpires, l.refreshGrace)
+	} else {
+		rotated, err = l.sessions.Rotate(ctx, session.ID, security.DigestRefreshSecret(refresh.Secret, l.pepper), security.DigestRefreshSecret(next.Secret, l.pepper), now, nextExpires)
+	}
 	if err != nil {
 		if errors.Is(err, repository.ErrSessionReplay) {
 			return nil, identityerrors.Unauthenticated.Wrap(err)
 		}
 		return nil, identityerrors.Unauthenticated.Wrap(err)
 	}
-	user, err := l.users.FindByID(ctx, rotated.UserID)
-	if err != nil {
-		return nil, identityerrors.Unauthenticated.Wrap(err)
-	}
-	if user == nil || user.Status != domain.StatusActive {
-		return nil, identityerrors.UserDisabled.New()
-	}
 	access, err := l.issuer.Issue(coreauth.Principal{UserID: user.ID, Role: user.Role, TokenVersion: user.TokenVersion, SessionID: rotated.ID})
 	if err != nil {
 		return nil, fmt.Errorf("issue refreshed identity access token: %w", err)
 	}
-	return &SessionAuthentication{User: user, AccessToken: access, RefreshToken: nextEncoded, SessionID: rotated.ID}, nil
+	refreshToken := nextEncoded
+	if rotated.CurrentRefreshToken != "" {
+		refreshToken = rotated.CurrentRefreshToken
+	}
+	return &SessionAuthentication{User: user, AccessToken: access, RefreshToken: refreshToken, SessionID: rotated.ID}, nil
 }
 
 func (l *SessionLogic) List(ctx context.Context, userID int64) ([]*domain.Session, error) {

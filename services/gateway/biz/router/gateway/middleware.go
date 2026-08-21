@@ -253,23 +253,19 @@ func _refreshsessionMw() []app.HandlerFunc {
 }
 
 func _requestemailverificationMw() []app.HandlerFunc {
-	// your code...
-	return nil
+	return []app.HandlerFunc{gatewaymiddleware.ActionRateLimit()}
 }
 
 func _verifyemailMw() []app.HandlerFunc {
-	// your code...
-	return nil
+	return []app.HandlerFunc{gatewaymiddleware.ActionRateLimit()}
 }
 
 func _requestpasswordresetMw() []app.HandlerFunc {
-	// your code...
-	return nil
+	return []app.HandlerFunc{gatewaymiddleware.ActionRateLimit()}
 }
 
 func _resetpasswordMw() []app.HandlerFunc {
-	// your code...
-	return nil
+	return []app.HandlerFunc{gatewaymiddleware.ActionRateLimit()}
 }
 
 func _revokeallsessionsMw() []app.HandlerFunc {

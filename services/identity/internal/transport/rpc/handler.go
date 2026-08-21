@@ -178,12 +178,6 @@ func (h *Handler) Register(ctx context.Context, request *identityv1.RegisterRequ
 		)
 		return nil, apperror.ToKitexBizStatus(ctx, mapped)
 	}
-	if h.actions != nil {
-		if err := h.actions.RequestEmailVerification(ctx, user.Email); err != nil {
-			return nil, h.transportError(ctx, "queue_email_verification_failed", err)
-		}
-	}
-
 	return toTransportUser(user), nil
 }
 

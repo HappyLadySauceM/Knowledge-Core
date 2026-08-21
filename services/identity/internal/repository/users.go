@@ -99,6 +99,24 @@ func (r *postgresUserRepository) Deactivate(ctx context.Context, id int64, at ti
 	return nil
 }
 
+// DeactivateAndRevoke performs the account state transition and session
+// invalidation in one Identity database transaction.
+func (r *postgresUserRepository) DeactivateAndRevoke(ctx context.Context, id int64, at time.Time) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		result := tx.Model(&model.User{}).Where("id = ? AND status <> ?", id, domain.StatusDisabled).Updates(map[string]any{"status": domain.StatusDisabled, "token_version": gorm.Expr("token_version + 1"), "updated_at": at.UTC()})
+		if result.Error != nil {
+			return fmt.Errorf("deactivate identity user: %w", result.Error)
+		}
+		if result.RowsAffected == 0 {
+			return ErrUserNotFound
+		}
+		if err := tx.Model(&model.Session{}).Where("user_id = ? AND revoked_at IS NULL", id).Updates(map[string]any{"revoked_at": at.UTC(), "revoked_reason": "account_deactivated"}).Error; err != nil {
+			return fmt.Errorf("revoke deactivated identity sessions: %w", err)
+		}
+		return nil
+	})
+}
+
 func (r *postgresUserRepository) FindByUsername(ctx context.Context, username string) (*domain.User, error) {
 	username = strings.ToLower(strings.TrimSpace(username))
 	var record model.User

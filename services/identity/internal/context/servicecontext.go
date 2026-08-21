@@ -82,15 +82,32 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 	if err != nil {
 		return nil, err
 	}
-	sessions, err := identityrepository.NewSessionRepository(db)
+	legacyKey := identitylogic.SessionPepper(cfg.Auth.PrivateKey)
+	refreshKey := cfg.Auth.RefreshTokenEncryptionKey
+	if refreshKey == "" {
+		refreshKey = legacyKey
+	}
+	refreshPepper := cfg.Auth.RefreshTokenPepper
+	if refreshPepper == "" {
+		refreshPepper = legacyKey
+	}
+	actionPepper := cfg.Auth.ActionTokenPepper
+	if actionPepper == "" {
+		actionPepper = legacyKey
+	}
+	emailKey := cfg.Auth.EmailEncryptionKey
+	if emailKey == "" {
+		emailKey = legacyKey
+	}
+	sessions, err := identityrepository.NewSessionRepository(db, refreshKey)
 	if err != nil {
 		return nil, err
 	}
-	actionsRepo, err := identityrepository.NewActionRepository(db, identitylogic.SessionPepper(cfg.Auth.PrivateKey))
+	actionsRepo, err := identityrepository.NewActionRepository(db, emailKey)
 	if err != nil {
 		return nil, err
 	}
-	outbox, err := identityrepository.NewEmailOutboxRepository(db, identitylogic.SessionPepper(cfg.Auth.PrivateKey))
+	outbox, err := identityrepository.NewEmailOutboxRepository(db, emailKey)
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +115,7 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 	if err != nil {
 		return nil, err
 	}
-	register, err := identitylogic.NewRegisterLogic(users, hasher)
+	register, err := identitylogic.NewRegisterLogic(users, hasher, actionsRepo, actionPepper, cfg.Auth.ActionTokenTTL)
 	if err != nil {
 		return nil, err
 	}
@@ -110,11 +127,11 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 	if err != nil {
 		return nil, fmt.Errorf("create identity access-token verifier: %w", err)
 	}
-	sessionLogic, err := identitylogic.NewSessionLogic(users, sessions, issuer, identitylogic.SessionPepper(cfg.Auth.PrivateKey), cfg.Auth.RefreshTokenTTL, cfg.Auth.SessionIdleTTL)
+	sessionLogic, err := identitylogic.NewSessionLogic(users, sessions, issuer, refreshPepper, cfg.Auth.RefreshTokenTTL, cfg.Auth.SessionIdleTTL)
 	if err != nil {
 		return nil, err
 	}
-	actionLogic, err := identitylogic.NewActionLogic(users, actionsRepo, sessions, hasher, identitylogic.SessionPepper(cfg.Auth.PrivateKey), cfg.Auth.ActionTokenTTL, outbox.Enqueue)
+	actionLogic, err := identitylogic.NewActionLogic(users, actionsRepo, sessions, hasher, actionPepper, cfg.Auth.ActionTokenTTL, outbox.Enqueue)
 	if err != nil {
 		return nil, err
 	}
@@ -132,7 +149,7 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 	if err != nil {
 		return nil, err
 	}
-	worker, err := identityemail.NewWorker(*cfg.SMTP, outbox, identitylogic.SessionPepper(cfg.Auth.PrivateKey), runtime.Logger)
+	worker, err := identityemail.NewWorker(*cfg.SMTP, outbox, emailKey, runtime.Logger)
 	if err != nil {
 		return nil, err
 	}

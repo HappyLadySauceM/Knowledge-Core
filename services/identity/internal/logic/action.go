@@ -64,8 +64,11 @@ func (l *ActionLogic) issue(ctx context.Context, user *domain.User, kind, subjec
 
 func (l *ActionLogic) RequestEmailVerification(ctx context.Context, email string) error {
 	user, err := l.users.FindByLogin(ctx, strings.TrimSpace(email))
-	if err != nil || user == nil || user.EmailVerifiedAt != nil || user.Status == domain.StatusDisabled {
+	if errors.Is(err, repository.ErrUserNotFound) || user == nil || user.EmailVerifiedAt != nil || user.Status == domain.StatusDisabled {
 		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("find identity verification user: %w", err)
 	}
 	return l.issue(ctx, user, domain.ActionEmailVerification, "Verify your email")
 }
@@ -75,7 +78,17 @@ func (l *ActionLogic) VerifyEmail(ctx context.Context, token string) error {
 	if token == "" {
 		return identityerrors.InvalidInput.New()
 	}
-	entry, err := l.actions.Consume(ctx, domain.ActionEmailVerification, security.DigestActionToken(token, l.pepper), l.now().UTC())
+	now := l.now().UTC()
+	digest := security.DigestActionToken(token, l.pepper)
+	if atomic, ok := l.actions.(interface {
+		ConsumeAndVerifyEmail(context.Context, []byte, time.Time) error
+	}); ok {
+		if err := atomic.ConsumeAndVerifyEmail(ctx, digest, now); err != nil {
+			return identityerrors.InvalidInput.Wrap(err)
+		}
+		return nil
+	}
+	entry, err := l.actions.Consume(ctx, domain.ActionEmailVerification, digest, now)
 	if err != nil {
 		return identityerrors.InvalidInput.Wrap(err)
 	}
@@ -87,8 +100,11 @@ func (l *ActionLogic) VerifyEmail(ctx context.Context, token string) error {
 
 func (l *ActionLogic) RequestPasswordReset(ctx context.Context, identifier string) error {
 	user, err := l.users.FindByLogin(ctx, strings.TrimSpace(identifier))
-	if err != nil || user == nil || user.Status == domain.StatusDisabled {
+	if errors.Is(err, repository.ErrUserNotFound) || user == nil || user.Status == domain.StatusDisabled {
 		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("find identity password reset user: %w", err)
 	}
 	return l.issue(ctx, user, domain.ActionPasswordReset, "Reset your password")
 }
@@ -97,15 +113,25 @@ func (l *ActionLogic) ResetPassword(ctx context.Context, token, password string)
 	if err := domain.ValidatePassword(password); err != nil {
 		return identityerrors.InvalidInput.Wrap(err)
 	}
-	entry, err := l.actions.Consume(ctx, domain.ActionPasswordReset, security.DigestActionToken(strings.TrimSpace(token), l.pepper), l.now().UTC())
-	if err != nil {
-		return identityerrors.InvalidInput.Wrap(err)
-	}
 	hash, err := l.passwords.Hash(password)
 	if err != nil {
 		return fmt.Errorf("hash identity reset password: %w", err)
 	}
-	if _, err := l.users.UpdatePassword(ctx, entry.UserID, hash, l.now().UTC()); err != nil {
+	now := l.now().UTC()
+	digest := security.DigestActionToken(strings.TrimSpace(token), l.pepper)
+	if atomic, ok := l.actions.(interface {
+		ConsumeAndResetPassword(context.Context, []byte, string, time.Time) error
+	}); ok {
+		if err := atomic.ConsumeAndResetPassword(ctx, digest, hash, now); err != nil {
+			return identityerrors.InvalidInput.Wrap(err)
+		}
+		return nil
+	}
+	entry, err := l.actions.Consume(ctx, domain.ActionPasswordReset, digest, now)
+	if err != nil {
+		return identityerrors.InvalidInput.Wrap(err)
+	}
+	if _, err := l.users.UpdatePassword(ctx, entry.UserID, hash, now); err != nil {
 		return identityerrors.InvalidInput.Wrap(err)
 	}
 	return nil
@@ -123,10 +149,19 @@ func (l *ActionLogic) Deactivate(ctx context.Context, userID int64, password str
 	if !matched {
 		return identityerrors.InvalidCredentials.New()
 	}
-	if err := l.users.Deactivate(ctx, userID, l.now().UTC()); err != nil {
+	at := l.now().UTC()
+	if atomic, ok := l.users.(interface {
+		DeactivateAndRevoke(context.Context, int64, time.Time) error
+	}); ok {
+		if err := atomic.DeactivateAndRevoke(ctx, userID, at); err != nil {
+			return fmt.Errorf("deactivate identity account: %w", err)
+		}
+		return nil
+	}
+	if err := l.users.Deactivate(ctx, userID, at); err != nil {
 		return fmt.Errorf("deactivate identity account: %w", err)
 	}
-	if err := l.sessions.RevokeAll(ctx, userID, "account_deactivated", l.now().UTC()); err != nil {
+	if err := l.sessions.RevokeAll(ctx, userID, "account_deactivated", at); err != nil {
 		return fmt.Errorf("revoke deactivated identity sessions: %w", err)
 	}
 	return nil
