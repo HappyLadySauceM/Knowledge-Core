@@ -76,9 +76,23 @@ collaboration_rpc:
   tls:
     enabled: false
 
+attachment_rpc:
+  service_name: knowledge-core.attachment
+  address: 127.0.0.1:8884
+  connect_timeout: 500ms
+  request_timeout: 10s
+  tls:
+    enabled: false
+
 endpoints:
   public_base_url: http://localhost:8080
   collaboration_websocket_base_url: ws://localhost:8091
+  site_title: HappyLadySauce
+  site_tagline_zh: 把值得留下的想法，写成值得阅读的文章。
+  site_tagline_en: Turn ideas worth keeping into pages worth reading.
+  site_hero_image_url: /images/home-hero.png
+  site_hero_focal_x: 50
+  site_hero_focal_y: 50
 
 cors:
   allowed_origins:

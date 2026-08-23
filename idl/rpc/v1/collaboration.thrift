@@ -63,6 +63,7 @@ struct CreateVersionRequest {
   1: required string document_id
   2: optional string label
   3: optional string idempotency_key
+  4: optional binary state_vector
 }
 
 struct GetVersionRequest {

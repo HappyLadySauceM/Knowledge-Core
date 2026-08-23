@@ -203,6 +203,20 @@ func (p *User) FastRead(buf []byte) (int, error) {
 					goto SkipFieldError
 				}
 			}
+		case 11:
+			if fieldTypeId == thrift.STRING {
+				l, err = p.FastReadField11(buf[offset:])
+				offset += l
+				if err != nil {
+					goto ReadFieldError
+				}
+			} else {
+				l, err = thrift.Binary.Skip(buf[offset:], fieldTypeId)
+				offset += l
+				if err != nil {
+					goto SkipFieldError
+				}
+			}
 		default:
 			l, err = thrift.Binary.Skip(buf[offset:], fieldTypeId)
 			offset += l
@@ -412,6 +426,20 @@ func (p *User) FastReadField10(buf []byte) (int, error) {
 	return offset, nil
 }
 
+func (p *User) FastReadField11(buf []byte) (int, error) {
+	offset := 0
+
+	var _field *string
+	if v, l, err := thrift.Binary.ReadString(buf[offset:]); err != nil {
+		return offset, err
+	} else {
+		offset += l
+		_field = &v
+	}
+	p.AvatarAttachmentId = _field
+	return offset, nil
+}
+
 func (p *User) FastWrite(buf []byte) int {
 	return p.FastWriteNocopy(buf, nil)
 }
@@ -429,6 +457,7 @@ func (p *User) FastWriteNocopy(buf []byte, w thrift.NocopyWriter) int {
 		offset += p.fastWriteField8(buf[offset:], w)
 		offset += p.fastWriteField9(buf[offset:], w)
 		offset += p.fastWriteField10(buf[offset:], w)
+		offset += p.fastWriteField11(buf[offset:], w)
 	}
 	offset += thrift.Binary.WriteFieldStop(buf[offset:])
 	return offset
@@ -447,6 +476,7 @@ func (p *User) BLength() int {
 		l += p.field8Length()
 		l += p.field9Length()
 		l += p.field10Length()
+		l += p.field11Length()
 	}
 	l += thrift.Binary.FieldStopLength()
 	return l
@@ -522,6 +552,15 @@ func (p *User) fastWriteField10(buf []byte, w thrift.NocopyWriter) int {
 	return offset
 }
 
+func (p *User) fastWriteField11(buf []byte, w thrift.NocopyWriter) int {
+	offset := 0
+	if p.IsSetAvatarAttachmentId() {
+		offset += thrift.Binary.WriteFieldBegin(buf[offset:], thrift.STRING, 11)
+		offset += thrift.Binary.WriteStringNocopy(buf[offset:], w, *p.AvatarAttachmentId)
+	}
+	return offset
+}
+
 func (p *User) field1Length() int {
 	l := 0
 	l += thrift.Binary.FieldBeginLength()
@@ -592,6 +631,15 @@ func (p *User) field10Length() int {
 	return l
 }
 
+func (p *User) field11Length() int {
+	l := 0
+	if p.IsSetAvatarAttachmentId() {
+		l += thrift.Binary.FieldBeginLength()
+		l += thrift.Binary.StringLengthNocopy(*p.AvatarAttachmentId)
+	}
+	return l
+}
+
 func (p *PublicUser) FastRead(buf []byte) (int, error) {
 
 	var err error
@@ -650,6 +698,20 @@ func (p *PublicUser) FastRead(buf []byte) (int, error) {
 					goto ReadFieldError
 				}
 				issetAvatar = true
+			} else {
+				l, err = thrift.Binary.Skip(buf[offset:], fieldTypeId)
+				offset += l
+				if err != nil {
+					goto SkipFieldError
+				}
+			}
+		case 4:
+			if fieldTypeId == thrift.STRING {
+				l, err = p.FastReadField4(buf[offset:])
+				offset += l
+				if err != nil {
+					goto ReadFieldError
+				}
 			} else {
 				l, err = thrift.Binary.Skip(buf[offset:], fieldTypeId)
 				offset += l
@@ -733,6 +795,20 @@ func (p *PublicUser) FastReadField3(buf []byte) (int, error) {
 	return offset, nil
 }
 
+func (p *PublicUser) FastReadField4(buf []byte) (int, error) {
+	offset := 0
+
+	var _field *string
+	if v, l, err := thrift.Binary.ReadString(buf[offset:]); err != nil {
+		return offset, err
+	} else {
+		offset += l
+		_field = &v
+	}
+	p.AvatarAttachmentId = _field
+	return offset, nil
+}
+
 func (p *PublicUser) FastWrite(buf []byte) int {
 	return p.FastWriteNocopy(buf, nil)
 }
@@ -743,6 +819,7 @@ func (p *PublicUser) FastWriteNocopy(buf []byte, w thrift.NocopyWriter) int {
 		offset += p.fastWriteField1(buf[offset:], w)
 		offset += p.fastWriteField2(buf[offset:], w)
 		offset += p.fastWriteField3(buf[offset:], w)
+		offset += p.fastWriteField4(buf[offset:], w)
 	}
 	offset += thrift.Binary.WriteFieldStop(buf[offset:])
 	return offset
@@ -754,6 +831,7 @@ func (p *PublicUser) BLength() int {
 		l += p.field1Length()
 		l += p.field2Length()
 		l += p.field3Length()
+		l += p.field4Length()
 	}
 	l += thrift.Binary.FieldStopLength()
 	return l
@@ -780,6 +858,15 @@ func (p *PublicUser) fastWriteField3(buf []byte, w thrift.NocopyWriter) int {
 	return offset
 }
 
+func (p *PublicUser) fastWriteField4(buf []byte, w thrift.NocopyWriter) int {
+	offset := 0
+	if p.IsSetAvatarAttachmentId() {
+		offset += thrift.Binary.WriteFieldBegin(buf[offset:], thrift.STRING, 4)
+		offset += thrift.Binary.WriteStringNocopy(buf[offset:], w, *p.AvatarAttachmentId)
+	}
+	return offset
+}
+
 func (p *PublicUser) field1Length() int {
 	l := 0
 	l += thrift.Binary.FieldBeginLength()
@@ -798,6 +885,15 @@ func (p *PublicUser) field3Length() int {
 	l := 0
 	l += thrift.Binary.FieldBeginLength()
 	l += thrift.Binary.StringLengthNocopy(p.Avatar)
+	return l
+}
+
+func (p *PublicUser) field4Length() int {
+	l := 0
+	if p.IsSetAvatarAttachmentId() {
+		l += thrift.Binary.FieldBeginLength()
+		l += thrift.Binary.StringLengthNocopy(*p.AvatarAttachmentId)
+	}
 	return l
 }
 

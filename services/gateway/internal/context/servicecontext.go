@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/attachment/attachmentservice"
 	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/collaboration/collaborationservice"
 	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/identity/identityservice"
 	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/knowledge/knowledgeservice"
@@ -29,6 +30,7 @@ type ServiceContext struct {
 	Identity      identityservice.Client
 	Knowledge     knowledgeservice.Client
 	Collaboration collaborationservice.Client
+	Attachment    attachmentservice.Client
 	Verifier      *coreauth.Verifier
 	Limiter       *ratelimit.RedisLimiter
 	Middleware    *gatewaymiddleware.Dependencies
@@ -66,6 +68,10 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 	if err != nil {
 		return nil, err
 	}
+	attachment, err := gatewayclient.NewAttachment(*cfg.AttachmentRPC, runtime.Trace, runtime.Metrics)
+	if err != nil {
+		return nil, err
+	}
 	verifier, err := coreauth.NewVerifier(cfg.Auth.PublicKey)
 	if err != nil {
 		return nil, fmt.Errorf("create gateway access-token verifier: %w", err)
@@ -75,7 +81,7 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 		return nil, err
 	}
 	middlewareDependencies, err := gatewaymiddleware.NewDependencies(
-		identity, knowledge, collaboration, verifier, limiter, runtime.Health, runtime.Logger, runtime.Requests,
+		identity, knowledge, collaboration, attachment, verifier, limiter, runtime.Health, runtime.Logger, runtime.Requests,
 		*cfg.CORS, *cfg.RateLimit, *cfg.Endpoints, cfg.PublicHTTP.TLS.Enabled,
 	)
 	if err != nil {
@@ -130,7 +136,7 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 		slog.String("event", "dependencies_ready"),
 	)
 	return &ServiceContext{
-		Config: cfg, Redis: cache, Identity: identity, Knowledge: knowledge, Collaboration: collaboration, Verifier: verifier,
+		Config: cfg, Redis: cache, Identity: identity, Knowledge: knowledge, Collaboration: collaboration, Attachment: attachment, Verifier: verifier,
 		Limiter: limiter, Middleware: middlewareDependencies, AdminServer: admin, PublicServer: public,
 	}, nil
 }

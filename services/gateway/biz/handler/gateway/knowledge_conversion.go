@@ -176,9 +176,7 @@ func toPublicUserData(value *knowledgev1.PublicUser) (*gatewaymodel.PublicUserDa
 	if value == nil || value.Id <= 0 || strings.TrimSpace(value.Username) == "" {
 		return nil, errors.New("knowledge public user is incomplete")
 	}
-	return &gatewaymodel.PublicUserData{
-		ID: strconv.FormatInt(value.Id, 10), Username: value.Username, Avatar: value.Avatar,
-	}, nil
+	return &gatewaymodel.PublicUserData{ID: strconv.FormatInt(value.Id, 10), Username: value.Username, Avatar: value.Avatar}, nil
 }
 
 func toRichTextDocumentData(value *knowledgev1.RichTextDocument) (*gatewaymodel.RichTextDocumentData, error) {

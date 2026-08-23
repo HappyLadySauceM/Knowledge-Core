@@ -165,7 +165,7 @@ func toUserData(user *identityv1.User) (*gatewaymodel.UserData, error) {
 	}
 	return &gatewaymodel.UserData{
 		ID: strconv.FormatInt(user.Id, 10), Username: user.Username, Email: user.Email, Role: user.Role, Status: user.Status,
-		Avatar: user.Avatar, Bio: user.Bio, CreatedAt: user.CreatedAt, UpdatedAt: user.UpdatedAt,
+		Avatar: user.Avatar, AvatarAttachmentID: copyString(user.AvatarAttachmentId), Bio: user.Bio, CreatedAt: user.CreatedAt, UpdatedAt: user.UpdatedAt,
 	}, nil
 }
 
@@ -578,4 +578,46 @@ func UpdateFolder(ctx context.Context, c *app.RequestContext) {
 // @router /api/v1/studio/folders/:folder_id [DELETE]
 func DeleteFolder(ctx context.Context, c *app.RequestContext) {
 	handleDeleteFolder(ctx, c)
+}
+
+// ListMediaAttachments .
+// @router /api/v1/attachments [GET]
+func ListMediaAttachments(ctx context.Context, c *app.RequestContext) {
+	handleListMediaAttachments(ctx, c)
+}
+
+// CreateMediaAttachment .
+// @router /api/v1/attachments [POST]
+func CreateMediaAttachment(ctx context.Context, c *app.RequestContext) {
+	handleCreateMediaAttachment(ctx, c)
+}
+
+// GetMediaAttachment .
+// @router /api/v1/attachments/:attachment_id [GET]
+func GetMediaAttachment(ctx context.Context, c *app.RequestContext) {
+	handleGetMediaAttachment(ctx, c)
+}
+
+// CompleteMediaAttachment .
+// @router /api/v1/attachments/:attachment_id/complete [POST]
+func CompleteMediaAttachment(ctx context.Context, c *app.RequestContext) {
+	handleCompleteMediaAttachment(ctx, c)
+}
+
+// DeleteMediaAttachment .
+// @router /api/v1/attachments/:attachment_id [DELETE]
+func DeleteMediaAttachment(ctx context.Context, c *app.RequestContext) {
+	handleDeleteMediaAttachment(ctx, c)
+}
+
+// RestoreMediaAttachment .
+// @router /api/v1/attachments/:attachment_id/restore [POST]
+func RestoreMediaAttachment(ctx context.Context, c *app.RequestContext) {
+	handleRestoreMediaAttachment(ctx, c)
+}
+
+// GetSiteProfile .
+// @router /api/v1/site-profile [GET]
+func GetSiteProfile(ctx context.Context, c *app.RequestContext) {
+	handleGetSiteProfile(ctx, c)
 }

@@ -24,12 +24,14 @@ struct User {
   8: required string bio
   9: required string created_at
   10: required string updated_at
+  11: optional string avatar_attachment_id
 }
 
 struct PublicUser {
   1: required i64 id
   2: required string username
   3: required string avatar
+  4: optional string avatar_attachment_id
 }
 
 struct RegisterRequest {

@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"strings"
 
+	attachmentv1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/attachment"
 	collaborationv1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/collaboration"
 	knowledgev1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/knowledge"
 	gatewaymodel "github.com/HappyLadySauce/Knowledge-Core/services/gateway/biz/model/gateway"
@@ -76,6 +77,25 @@ func handleGetAttachmentContent(ctx context.Context, request *app.RequestContext
 	if !ok {
 		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInternal)
 		return
+	}
+	// Generic attachments are owner-scoped and are served through the same
+	// stable URL. Keep the legacy Knowledge lookup as a compatibility fallback
+	// for the two-release migration window.
+	if _, authenticated := gatewaymiddleware.Principal(request); authenticated && dependencies.Attachment != nil {
+		attachment, attachmentErr := dependencies.Attachment.GetAttachment(
+			upstreamContext(ctx, request), &attachmentv1.AttachmentIDRequest{AttachmentId: attachmentID},
+		)
+		if attachmentErr == nil {
+			if attachment == nil || attachment.Status != "ready" || attachment.DownloadUrl == nil || attachment.DownloadExpiresAt == nil || !validRFC3339(*attachment.DownloadExpiresAt) || !validRedirectURL(*attachment.DownloadUrl) {
+				gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidUpstreamResponse)
+				return
+			}
+			gatewaymiddleware.ResponseMetadata(ctx, request)
+			request.Header("Cache-Control", "private, no-store")
+			request.Header("Location", *attachment.DownloadUrl)
+			request.Status(http.StatusSeeOther)
+			return
+		}
 	}
 	content, err := dependencies.Knowledge.GetAttachmentContent(
 		upstreamContext(ctx, request), &knowledgev1.AttachmentContentRequest{AttachmentId: attachmentID},
@@ -248,15 +268,10 @@ func handlePublishDocument(ctx context.Context, request *app.RequestContext) {
 		return
 	}
 	stateVector, decodeErr := base64.RawURLEncoding.DecodeString(strings.TrimSpace(body.StateVector))
-	if decodeErr != nil || len(stateVector) == 0 {
+	if decodeErr != nil || len(stateVector) == 0 || len(stateVector) > 64*1024 {
 		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidRequest)
 		return
 	}
-	// The current Collaboration API snapshots the committed head. Keeping the
-	// state vector in the HTTP contract lets the client detect stale local state;
-	// the strict equality precondition is added when the publication-version RPC
-	// is enabled.
-	_ = stateVector
 	dependencies, ok := gatewaymiddleware.FromRequest(request)
 	if !ok {
 		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInternal)
@@ -268,7 +283,7 @@ func handlePublishDocument(ctx context.Context, request *app.RequestContext) {
 		return
 	}
 	version, err := dependencies.Collaboration.CreateVersion(upstreamContext(ctx, request), &collaborationv1.CreateVersionRequest{
-		DocumentId: documentID, Label: optionalString("publication"), IdempotencyKey: optionalString(idempotency),
+		DocumentId: documentID, Label: optionalString("publication"), IdempotencyKey: optionalString(idempotency), StateVector: stateVector,
 	})
 	if err != nil {
 		gatewaymiddleware.WriteCollaborationError(ctx, request, err)

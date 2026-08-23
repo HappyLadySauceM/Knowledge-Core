@@ -317,3 +317,31 @@ func _updatefolderMw() []app.HandlerFunc {
 	// your code...
 	return nil
 }
+
+func _listmediaattachmentsMw() []app.HandlerFunc {
+	return []app.HandlerFunc{gatewaymiddleware.RequireAuthenticated()}
+}
+
+func _createmediaattachmentMw() []app.HandlerFunc {
+	return []app.HandlerFunc{gatewaymiddleware.RequireAuthenticated()}
+}
+
+func _deletemediaattachmentMw() []app.HandlerFunc {
+	return []app.HandlerFunc{gatewaymiddleware.RequireAuthenticated()}
+}
+
+func _getmediaattachmentMw() []app.HandlerFunc {
+	return []app.HandlerFunc{gatewaymiddleware.RequireAuthenticated()}
+}
+
+func _completemediaattachmentMw() []app.HandlerFunc {
+	return []app.HandlerFunc{gatewaymiddleware.RequireAuthenticated()}
+}
+
+func _restoremediaattachmentMw() []app.HandlerFunc {
+	return []app.HandlerFunc{gatewaymiddleware.RequireAuthenticated()}
+}
+
+func _getsiteprofileMw() []app.HandlerFunc {
+	return nil
+}

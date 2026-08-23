@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1.7
 ARG RUNTIME_BASE_IMAGE=harbor.happyladysauce.local/knowledge-core/base/distroless-static-debian12:nonroot
 FROM ${RUNTIME_BASE_IMAGE}
 WORKDIR /app

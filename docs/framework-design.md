@@ -27,16 +27,17 @@ Knowledge Core 是一个包含 Go module 与 Rust workspace 的 Monorepo。公�
 
 | 服务 | 入口 | 拥有的数据 | 必需依赖 |
 | --- | --- | --- | --- |
-| Gateway | public `:8080`，admin `:8082` | 无业务数据库 | Redis、Identity RPC、Knowledge RPC、Collaboration RPC |
+| Gateway | public `:8080`，admin `:8082` | 无业务数据库 | Redis、Identity RPC、Knowledge RPC、Collaboration RPC、Attachment RPC |
 | Identity | RPC `:8881`，admin `:8081` | PostgreSQL `identity` schema | PostgreSQL、Redis |
-| Knowledge | RPC `:8882`，admin `:8083` | PostgreSQL `knowledge` schema、S3 对象 | PostgreSQL、NATS JetStream、Identity RPC、S3、ClamAV、Collaboration RPC |
+| Knowledge | RPC `:8882`，admin `:8083` | PostgreSQL `knowledge` schema 中的文档、成员、公开投影和 outbox；文档附件进入兼容迁移窗口 | PostgreSQL、NATS JetStream、Identity RPC、Collaboration RPC、Attachment RPC |
+| Attachment | RPC `:8884`，admin `:8085` | PostgreSQL `attachment` schema 中的通用附件、multipart 状态、扫描任务和引用 | PostgreSQL、MinIO、ClamAV |
 | Collaboration | WebSocket `:8091`，RPC `:8883`，admin `:8084` | PostgreSQL `collaboration` schema 中的 Yjs update、snapshot、version、projection job 和 outbox | PostgreSQL、Redis、NATS JetStream、Knowledge RPC |
 
 所有权规则如下：
 
 - Gateway 是 HTTP edge，不持久化领域数据，不直连 Identity、Knowledge 或 Collaboration 的数据库。
 - Identity 只拥有用户、凭据状态和 token version。其他服务通过 Identity RPC 获取当前用户或解析成员用户名。
-- Knowledge 拥有文档元数据、成员、公开投影、附件状态、幂等记录和 outbox，不保存 Yjs 二进制状态或版本。
+- Knowledge 拥有文档元数据、成员、公开投影、幂等记录和 outbox，不保存 Yjs 二进制状态或版本；图片、视频、文件和压缩包由 Attachment 统一拥有，旧文档附件接口仅保留兼容窗口。
 - Collaboration 拥有协作状态和版本，不复制文档权限规则。创建 session 时通过 Knowledge RPC 复核访问级别；短期单次 ticket 被消费后建立有明确到期时间的连接。
 - `pkg/` 只承载跨服务公共能力，禁止导入 `services/*`。
 

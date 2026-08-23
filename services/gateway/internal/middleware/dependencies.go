@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/attachment/attachmentservice"
 	collaborationv1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/collaboration"
 	commonv1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/common"
 	identityv1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/identity"
@@ -46,6 +47,7 @@ type Dependencies struct {
 	Identity       IdentityClient
 	Knowledge      knowledgeservice.Client
 	Collaboration  CollaborationClient
+	Attachment     attachmentservice.Client
 	Verifier       TokenVerifier
 	Limiter        RateLimiter
 	Health         *health.Registry
@@ -80,6 +82,7 @@ func NewDependencies(
 	identity IdentityClient,
 	knowledge knowledgeservice.Client,
 	collaboration CollaborationClient,
+	attachment attachmentservice.Client,
 	verifier TokenVerifier,
 	limiter RateLimiter,
 	healthRegistry *health.Registry,
@@ -90,7 +93,7 @@ func NewDependencies(
 	endpoints config.EndpointOptions,
 	secure bool,
 ) (*Dependencies, error) {
-	if identity == nil || knowledge == nil || collaboration == nil || verifier == nil || limiter == nil || healthRegistry == nil || logger == nil {
+	if identity == nil || knowledge == nil || collaboration == nil || attachment == nil || verifier == nil || limiter == nil || healthRegistry == nil || logger == nil {
 		return nil, errors.New("create gateway middleware dependencies: upstream clients, verifier, limiter, health, and logger are required")
 	}
 	if err := cors.Validate(); err != nil {
@@ -111,7 +114,7 @@ func NewDependencies(
 		allowedOrigins[origin] = struct{}{}
 	}
 	dependencies := &Dependencies{
-		Identity: identity, Knowledge: knowledge, Collaboration: collaboration,
+		Identity: identity, Knowledge: knowledge, Collaboration: collaboration, Attachment: attachment,
 		Verifier: verifier, Limiter: limiter, Health: healthRegistry, Logger: logger, RequestLogs: requestLogs,
 		AllowedOrigins: allowedOrigins, TrustedProxies: trustedProxies, RateLimit: rateLimit, Endpoints: endpoints, Secure: secure,
 		Now: time.Now,

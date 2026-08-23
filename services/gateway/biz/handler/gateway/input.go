@@ -72,6 +72,22 @@ type createAttachmentBody struct {
 	SHA256    string `json:"sha256"`
 }
 
+type createMediaAttachmentBody struct {
+	Filename  string `json:"filename"`
+	MediaType string `json:"media_type"`
+	SizeBytes int64  `json:"size_bytes"`
+}
+
+type completeMediaAttachmentPartBody struct {
+	PartNumber int32  `json:"part_number"`
+	ETag       string `json:"etag"`
+}
+
+type completeMediaAttachmentBody struct {
+	UploadID string                            `json:"upload_id"`
+	Parts    []completeMediaAttachmentPartBody `json:"parts"`
+}
+
 func decodeJSONBody(request *app.RequestContext, target any) error {
 	if request == nil || target == nil {
 		return errors.New("request and target are required")

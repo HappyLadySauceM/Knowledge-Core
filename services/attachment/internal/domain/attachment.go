@@ -14,6 +14,7 @@ import (
 const (
 	StatusPendingUpload       = "pending_upload"
 	StatusScanning            = "scanning"
+	StatusScanParked          = "scan_parked"
 	StatusReady               = "ready"
 	StatusRejected            = "rejected"
 	StatusTrashed             = "trashed"
@@ -30,8 +31,16 @@ const (
 )
 
 var shaPattern = regexp.MustCompile(`^[a-fA-F0-9]{64}$`)
+var idempotencyKeyPattern = regexp.MustCompile(`^[\x21-\x7e]{1,128}$`)
 
-var allowed = map[string]string{"image/jpeg": CategoryImage, "image/png": CategoryImage, "image/gif": CategoryImage, "image/webp": CategoryImage, "image/avif": CategoryImage, "audio/mpeg": CategoryAudio, "audio/ogg": CategoryAudio, "audio/wav": CategoryAudio, "audio/webm": CategoryAudio, "video/mp4": CategoryVideo, "video/webm": CategoryVideo, "video/quicktime": CategoryVideo, "application/pdf": CategoryDocument, "application/zip": CategoryArchive, "application/x-7z-compressed": CategoryArchive, "application/x-rar-compressed": CategoryArchive, "text/plain": CategoryFile, "text/markdown": CategoryFile, "application/json": CategoryFile, "application/vnd.openxmlformats-officedocument.wordprocessingml.document": CategoryDocument, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": CategoryDocument, "application/vnd.openxmlformats-officedocument.presentationml.presentation": CategoryDocument}
+var allowed = map[string]string{
+	"image/jpeg": CategoryImage, "image/png": CategoryImage, "image/gif": CategoryImage, "image/webp": CategoryImage, "image/avif": CategoryImage,
+	"audio/mpeg": CategoryAudio, "audio/ogg": CategoryAudio, "audio/wav": CategoryAudio, "audio/webm": CategoryAudio,
+	"video/mp4": CategoryVideo, "video/webm": CategoryVideo, "video/quicktime": CategoryVideo,
+	"application/pdf": CategoryDocument, "application/zip": CategoryArchive, "application/x-7z-compressed": CategoryArchive, "application/x-rar-compressed": CategoryArchive, "application/gzip": CategoryArchive, "application/x-tar": CategoryArchive,
+	"text/plain": CategoryFile, "text/markdown": CategoryFile, "text/csv": CategoryFile, "application/json": CategoryFile, "application/octet-stream": CategoryFile,
+	"application/vnd.openxmlformats-officedocument.wordprocessingml.document": CategoryDocument, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": CategoryDocument, "application/vnd.openxmlformats-officedocument.presentationml.presentation": CategoryDocument,
+}
 
 type Attachment struct {
 	ID                                                string
@@ -50,7 +59,15 @@ type ScanResult struct {
 	DetectedType string
 }
 
-func NewID() string { return uuid.NewString() }
+// NewID returns a UUIDv7 so attachment identifiers have the same ordering
+// semantics as the document identifiers used by the collaboration service.
+func NewID() (string, error) {
+	id, err := uuid.NewV7()
+	if err != nil {
+		return "", fmt.Errorf("generate attachment id: %w", err)
+	}
+	return id.String(), nil
+}
 func Validate(filename, mediaType string, size int64) (string, error) {
 	filename = strings.TrimSpace(filename)
 	mediaType = strings.ToLower(strings.TrimSpace(mediaType))
@@ -72,6 +89,15 @@ func Validate(filename, mediaType string, size int64) (string, error) {
 func ValidateHash(hash string) error {
 	if !shaPattern.MatchString(hash) {
 		return errors.New("sha256 must be a 64 character hex string")
+	}
+	return nil
+}
+func ValidateIdempotencyKey(value string) error {
+	if value == "" {
+		return nil
+	}
+	if value != strings.TrimSpace(value) || !idempotencyKeyPattern.MatchString(value) {
+		return errors.New("idempotency key must contain 1-128 visible ASCII characters")
 	}
 	return nil
 }

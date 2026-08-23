@@ -1,12 +1,13 @@
 # Knowledge Core
 
-Knowledge Core 是一个支持文档元数据、权限、附件、实时协作与版本恢复的知识协作后端。仓库包含 Go module 与 Rust workspace；Collaboration 服务使用 Rust、Yrs 和标准 y-sync 协议。
+Knowledge Core 是一个支持文档元数据、权限、通用附件、实时协作与版本恢复的知识协作后端。仓库包含 Go module 与 Rust workspace；Collaboration 服务使用 Rust、Yrs 和标准 y-sync 协议。
 
 当前实现包含四个服务：
 
 - Gateway：公网 HTTP edge，负责严格输入校验、JWT、CORS、安全头、限流、错误映射和上游编排。
 - Identity：用户注册、密码认证、邮箱验证、密码重置、账户锁定、Refresh Token 轮换、会话撤销、Ed25519 JWT 签发与用户状态复核。
-- Knowledge：文档元数据、成员权限、发布、附件、回收站、投影、配额和 outbox。
+- Knowledge：文档元数据、成员权限、发布、回收站、投影、配额和 outbox；旧文档附件接口处于迁移兼容窗口。
+- Attachment：图片、音频、视频、文档、压缩包和普通文件的 multipart 上传、扫描、引用与生命周期。
 - Collaboration：Yrs/y-sync WebSocket、一次性 session ticket、持久化 update、快照、版本、恢复和多实例同步。
 
 详细架构和运行时契约见 [docs/framework-design.md](docs/framework-design.md)，编码约束见 [AGENTS.md](AGENTS.md)。
@@ -21,6 +22,8 @@ Knowledge Core 是一个支持文档元数据、权限、附件、实时协作�
 | 当前用户 | `GET /api/v1/users/me` | 验签后向 Identity 复核 active 状态与 token version |
 | 公开文档 | `GET /api/v1/documents`、`GET /api/v1/documents/:slug` | 发布列表、投影内容和附件元数据 |
 | 附件下载 | `GET /api/v1/attachments/:attachment_id/content` | 返回 `303 See Other` 到短期预签名地址 |
+| 通用附件 | `/api/v1/attachments` | Attachment façade、16MiB 分片上传、幂等重试、扫描状态和回收 |
+| 站点配置 | `GET /api/v1/site-profile` | 站点标题、双语标语、首图和焦点位置 |
 | Studio 文档 | `/api/v1/studio/documents` | 列表、创建、读取、更新、删除、发布和取消发布 |
 | 成员 | `/api/v1/studio/documents/:document_id/members` | viewer/editor 成员管理 |
 | 版本 | `/api/v1/studio/documents/:document_id/versions` | 手工版本、详情和恢复 |
@@ -71,12 +74,13 @@ flowchart LR
     Gateway --> Identity[Identity RPC :8881]
     Gateway --> Knowledge[Knowledge RPC :8882]
     Gateway --> CollaborationRPC[Collaboration RPC :8883]
+    Gateway --> Attachment[Attachment RPC :8884]
     Collaboration --> KnowledgeRPC[Knowledge RPC :8882]
     Identity --> PostgreSQL[(PostgreSQL)]
     Identity --> Redis[(Redis)]
     Knowledge --> PostgreSQL
-    Knowledge --> S3[(S3 / MinIO)]
-    Knowledge --> ClamAV[ClamAV]
+    Attachment --> S3[(S3 / MinIO)]
+    Attachment --> ClamAV[ClamAV]
     Knowledge --> NATS[(NATS)]
     Collaboration --> PostgreSQL
     Collaboration --> Redis

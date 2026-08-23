@@ -28,6 +28,7 @@ type User struct {
 	Status              string
 	TokenVersion        int64
 	Avatar              string
+	AvatarAttachmentID  string
 	Bio                 string
 	FailedLoginAttempts int
 	LockedUntil         *time.Time

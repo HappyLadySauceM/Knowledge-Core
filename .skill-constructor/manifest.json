@@ -22,11 +22,11 @@
     },
     {
       "id": "architecture.summary",
-      "revision": 125,
+      "revision": 127,
       "section": "architecture",
       "sources": [
         {
-          "detail": "evidence-sha256:57db899a6e013d5ecb2f141957cfbcd4f84f19fe3a52cabd23880321ae6542e3",
+          "detail": "evidence-sha256:f65bfec9679bdc64955d068c0002a5176b3aa78dd6c3d24e85f788765e8a7068",
           "kind": "documented",
           "reference": "README.md#knowledge-core"
         },
@@ -36,17 +36,17 @@
           "reference": "deploy/overlay/dev/README.md#development-overlay"
         },
         {
-          "detail": "evidence-sha256:57db899a6e013d5ecb2f141957cfbcd4f84f19fe3a52cabd23880321ae6542e3",
+          "detail": "evidence-sha256:f65bfec9679bdc64955d068c0002a5176b3aa78dd6c3d24e85f788765e8a7068",
           "kind": "documented",
           "reference": "docs/framework-design.md#9"
         },
         {
-          "detail": "evidence-sha256:57db899a6e013d5ecb2f141957cfbcd4f84f19fe3a52cabd23880321ae6542e3",
+          "detail": "evidence-sha256:f65bfec9679bdc64955d068c0002a5176b3aa78dd6c3d24e85f788765e8a7068",
           "kind": "documented",
           "reference": "docs/framework-design.md#knowledge-core"
         },
         {
-          "detail": "evidence-sha256:57db899a6e013d5ecb2f141957cfbcd4f84f19fe3a52cabd23880321ae6542e3",
+          "detail": "evidence-sha256:f65bfec9679bdc64955d068c0002a5176b3aa78dd6c3d24e85f788765e8a7068",
           "kind": "documented",
           "reference": "docs/rust-collaboration-design.md#rust-collaboration"
         },
@@ -60,7 +60,7 @@
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-08-23T05:36:03Z",
+      "updatedAt": "2026-08-23T08:26:58Z",
       "value": "Knowledge Core contains five explicitly composed services: Go Gateway, Identity, Knowledge, and Attachment services plus a Rust Collaboration service. Go assembly flows main/spec -> internal/config -> internal/context -> domain/logic/repository/transport. ServiceContext owns service dependencies, while pkg/app.Runtime is limited to process-level observability, health, metrics, and lifecycle orchestration. Business logic depends on service-local small interfaces; repositories own persistence and storage error mapping; transports validate and adapt protocols without domain rules."
     },
     {
@@ -608,11 +608,11 @@
     "profile": "generic",
     "slug": "knowledge-core"
   },
-  "revision": 126,
+  "revision": 127,
   "scan": {
-    "fingerprint": "f3b8f2fd4b4e04c9fe49553d5448baeaebdc4407482a51a0dd52b0141c1affbb",
-    "inventoryCount": 392
+    "fingerprint": "b3652f33adf65ce104c7093a9b32e17b745656c09c8c435753209d09885ec769",
+    "inventoryCount": 396
   },
   "schemaVersion": 1,
-  "updatedAt": "2026-08-23T05:38:23Z"
+  "updatedAt": "2026-08-23T08:26:58Z"
 }

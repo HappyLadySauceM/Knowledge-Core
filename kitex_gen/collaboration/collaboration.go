@@ -477,6 +477,7 @@ type CreateVersionRequest struct {
 	DocumentId     string  `thrift:"document_id,1,required" frugal:"1,required,string" json:"document_id"`
 	Label          *string `thrift:"label,2,optional" frugal:"2,optional,string" json:"label,omitempty"`
 	IdempotencyKey *string `thrift:"idempotency_key,3,optional" frugal:"3,optional,string" json:"idempotency_key,omitempty"`
+	StateVector    []byte  `thrift:"state_vector,4,optional" frugal:"4,optional,binary" json:"state_vector,omitempty"`
 }
 
 func NewCreateVersionRequest() *CreateVersionRequest {
@@ -507,6 +508,15 @@ func (p *CreateVersionRequest) GetIdempotencyKey() (v string) {
 	}
 	return *p.IdempotencyKey
 }
+
+var CreateVersionRequest_StateVector_DEFAULT []byte
+
+func (p *CreateVersionRequest) GetStateVector() (v []byte) {
+	if !p.IsSetStateVector() {
+		return CreateVersionRequest_StateVector_DEFAULT
+	}
+	return p.StateVector
+}
 func (p *CreateVersionRequest) SetDocumentId(val string) {
 	p.DocumentId = val
 }
@@ -516,6 +526,9 @@ func (p *CreateVersionRequest) SetLabel(val *string) {
 func (p *CreateVersionRequest) SetIdempotencyKey(val *string) {
 	p.IdempotencyKey = val
 }
+func (p *CreateVersionRequest) SetStateVector(val []byte) {
+	p.StateVector = val
+}
 
 func (p *CreateVersionRequest) IsSetLabel() bool {
 	return p.Label != nil
@@ -523,6 +536,10 @@ func (p *CreateVersionRequest) IsSetLabel() bool {
 
 func (p *CreateVersionRequest) IsSetIdempotencyKey() bool {
 	return p.IdempotencyKey != nil
+}
+
+func (p *CreateVersionRequest) IsSetStateVector() bool {
+	return p.StateVector != nil
 }
 
 func (p *CreateVersionRequest) String() string {
@@ -536,6 +553,7 @@ var fieldIDToName_CreateVersionRequest = map[int16]string{
 	1: "document_id",
 	2: "label",
 	3: "idempotency_key",
+	4: "state_vector",
 }
 
 type GetVersionRequest struct {

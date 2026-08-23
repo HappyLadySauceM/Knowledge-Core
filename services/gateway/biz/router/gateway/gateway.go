@@ -21,6 +21,8 @@ func Register(r *server.Hertz) {
 		_api := root.Group("/api", _apiMw()...)
 		{
 			_v1 := _api.Group("/v1", _v1Mw()...)
+			_v1.GET("/attachments", append(_listmediaattachmentsMw(), gateway.ListMediaAttachments)...)
+			_v1.POST("/attachments", append(_createmediaattachmentMw(), gateway.CreateMediaAttachment)...)
 			_v1.GET("/documents", append(_listpublisheddocumentsMw(), gateway.ListPublishedDocuments)...)
 			_v1.POST("/email-verification-requests", append(_requestemailverificationMw(), gateway.RequestEmailVerification)...)
 			_v1.POST("/email-verifications", append(_verifyemailMw(), gateway.VerifyEmail)...)
@@ -29,12 +31,17 @@ func Register(r *server.Hertz) {
 			_v1.DELETE("/sessions", append(_revokeallsessionsMw(), gateway.RevokeAllSessions)...)
 			_v1.GET("/sessions", append(_listsessionsMw(), gateway.ListSessions)...)
 			_v1.POST("/sessions", append(_loginMw(), gateway.Login)...)
+			_v1.GET("/site-profile", append(_getsiteprofileMw(), gateway.GetSiteProfile)...)
 			_v1.POST("/users", append(_registerMw(), gateway.Register)...)
 			{
 				_attachments := _v1.Group("/attachments", _attachmentsMw()...)
+				_attachments.DELETE("/:attachment_id", append(_deletemediaattachmentMw(), gateway.DeleteMediaAttachment)...)
+				_attachments.GET("/:attachment_id", append(_getmediaattachmentMw(), gateway.GetMediaAttachment)...)
 				{
 					_attachment_id := _attachments.Group("/:attachment_id", _attachment_idMw()...)
+					_attachment_id.POST("/complete", append(_completemediaattachmentMw(), gateway.CompleteMediaAttachment)...)
 					_attachment_id.GET("/content", append(_getattachmentcontentMw(), gateway.GetAttachmentContent)...)
+					_attachment_id.POST("/restore", append(_restoremediaattachmentMw(), gateway.RestoreMediaAttachment)...)
 				}
 			}
 			{

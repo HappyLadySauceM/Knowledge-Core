@@ -31,16 +31,17 @@ const (
 )
 
 type User struct {
-	Id           int64  `thrift:"id,1,required" frugal:"1,required,i64" json:"id"`
-	Username     string `thrift:"username,2,required" frugal:"2,required,string" json:"username"`
-	Email        string `thrift:"email,3,required" frugal:"3,required,string" json:"email"`
-	Role         string `thrift:"role,4,required" frugal:"4,required,string" json:"role"`
-	Status       string `thrift:"status,5,required" frugal:"5,required,string" json:"status"`
-	TokenVersion int64  `thrift:"token_version,6,required" frugal:"6,required,i64" json:"token_version"`
-	Avatar       string `thrift:"avatar,7,required" frugal:"7,required,string" json:"avatar"`
-	Bio          string `thrift:"bio,8,required" frugal:"8,required,string" json:"bio"`
-	CreatedAt    string `thrift:"created_at,9,required" frugal:"9,required,string" json:"created_at"`
-	UpdatedAt    string `thrift:"updated_at,10,required" frugal:"10,required,string" json:"updated_at"`
+	Id                 int64   `thrift:"id,1,required" frugal:"1,required,i64" json:"id"`
+	Username           string  `thrift:"username,2,required" frugal:"2,required,string" json:"username"`
+	Email              string  `thrift:"email,3,required" frugal:"3,required,string" json:"email"`
+	Role               string  `thrift:"role,4,required" frugal:"4,required,string" json:"role"`
+	Status             string  `thrift:"status,5,required" frugal:"5,required,string" json:"status"`
+	TokenVersion       int64   `thrift:"token_version,6,required" frugal:"6,required,i64" json:"token_version"`
+	Avatar             string  `thrift:"avatar,7,required" frugal:"7,required,string" json:"avatar"`
+	Bio                string  `thrift:"bio,8,required" frugal:"8,required,string" json:"bio"`
+	CreatedAt          string  `thrift:"created_at,9,required" frugal:"9,required,string" json:"created_at"`
+	UpdatedAt          string  `thrift:"updated_at,10,required" frugal:"10,required,string" json:"updated_at"`
+	AvatarAttachmentId *string `thrift:"avatar_attachment_id,11,optional" frugal:"11,optional,string" json:"avatar_attachment_id,omitempty"`
 }
 
 func NewUser() *User {
@@ -89,6 +90,15 @@ func (p *User) GetCreatedAt() (v string) {
 func (p *User) GetUpdatedAt() (v string) {
 	return p.UpdatedAt
 }
+
+var User_AvatarAttachmentId_DEFAULT string
+
+func (p *User) GetAvatarAttachmentId() (v string) {
+	if !p.IsSetAvatarAttachmentId() {
+		return User_AvatarAttachmentId_DEFAULT
+	}
+	return *p.AvatarAttachmentId
+}
 func (p *User) SetId(val int64) {
 	p.Id = val
 }
@@ -119,6 +129,13 @@ func (p *User) SetCreatedAt(val string) {
 func (p *User) SetUpdatedAt(val string) {
 	p.UpdatedAt = val
 }
+func (p *User) SetAvatarAttachmentId(val *string) {
+	p.AvatarAttachmentId = val
+}
+
+func (p *User) IsSetAvatarAttachmentId() bool {
+	return p.AvatarAttachmentId != nil
+}
 
 func (p *User) String() string {
 	if p == nil {
@@ -138,12 +155,14 @@ var fieldIDToName_User = map[int16]string{
 	8:  "bio",
 	9:  "created_at",
 	10: "updated_at",
+	11: "avatar_attachment_id",
 }
 
 type PublicUser struct {
-	Id       int64  `thrift:"id,1,required" frugal:"1,required,i64" json:"id"`
-	Username string `thrift:"username,2,required" frugal:"2,required,string" json:"username"`
-	Avatar   string `thrift:"avatar,3,required" frugal:"3,required,string" json:"avatar"`
+	Id                 int64   `thrift:"id,1,required" frugal:"1,required,i64" json:"id"`
+	Username           string  `thrift:"username,2,required" frugal:"2,required,string" json:"username"`
+	Avatar             string  `thrift:"avatar,3,required" frugal:"3,required,string" json:"avatar"`
+	AvatarAttachmentId *string `thrift:"avatar_attachment_id,4,optional" frugal:"4,optional,string" json:"avatar_attachment_id,omitempty"`
 }
 
 func NewPublicUser() *PublicUser {
@@ -164,6 +183,15 @@ func (p *PublicUser) GetUsername() (v string) {
 func (p *PublicUser) GetAvatar() (v string) {
 	return p.Avatar
 }
+
+var PublicUser_AvatarAttachmentId_DEFAULT string
+
+func (p *PublicUser) GetAvatarAttachmentId() (v string) {
+	if !p.IsSetAvatarAttachmentId() {
+		return PublicUser_AvatarAttachmentId_DEFAULT
+	}
+	return *p.AvatarAttachmentId
+}
 func (p *PublicUser) SetId(val int64) {
 	p.Id = val
 }
@@ -172,6 +200,13 @@ func (p *PublicUser) SetUsername(val string) {
 }
 func (p *PublicUser) SetAvatar(val string) {
 	p.Avatar = val
+}
+func (p *PublicUser) SetAvatarAttachmentId(val *string) {
+	p.AvatarAttachmentId = val
+}
+
+func (p *PublicUser) IsSetAvatarAttachmentId() bool {
+	return p.AvatarAttachmentId != nil
 }
 
 func (p *PublicUser) String() string {
@@ -185,6 +220,7 @@ var fieldIDToName_PublicUser = map[int16]string{
 	1: "id",
 	2: "username",
 	3: "avatar",
+	4: "avatar_attachment_id",
 }
 
 type RegisterRequest struct {

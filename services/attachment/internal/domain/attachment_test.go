@@ -1,6 +1,24 @@
 package domain
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/google/uuid"
+)
+
+func TestNewIDIsUUIDv7(t *testing.T) {
+	id, err := NewID()
+	if err != nil {
+		t.Fatalf("NewID() error = %v", err)
+	}
+	parsed, err := uuid.Parse(id)
+	if err != nil {
+		t.Fatalf("NewID() returned invalid UUID: %v", err)
+	}
+	if got := parsed.Version(); got != 7 {
+		t.Fatalf("NewID() version = %v, want 7", got)
+	}
+}
 
 func TestValidateCategoriesAndLimits(t *testing.T) {
 	tests := []struct{ name, media, want string }{
@@ -14,10 +32,13 @@ func TestValidateCategoriesAndLimits(t *testing.T) {
 			}
 		})
 	}
-	for _, media := range []string{"application/x-msdownload", "text/html", "application/octet-stream"} {
+	for _, media := range []string{"application/x-msdownload", "text/html"} {
 		if _, err := Validate("file.bin", media, 1); err == nil {
 			t.Fatalf("Validate(%q) accepted blocked media", media)
 		}
+	}
+	if category, err := Validate("file.bin", "application/octet-stream", 1); err != nil || category != CategoryFile {
+		t.Fatalf("Validate(application/octet-stream) = %q, %v; want file", category, err)
 	}
 	if _, err := Validate("file.bin", "application/pdf", 1<<30+1); err == nil {
 		t.Fatal("Validate accepted a file larger than 1 GiB")

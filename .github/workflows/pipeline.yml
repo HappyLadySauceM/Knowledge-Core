@@ -317,6 +317,16 @@ jobs:
           echo "$result"
           echo "gitops_revision=$(echo "$result" | jq -r '.gitops_revision')" >> "$GITHUB_OUTPUT"
           echo "gitops_base_revision=$(echo "$result" | jq -r '.gitops_base_revision')" >> "$GITHUB_OUTPUT"
+      - name: Reconcile Knowledge Core ApplicationSet
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: HappyLadySauceM/k3s-home-deploy
+          ref: ${{ steps.gitops.outputs.gitops_revision }}
+          token: ${{ steps.app-token.outputs.token }}
+          fetch-depth: 1
+          path: .gitops
+      - name: Apply Knowledge Core ApplicationSet
+        run: kubectl apply -k .gitops/Knowledge-Core/argocd
       - name: Mark dev deployment pending
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}

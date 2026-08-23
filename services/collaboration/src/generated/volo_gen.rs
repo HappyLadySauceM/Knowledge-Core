@@ -5759,6 +5759,8 @@ pub mod volo_gen {
             pub label: ::std::option::Option<::pilota::FastStr>,
 
             pub idempotency_key: ::std::option::Option<::pilota::FastStr>,
+
+            pub state_vector: ::std::option::Option<::pilota::Bytes>,
         }
         impl ::pilota::thrift::Message for CreateVersionRequest {
             fn encode<T: ::pilota::thrift::TOutputProtocol>(
@@ -5779,6 +5781,9 @@ pub mod volo_gen {
                 if let Some(value) = self.idempotency_key.as_ref() {
                     __protocol.write_faststr_field(3, (value).clone())?;
                 }
+                if let Some(value) = self.state_vector.as_ref() {
+                    __protocol.write_bytes_field(4, (value).clone())?;
+                }
                 __protocol.write_field_stop()?;
                 __protocol.write_struct_end()?;
                 ::std::result::Result::Ok(())
@@ -5793,6 +5798,7 @@ pub mod volo_gen {
                 let mut var_1 = None;
                 let mut var_2 = None;
                 let mut var_3 = None;
+                let mut var_4 = None;
 
                 let mut __pilota_decoding_field_id = None;
 
@@ -5822,6 +5828,11 @@ pub mod volo_gen {
                                 if field_ident.field_type == ::pilota::thrift::TType::Binary =>
                             {
                                 var_3 = Some(__protocol.read_faststr()?);
+                            }
+                            Some(4)
+                                if field_ident.field_type == ::pilota::thrift::TType::Binary =>
+                            {
+                                var_4 = Some(__protocol.read_bytes()?);
                             }
                             _ => {
                                 __protocol.skip(field_ident.field_type)?;
@@ -5854,6 +5865,7 @@ pub mod volo_gen {
                     document_id: var_1,
                     label: var_2,
                     idempotency_key: var_3,
+                    state_vector: var_4,
                 };
                 ::std::result::Result::Ok(data)
             }
@@ -5872,6 +5884,7 @@ pub mod volo_gen {
                     let mut var_1 = None;
                     let mut var_2 = None;
                     let mut var_3 = None;
+                    let mut var_4 = None;
 
                     let mut __pilota_decoding_field_id = None;
 
@@ -5902,6 +5915,12 @@ pub mod volo_gen {
                                         == ::pilota::thrift::TType::Binary =>
                                 {
                                     var_3 = Some(__protocol.read_faststr().await?);
+                                }
+                                Some(4)
+                                    if field_ident.field_type
+                                        == ::pilota::thrift::TType::Binary =>
+                                {
+                                    var_4 = Some(__protocol.read_bytes().await?);
                                 }
                                 _ => {
                                     __protocol.skip(field_ident.field_type).await?;
@@ -5934,6 +5953,7 @@ pub mod volo_gen {
                         document_id: var_1,
                         label: var_2,
                         idempotency_key: var_3,
+                        state_vector: var_4,
                     };
                     ::std::result::Result::Ok(data)
                 })
@@ -5953,6 +5973,10 @@ pub mod volo_gen {
                         .idempotency_key
                         .as_ref()
                         .map_or(0, |value| __protocol.faststr_field_len(Some(3), value))
+                    + self
+                        .state_vector
+                        .as_ref()
+                        .map_or(0, |value| __protocol.bytes_field_len(Some(4), value))
                     + __protocol.field_stop_len()
                     + __protocol.struct_end_len()
             }

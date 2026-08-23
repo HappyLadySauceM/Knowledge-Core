@@ -5,6 +5,8 @@ use pilota::FastStr;
 use serde::{Deserialize, Serialize};
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 use volo_thrift::ServerError;
+use yrs::updates::encoder::Encode;
+use yrs::{ReadTxn, Transact};
 
 use crate::{
     actor::{ActorRegistry, CLOSE_DOCUMENT_INVALIDATED},
@@ -15,7 +17,7 @@ use crate::{
     ports::KnowledgePort,
     richtext::projection_from_state,
     routing::RoutingService,
-    storage::{VersionCursor, VersionStore},
+    storage::{DocumentStore, VersionCursor, VersionStore},
     ticket::TicketService,
 };
 
@@ -28,6 +30,7 @@ const MAXIMUM_CURSOR_LENGTH: usize = 1_024;
 #[derive(Clone)]
 pub struct CollaborationHandler {
     knowledge: Arc<dyn KnowledgePort>,
+    documents: Arc<dyn DocumentStore>,
     tickets: TicketService,
     versions: Arc<dyn VersionStore>,
     actors: ActorRegistry,
@@ -45,6 +48,7 @@ impl CollaborationHandler {
     /// Returns an error when the public session contract is invalid.
     pub fn new(
         knowledge: Arc<dyn KnowledgePort>,
+        documents: Arc<dyn DocumentStore>,
         tickets: TicketService,
         versions: Arc<dyn VersionStore>,
         actors: ActorRegistry,
@@ -59,6 +63,7 @@ impl CollaborationHandler {
         }
         Ok(Self {
             knowledge,
+            documents,
             tickets,
             versions,
             actors,
@@ -215,6 +220,19 @@ impl collaboration::CollaborationService for CollaborationHandler {
                 .map(validate_idempotency_key)
                 .transpose()?;
             let (context, authorization) = self.authorization(document_id, true).await?;
+            if let Some(state_vector) = request.state_vector.as_deref() {
+                if state_vector.is_empty() || state_vector.len() > 64 * 1024 {
+                    return Err(ServiceError::invalid_input(
+                        "state vector exceeds the configured size boundary",
+                    ));
+                }
+                let loaded = self.documents.load_document(&context, document_id).await?;
+                let current = crate::richtext::document_from_state(&loaded.state)?;
+                let current_vector = current.transact().state_vector().encode_v1();
+                if current_vector != state_vector {
+                    return Err(ServiceError::precondition_failed());
+                }
+            }
             let version = self
                 .versions
                 .create_manual_version(
@@ -676,6 +694,7 @@ mod tests {
                     document_id: document_id.clone().into(),
                     label: None,
                     idempotency_key: None,
+                    state_vector: None,
                 })
                 .await
                 .expect_err("version creation must fail while not ready"),
@@ -741,6 +760,7 @@ mod tests {
             document_id: document_id.to_string().into(),
             label: Some("Checkpoint".into()),
             idempotency_key: Some("request-1".into()),
+            state_vector: None,
         };
         let error =
             scope_request_context_for_test(authenticated_context(), viewer.create_version(request))
@@ -756,6 +776,7 @@ mod tests {
                 document_id: document_id.to_string().into(),
                 label: Some("Checkpoint".into()),
                 idempotency_key: Some("request-2".into()),
+                state_vector: None,
             }),
         )
         .await
@@ -862,7 +883,7 @@ mod tests {
         let versions: Arc<dyn VersionStore> = store.clone();
         let knowledge_port: Arc<dyn KnowledgePort> = knowledge.clone();
         let actors = ActorRegistry::new(
-            documents,
+            Arc::clone(&documents),
             ActorLimits::for_test(),
             Metrics::new().expect("metrics"),
             CancellationToken::new(),
@@ -872,6 +893,7 @@ mod tests {
         let routing = RoutingService::new(routing_store, 1, 0, 8).expect("routing");
         let handler = CollaborationHandler::new(
             knowledge_port,
+            documents,
             tickets,
             versions,
             actors,

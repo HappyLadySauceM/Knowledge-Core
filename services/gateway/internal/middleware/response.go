@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 
+	attachmentv1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/attachment"
 	collaborationv1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/collaboration"
 	identityv1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/identity"
 	knowledgev1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/knowledge"
@@ -66,6 +67,17 @@ var knowledgeErrors = []rpcErrorMapping{
 	{knowledgev1.CodeInternal, "knowledge.internal", responseErrorWithStatus(knowledgev1.CodeInternal, http.StatusBadGateway, "knowledge.internal", apperror.KindUnavailable, "knowledge service unavailable")},
 }
 
+var attachmentErrors = []rpcErrorMapping{
+	{attachmentv1.CodeInvalidInput, "attachment.invalid_input", responseError(attachmentv1.CodeInvalidInput, "attachment.invalid_input", apperror.KindInvalidArgument, "invalid attachment input")},
+	{attachmentv1.CodeNotFound, "attachment.not_found", responseError(attachmentv1.CodeNotFound, "attachment.not_found", apperror.KindNotFound, "attachment not found")},
+	{attachmentv1.CodeConflict, "attachment.conflict", responseError(attachmentv1.CodeConflict, "attachment.conflict", apperror.KindConflict, "attachment state conflict")},
+	{attachmentv1.CodeForbidden, "attachment.forbidden", responseError(attachmentv1.CodeForbidden, "attachment.forbidden", apperror.KindPermissionDenied, "attachment access denied")},
+	{attachmentv1.CodeUnauthenticated, "attachment.unauthenticated", responseError(attachmentv1.CodeUnauthenticated, "attachment.unauthenticated", apperror.KindUnauthenticated, "authentication required")},
+	{attachmentv1.CodeUnavailable, "attachment.unavailable", responseError(attachmentv1.CodeUnavailable, "attachment.unavailable", apperror.KindUnavailable, "attachment service unavailable")},
+	{attachmentv1.CodeQuotaExceeded, "attachment.quota_exceeded", responseError(attachmentv1.CodeQuotaExceeded, "attachment.quota_exceeded", apperror.KindConflict, "attachment quota exceeded")},
+	{attachmentv1.CodeInternal, "attachment.internal", responseErrorWithStatus(attachmentv1.CodeInternal, http.StatusBadGateway, "attachment.internal", apperror.KindUnavailable, "attachment service unavailable")},
+}
+
 var collaborationErrors = []rpcErrorMapping{
 	{collaborationv1.CodeInvalidInput, "collaboration.invalid_input", responseErrorWithStatus(collaborationv1.CodeInvalidInput, http.StatusBadRequest, "collaboration.invalid_input", apperror.KindInvalidArgument, "invalid collaboration input")},
 	{collaborationv1.CodeUnauthenticated, "collaboration.unauthenticated", responseErrorWithStatus(collaborationv1.CodeUnauthenticated, http.StatusUnauthorized, "collaboration.unauthenticated", apperror.KindUnauthenticated, "authentication required")},
@@ -101,6 +113,10 @@ func WriteIdentityError(ctx context.Context, request *app.RequestContext, err er
 
 func WriteKnowledgeError(ctx context.Context, request *app.RequestContext, err error) {
 	writeRPCError(ctx, request, err, knowledgeErrors)
+}
+
+func WriteAttachmentError(ctx context.Context, request *app.RequestContext, err error) {
+	writeRPCError(ctx, request, err, attachmentErrors)
 }
 
 func WriteCollaborationError(ctx context.Context, request *app.RequestContext, err error) {

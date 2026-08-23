@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1.7
 ARG RUNTIME_BASE_IMAGE=harbor.happyladysauce.local/knowledge-core/base/debian:bookworm-slim
 FROM ${RUNTIME_BASE_IMAGE}
 RUN apt-get update && apt-get install --yes --no-install-recommends ca-certificates \

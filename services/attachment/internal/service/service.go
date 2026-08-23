@@ -2,6 +2,9 @@ package service
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"math"
 	"strings"
@@ -43,7 +46,18 @@ func (s *Service) Create(ctx context.Context, owner int64, req *attachmentv1.Cre
 	if parts < 1 || parts > domain.MaxParts {
 		return nil, attachmenterrors.InvalidInput.New()
 	}
-	id := domain.NewID()
+	idempotencyKey := req.GetIdempotencyKey()
+	if err := domain.ValidateIdempotencyKey(idempotencyKey); err != nil {
+		return nil, attachmenterrors.InvalidInput.Wrap(err)
+	}
+	requestHash, err := hashCreateRequest(strings.TrimSpace(req.Filename), strings.ToLower(strings.TrimSpace(req.MediaType)), req.SizeBytes)
+	if err != nil {
+		return nil, attachmenterrors.Internal.Wrap(err)
+	}
+	id, err := domain.NewID()
+	if err != nil {
+		return nil, attachmenterrors.Internal.Wrap(err)
+	}
 	key := domain.ObjectKey(id)
 	uploadID, err := s.objects.StartMultipart(ctx, key, req.MediaType)
 	if err != nil {
@@ -51,18 +65,51 @@ func (s *Service) Create(ctx context.Context, owner int64, req *attachmentv1.Cre
 	}
 	now := time.Now().UTC()
 	record := &domain.Attachment{ID: id, OwnerID: owner, Filename: strings.TrimSpace(req.Filename), MediaType: strings.ToLower(strings.TrimSpace(req.MediaType)), Category: category, SizeBytes: req.SizeBytes, ObjectKey: key, UploadID: uploadID, Status: domain.StatusPendingUpload, PartSize: s.partSize, PartCount: parts, CreatedAt: now, UpdatedAt: now}
-	stored, err := s.repo.Create(ctx, record)
+	stored, err := s.repo.Create(ctx, record, repository.Idempotency{OwnerID: owner, Key: idempotencyKey, RequestHash: requestHash})
 	if err != nil {
 		_ = s.objects.AbortMultipart(ctx, key, uploadID)
+		if errors.Is(err, repository.ErrIdempotencyConflict) {
+			return nil, attachmenterrors.Conflict.New()
+		}
 		if errors.Is(err, repository.ErrConflict) {
 			return nil, attachmenterrors.QuotaExceeded.New()
 		}
 		return nil, attachmenterrors.Internal.Wrap(err)
 	}
-	result := &attachmentv1.AttachmentUpload{Attachment: toTransport(stored), UploadId: uploadID, ExpiresAt: now.Add(s.uploadTTL).Format(time.RFC3339)}
-	result.Parts = make([]*attachmentv1.UploadPart, 0, parts)
-	for i := int32(1); i <= parts; i++ {
-		u, expires, err := s.objects.PresignPart(ctx, key, uploadID, int(i))
+	if stored.ID != record.ID {
+		if stored.Status != domain.StatusPendingUpload {
+			_ = s.objects.AbortMultipart(ctx, key, uploadID)
+			return nil, attachmenterrors.Conflict.New()
+		}
+		if abortErr := s.objects.AbortMultipart(ctx, key, uploadID); abortErr != nil {
+			return nil, attachmenterrors.Unavailable.Wrap(abortErr)
+		}
+		record = stored
+	}
+	return s.uploadResult(ctx, record, now.Add(s.uploadTTL))
+}
+
+func hashCreateRequest(filename, mediaType string, size int64) (string, error) {
+	payload, err := json.Marshal(struct {
+		Filename  string `json:"filename"`
+		MediaType string `json:"media_type"`
+		SizeBytes int64  `json:"size_bytes"`
+	}{filename, mediaType, size})
+	if err != nil {
+		return "", err
+	}
+	digest := sha256.Sum256(payload)
+	return hex.EncodeToString(digest[:]), nil
+}
+
+func (s *Service) uploadResult(ctx context.Context, record *domain.Attachment, expiresAt time.Time) (*attachmentv1.AttachmentUpload, error) {
+	if record == nil || record.UploadID == "" || record.PartCount <= 0 {
+		return nil, attachmenterrors.Conflict.New()
+	}
+	result := &attachmentv1.AttachmentUpload{Attachment: toTransport(record), UploadId: record.UploadID, ExpiresAt: expiresAt.Format(time.RFC3339)}
+	result.Parts = make([]*attachmentv1.UploadPart, 0, record.PartCount)
+	for i := int32(1); i <= record.PartCount; i++ {
+		u, expires, err := s.objects.PresignPart(ctx, record.ObjectKey, record.UploadID, int(i))
 		if err != nil {
 			return nil, attachmenterrors.Unavailable.Wrap(err)
 		}
@@ -164,12 +211,18 @@ func (s *Service) ScanOnce(ctx context.Context) error {
 	}
 	obj, err := s.objects.OpenObject(ctx, row.ObjectKey)
 	if err != nil {
-		return s.repo.CompleteScan(ctx, row.ID, domain.ScanResult{}, false)
+		if retryErr := s.repo.RetryScan(ctx, row.ID, err); retryErr != nil {
+			return retryErr
+		}
+		return err
 	}
 	defer func() { _ = obj.Close() }()
 	result, err := s.scanner.Scan(ctx, obj)
 	if err != nil {
-		return s.repo.CompleteScan(ctx, row.ID, domain.ScanResult{}, false)
+		if retryErr := s.repo.RetryScan(ctx, row.ID, err); retryErr != nil {
+			return retryErr
+		}
+		return err
 	}
 	return s.repo.CompleteScan(ctx, row.ID, domain.ScanResult{Clean: result.Clean, SHA256: result.SHA256, Size: result.Size, DetectedType: result.DetectedType}, result.Clean)
 }

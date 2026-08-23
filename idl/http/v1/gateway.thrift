@@ -20,6 +20,15 @@ struct HealthData {
   1: required string status (api.body="status")
   2: required string service (api.body="service")
 }
+struct SiteProfileData {
+  1: required string title (api.body="title")
+  2: required string tagline_zh (api.body="tagline_zh")
+  3: required string tagline_en (api.body="tagline_en")
+  4: required string hero_image_url (api.body="hero_image_url")
+  5: required double hero_focal_x (api.body="hero_focal_x")
+  6: required double hero_focal_y (api.body="hero_focal_y")
+  7: required i64 revision (api.body="revision")
+}
 
 struct UserData {
   1: required string id (api.body="id")
@@ -31,12 +40,14 @@ struct UserData {
   7: required string bio (api.body="bio")
   8: required string created_at (api.body="created_at")
   9: required string updated_at (api.body="updated_at")
+  10: optional string avatar_attachment_id (api.body="avatar_attachment_id")
 }
 
 struct PublicUserData {
   1: required string id (api.body="id")
   2: required string username (api.body="username")
   3: required string avatar (api.body="avatar")
+  4: optional string avatar_attachment_id (api.body="avatar_attachment_id")
 }
 
 struct RegisterRequest {
@@ -341,6 +352,59 @@ struct AttachmentPathRequest {
 struct PublicAttachmentRequest { 1: required string attachment_id (api.path="attachment_id") }
 struct AttachmentListData { 1: required list<AttachmentData> items (api.body="items") }
 
+// Attachment service façade. These types are deliberately separate from the
+// legacy document-scoped attachment projection above so clients can migrate
+// without mixing document ownership with the generic media library.
+struct MediaAttachmentData {
+  1: required string id (api.body="id")
+  2: required i64 owner_id (api.body="owner_id")
+  3: required string filename (api.body="filename")
+  4: required string media_type (api.body="media_type")
+  5: required string category (api.body="category")
+  6: required i64 size_bytes (api.body="size_bytes")
+  7: required string sha256 (api.body="sha256")
+  8: required string status (api.body="status")
+  9: required i32 part_size (api.body="part_size")
+  10: required i32 part_count (api.body="part_count")
+  11: required string created_at (api.body="created_at")
+  12: optional string detected_type (api.body="detected_type")
+  13: required string content_url (api.body="content_url")
+}
+struct MediaAttachmentPartData {
+  1: required i32 part_number (api.body="part_number")
+  2: required string url (api.body="url")
+  3: required string expires_at (api.body="expires_at")
+}
+struct MediaAttachmentUploadData {
+  1: required MediaAttachmentData attachment (api.body="attachment")
+  2: required string upload_id (api.body="upload_id")
+  3: required list<MediaAttachmentPartData> parts (api.body="parts")
+  4: required string expires_at (api.body="expires_at")
+}
+struct CreateMediaAttachmentRequest {
+  1: required string filename (api.body="filename")
+  2: required string media_type (api.body="media_type")
+  3: required i64 size_bytes (api.body="size_bytes")
+  4: optional string idempotency_key (api.header="Idempotency-Key")
+}
+struct CompleteMediaAttachmentPart {
+  1: required i32 part_number (api.body="part_number")
+  2: required string etag (api.body="etag")
+}
+struct CompleteMediaAttachmentRequest {
+  1: required string attachment_id (api.path="attachment_id")
+  2: required string upload_id (api.body="upload_id")
+  3: required list<CompleteMediaAttachmentPart> parts (api.body="parts")
+}
+struct MediaAttachmentPathRequest { 1: required string attachment_id (api.path="attachment_id") }
+struct ListMediaAttachmentsRequest {
+  1: optional string status (api.query="status")
+  2: optional string category (api.query="category")
+  3: optional string cursor (api.query="cursor")
+  4: optional i32 limit (api.query="limit")
+}
+struct MediaAttachmentListData { 1: required list<MediaAttachmentData> items (api.body="items") }
+
 service GatewayService {
   HealthData Live(1: EmptyRequest request) (api.get="/health/live")
   HealthData Ready(1: EmptyRequest request) (api.get="/health/ready")
@@ -359,7 +423,14 @@ service GatewayService {
   UserData CurrentUser(1: EmptyRequest request) (api.get="/api/v1/users/me")
   DocumentPageData ListPublishedDocuments(1: ListDocumentsRequest request) (api.get="/api/v1/documents")
   DocumentDetailData GetPublishedDocument(1: SlugRequest request) (api.get="/api/v1/documents/:slug")
+  SiteProfileData GetSiteProfile(1: EmptyRequest request) (api.get="/api/v1/site-profile")
   EmptyResponse GetAttachmentContent(1: PublicAttachmentRequest request) (api.get="/api/v1/attachments/:attachment_id/content")
+  MediaAttachmentListData ListMediaAttachments(1: ListMediaAttachmentsRequest request) (api.get="/api/v1/attachments")
+  MediaAttachmentUploadData CreateMediaAttachment(1: CreateMediaAttachmentRequest request) (api.post="/api/v1/attachments")
+  MediaAttachmentData GetMediaAttachment(1: MediaAttachmentPathRequest request) (api.get="/api/v1/attachments/:attachment_id")
+  MediaAttachmentData CompleteMediaAttachment(1: CompleteMediaAttachmentRequest request) (api.post="/api/v1/attachments/:attachment_id/complete")
+  EmptyResponse DeleteMediaAttachment(1: MediaAttachmentPathRequest request) (api.delete="/api/v1/attachments/:attachment_id")
+  MediaAttachmentData RestoreMediaAttachment(1: MediaAttachmentPathRequest request) (api.post="/api/v1/attachments/:attachment_id/restore")
   DocumentPageData ListDocuments(1: ListDocumentsRequest request) (api.get="/api/v1/studio/documents")
   FolderListData ListFolders(1: ListFoldersRequest request) (api.get="/api/v1/studio/folders")
   FolderData CreateFolder(1: CreateFolderRequest request) (api.post="/api/v1/studio/folders")

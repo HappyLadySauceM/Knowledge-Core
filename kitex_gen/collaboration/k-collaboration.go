@@ -1755,6 +1755,20 @@ func (p *CreateVersionRequest) FastRead(buf []byte) (int, error) {
 					goto SkipFieldError
 				}
 			}
+		case 4:
+			if fieldTypeId == thrift.STRING {
+				l, err = p.FastReadField4(buf[offset:])
+				offset += l
+				if err != nil {
+					goto ReadFieldError
+				}
+			} else {
+				l, err = thrift.Binary.Skip(buf[offset:], fieldTypeId)
+				offset += l
+				if err != nil {
+					goto SkipFieldError
+				}
+			}
 		default:
 			l, err = thrift.Binary.Skip(buf[offset:], fieldTypeId)
 			offset += l
@@ -1821,6 +1835,21 @@ func (p *CreateVersionRequest) FastReadField3(buf []byte) (int, error) {
 	return offset, nil
 }
 
+func (p *CreateVersionRequest) FastReadField4(buf []byte) (int, error) {
+	offset := 0
+
+	var _field []byte
+	if v, l, err := thrift.Binary.ReadBinary(buf[offset:]); err != nil {
+		return offset, err
+	} else {
+		offset += l
+
+		_field = []byte(v)
+	}
+	p.StateVector = _field
+	return offset, nil
+}
+
 func (p *CreateVersionRequest) FastWrite(buf []byte) int {
 	return p.FastWriteNocopy(buf, nil)
 }
@@ -1831,6 +1860,7 @@ func (p *CreateVersionRequest) FastWriteNocopy(buf []byte, w thrift.NocopyWriter
 		offset += p.fastWriteField1(buf[offset:], w)
 		offset += p.fastWriteField2(buf[offset:], w)
 		offset += p.fastWriteField3(buf[offset:], w)
+		offset += p.fastWriteField4(buf[offset:], w)
 	}
 	offset += thrift.Binary.WriteFieldStop(buf[offset:])
 	return offset
@@ -1842,6 +1872,7 @@ func (p *CreateVersionRequest) BLength() int {
 		l += p.field1Length()
 		l += p.field2Length()
 		l += p.field3Length()
+		l += p.field4Length()
 	}
 	l += thrift.Binary.FieldStopLength()
 	return l
@@ -1872,6 +1903,15 @@ func (p *CreateVersionRequest) fastWriteField3(buf []byte, w thrift.NocopyWriter
 	return offset
 }
 
+func (p *CreateVersionRequest) fastWriteField4(buf []byte, w thrift.NocopyWriter) int {
+	offset := 0
+	if p.IsSetStateVector() {
+		offset += thrift.Binary.WriteFieldBegin(buf[offset:], thrift.STRING, 4)
+		offset += thrift.Binary.WriteBinaryNocopy(buf[offset:], w, []byte(p.StateVector))
+	}
+	return offset
+}
+
 func (p *CreateVersionRequest) field1Length() int {
 	l := 0
 	l += thrift.Binary.FieldBeginLength()
@@ -1893,6 +1933,15 @@ func (p *CreateVersionRequest) field3Length() int {
 	if p.IsSetIdempotencyKey() {
 		l += thrift.Binary.FieldBeginLength()
 		l += thrift.Binary.StringLengthNocopy(*p.IdempotencyKey)
+	}
+	return l
+}
+
+func (p *CreateVersionRequest) field4Length() int {
+	l := 0
+	if p.IsSetStateVector() {
+		l += thrift.Binary.FieldBeginLength()
+		l += thrift.Binary.BinaryLengthNocopy([]byte(p.StateVector))
 	}
 	return l
 }

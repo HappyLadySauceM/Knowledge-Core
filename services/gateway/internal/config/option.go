@@ -73,13 +73,20 @@ type RateLimitOptions struct {
 }
 
 type EndpointOptions struct {
-	PublicBaseURL                 string `mapstructure:"public_base_url" json:"public_base_url" yaml:"public_base_url"`
-	CollaborationWebSocketBaseURL string `mapstructure:"collaboration_websocket_base_url" json:"collaboration_websocket_base_url" yaml:"collaboration_websocket_base_url"`
+	PublicBaseURL                 string  `mapstructure:"public_base_url" json:"public_base_url" yaml:"public_base_url"`
+	CollaborationWebSocketBaseURL string  `mapstructure:"collaboration_websocket_base_url" json:"collaboration_websocket_base_url" yaml:"collaboration_websocket_base_url"`
+	SiteTitle                     string  `mapstructure:"site_title" json:"site_title" yaml:"site_title"`
+	SiteTaglineZH                 string  `mapstructure:"site_tagline_zh" json:"site_tagline_zh" yaml:"site_tagline_zh"`
+	SiteTaglineEN                 string  `mapstructure:"site_tagline_en" json:"site_tagline_en" yaml:"site_tagline_en"`
+	SiteHeroImageURL              string  `mapstructure:"site_hero_image_url" json:"site_hero_image_url" yaml:"site_hero_image_url"`
+	SiteHeroFocalX                float64 `mapstructure:"site_hero_focal_x" json:"site_hero_focal_x" yaml:"site_hero_focal_x"`
+	SiteHeroFocalY                float64 `mapstructure:"site_hero_focal_y" json:"site_hero_focal_y" yaml:"site_hero_focal_y"`
 }
 
 func NewEndpointOptions() *EndpointOptions {
 	return &EndpointOptions{
 		PublicBaseURL: "http://localhost:8080", CollaborationWebSocketBaseURL: "ws://localhost:8091",
+		SiteTitle: "HappyLadySauce", SiteTaglineZH: "把值得留下的想法，写成值得阅读的文章。", SiteTaglineEN: "Turn ideas worth keeping into pages worth reading.", SiteHeroImageURL: "/images/home-hero.png", SiteHeroFocalX: 50, SiteHeroFocalY: 50,
 	}
 }
 
@@ -94,7 +101,11 @@ func (o EndpointOptions) Validate() error {
 		(websocket.Scheme != "ws" && websocket.Scheme != "wss") {
 		websocketErr = errors.New("endpoints.collaboration_websocket_base_url must be an absolute ws/wss origin without credentials")
 	}
-	return errors.Join(publicErr, websocketErr)
+	var siteErr error
+	if strings.TrimSpace(o.SiteTitle) == "" || len([]rune(o.SiteTitle)) > 120 || strings.TrimSpace(o.SiteTaglineZH) == "" || strings.TrimSpace(o.SiteTaglineEN) == "" || strings.TrimSpace(o.SiteHeroImageURL) == "" || o.SiteHeroFocalX < 0 || o.SiteHeroFocalX > 100 || o.SiteHeroFocalY < 0 || o.SiteHeroFocalY > 100 {
+		siteErr = errors.New("site profile fields are invalid")
+	}
+	return errors.Join(publicErr, websocketErr, siteErr)
 }
 
 func validOrigin(parsed *url.URL, schemes ...string) bool {

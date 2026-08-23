@@ -253,7 +253,7 @@ impl Application {
         let document_store: Arc<dyn DocumentStore> = postgres.clone();
         let actor_limits = ActorLimits::from_config(&config.actor, &config.public)?;
         let actors = ActorRegistry::new(
-            document_store,
+            Arc::clone(&document_store),
             actor_limits,
             metrics.clone(),
             startup.root_cancellation.child_token(),
@@ -352,6 +352,7 @@ impl Application {
         let versions: Arc<dyn VersionStore> = postgres.clone();
         let handler = CollaborationHandler::new(
             Arc::clone(&knowledge),
+            Arc::clone(&document_store),
             tickets.clone(),
             versions,
             actors.clone(),

@@ -410,7 +410,11 @@ func (h *Handler) ResolveUser(ctx context.Context, request *identityv1.ResolveUs
 	if user == nil || user.Status != domain.StatusActive {
 		return nil, apperror.ToKitexBizStatus(ctx, identityerrors.UserNotFound.New())
 	}
-	return &identityv1.PublicUser{Id: user.ID, Username: user.Username, Avatar: user.Avatar}, nil
+	result := &identityv1.PublicUser{Id: user.ID, Username: user.Username, Avatar: user.Avatar}
+	if user.AvatarAttachmentID != "" {
+		result.AvatarAttachmentId = &user.AvatarAttachmentID
+	}
+	return result, nil
 }
 
 func (h *Handler) authenticateRequest(ctx context.Context) (coreauth.Principal, *domain.User, error) {
@@ -465,7 +469,7 @@ func toTransportUser(user *domain.User) *identityv1.User {
 	if user == nil {
 		return nil
 	}
-	return &identityv1.User{
+	result := &identityv1.User{
 		Id:           user.ID,
 		Username:     user.Username,
 		Email:        user.Email,
@@ -477,6 +481,10 @@ func toTransportUser(user *domain.User) *identityv1.User {
 		CreatedAt:    user.CreatedAt.UTC().Format(time.RFC3339Nano),
 		UpdatedAt:    user.UpdatedAt.UTC().Format(time.RFC3339Nano),
 	}
+	if user.AvatarAttachmentID != "" {
+		result.AvatarAttachmentId = &user.AvatarAttachmentID
+	}
+	return result
 }
 
 var _ identityv1.IdentityService = (*Handler)(nil)
