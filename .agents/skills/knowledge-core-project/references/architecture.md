@@ -14,6 +14,6 @@ Sources: `filesystem:top-level-directories`, `user-confirmed`
 
 Status: `verified`
 
-Knowledge Core contains four explicitly composed services: Go Gateway, Identity, and Knowledge services plus a Rust Collaboration service. Go assembly flows main/spec -> internal/config -> internal/context -> domain/logic/repository/transport. ServiceContext owns service dependencies, while pkg/app.Runtime is limited to process-level observability, health, metrics, and lifecycle orchestration. Business logic depends on service-local small interfaces; repositories own persistence and storage error mapping; transports validate and adapt protocols without domain rules.
+Knowledge Core contains five explicitly composed services: Go Gateway, Identity, Knowledge, and Attachment services plus a Rust Collaboration service. Go assembly flows main/spec -> internal/config -> internal/context -> domain/logic/repository/transport. ServiceContext owns service dependencies, while pkg/app.Runtime is limited to process-level observability, health, metrics, and lifecycle orchestration. Business logic depends on service-local small interfaces; repositories own persistence and storage error mapping; transports validate and adapt protocols without domain rules.
 
 Sources: `README.md#knowledge-core`, `deploy/overlay/dev/README.md#development-overlay`, `docs/framework-design.md#9`, `docs/framework-design.md#knowledge-core`, `docs/rust-collaboration-design.md#rust-collaboration`, `AGENTS.md user-provided repository instructions`, `user-confirmed`

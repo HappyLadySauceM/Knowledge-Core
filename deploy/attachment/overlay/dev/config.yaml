@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: knowledge-core-attachment-config
+  labels:
+    app.kubernetes.io/name: knowledge-core-attachment
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/part-of: knowledge-core
+    app.kubernetes.io/managed-by: kustomize
+data:
+  ATTACHMENT_APP_ENVIRONMENT: development
+  ATTACHMENT_OBJECT_STORAGE_AUTO_CREATE_BUCKET: "false"

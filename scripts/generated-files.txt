@@ -1,4 +1,10 @@
 # Generator-owned Kitex RPC and Hertz model/router files.
+kitex_gen/attachment/attachment.go
+kitex_gen/attachment/attachmentservice/attachmentservice.go
+kitex_gen/attachment/attachmentservice/client.go
+kitex_gen/attachment/attachmentservice/server.go
+kitex_gen/attachment/k-attachment.go
+kitex_gen/attachment/k-consts.go
 kitex_gen/collaboration/collaboration.go
 kitex_gen/collaboration/collaborationservice/client.go
 kitex_gen/collaboration/collaborationservice/collaborationservice.go

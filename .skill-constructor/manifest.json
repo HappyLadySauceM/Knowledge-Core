@@ -22,7 +22,7 @@
     },
     {
       "id": "architecture.summary",
-      "revision": 121,
+      "revision": 125,
       "section": "architecture",
       "sources": [
         {
@@ -60,8 +60,8 @@
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-08-21T15:08:00Z",
-      "value": "Knowledge Core contains four explicitly composed services: Go Gateway, Identity, and Knowledge services plus a Rust Collaboration service. Go assembly flows main/spec -> internal/config -> internal/context -> domain/logic/repository/transport. ServiceContext owns service dependencies, while pkg/app.Runtime is limited to process-level observability, health, metrics, and lifecycle orchestration. Business logic depends on service-local small interfaces; repositories own persistence and storage error mapping; transports validate and adapt protocols without domain rules."
+      "updatedAt": "2026-08-23T05:36:03Z",
+      "value": "Knowledge Core contains five explicitly composed services: Go Gateway, Identity, Knowledge, and Attachment services plus a Rust Collaboration service. Go assembly flows main/spec -> internal/config -> internal/context -> domain/logic/repository/transport. ServiceContext owns service dependencies, while pkg/app.Runtime is limited to process-level observability, health, metrics, and lifecycle orchestration. Business logic depends on service-local small interfaces; repositories own persistence and storage error mapping; transports validate and adapt protocols without domain rules."
     },
     {
       "id": "boundaries.repository",
@@ -145,7 +145,7 @@
     },
     {
       "id": "entrypoints.catalog",
-      "revision": 2,
+      "revision": 125,
       "section": "services",
       "sources": [
         {
@@ -159,8 +159,8 @@
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-08-08T01:14:27Z",
-      "value": "Service process entrypoints are services/gateway/main.go, services/identity/main.go, services/knowledge/main.go, and services/collaboration/src/main.rs. Service main files only create and execute application commands; Go spec files only declare application specifications. Supporting executable entrypoints include scripts/idlguard, collaboration Rust code generation, and tools/authkeys, tools/configctl, and tools/interop. Deployment definitions live under deploy and docker."
+      "updatedAt": "2026-08-23T05:36:03Z",
+      "value": "Service process entrypoints are services/gateway/main.go, services/identity/main.go, services/knowledge/main.go, services/attachment/main.go, and services/collaboration/src/main.rs. Service main files only create and execute application commands; Go spec files only declare application specifications. Supporting executable entrypoints include scripts/idlguard, collaboration Rust code generation, and tools/authkeys, tools/configctl, and tools/interop. Deployment definitions live under deploy and docker."
     },
     {
       "id": "environment.setup",
@@ -306,7 +306,7 @@
     },
     {
       "id": "services.catalog",
-      "revision": 2,
+      "revision": 125,
       "section": "services",
       "sources": [
         {
@@ -320,8 +320,8 @@
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-08-08T01:14:27Z",
-      "value": "Gateway is the HTTP edge and calls typed upstream clients without accessing Identity storage. Identity owns identity domain behavior and persistence. Knowledge owns document metadata, permissions, publication/public projections, attachments, trash, quotas, and outbox in the PostgreSQL knowledge schema, but not Yjs binary state. Collaboration is the Rust Volo Thrift and WebSocket/Yrs service; it owns collaboration state in its PostgreSQL schema and rechecks document access through Knowledge RPC."
+      "updatedAt": "2026-08-23T05:36:03Z",
+      "value": "Gateway is the HTTP edge and calls typed upstream clients without accessing service storage. Identity owns identity domain behavior and persistence. Knowledge owns document metadata, permissions, publication/public projections, document trash, quotas, outbox, and the temporary legacy document-attachment compatibility surface, but not Yjs binary state or new attachment storage. Attachment owns unified file metadata, multipart upload lifecycle, private object-storage access, malware scan state, attachment references, and attachment trash lifecycle in the PostgreSQL attachment schema. Collaboration is the Rust Volo Thrift and WebSocket/Yrs service; it owns collaboration state in its PostgreSQL schema and rechecks document access through Knowledge RPC."
     },
     {
       "id": "validation.definition-of-done",
@@ -608,11 +608,11 @@
     "profile": "generic",
     "slug": "knowledge-core"
   },
-  "revision": 123,
+  "revision": 126,
   "scan": {
-    "fingerprint": "293a14e19715f3e26695e50efbe0942e31498c904befe300fc19fb78cb49a9c8",
-    "inventoryCount": 357
+    "fingerprint": "f3b8f2fd4b4e04c9fe49553d5448baeaebdc4407482a51a0dd52b0141c1affbb",
+    "inventoryCount": 392
   },
   "schemaVersion": 1,
-  "updatedAt": "2026-08-23T02:18:01Z"
+  "updatedAt": "2026-08-23T05:38:23Z"
 }
