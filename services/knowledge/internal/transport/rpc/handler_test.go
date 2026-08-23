@@ -51,6 +51,9 @@ func (s *documentServiceStub) Update(context.Context, knowledgelogic.UpdateDocum
 func (s *documentServiceStub) SetPublication(context.Context, string, int64, int64, bool) (*domain.Document, error) {
 	return s.document, s.err
 }
+func (s *documentServiceStub) PublishSnapshot(context.Context, string, int64, int64, knowledgelogic.PublishSnapshotInput) (*domain.Document, error) {
+	return s.document, s.err
+}
 func (s *documentServiceStub) Delete(context.Context, string, int64, int64) (*domain.Document, error) {
 	return s.document, s.err
 }

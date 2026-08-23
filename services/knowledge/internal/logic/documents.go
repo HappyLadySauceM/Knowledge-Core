@@ -17,11 +17,110 @@ type DocumentRepository interface {
 	GetDocument(context.Context, string, int64, bool) (*domain.Document, error)
 	GetPublishedDocument(context.Context, string, int64) (*domain.Document, *domain.Projection, bool, error)
 	ListDocuments(context.Context, repository.ListOptions) ([]*domain.Document, error)
-	UpdateDocument(context.Context, string, int64, int64, *string, *string, *string) (*domain.Document, error)
+	UpdateDocument(context.Context, string, int64, int64, *string, *string, *string, *string, []string, *string) (*domain.Document, error)
 	SetPublication(context.Context, string, int64, int64, bool) (*domain.Document, error)
+	PublishSnapshot(context.Context, string, int64, int64, repository.PublicationSnapshotInput) (*domain.Document, error)
 	SoftDeleteDocument(context.Context, string, int64, int64) (*domain.Document, error)
 	RestoreDeletedDocument(context.Context, string, int64) (*domain.Document, error)
 	ListReadyAttachments(context.Context, string) ([]*domain.Attachment, error)
+	ListFolders(context.Context, int64, *string) ([]*domain.Folder, error)
+	CreateFolder(context.Context, int64, string, *string, repository.Idempotency) (*domain.Folder, error)
+	UpdateFolder(context.Context, int64, string, int64, *string, *string) (*domain.Folder, error)
+	DeleteFolder(context.Context, int64, string, int64) error
+}
+
+func (l *DocumentLogic) ListFolders(ctx context.Context, actorID int64, parentID *string) ([]*domain.Folder, error) {
+	if actorID <= 0 {
+		return nil, mapError(repository.ErrForbidden)
+	}
+	if parentID != nil && *parentID != "" {
+		if err := domain.ValidateID("parent_id", *parentID); err != nil {
+			return nil, mapError(err)
+		}
+	} else {
+		parentID = nil
+	}
+	result, err := l.repository.ListFolders(ctx, actorID, parentID)
+	if err != nil {
+		return nil, mapError(err)
+	}
+	return result, nil
+}
+
+func (l *DocumentLogic) CreateFolder(ctx context.Context, actorID int64, name string, parentID *string, key string) (*domain.Folder, error) {
+	if actorID <= 0 {
+		return nil, mapError(repository.ErrForbidden)
+	}
+	name = strings.Join(strings.Fields(strings.TrimSpace(name)), " ")
+	if len([]rune(name)) < 1 || len([]rune(name)) > 120 {
+		return nil, mapError(&domain.ValidationError{Field: "name", Reason: "must contain 1-120 characters"})
+	}
+	if parentID != nil && *parentID != "" {
+		if err := domain.ValidateID("parent_id", *parentID); err != nil {
+			return nil, mapError(err)
+		}
+	} else {
+		parentID = nil
+	}
+	idempotencyValue, err := idempotency(actorID, "create_folder", key, struct {
+		Name     string  `json:"name"`
+		ParentID *string `json:"parent_id"`
+	}{name, parentID})
+	if err != nil {
+		return nil, mapError(err)
+	}
+	result, err := l.repository.CreateFolder(ctx, actorID, name, parentID, idempotencyValue)
+	if err != nil {
+		return nil, mapError(err)
+	}
+	return result, nil
+}
+
+func (l *DocumentLogic) UpdateFolder(ctx context.Context, actorID int64, id string, expected int64, name, parentID *string) (*domain.Folder, error) {
+	if actorID <= 0 {
+		return nil, mapError(repository.ErrForbidden)
+	}
+	if err := domain.ValidateID("folder_id", id); err != nil {
+		return nil, mapError(err)
+	}
+	if expected <= 0 {
+		return nil, mapError(&domain.ValidationError{Field: "expected_revision", Reason: "must be positive"})
+	}
+	if name != nil {
+		value := strings.Join(strings.Fields(strings.TrimSpace(*name)), " ")
+		if len([]rune(value)) < 1 || len([]rune(value)) > 120 {
+			return nil, mapError(&domain.ValidationError{Field: "name", Reason: "must contain 1-120 characters"})
+		}
+		name = &value
+	}
+	if parentID != nil && *parentID != "" {
+		if err := domain.ValidateID("parent_id", *parentID); err != nil {
+			return nil, mapError(err)
+		}
+	} else if parentID != nil {
+		parentID = new(string)
+	}
+	if name == nil && parentID == nil {
+		return nil, mapError(&domain.ValidationError{Field: "folder", Reason: "at least one field must be provided"})
+	}
+	result, err := l.repository.UpdateFolder(ctx, actorID, id, expected, name, parentID)
+	if err != nil {
+		return nil, mapError(err)
+	}
+	return result, nil
+}
+
+func (l *DocumentLogic) DeleteFolder(ctx context.Context, actorID int64, id string, expected int64) error {
+	if actorID <= 0 {
+		return mapError(repository.ErrForbidden)
+	}
+	if err := domain.ValidateID("folder_id", id); err != nil {
+		return mapError(err)
+	}
+	if expected <= 0 {
+		return mapError(&domain.ValidationError{Field: "expected_revision", Reason: "must be positive"})
+	}
+	return mapError(l.repository.DeleteFolder(ctx, actorID, id, expected))
 }
 
 type DocumentLogic struct {
@@ -67,6 +166,22 @@ type UpdateDocumentInput struct {
 	Title            *string
 	Summary          *string
 	Slug             *string
+	Language         *string
+	Tags             []string
+	FolderID         *string
+}
+
+type PublishSnapshotInput struct {
+	VersionID       string
+	VersionSequence int64
+	Title           string
+	Summary         string
+	Slug            string
+	Language        string
+	Tags            []string
+	Content         domain.RichTextDocument
+	PlainText       string
+	IdempotencyKey  string
 }
 
 func NewDocumentLogic(repository DocumentRepository, directory Directory) (*DocumentLogic, error) {
@@ -208,7 +323,7 @@ func (l *DocumentLogic) Create(ctx context.Context, input CreateDocumentInput) (
 	}
 	now := l.now().UTC()
 	document := &domain.Document{
-		ID: id, Title: input.Title, Summary: summary, Slug: slug, Owner: owner,
+		ID: id, Title: input.Title, Summary: summary, Slug: slug, Language: "zh-CN", Owner: owner,
 		Access: domain.AccessOwner, MetadataRevision: 1, PermissionRevision: 1,
 		CreatedAt: now, UpdatedAt: now,
 	}
@@ -239,9 +354,6 @@ func (l *DocumentLogic) Update(ctx context.Context, input UpdateDocumentInput) (
 	if input.ExpectedRevision <= 0 {
 		return nil, mapError(&domain.ValidationError{Field: "expected_revision", Reason: "must be positive"})
 	}
-	if input.Title == nil && input.Summary == nil && input.Slug == nil {
-		return nil, mapError(&domain.ValidationError{Field: "document", Reason: "at least one field must be provided"})
-	}
 	if input.Title != nil {
 		value := strings.TrimSpace(*input.Title)
 		if err := domain.ValidateTitle(value); err != nil {
@@ -263,8 +375,25 @@ func (l *DocumentLogic) Update(ctx context.Context, input UpdateDocumentInput) (
 		}
 		input.Slug = &value
 	}
+	if input.Language != nil {
+		value := strings.TrimSpace(*input.Language)
+		if len(value) < 2 || len(value) > 16 {
+			return nil, mapError(&domain.ValidationError{Field: "language", Reason: "must contain 2-16 characters"})
+		}
+		input.Language = &value
+	}
+	if input.Tags != nil {
+		tags, err := domain.NormalizeTags(input.Tags)
+		if err != nil {
+			return nil, mapError(err)
+		}
+		input.Tags = tags
+	}
+	if input.Title == nil && input.Summary == nil && input.Slug == nil && input.Language == nil && input.Tags == nil && input.FolderID == nil {
+		return nil, mapError(&domain.ValidationError{Field: "document", Reason: "at least one field must be provided"})
+	}
 	result, err := l.repository.UpdateDocument(
-		ctx, input.DocumentID, input.ActorID, input.ExpectedRevision, input.Title, input.Summary, input.Slug,
+		ctx, input.DocumentID, input.ActorID, input.ExpectedRevision, input.Title, input.Summary, input.Slug, input.Language, input.Tags, input.FolderID,
 	)
 	if err != nil {
 		return nil, mapError(err)
@@ -277,6 +406,71 @@ func (l *DocumentLogic) SetPublication(ctx context.Context, documentID string, a
 		return nil, mapError(err)
 	}
 	result, err := l.repository.SetPublication(ctx, documentID, actorID, expected, published)
+	if err != nil {
+		return nil, mapError(err)
+	}
+	return result, nil
+}
+
+func (l *DocumentLogic) PublishSnapshot(ctx context.Context, documentID string, actorID, expected int64, input PublishSnapshotInput) (*domain.Document, error) {
+	if err := validateMutation(documentID, expected); err != nil {
+		return nil, mapError(err)
+	}
+	if err := domain.ValidateID("version_id", input.VersionID); err != nil {
+		return nil, mapError(err)
+	}
+	if input.VersionSequence < 0 {
+		return nil, mapError(&domain.ValidationError{Field: "version_sequence", Reason: "must be non-negative"})
+	}
+	input.Title = strings.TrimSpace(input.Title)
+	if err := domain.ValidateTitle(input.Title); err != nil {
+		return nil, mapError(err)
+	}
+	input.Summary = strings.TrimSpace(input.Summary)
+	if err := domain.ValidateSummary(input.Summary); err != nil {
+		return nil, mapError(err)
+	}
+	normalizedSlug, err := domain.NormalizeSlug(input.Slug)
+	if err != nil {
+		return nil, mapError(err)
+	}
+	input.Slug = normalizedSlug
+	input.Language = strings.TrimSpace(input.Language)
+	if len(input.Language) < 2 || len(input.Language) > 16 {
+		return nil, mapError(&domain.ValidationError{Field: "language", Reason: "must contain 2-16 characters"})
+	}
+	if err := input.Content.Validate(); err != nil {
+		return nil, mapError(err)
+	}
+	if input.Tags == nil {
+		input.Tags = []string{}
+	} else {
+		tags, tagErr := domain.NormalizeTags(input.Tags)
+		if tagErr != nil {
+			return nil, mapError(tagErr)
+		}
+		input.Tags = tags
+	}
+	if len(input.PlainText) > domain.MaxProjectionBytes {
+		return nil, mapError(&domain.ValidationError{Field: "plain_text", Reason: "is too large"})
+	}
+	owner, err := l.directory.CurrentUser(ctx)
+	if err != nil {
+		return nil, mapError(err)
+	}
+	idempotencyValue, err := idempotency(owner.ID, "publish_snapshot", input.IdempotencyKey, struct {
+		DocumentID string `json:"document_id"`
+		VersionID  string `json:"version_id"`
+		Sequence   int64  `json:"sequence"`
+	}{documentID, input.VersionID, input.VersionSequence})
+	if err != nil {
+		return nil, mapError(err)
+	}
+	result, err := l.repository.PublishSnapshot(ctx, documentID, actorID, expected, repository.PublicationSnapshotInput{
+		VersionID: input.VersionID, VersionSequence: input.VersionSequence, Title: input.Title, Summary: input.Summary,
+		Slug: input.Slug, Language: input.Language, Tags: append([]string(nil), input.Tags...), Content: input.Content,
+		PlainText: input.PlainText, Idempotency: idempotencyValue,
+	})
 	if err != nil {
 		return nil, mapError(err)
 	}

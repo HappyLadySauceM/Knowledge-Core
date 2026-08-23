@@ -292,3 +292,28 @@ func _meMw() []app.HandlerFunc {
 func _deactivateaccountMw() []app.HandlerFunc {
 	return []app.HandlerFunc{gatewaymiddleware.RequireAuthenticated()}
 }
+
+func _listfoldersMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _createfolderMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _foldersMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _deletefolderMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _updatefolderMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}

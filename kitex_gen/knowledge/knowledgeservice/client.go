@@ -20,6 +20,11 @@ type Client interface {
 	CreateDocument(ctx context.Context, request *knowledge.CreateDocumentRequest, callOptions ...callopt.Option) (r *knowledge.Document, err error)
 	GetDocument(ctx context.Context, request *knowledge.DocumentIDRequest, callOptions ...callopt.Option) (r *knowledge.Document, err error)
 	UpdateDocument(ctx context.Context, request *knowledge.UpdateDocumentRequest, callOptions ...callopt.Option) (r *knowledge.Document, err error)
+	PublishSnapshot(ctx context.Context, request *knowledge.PublishSnapshotRequest, callOptions ...callopt.Option) (r *knowledge.Document, err error)
+	ListFolders(ctx context.Context, request *knowledge.ListFoldersRequest, callOptions ...callopt.Option) (r *knowledge.FolderList, err error)
+	CreateFolder(ctx context.Context, request *knowledge.CreateFolderRequest, callOptions ...callopt.Option) (r *knowledge.Folder, err error)
+	UpdateFolder(ctx context.Context, request *knowledge.UpdateFolderRequest, callOptions ...callopt.Option) (r *knowledge.Folder, err error)
+	DeleteFolder(ctx context.Context, request *knowledge.DeleteFolderRequest, callOptions ...callopt.Option) (err error)
 	SetPublication(ctx context.Context, request *knowledge.SetPublicationRequest, callOptions ...callopt.Option) (r *knowledge.Document, err error)
 	DeleteDocument(ctx context.Context, request *knowledge.DeleteDocumentRequest, callOptions ...callopt.Option) (r *knowledge.Document, err error)
 	RestoreDeletedDocument(ctx context.Context, request *knowledge.DocumentIDRequest, callOptions ...callopt.Option) (r *knowledge.Document, err error)
@@ -104,6 +109,31 @@ func (p *kKnowledgeServiceClient) GetDocument(ctx context.Context, request *know
 func (p *kKnowledgeServiceClient) UpdateDocument(ctx context.Context, request *knowledge.UpdateDocumentRequest, callOptions ...callopt.Option) (r *knowledge.Document, err error) {
 	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
 	return p.kClient.UpdateDocument(ctx, request)
+}
+
+func (p *kKnowledgeServiceClient) PublishSnapshot(ctx context.Context, request *knowledge.PublishSnapshotRequest, callOptions ...callopt.Option) (r *knowledge.Document, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.PublishSnapshot(ctx, request)
+}
+
+func (p *kKnowledgeServiceClient) ListFolders(ctx context.Context, request *knowledge.ListFoldersRequest, callOptions ...callopt.Option) (r *knowledge.FolderList, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.ListFolders(ctx, request)
+}
+
+func (p *kKnowledgeServiceClient) CreateFolder(ctx context.Context, request *knowledge.CreateFolderRequest, callOptions ...callopt.Option) (r *knowledge.Folder, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.CreateFolder(ctx, request)
+}
+
+func (p *kKnowledgeServiceClient) UpdateFolder(ctx context.Context, request *knowledge.UpdateFolderRequest, callOptions ...callopt.Option) (r *knowledge.Folder, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.UpdateFolder(ctx, request)
+}
+
+func (p *kKnowledgeServiceClient) DeleteFolder(ctx context.Context, request *knowledge.DeleteFolderRequest, callOptions ...callopt.Option) (err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.DeleteFolder(ctx, request)
 }
 
 func (p *kKnowledgeServiceClient) SetPublication(ctx context.Context, request *knowledge.SetPublicationRequest, callOptions ...callopt.Option) (r *knowledge.Document, err error) {

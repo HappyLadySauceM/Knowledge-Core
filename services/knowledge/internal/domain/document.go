@@ -57,6 +57,9 @@ type Document struct {
 	Title              string
 	Summary            string
 	Slug               string
+	Language           string
+	Tags               []string
+	FolderID           *string
 	Owner              PublicUser
 	Access             string
 	Published          bool
@@ -69,6 +72,32 @@ type Document struct {
 	ProjectedAt        *time.Time
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
+}
+
+type PublicationSnapshot struct {
+	DocumentID      string
+	VersionID       *string
+	VersionSequence int64
+	Title           string
+	Summary         string
+	Slug            string
+	Language        string
+	Tags            []string
+	Owner           PublicUser
+	Content         RichTextDocument
+	PlainText       string
+	PublishedAt     time.Time
+	UpdatedAt       time.Time
+}
+
+type Folder struct {
+	ID        string
+	ParentID  *string
+	Name      string
+	Depth     int32
+	Revision  int64
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 type Projection struct {
@@ -170,6 +199,27 @@ func ValidateSummary(value string) error {
 		return &ValidationError{Field: "summary", Reason: "must contain at most 1000 characters"}
 	}
 	return nil
+}
+
+func NormalizeTags(values []string) ([]string, error) {
+	if len(values) > 20 {
+		return nil, &ValidationError{Field: "tags", Reason: "must contain at most 20 tags"}
+	}
+	result := make([]string, 0, len(values))
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		value = strings.Join(strings.Fields(strings.TrimSpace(value)), " ")
+		if value == "" || len([]rune(value)) > 64 {
+			return nil, &ValidationError{Field: "tags", Reason: "each tag must contain 1-64 characters"}
+		}
+		key := strings.ToLower(value)
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		result = append(result, value)
+	}
+	return result, nil
 }
 
 func NormalizeSlug(value string) (string, error) {

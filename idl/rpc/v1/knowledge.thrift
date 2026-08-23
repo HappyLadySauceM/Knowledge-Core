@@ -68,6 +68,9 @@ struct Document {
   12: optional string projected_at
   13: required string created_at
   14: required string updated_at
+  15: optional string language
+  16: optional list<string> tags
+  17: optional string folder_id
 }
 
 struct Attachment {
@@ -97,6 +100,18 @@ struct DocumentPage {
   2: required PageInfo page
 }
 
+struct Folder {
+  1: required string id
+  2: optional string parent_id
+  3: required string name
+  4: required i32 depth
+  5: required i64 revision
+  6: required string created_at
+  7: required string updated_at
+}
+
+struct FolderList { 1: required list<Folder> items }
+
 struct EmptyRequest {}
 
 struct ListDocumentsRequest {
@@ -123,6 +138,41 @@ struct UpdateDocumentRequest {
   3: optional string title
   4: optional string summary
   5: optional string slug
+  6: optional string language
+  7: optional list<string> tags
+  8: optional string folder_id
+}
+
+struct PublishSnapshotRequest {
+  1: required string document_id
+  2: required i64 expected_metadata_revision
+  3: required string version_id
+  4: required i64 version_sequence
+  5: required string title
+  6: required string summary
+  7: required string slug
+  8: required string language
+  9: required list<string> tags
+  10: required RichTextDocument content
+  11: required string plain_text
+  12: optional string idempotency_key
+}
+
+struct ListFoldersRequest { 1: optional string parent_id }
+struct CreateFolderRequest {
+  1: required string name
+  2: optional string parent_id
+  3: optional string idempotency_key
+}
+struct UpdateFolderRequest {
+  1: required string folder_id
+  2: required i64 expected_revision
+  3: optional string name
+  4: optional string parent_id
+}
+struct DeleteFolderRequest {
+  1: required string folder_id
+  2: required i64 expected_revision
 }
 
 struct SetPublicationRequest {
@@ -224,6 +274,11 @@ service KnowledgeService {
   Document CreateDocument(1: CreateDocumentRequest request)
   Document GetDocument(1: DocumentIDRequest request)
   Document UpdateDocument(1: UpdateDocumentRequest request)
+  Document PublishSnapshot(1: PublishSnapshotRequest request)
+  FolderList ListFolders(1: ListFoldersRequest request)
+  Folder CreateFolder(1: CreateFolderRequest request)
+  Folder UpdateFolder(1: UpdateFolderRequest request)
+  void DeleteFolder(1: DeleteFolderRequest request)
   Document SetPublication(1: SetPublicationRequest request)
   Document DeleteDocument(1: DeleteDocumentRequest request)
   Document RestoreDeletedDocument(1: DocumentIDRequest request)

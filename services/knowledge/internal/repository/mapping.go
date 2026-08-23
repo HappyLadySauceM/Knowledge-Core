@@ -13,7 +13,8 @@ import (
 func documentToModel(value *domain.Document) *model.Document {
 	return &model.Document{
 		ID: value.ID, Title: value.Title, Summary: value.Summary, Slug: value.Slug,
-		OwnerID: value.Owner.ID, OwnerUsername: value.Owner.Username, OwnerAvatar: value.Owner.Avatar,
+		Language: value.Language,
+		OwnerID:  value.Owner.ID, OwnerUsername: value.Owner.Username, OwnerAvatar: value.Owner.Avatar,
 		Published: value.Published, MetadataRevision: value.MetadataRevision, ContentRevision: value.ContentRevision,
 		PermissionRevision: value.PermissionRevision, PublishedAt: value.PublishedAt,
 		DeletedAt: value.DeletedAt, PurgeAfter: value.PurgeAfter, CreatedAt: value.CreatedAt.UTC(), UpdatedAt: value.UpdatedAt.UTC(),
@@ -26,8 +27,9 @@ func documentFromModel(value *model.Document, access string, projection *model.P
 	}
 	result := &domain.Document{
 		ID: value.ID, Title: value.Title, Summary: value.Summary, Slug: value.Slug,
-		Owner:  domain.PublicUser{ID: value.OwnerID, Username: value.OwnerUsername, Avatar: value.OwnerAvatar},
-		Access: access, Published: value.Published, MetadataRevision: value.MetadataRevision,
+		Language: value.Language,
+		Owner:    domain.PublicUser{ID: value.OwnerID, Username: value.OwnerUsername, Avatar: value.OwnerAvatar},
+		Access:   access, Published: value.Published, MetadataRevision: value.MetadataRevision,
 		ContentRevision: value.ContentRevision, PermissionRevision: value.PermissionRevision,
 		PublishedAt: value.PublishedAt, DeletedAt: value.DeletedAt, PurgeAfter: value.PurgeAfter,
 		CreatedAt: value.CreatedAt, UpdatedAt: value.UpdatedAt,

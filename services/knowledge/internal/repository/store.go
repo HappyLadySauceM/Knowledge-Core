@@ -51,6 +51,19 @@ type Idempotency struct {
 	RequestHash string
 }
 
+type PublicationSnapshotInput struct {
+	VersionID       string
+	VersionSequence int64
+	Title           string
+	Summary         string
+	Slug            string
+	Language        string
+	Tags            []string
+	Content         domain.RichTextDocument
+	PlainText       string
+	Idempotency     Idempotency
+}
+
 func EncodeCursor(value Cursor) (string, error) {
 	value.Version = 1
 	payload, err := jsoncodec.Marshal(value)
@@ -144,10 +157,22 @@ func (s *Store) getDocument(db *gorm.DB, id string, actorID int64, includeDelete
 	if err != nil {
 		return nil, err
 	}
-	return documentFromModel(&record, access, projection), nil
+	document := documentFromModel(&record, access, projection)
+	if err := s.loadDocumentStructure(db, document); err != nil {
+		return nil, err
+	}
+	return document, nil
 }
 
 func (s *Store) GetPublishedDocument(ctx context.Context, slug string, actorID int64) (*domain.Document, *domain.Projection, bool, error) {
+	var publication model.DocumentPublication
+	publicationErr := s.db.WithContext(ctx).Where("lower(slug) = lower(?)", slug).First(&publication).Error
+	if publicationErr == nil {
+		return s.publishedSnapshot(ctx, &publication, slug, actorID)
+	}
+	if !errors.Is(publicationErr, gorm.ErrRecordNotFound) {
+		return nil, nil, false, fmt.Errorf("resolve published snapshot slug: %w", publicationErr)
+	}
 	var alias model.SlugAlias
 	if err := s.db.WithContext(ctx).Where("lower(slug) = lower(?)", slug).First(&alias).Error; err != nil {
 		return nil, nil, false, mapNotFound("resolve published document slug", err)
@@ -165,6 +190,9 @@ func (s *Store) GetPublishedDocument(ctx context.Context, slug string, actorID i
 	if !record.Published {
 		return nil, nil, false, ErrNotFound
 	}
+	if err := s.db.WithContext(ctx).Where("document_id = ?", record.ID).First(&publication).Error; err == nil {
+		return s.publishedSnapshot(ctx, &publication, slug, actorID)
+	}
 	access, err := accessFor(s.db.WithContext(ctx), &record, actorID)
 	if err != nil {
 		return nil, nil, false, err
@@ -175,6 +203,158 @@ func (s *Store) GetPublishedDocument(ctx context.Context, slug string, actorID i
 	}
 	document := documentFromModel(&record, access, projection)
 	return document, projectionFromModel(projection), !strings.EqualFold(record.Slug, slug), nil
+}
+
+func (s *Store) publishedSnapshot(ctx context.Context, publication *model.DocumentPublication, requestedSlug string, actorID int64) (*domain.Document, *domain.Projection, bool, error) {
+	var record model.Document
+	if err := s.db.WithContext(ctx).Where("id = ?", publication.DocumentID).First(&record).Error; err != nil {
+		return nil, nil, false, mapNotFound("get published snapshot document", err)
+	}
+	if record.DeletedAt != nil || !record.Published {
+		return nil, nil, false, ErrNotFound
+	}
+	access, err := accessFor(s.db.WithContext(ctx), &record, actorID)
+	if err != nil {
+		return nil, nil, false, err
+	}
+	projection := &model.Projection{DocumentID: publication.DocumentID, Sequence: publication.VersionSequence, Content: append([]byte(nil), publication.Content...), PlainText: publication.PlainText, ProjectedAt: publication.UpdatedAt}
+	document := documentFromModel(&record, access, projection)
+	document.Title, document.Summary, document.Slug, document.Language = publication.Title, publication.Summary, publication.Slug, publication.Language
+	document.PublishedAt = &publication.PublishedAt
+	document.Published = true
+	document.Tags = publicationTags(publication.Tags)
+	return document, projectionFromModel(projection), !strings.EqualFold(publication.Slug, requestedSlug), nil
+}
+
+func publicationTags(value []byte) []string {
+	var tags []string
+	if len(value) == 0 || jsoncodec.Unmarshal(value, &tags) != nil {
+		return nil
+	}
+	return tags
+}
+
+func (s *Store) loadDocumentStructure(db *gorm.DB, document *domain.Document) error {
+	if document == nil {
+		return nil
+	}
+	var placement model.DocumentPlacement
+	if err := db.Where("owner_id = ? AND document_id = ?", document.Owner.ID, document.ID).First(&placement).Error; err == nil {
+		document.FolderID = placement.FolderID
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return fmt.Errorf("load document folder: %w", err)
+	}
+	var tags []string
+	if err := db.Table("knowledge.tags").Select("knowledge.tags.name").Joins("JOIN knowledge.document_tags ON knowledge.document_tags.tag_id = knowledge.tags.id").Where("knowledge.document_tags.document_id = ?", document.ID).Order("knowledge.tags.name ASC").Pluck("knowledge.tags.name", &tags).Error; err != nil {
+		return fmt.Errorf("load document tags: %w", err)
+	}
+	document.Tags = tags
+	return nil
+}
+
+func (s *Store) replaceDocumentTags(tx *gorm.DB, ownerID int64, documentID string, tags []string, now time.Time) error {
+	if err := tx.Where("document_id = ?", documentID).Delete(&model.DocumentTag{}).Error; err != nil {
+		return fmt.Errorf("clear document tags: %w", err)
+	}
+	for _, name := range tags {
+		slug := strings.ToLower(strings.Join(strings.Fields(strings.TrimSpace(name)), "-"))
+		var tag model.Tag
+		err := tx.Where("owner_id = ? AND slug = ?", ownerID, slug).First(&tag).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			id, idErr := domain.NewID()
+			if idErr != nil {
+				return idErr
+			}
+			tag = model.Tag{ID: id, OwnerID: ownerID, Name: name, Slug: slug, CreatedAt: now, UpdatedAt: now}
+			if err := tx.Create(&tag).Error; err != nil {
+				return mapWriteError("create document tag", err)
+			}
+		} else if err != nil {
+			return fmt.Errorf("get document tag: %w", err)
+		}
+		if err := tx.Create(&model.DocumentTag{DocumentID: documentID, TagID: tag.ID, CreatedAt: now}).Error; err != nil {
+			return mapWriteError("attach document tag", err)
+		}
+	}
+	return nil
+}
+
+func (s *Store) PublishSnapshot(ctx context.Context, id string, actorID, expected int64, input PublicationSnapshotInput) (*domain.Document, error) {
+	var result *domain.Document
+	content, err := jsoncodec.Marshal(input.Content)
+	if err != nil {
+		return nil, fmt.Errorf("encode publication snapshot: %w", err)
+	}
+	tags, err := jsoncodec.Marshal(input.Tags)
+	if err != nil {
+		return nil, fmt.Errorf("encode publication tags: %w", err)
+	}
+	err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		existingID, found, err := s.idempotentResource(tx, input.Idempotency)
+		if err != nil {
+			return err
+		}
+		if found {
+			document, loadErr := s.getDocument(tx, existingID, actorID, false)
+			if loadErr != nil {
+				return loadErr
+			}
+			result = document
+			return nil
+		}
+		record, access, err := lockDocument(tx, id, actorID, false)
+		if err != nil {
+			return err
+		}
+		if !domain.CanEdit(access) {
+			return ErrForbidden
+		}
+		if record.MetadataRevision != expected {
+			return ErrPrecondition
+		}
+		now := s.now().UTC()
+		publication := &model.DocumentPublication{DocumentID: id, VersionID: stringPointer(input.VersionID), VersionSequence: input.VersionSequence, Title: input.Title, Summary: input.Summary, Slug: input.Slug, Language: input.Language, Tags: tags, OwnerID: record.OwnerID, OwnerUsername: record.OwnerUsername, OwnerAvatar: record.OwnerAvatar, Content: content, PlainText: input.PlainText, PublishedAt: now, UpdatedAt: now}
+		if err := tx.Save(publication).Error; err != nil {
+			return mapWriteError("save publication snapshot", err)
+		}
+		if err := s.replaceDocumentTags(tx, record.OwnerID, id, input.Tags, now); err != nil {
+			return err
+		}
+		var alias model.SlugAlias
+		aliasErr := tx.Where("slug = ?", input.Slug).First(&alias).Error
+		if aliasErr == nil && alias.DocumentID != nil && *alias.DocumentID != id {
+			return ErrConflict
+		}
+		if errors.Is(aliasErr, gorm.ErrRecordNotFound) {
+			if err := tx.Create(&model.SlugAlias{Slug: input.Slug, DocumentID: stringPointer(id), CreatedAt: now}).Error; err != nil {
+				return mapWriteError("reserve publication slug", err)
+			}
+		} else if aliasErr != nil {
+			return fmt.Errorf("check publication slug: %w", aliasErr)
+		} else if err := tx.Model(&alias).Updates(map[string]any{"document_id": id, "gone_at": nil}).Error; err != nil {
+			return fmt.Errorf("activate publication slug: %w", err)
+		}
+		if err := tx.Model(record).Updates(map[string]any{"published": true, "published_at": now, "metadata_revision": gorm.Expr("metadata_revision + 1"), "permission_revision": gorm.Expr("permission_revision + 1"), "updated_at": now}).Error; err != nil {
+			return fmt.Errorf("mark document published: %w", err)
+		}
+		if err := tx.Where("id = ?", id).First(record).Error; err != nil {
+			return fmt.Errorf("reload published document: %w", err)
+		}
+		if err := s.enqueuePermissionChanged(tx, record, now); err != nil {
+			return err
+		}
+		if err := s.saveIdempotency(tx, input.Idempotency, id); err != nil {
+			return err
+		}
+		projection, err := getProjection(tx, id)
+		if err != nil {
+			return err
+		}
+		result = documentFromModel(record, access, projection)
+		result.Tags = append([]string(nil), input.Tags...)
+		return nil
+	})
+	return result, err
 }
 
 type ListOptions struct {
@@ -195,8 +375,13 @@ func (s *Store) ListDocuments(ctx context.Context, options ListOptions) ([]*doma
 	}
 	type row struct {
 		model.Document
-		Access      string     `gorm:"column:access"`
-		ProjectedAt *time.Time `gorm:"column:projected_at"`
+		Access              string     `gorm:"column:access"`
+		ProjectedAt         *time.Time `gorm:"column:projected_at"`
+		PublicationTitle    *string    `gorm:"column:publication_title"`
+		PublicationSummary  *string    `gorm:"column:publication_summary"`
+		PublicationSlug     *string    `gorm:"column:publication_slug"`
+		PublicationLanguage *string    `gorm:"column:publication_language"`
+		PublicationTags     []byte     `gorm:"column:publication_tags"`
 	}
 	selectSQL, args := buildListDocumentsQuery(options, limit)
 	var rows []row
@@ -209,16 +394,33 @@ func (s *Store) ListDocuments(ctx context.Context, options ListOptions) ([]*doma
 		if rows[index].ProjectedAt != nil {
 			projection.ProjectedAt = *rows[index].ProjectedAt
 		}
-		result = append(result, documentFromModel(&rows[index].Document, rows[index].Access, projection))
+		document := documentFromModel(&rows[index].Document, rows[index].Access, projection)
+		if options.Published {
+			if rows[index].PublicationTitle != nil {
+				document.Title = *rows[index].PublicationTitle
+			}
+			if rows[index].PublicationSummary != nil {
+				document.Summary = *rows[index].PublicationSummary
+			}
+			if rows[index].PublicationSlug != nil {
+				document.Slug = *rows[index].PublicationSlug
+			}
+			if rows[index].PublicationLanguage != nil {
+				document.Language = *rows[index].PublicationLanguage
+			}
+			document.Tags = publicationTags(rows[index].PublicationTags)
+		}
+		result = append(result, document)
 	}
 	return result, nil
 }
 
 func buildListDocumentsQuery(options ListOptions, limit int) (string, []any) {
-	selectSQL := `SELECT d.*, p.projected_at, CASE WHEN d.owner_id = ? THEN 'owner' ELSE COALESCE(m.role, 'none') END AS access
+	selectSQL := `SELECT d.*, p.projected_at, pub.title AS publication_title, pub.summary AS publication_summary, pub.slug AS publication_slug, pub.language AS publication_language, pub.tags AS publication_tags, CASE WHEN d.owner_id = ? THEN 'owner' ELSE COALESCE(m.role, 'none') END AS access
 FROM knowledge.documents d
 LEFT JOIN knowledge.document_members m ON m.document_id = d.id AND m.user_id = ?
-LEFT JOIN knowledge.document_projections p ON p.document_id = d.id`
+LEFT JOIN knowledge.document_projections p ON p.document_id = d.id
+LEFT JOIN knowledge.document_publications pub ON pub.document_id = d.id`
 	args := []any{options.ActorID, options.ActorID}
 	if options.Query != "" {
 		selectSQL += `
@@ -276,7 +478,7 @@ JOIN (
 	return selectSQL, args
 }
 
-func (s *Store) UpdateDocument(ctx context.Context, id string, actorID, expected int64, title, summary, slug *string) (*domain.Document, error) {
+func (s *Store) UpdateDocument(ctx context.Context, id string, actorID, expected int64, title, summary, slug, language *string, tags []string, folderID *string) (*domain.Document, error) {
 	var result *domain.Document
 	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		record, access, err := lockDocument(tx, id, actorID, false)
@@ -297,11 +499,39 @@ func (s *Store) UpdateDocument(ctx context.Context, id string, actorID, expected
 		if summary != nil {
 			updates["summary"] = *summary
 		}
+		if language != nil {
+			updates["language"] = *language
+		}
 		if slug != nil && *slug != record.Slug {
-			if err := tx.Create(&model.SlugAlias{Slug: *slug, DocumentID: stringPointer(id), CreatedAt: now}).Error; err != nil {
-				return mapWriteError("reserve updated document slug", err)
+			var alias model.SlugAlias
+			aliasErr := tx.Where("slug = ?", *slug).First(&alias).Error
+			if aliasErr == nil && alias.DocumentID != nil && *alias.DocumentID != id {
+				return ErrConflict
+			}
+			if errors.Is(aliasErr, gorm.ErrRecordNotFound) {
+				if err := tx.Create(&model.SlugAlias{Slug: *slug, DocumentID: stringPointer(id), CreatedAt: now}).Error; err != nil {
+					return mapWriteError("reserve updated document slug", err)
+				}
+			} else if aliasErr != nil {
+				return fmt.Errorf("check updated document slug: %w", aliasErr)
 			}
 			updates["slug"] = *slug
+		}
+		if folderID != nil {
+			if *folderID == "" {
+				if err := tx.Where("owner_id = ? AND document_id = ?", record.OwnerID, id).Delete(&model.DocumentPlacement{}).Error; err != nil {
+					return fmt.Errorf("clear document folder: %w", err)
+				}
+			} else {
+				var folder model.Folder
+				if err := tx.Where("id = ? AND owner_id = ?", *folderID, record.OwnerID).First(&folder).Error; err != nil {
+					return mapNotFound("get document folder", err)
+				}
+				placement := &model.DocumentPlacement{OwnerID: record.OwnerID, DocumentID: id, FolderID: folderID, Revision: 1, CreatedAt: now, UpdatedAt: now}
+				if err := tx.Where("owner_id = ? AND document_id = ?", record.OwnerID, id).Assign(map[string]any{"folder_id": *folderID, "updated_at": now, "revision": gorm.Expr("revision + 1")}).FirstOrCreate(placement).Error; err != nil {
+					return mapWriteError("place document in folder", err)
+				}
+			}
 		}
 		if err := tx.Model(record).Updates(updates).Error; err != nil {
 			return mapWriteError("update document", err)
@@ -309,11 +539,26 @@ func (s *Store) UpdateDocument(ctx context.Context, id string, actorID, expected
 		if err := tx.Where("id = ?", id).First(record).Error; err != nil {
 			return fmt.Errorf("reload updated document: %w", err)
 		}
+		if tags != nil {
+			if err := s.replaceDocumentTags(tx, record.OwnerID, id, tags, now); err != nil {
+				return err
+			}
+		}
 		projection, err := getProjection(tx, id)
 		if err != nil {
 			return err
 		}
 		result = documentFromModel(record, access, projection)
+		if tags != nil {
+			result.Tags = append([]string(nil), tags...)
+		}
+		if folderID != nil {
+			if *folderID == "" {
+				result.FolderID = nil
+			} else {
+				result.FolderID = stringPointer(*folderID)
+			}
+		}
 		return nil
 	})
 	return result, err

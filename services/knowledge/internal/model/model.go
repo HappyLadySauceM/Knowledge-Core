@@ -7,6 +7,7 @@ type Document struct {
 	Title              string     `gorm:"size:200;not null"`
 	Summary            string     `gorm:"size:1000;not null;default:''"`
 	Slug               string     `gorm:"size:80;not null"`
+	Language           string     `gorm:"size:16;not null;default:'zh-CN'"`
 	OwnerID            int64      `gorm:"not null"`
 	OwnerUsername      string     `gorm:"size:32;not null"`
 	OwnerAvatar        string     `gorm:"type:text;not null;default:''"`
@@ -55,6 +56,76 @@ type Projection struct {
 }
 
 func (Projection) TableName() string { return "knowledge.document_projections" }
+
+type Folder struct {
+	ID        string    `gorm:"type:uuid;primaryKey"`
+	OwnerID   int64     `gorm:"not null"`
+	ParentID  *string   `gorm:"type:uuid"`
+	Name      string    `gorm:"size:120;not null"`
+	Depth     int       `gorm:"not null"`
+	Revision  int64     `gorm:"not null;default:1"`
+	CreatedAt time.Time `gorm:"type:timestamptz;not null"`
+	UpdatedAt time.Time `gorm:"type:timestamptz;not null"`
+}
+
+func (Folder) TableName() string { return "knowledge.folders" }
+
+type DocumentPlacement struct {
+	OwnerID    int64     `gorm:"primaryKey"`
+	DocumentID string    `gorm:"type:uuid;primaryKey"`
+	FolderID   *string   `gorm:"type:uuid"`
+	Revision   int64     `gorm:"not null;default:1"`
+	CreatedAt  time.Time `gorm:"type:timestamptz;not null"`
+	UpdatedAt  time.Time `gorm:"type:timestamptz;not null"`
+}
+
+func (DocumentPlacement) TableName() string { return "knowledge.document_placements" }
+
+type Tag struct {
+	ID        string    `gorm:"type:uuid;primaryKey"`
+	OwnerID   int64     `gorm:"not null"`
+	Name      string    `gorm:"size:64;not null"`
+	Slug      string    `gorm:"size:80;not null"`
+	CreatedAt time.Time `gorm:"type:timestamptz;not null"`
+	UpdatedAt time.Time `gorm:"type:timestamptz;not null"`
+}
+
+func (Tag) TableName() string { return "knowledge.tags" }
+
+type DocumentTag struct {
+	DocumentID string    `gorm:"type:uuid;primaryKey"`
+	TagID      string    `gorm:"type:uuid;primaryKey"`
+	CreatedAt  time.Time `gorm:"type:timestamptz;not null"`
+}
+
+func (DocumentTag) TableName() string { return "knowledge.document_tags" }
+
+type DocumentPublication struct {
+	DocumentID      string    `gorm:"type:uuid;primaryKey"`
+	VersionID       *string   `gorm:"type:uuid"`
+	VersionSequence int64     `gorm:"not null"`
+	Title           string    `gorm:"size:200;not null"`
+	Summary         string    `gorm:"size:1000;not null;default:''"`
+	Slug            string    `gorm:"size:80;not null"`
+	Language        string    `gorm:"size:16;not null;default:'zh-CN'"`
+	Tags            []byte    `gorm:"type:jsonb;not null"`
+	OwnerID         int64     `gorm:"not null"`
+	OwnerUsername   string    `gorm:"size:32;not null"`
+	OwnerAvatar     string    `gorm:"type:text;not null;default:''"`
+	Content         []byte    `gorm:"type:jsonb;not null"`
+	PlainText       string    `gorm:"type:text;not null;default:''"`
+	PublishedAt     time.Time `gorm:"type:timestamptz;not null"`
+	UpdatedAt       time.Time `gorm:"type:timestamptz;not null"`
+}
+
+func (DocumentPublication) TableName() string { return "knowledge.document_publications" }
+
+type PublicationAttachment struct {
+	DocumentID   string `gorm:"type:uuid;primaryKey"`
+	AttachmentID string `gorm:"type:uuid;primaryKey"`
+}
+
+func (PublicationAttachment) TableName() string { return "knowledge.publication_attachments" }
 
 type Attachment struct {
 	ID            string    `gorm:"type:uuid;primaryKey"`

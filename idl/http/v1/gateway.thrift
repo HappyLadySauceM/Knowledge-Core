@@ -130,6 +130,9 @@ struct DocumentData {
   12: optional string projected_at (api.body="projected_at")
   13: required string created_at (api.body="created_at")
   14: required string updated_at (api.body="updated_at")
+  15: optional string language (api.body="language")
+  16: optional list<string> tags (api.body="tags")
+  17: optional string folder_id (api.body="folder_id")
 }
 
 struct AttachmentData {
@@ -170,12 +173,40 @@ struct DocumentPageData {
   2: required PageInfoData page (api.body="page")
 }
 
+struct FolderData {
+  1: required string id (api.body="id")
+  2: optional string parent_id (api.body="parent_id")
+  3: required string name (api.body="name")
+  4: required i32 depth (api.body="depth")
+  5: required i64 revision (api.body="revision")
+  6: required string created_at (api.body="created_at")
+  7: required string updated_at (api.body="updated_at")
+}
+struct FolderListData { 1: required list<FolderData> items (api.body="items") }
+
 struct ListDocumentsRequest {
   1: optional string query (api.query="q")
   2: optional string cursor (api.query="cursor")
   3: optional i32 limit (api.query="limit")
   4: optional string access (api.query="access")
   5: optional string publication (api.query="publication")
+}
+
+struct ListFoldersRequest { 1: optional string parent_id (api.query="parent_id") }
+struct CreateFolderRequest {
+  1: required string name (api.body="name")
+  2: optional string parent_id (api.body="parent_id")
+  3: optional string idempotency_key (api.header="Idempotency-Key")
+}
+struct UpdateFolderRequest {
+  1: required string folder_id (api.path="folder_id")
+  2: required string if_match (api.header="If-Match")
+  3: optional string name (api.body="name")
+  4: optional string parent_id (api.body="parent_id")
+}
+struct DeleteFolderRequest {
+  1: required string folder_id (api.path="folder_id")
+  2: required string if_match (api.header="If-Match")
 }
 
 struct SlugRequest { 1: required string slug (api.path="slug") }
@@ -194,11 +225,16 @@ struct UpdateDocumentRequest {
   3: optional string title (api.body="title")
   4: optional string summary (api.body="summary")
   5: optional string slug (api.body="slug")
+  6: optional string language (api.body="language")
+  7: optional list<string> tags (api.body="tags")
+  8: optional string folder_id (api.body="folder_id")
 }
 
 struct PublicationRequest {
   1: required string document_id (api.path="document_id")
   2: required string if_match (api.header="If-Match")
+  3: optional string state_vector (api.body="state_vector")
+  4: optional string idempotency_key (api.header="Idempotency-Key")
 }
 
 struct DeleteDocumentRequest {
@@ -325,6 +361,10 @@ service GatewayService {
   DocumentDetailData GetPublishedDocument(1: SlugRequest request) (api.get="/api/v1/documents/:slug")
   EmptyResponse GetAttachmentContent(1: PublicAttachmentRequest request) (api.get="/api/v1/attachments/:attachment_id/content")
   DocumentPageData ListDocuments(1: ListDocumentsRequest request) (api.get="/api/v1/studio/documents")
+  FolderListData ListFolders(1: ListFoldersRequest request) (api.get="/api/v1/studio/folders")
+  FolderData CreateFolder(1: CreateFolderRequest request) (api.post="/api/v1/studio/folders")
+  FolderData UpdateFolder(1: UpdateFolderRequest request) (api.patch="/api/v1/studio/folders/:folder_id")
+  EmptyResponse DeleteFolder(1: DeleteFolderRequest request) (api.delete="/api/v1/studio/folders/:folder_id")
   DocumentData CreateDocument(1: CreateDocumentRequest request) (api.post="/api/v1/studio/documents")
   DocumentData GetDocument(1: DocumentIDRequest request) (api.get="/api/v1/studio/documents/:document_id")
   CollaborationSessionData CreateCollaborationSession(1: DocumentIDRequest request) (api.post="/api/v1/studio/documents/:document_id/collaboration-sessions")

@@ -514,6 +514,9 @@ type Document struct {
 	ProjectedAt      *string     `thrift:"projected_at,12,optional" frugal:"12,optional,string" json:"projected_at,omitempty"`
 	CreatedAt        string      `thrift:"created_at,13,required" frugal:"13,required,string" json:"created_at"`
 	UpdatedAt        string      `thrift:"updated_at,14,required" frugal:"14,required,string" json:"updated_at"`
+	Language         *string     `thrift:"language,15,optional" frugal:"15,optional,string" json:"language,omitempty"`
+	Tags             []string    `thrift:"tags,16,optional" frugal:"16,optional,list<string>" json:"tags,omitempty"`
+	FolderId         *string     `thrift:"folder_id,17,optional" frugal:"17,optional,string" json:"folder_id,omitempty"`
 }
 
 func NewDocument() *Document {
@@ -598,6 +601,33 @@ func (p *Document) GetCreatedAt() (v string) {
 func (p *Document) GetUpdatedAt() (v string) {
 	return p.UpdatedAt
 }
+
+var Document_Language_DEFAULT string
+
+func (p *Document) GetLanguage() (v string) {
+	if !p.IsSetLanguage() {
+		return Document_Language_DEFAULT
+	}
+	return *p.Language
+}
+
+var Document_Tags_DEFAULT []string
+
+func (p *Document) GetTags() (v []string) {
+	if !p.IsSetTags() {
+		return Document_Tags_DEFAULT
+	}
+	return p.Tags
+}
+
+var Document_FolderId_DEFAULT string
+
+func (p *Document) GetFolderId() (v string) {
+	if !p.IsSetFolderId() {
+		return Document_FolderId_DEFAULT
+	}
+	return *p.FolderId
+}
 func (p *Document) SetId(val string) {
 	p.Id = val
 }
@@ -640,6 +670,15 @@ func (p *Document) SetCreatedAt(val string) {
 func (p *Document) SetUpdatedAt(val string) {
 	p.UpdatedAt = val
 }
+func (p *Document) SetLanguage(val *string) {
+	p.Language = val
+}
+func (p *Document) SetTags(val []string) {
+	p.Tags = val
+}
+func (p *Document) SetFolderId(val *string) {
+	p.FolderId = val
+}
 
 func (p *Document) IsSetOwner() bool {
 	return p.Owner != nil
@@ -655,6 +694,18 @@ func (p *Document) IsSetDeletedAt() bool {
 
 func (p *Document) IsSetProjectedAt() bool {
 	return p.ProjectedAt != nil
+}
+
+func (p *Document) IsSetLanguage() bool {
+	return p.Language != nil
+}
+
+func (p *Document) IsSetTags() bool {
+	return p.Tags != nil
+}
+
+func (p *Document) IsSetFolderId() bool {
+	return p.FolderId != nil
 }
 
 func (p *Document) String() string {
@@ -679,6 +730,9 @@ var fieldIDToName_Document = map[int16]string{
 	12: "projected_at",
 	13: "created_at",
 	14: "updated_at",
+	15: "language",
+	16: "tags",
+	17: "folder_id",
 }
 
 type Attachment struct {
@@ -930,6 +984,127 @@ func (p *DocumentPage) String() string {
 var fieldIDToName_DocumentPage = map[int16]string{
 	1: "items",
 	2: "page",
+}
+
+type Folder struct {
+	Id        string  `thrift:"id,1,required" frugal:"1,required,string" json:"id"`
+	ParentId  *string `thrift:"parent_id,2,optional" frugal:"2,optional,string" json:"parent_id,omitempty"`
+	Name      string  `thrift:"name,3,required" frugal:"3,required,string" json:"name"`
+	Depth     int32   `thrift:"depth,4,required" frugal:"4,required,i32" json:"depth"`
+	Revision  int64   `thrift:"revision,5,required" frugal:"5,required,i64" json:"revision"`
+	CreatedAt string  `thrift:"created_at,6,required" frugal:"6,required,string" json:"created_at"`
+	UpdatedAt string  `thrift:"updated_at,7,required" frugal:"7,required,string" json:"updated_at"`
+}
+
+func NewFolder() *Folder {
+	return &Folder{}
+}
+
+func (p *Folder) InitDefault() {
+}
+
+func (p *Folder) GetId() (v string) {
+	return p.Id
+}
+
+var Folder_ParentId_DEFAULT string
+
+func (p *Folder) GetParentId() (v string) {
+	if !p.IsSetParentId() {
+		return Folder_ParentId_DEFAULT
+	}
+	return *p.ParentId
+}
+
+func (p *Folder) GetName() (v string) {
+	return p.Name
+}
+
+func (p *Folder) GetDepth() (v int32) {
+	return p.Depth
+}
+
+func (p *Folder) GetRevision() (v int64) {
+	return p.Revision
+}
+
+func (p *Folder) GetCreatedAt() (v string) {
+	return p.CreatedAt
+}
+
+func (p *Folder) GetUpdatedAt() (v string) {
+	return p.UpdatedAt
+}
+func (p *Folder) SetId(val string) {
+	p.Id = val
+}
+func (p *Folder) SetParentId(val *string) {
+	p.ParentId = val
+}
+func (p *Folder) SetName(val string) {
+	p.Name = val
+}
+func (p *Folder) SetDepth(val int32) {
+	p.Depth = val
+}
+func (p *Folder) SetRevision(val int64) {
+	p.Revision = val
+}
+func (p *Folder) SetCreatedAt(val string) {
+	p.CreatedAt = val
+}
+func (p *Folder) SetUpdatedAt(val string) {
+	p.UpdatedAt = val
+}
+
+func (p *Folder) IsSetParentId() bool {
+	return p.ParentId != nil
+}
+
+func (p *Folder) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("Folder(%+v)", *p)
+}
+
+var fieldIDToName_Folder = map[int16]string{
+	1: "id",
+	2: "parent_id",
+	3: "name",
+	4: "depth",
+	5: "revision",
+	6: "created_at",
+	7: "updated_at",
+}
+
+type FolderList struct {
+	Items []*Folder `thrift:"items,1,required" frugal:"1,required,list<Folder>" json:"items"`
+}
+
+func NewFolderList() *FolderList {
+	return &FolderList{}
+}
+
+func (p *FolderList) InitDefault() {
+}
+
+func (p *FolderList) GetItems() (v []*Folder) {
+	return p.Items
+}
+func (p *FolderList) SetItems(val []*Folder) {
+	p.Items = val
+}
+
+func (p *FolderList) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("FolderList(%+v)", *p)
+}
+
+var fieldIDToName_FolderList = map[int16]string{
+	1: "items",
 }
 
 type EmptyRequest struct {
@@ -1203,11 +1378,14 @@ var fieldIDToName_CreateDocumentRequest = map[int16]string{
 }
 
 type UpdateDocumentRequest struct {
-	DocumentId       string  `thrift:"document_id,1,required" frugal:"1,required,string" json:"document_id"`
-	ExpectedRevision int64   `thrift:"expected_revision,2,required" frugal:"2,required,i64" json:"expected_revision"`
-	Title            *string `thrift:"title,3,optional" frugal:"3,optional,string" json:"title,omitempty"`
-	Summary          *string `thrift:"summary,4,optional" frugal:"4,optional,string" json:"summary,omitempty"`
-	Slug             *string `thrift:"slug,5,optional" frugal:"5,optional,string" json:"slug,omitempty"`
+	DocumentId       string   `thrift:"document_id,1,required" frugal:"1,required,string" json:"document_id"`
+	ExpectedRevision int64    `thrift:"expected_revision,2,required" frugal:"2,required,i64" json:"expected_revision"`
+	Title            *string  `thrift:"title,3,optional" frugal:"3,optional,string" json:"title,omitempty"`
+	Summary          *string  `thrift:"summary,4,optional" frugal:"4,optional,string" json:"summary,omitempty"`
+	Slug             *string  `thrift:"slug,5,optional" frugal:"5,optional,string" json:"slug,omitempty"`
+	Language         *string  `thrift:"language,6,optional" frugal:"6,optional,string" json:"language,omitempty"`
+	Tags             []string `thrift:"tags,7,optional" frugal:"7,optional,list<string>" json:"tags,omitempty"`
+	FolderId         *string  `thrift:"folder_id,8,optional" frugal:"8,optional,string" json:"folder_id,omitempty"`
 }
 
 func NewUpdateDocumentRequest() *UpdateDocumentRequest {
@@ -1251,6 +1429,33 @@ func (p *UpdateDocumentRequest) GetSlug() (v string) {
 	}
 	return *p.Slug
 }
+
+var UpdateDocumentRequest_Language_DEFAULT string
+
+func (p *UpdateDocumentRequest) GetLanguage() (v string) {
+	if !p.IsSetLanguage() {
+		return UpdateDocumentRequest_Language_DEFAULT
+	}
+	return *p.Language
+}
+
+var UpdateDocumentRequest_Tags_DEFAULT []string
+
+func (p *UpdateDocumentRequest) GetTags() (v []string) {
+	if !p.IsSetTags() {
+		return UpdateDocumentRequest_Tags_DEFAULT
+	}
+	return p.Tags
+}
+
+var UpdateDocumentRequest_FolderId_DEFAULT string
+
+func (p *UpdateDocumentRequest) GetFolderId() (v string) {
+	if !p.IsSetFolderId() {
+		return UpdateDocumentRequest_FolderId_DEFAULT
+	}
+	return *p.FolderId
+}
 func (p *UpdateDocumentRequest) SetDocumentId(val string) {
 	p.DocumentId = val
 }
@@ -1266,6 +1471,15 @@ func (p *UpdateDocumentRequest) SetSummary(val *string) {
 func (p *UpdateDocumentRequest) SetSlug(val *string) {
 	p.Slug = val
 }
+func (p *UpdateDocumentRequest) SetLanguage(val *string) {
+	p.Language = val
+}
+func (p *UpdateDocumentRequest) SetTags(val []string) {
+	p.Tags = val
+}
+func (p *UpdateDocumentRequest) SetFolderId(val *string) {
+	p.FolderId = val
+}
 
 func (p *UpdateDocumentRequest) IsSetTitle() bool {
 	return p.Title != nil
@@ -1277,6 +1491,18 @@ func (p *UpdateDocumentRequest) IsSetSummary() bool {
 
 func (p *UpdateDocumentRequest) IsSetSlug() bool {
 	return p.Slug != nil
+}
+
+func (p *UpdateDocumentRequest) IsSetLanguage() bool {
+	return p.Language != nil
+}
+
+func (p *UpdateDocumentRequest) IsSetTags() bool {
+	return p.Tags != nil
+}
+
+func (p *UpdateDocumentRequest) IsSetFolderId() bool {
+	return p.FolderId != nil
 }
 
 func (p *UpdateDocumentRequest) String() string {
@@ -1292,6 +1518,370 @@ var fieldIDToName_UpdateDocumentRequest = map[int16]string{
 	3: "title",
 	4: "summary",
 	5: "slug",
+	6: "language",
+	7: "tags",
+	8: "folder_id",
+}
+
+type PublishSnapshotRequest struct {
+	DocumentId               string            `thrift:"document_id,1,required" frugal:"1,required,string" json:"document_id"`
+	ExpectedMetadataRevision int64             `thrift:"expected_metadata_revision,2,required" frugal:"2,required,i64" json:"expected_metadata_revision"`
+	VersionId                string            `thrift:"version_id,3,required" frugal:"3,required,string" json:"version_id"`
+	VersionSequence          int64             `thrift:"version_sequence,4,required" frugal:"4,required,i64" json:"version_sequence"`
+	Title                    string            `thrift:"title,5,required" frugal:"5,required,string" json:"title"`
+	Summary                  string            `thrift:"summary,6,required" frugal:"6,required,string" json:"summary"`
+	Slug                     string            `thrift:"slug,7,required" frugal:"7,required,string" json:"slug"`
+	Language                 string            `thrift:"language,8,required" frugal:"8,required,string" json:"language"`
+	Tags                     []string          `thrift:"tags,9,required" frugal:"9,required,list<string>" json:"tags"`
+	Content                  *RichTextDocument `thrift:"content,10,required" frugal:"10,required,RichTextDocument" json:"content"`
+	PlainText                string            `thrift:"plain_text,11,required" frugal:"11,required,string" json:"plain_text"`
+	IdempotencyKey           *string           `thrift:"idempotency_key,12,optional" frugal:"12,optional,string" json:"idempotency_key,omitempty"`
+}
+
+func NewPublishSnapshotRequest() *PublishSnapshotRequest {
+	return &PublishSnapshotRequest{}
+}
+
+func (p *PublishSnapshotRequest) InitDefault() {
+}
+
+func (p *PublishSnapshotRequest) GetDocumentId() (v string) {
+	return p.DocumentId
+}
+
+func (p *PublishSnapshotRequest) GetExpectedMetadataRevision() (v int64) {
+	return p.ExpectedMetadataRevision
+}
+
+func (p *PublishSnapshotRequest) GetVersionId() (v string) {
+	return p.VersionId
+}
+
+func (p *PublishSnapshotRequest) GetVersionSequence() (v int64) {
+	return p.VersionSequence
+}
+
+func (p *PublishSnapshotRequest) GetTitle() (v string) {
+	return p.Title
+}
+
+func (p *PublishSnapshotRequest) GetSummary() (v string) {
+	return p.Summary
+}
+
+func (p *PublishSnapshotRequest) GetSlug() (v string) {
+	return p.Slug
+}
+
+func (p *PublishSnapshotRequest) GetLanguage() (v string) {
+	return p.Language
+}
+
+func (p *PublishSnapshotRequest) GetTags() (v []string) {
+	return p.Tags
+}
+
+var PublishSnapshotRequest_Content_DEFAULT *RichTextDocument
+
+func (p *PublishSnapshotRequest) GetContent() (v *RichTextDocument) {
+	if !p.IsSetContent() {
+		return PublishSnapshotRequest_Content_DEFAULT
+	}
+	return p.Content
+}
+
+func (p *PublishSnapshotRequest) GetPlainText() (v string) {
+	return p.PlainText
+}
+
+var PublishSnapshotRequest_IdempotencyKey_DEFAULT string
+
+func (p *PublishSnapshotRequest) GetIdempotencyKey() (v string) {
+	if !p.IsSetIdempotencyKey() {
+		return PublishSnapshotRequest_IdempotencyKey_DEFAULT
+	}
+	return *p.IdempotencyKey
+}
+func (p *PublishSnapshotRequest) SetDocumentId(val string) {
+	p.DocumentId = val
+}
+func (p *PublishSnapshotRequest) SetExpectedMetadataRevision(val int64) {
+	p.ExpectedMetadataRevision = val
+}
+func (p *PublishSnapshotRequest) SetVersionId(val string) {
+	p.VersionId = val
+}
+func (p *PublishSnapshotRequest) SetVersionSequence(val int64) {
+	p.VersionSequence = val
+}
+func (p *PublishSnapshotRequest) SetTitle(val string) {
+	p.Title = val
+}
+func (p *PublishSnapshotRequest) SetSummary(val string) {
+	p.Summary = val
+}
+func (p *PublishSnapshotRequest) SetSlug(val string) {
+	p.Slug = val
+}
+func (p *PublishSnapshotRequest) SetLanguage(val string) {
+	p.Language = val
+}
+func (p *PublishSnapshotRequest) SetTags(val []string) {
+	p.Tags = val
+}
+func (p *PublishSnapshotRequest) SetContent(val *RichTextDocument) {
+	p.Content = val
+}
+func (p *PublishSnapshotRequest) SetPlainText(val string) {
+	p.PlainText = val
+}
+func (p *PublishSnapshotRequest) SetIdempotencyKey(val *string) {
+	p.IdempotencyKey = val
+}
+
+func (p *PublishSnapshotRequest) IsSetContent() bool {
+	return p.Content != nil
+}
+
+func (p *PublishSnapshotRequest) IsSetIdempotencyKey() bool {
+	return p.IdempotencyKey != nil
+}
+
+func (p *PublishSnapshotRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("PublishSnapshotRequest(%+v)", *p)
+}
+
+var fieldIDToName_PublishSnapshotRequest = map[int16]string{
+	1:  "document_id",
+	2:  "expected_metadata_revision",
+	3:  "version_id",
+	4:  "version_sequence",
+	5:  "title",
+	6:  "summary",
+	7:  "slug",
+	8:  "language",
+	9:  "tags",
+	10: "content",
+	11: "plain_text",
+	12: "idempotency_key",
+}
+
+type ListFoldersRequest struct {
+	ParentId *string `thrift:"parent_id,1,optional" frugal:"1,optional,string" json:"parent_id,omitempty"`
+}
+
+func NewListFoldersRequest() *ListFoldersRequest {
+	return &ListFoldersRequest{}
+}
+
+func (p *ListFoldersRequest) InitDefault() {
+}
+
+var ListFoldersRequest_ParentId_DEFAULT string
+
+func (p *ListFoldersRequest) GetParentId() (v string) {
+	if !p.IsSetParentId() {
+		return ListFoldersRequest_ParentId_DEFAULT
+	}
+	return *p.ParentId
+}
+func (p *ListFoldersRequest) SetParentId(val *string) {
+	p.ParentId = val
+}
+
+func (p *ListFoldersRequest) IsSetParentId() bool {
+	return p.ParentId != nil
+}
+
+func (p *ListFoldersRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("ListFoldersRequest(%+v)", *p)
+}
+
+var fieldIDToName_ListFoldersRequest = map[int16]string{
+	1: "parent_id",
+}
+
+type CreateFolderRequest struct {
+	Name           string  `thrift:"name,1,required" frugal:"1,required,string" json:"name"`
+	ParentId       *string `thrift:"parent_id,2,optional" frugal:"2,optional,string" json:"parent_id,omitempty"`
+	IdempotencyKey *string `thrift:"idempotency_key,3,optional" frugal:"3,optional,string" json:"idempotency_key,omitempty"`
+}
+
+func NewCreateFolderRequest() *CreateFolderRequest {
+	return &CreateFolderRequest{}
+}
+
+func (p *CreateFolderRequest) InitDefault() {
+}
+
+func (p *CreateFolderRequest) GetName() (v string) {
+	return p.Name
+}
+
+var CreateFolderRequest_ParentId_DEFAULT string
+
+func (p *CreateFolderRequest) GetParentId() (v string) {
+	if !p.IsSetParentId() {
+		return CreateFolderRequest_ParentId_DEFAULT
+	}
+	return *p.ParentId
+}
+
+var CreateFolderRequest_IdempotencyKey_DEFAULT string
+
+func (p *CreateFolderRequest) GetIdempotencyKey() (v string) {
+	if !p.IsSetIdempotencyKey() {
+		return CreateFolderRequest_IdempotencyKey_DEFAULT
+	}
+	return *p.IdempotencyKey
+}
+func (p *CreateFolderRequest) SetName(val string) {
+	p.Name = val
+}
+func (p *CreateFolderRequest) SetParentId(val *string) {
+	p.ParentId = val
+}
+func (p *CreateFolderRequest) SetIdempotencyKey(val *string) {
+	p.IdempotencyKey = val
+}
+
+func (p *CreateFolderRequest) IsSetParentId() bool {
+	return p.ParentId != nil
+}
+
+func (p *CreateFolderRequest) IsSetIdempotencyKey() bool {
+	return p.IdempotencyKey != nil
+}
+
+func (p *CreateFolderRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("CreateFolderRequest(%+v)", *p)
+}
+
+var fieldIDToName_CreateFolderRequest = map[int16]string{
+	1: "name",
+	2: "parent_id",
+	3: "idempotency_key",
+}
+
+type UpdateFolderRequest struct {
+	FolderId         string  `thrift:"folder_id,1,required" frugal:"1,required,string" json:"folder_id"`
+	ExpectedRevision int64   `thrift:"expected_revision,2,required" frugal:"2,required,i64" json:"expected_revision"`
+	Name             *string `thrift:"name,3,optional" frugal:"3,optional,string" json:"name,omitempty"`
+	ParentId         *string `thrift:"parent_id,4,optional" frugal:"4,optional,string" json:"parent_id,omitempty"`
+}
+
+func NewUpdateFolderRequest() *UpdateFolderRequest {
+	return &UpdateFolderRequest{}
+}
+
+func (p *UpdateFolderRequest) InitDefault() {
+}
+
+func (p *UpdateFolderRequest) GetFolderId() (v string) {
+	return p.FolderId
+}
+
+func (p *UpdateFolderRequest) GetExpectedRevision() (v int64) {
+	return p.ExpectedRevision
+}
+
+var UpdateFolderRequest_Name_DEFAULT string
+
+func (p *UpdateFolderRequest) GetName() (v string) {
+	if !p.IsSetName() {
+		return UpdateFolderRequest_Name_DEFAULT
+	}
+	return *p.Name
+}
+
+var UpdateFolderRequest_ParentId_DEFAULT string
+
+func (p *UpdateFolderRequest) GetParentId() (v string) {
+	if !p.IsSetParentId() {
+		return UpdateFolderRequest_ParentId_DEFAULT
+	}
+	return *p.ParentId
+}
+func (p *UpdateFolderRequest) SetFolderId(val string) {
+	p.FolderId = val
+}
+func (p *UpdateFolderRequest) SetExpectedRevision(val int64) {
+	p.ExpectedRevision = val
+}
+func (p *UpdateFolderRequest) SetName(val *string) {
+	p.Name = val
+}
+func (p *UpdateFolderRequest) SetParentId(val *string) {
+	p.ParentId = val
+}
+
+func (p *UpdateFolderRequest) IsSetName() bool {
+	return p.Name != nil
+}
+
+func (p *UpdateFolderRequest) IsSetParentId() bool {
+	return p.ParentId != nil
+}
+
+func (p *UpdateFolderRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("UpdateFolderRequest(%+v)", *p)
+}
+
+var fieldIDToName_UpdateFolderRequest = map[int16]string{
+	1: "folder_id",
+	2: "expected_revision",
+	3: "name",
+	4: "parent_id",
+}
+
+type DeleteFolderRequest struct {
+	FolderId         string `thrift:"folder_id,1,required" frugal:"1,required,string" json:"folder_id"`
+	ExpectedRevision int64  `thrift:"expected_revision,2,required" frugal:"2,required,i64" json:"expected_revision"`
+}
+
+func NewDeleteFolderRequest() *DeleteFolderRequest {
+	return &DeleteFolderRequest{}
+}
+
+func (p *DeleteFolderRequest) InitDefault() {
+}
+
+func (p *DeleteFolderRequest) GetFolderId() (v string) {
+	return p.FolderId
+}
+
+func (p *DeleteFolderRequest) GetExpectedRevision() (v int64) {
+	return p.ExpectedRevision
+}
+func (p *DeleteFolderRequest) SetFolderId(val string) {
+	p.FolderId = val
+}
+func (p *DeleteFolderRequest) SetExpectedRevision(val int64) {
+	p.ExpectedRevision = val
+}
+
+func (p *DeleteFolderRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("DeleteFolderRequest(%+v)", *p)
+}
+
+var fieldIDToName_DeleteFolderRequest = map[int16]string{
+	1: "folder_id",
+	2: "expected_revision",
 }
 
 type SetPublicationRequest struct {
@@ -2117,6 +2707,16 @@ type KnowledgeService interface {
 
 	UpdateDocument(ctx context.Context, request *UpdateDocumentRequest) (r *Document, err error)
 
+	PublishSnapshot(ctx context.Context, request *PublishSnapshotRequest) (r *Document, err error)
+
+	ListFolders(ctx context.Context, request *ListFoldersRequest) (r *FolderList, err error)
+
+	CreateFolder(ctx context.Context, request *CreateFolderRequest) (r *Folder, err error)
+
+	UpdateFolder(ctx context.Context, request *UpdateFolderRequest) (r *Folder, err error)
+
+	DeleteFolder(ctx context.Context, request *DeleteFolderRequest) (err error)
+
 	SetPublication(ctx context.Context, request *SetPublicationRequest) (r *Document, err error)
 
 	DeleteDocument(ctx context.Context, request *DeleteDocumentRequest) (r *Document, err error)
@@ -2755,6 +3355,367 @@ func (p *KnowledgeServiceUpdateDocumentResult) String() string {
 var fieldIDToName_KnowledgeServiceUpdateDocumentResult = map[int16]string{
 	0: "success",
 }
+
+type KnowledgeServicePublishSnapshotArgs struct {
+	Request *PublishSnapshotRequest `thrift:"request,1" frugal:"1,default,PublishSnapshotRequest" json:"request"`
+}
+
+func NewKnowledgeServicePublishSnapshotArgs() *KnowledgeServicePublishSnapshotArgs {
+	return &KnowledgeServicePublishSnapshotArgs{}
+}
+
+func (p *KnowledgeServicePublishSnapshotArgs) InitDefault() {
+}
+
+var KnowledgeServicePublishSnapshotArgs_Request_DEFAULT *PublishSnapshotRequest
+
+func (p *KnowledgeServicePublishSnapshotArgs) GetRequest() (v *PublishSnapshotRequest) {
+	if !p.IsSetRequest() {
+		return KnowledgeServicePublishSnapshotArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+func (p *KnowledgeServicePublishSnapshotArgs) SetRequest(val *PublishSnapshotRequest) {
+	p.Request = val
+}
+
+func (p *KnowledgeServicePublishSnapshotArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *KnowledgeServicePublishSnapshotArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("KnowledgeServicePublishSnapshotArgs(%+v)", *p)
+}
+
+var fieldIDToName_KnowledgeServicePublishSnapshotArgs = map[int16]string{
+	1: "request",
+}
+
+type KnowledgeServicePublishSnapshotResult struct {
+	Success *Document `thrift:"success,0,optional" frugal:"0,optional,Document" json:"success,omitempty"`
+}
+
+func NewKnowledgeServicePublishSnapshotResult() *KnowledgeServicePublishSnapshotResult {
+	return &KnowledgeServicePublishSnapshotResult{}
+}
+
+func (p *KnowledgeServicePublishSnapshotResult) InitDefault() {
+}
+
+var KnowledgeServicePublishSnapshotResult_Success_DEFAULT *Document
+
+func (p *KnowledgeServicePublishSnapshotResult) GetSuccess() (v *Document) {
+	if !p.IsSetSuccess() {
+		return KnowledgeServicePublishSnapshotResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *KnowledgeServicePublishSnapshotResult) SetSuccess(x interface{}) {
+	p.Success = x.(*Document)
+}
+
+func (p *KnowledgeServicePublishSnapshotResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *KnowledgeServicePublishSnapshotResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("KnowledgeServicePublishSnapshotResult(%+v)", *p)
+}
+
+var fieldIDToName_KnowledgeServicePublishSnapshotResult = map[int16]string{
+	0: "success",
+}
+
+type KnowledgeServiceListFoldersArgs struct {
+	Request *ListFoldersRequest `thrift:"request,1" frugal:"1,default,ListFoldersRequest" json:"request"`
+}
+
+func NewKnowledgeServiceListFoldersArgs() *KnowledgeServiceListFoldersArgs {
+	return &KnowledgeServiceListFoldersArgs{}
+}
+
+func (p *KnowledgeServiceListFoldersArgs) InitDefault() {
+}
+
+var KnowledgeServiceListFoldersArgs_Request_DEFAULT *ListFoldersRequest
+
+func (p *KnowledgeServiceListFoldersArgs) GetRequest() (v *ListFoldersRequest) {
+	if !p.IsSetRequest() {
+		return KnowledgeServiceListFoldersArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+func (p *KnowledgeServiceListFoldersArgs) SetRequest(val *ListFoldersRequest) {
+	p.Request = val
+}
+
+func (p *KnowledgeServiceListFoldersArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *KnowledgeServiceListFoldersArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("KnowledgeServiceListFoldersArgs(%+v)", *p)
+}
+
+var fieldIDToName_KnowledgeServiceListFoldersArgs = map[int16]string{
+	1: "request",
+}
+
+type KnowledgeServiceListFoldersResult struct {
+	Success *FolderList `thrift:"success,0,optional" frugal:"0,optional,FolderList" json:"success,omitempty"`
+}
+
+func NewKnowledgeServiceListFoldersResult() *KnowledgeServiceListFoldersResult {
+	return &KnowledgeServiceListFoldersResult{}
+}
+
+func (p *KnowledgeServiceListFoldersResult) InitDefault() {
+}
+
+var KnowledgeServiceListFoldersResult_Success_DEFAULT *FolderList
+
+func (p *KnowledgeServiceListFoldersResult) GetSuccess() (v *FolderList) {
+	if !p.IsSetSuccess() {
+		return KnowledgeServiceListFoldersResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *KnowledgeServiceListFoldersResult) SetSuccess(x interface{}) {
+	p.Success = x.(*FolderList)
+}
+
+func (p *KnowledgeServiceListFoldersResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *KnowledgeServiceListFoldersResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("KnowledgeServiceListFoldersResult(%+v)", *p)
+}
+
+var fieldIDToName_KnowledgeServiceListFoldersResult = map[int16]string{
+	0: "success",
+}
+
+type KnowledgeServiceCreateFolderArgs struct {
+	Request *CreateFolderRequest `thrift:"request,1" frugal:"1,default,CreateFolderRequest" json:"request"`
+}
+
+func NewKnowledgeServiceCreateFolderArgs() *KnowledgeServiceCreateFolderArgs {
+	return &KnowledgeServiceCreateFolderArgs{}
+}
+
+func (p *KnowledgeServiceCreateFolderArgs) InitDefault() {
+}
+
+var KnowledgeServiceCreateFolderArgs_Request_DEFAULT *CreateFolderRequest
+
+func (p *KnowledgeServiceCreateFolderArgs) GetRequest() (v *CreateFolderRequest) {
+	if !p.IsSetRequest() {
+		return KnowledgeServiceCreateFolderArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+func (p *KnowledgeServiceCreateFolderArgs) SetRequest(val *CreateFolderRequest) {
+	p.Request = val
+}
+
+func (p *KnowledgeServiceCreateFolderArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *KnowledgeServiceCreateFolderArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("KnowledgeServiceCreateFolderArgs(%+v)", *p)
+}
+
+var fieldIDToName_KnowledgeServiceCreateFolderArgs = map[int16]string{
+	1: "request",
+}
+
+type KnowledgeServiceCreateFolderResult struct {
+	Success *Folder `thrift:"success,0,optional" frugal:"0,optional,Folder" json:"success,omitempty"`
+}
+
+func NewKnowledgeServiceCreateFolderResult() *KnowledgeServiceCreateFolderResult {
+	return &KnowledgeServiceCreateFolderResult{}
+}
+
+func (p *KnowledgeServiceCreateFolderResult) InitDefault() {
+}
+
+var KnowledgeServiceCreateFolderResult_Success_DEFAULT *Folder
+
+func (p *KnowledgeServiceCreateFolderResult) GetSuccess() (v *Folder) {
+	if !p.IsSetSuccess() {
+		return KnowledgeServiceCreateFolderResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *KnowledgeServiceCreateFolderResult) SetSuccess(x interface{}) {
+	p.Success = x.(*Folder)
+}
+
+func (p *KnowledgeServiceCreateFolderResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *KnowledgeServiceCreateFolderResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("KnowledgeServiceCreateFolderResult(%+v)", *p)
+}
+
+var fieldIDToName_KnowledgeServiceCreateFolderResult = map[int16]string{
+	0: "success",
+}
+
+type KnowledgeServiceUpdateFolderArgs struct {
+	Request *UpdateFolderRequest `thrift:"request,1" frugal:"1,default,UpdateFolderRequest" json:"request"`
+}
+
+func NewKnowledgeServiceUpdateFolderArgs() *KnowledgeServiceUpdateFolderArgs {
+	return &KnowledgeServiceUpdateFolderArgs{}
+}
+
+func (p *KnowledgeServiceUpdateFolderArgs) InitDefault() {
+}
+
+var KnowledgeServiceUpdateFolderArgs_Request_DEFAULT *UpdateFolderRequest
+
+func (p *KnowledgeServiceUpdateFolderArgs) GetRequest() (v *UpdateFolderRequest) {
+	if !p.IsSetRequest() {
+		return KnowledgeServiceUpdateFolderArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+func (p *KnowledgeServiceUpdateFolderArgs) SetRequest(val *UpdateFolderRequest) {
+	p.Request = val
+}
+
+func (p *KnowledgeServiceUpdateFolderArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *KnowledgeServiceUpdateFolderArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("KnowledgeServiceUpdateFolderArgs(%+v)", *p)
+}
+
+var fieldIDToName_KnowledgeServiceUpdateFolderArgs = map[int16]string{
+	1: "request",
+}
+
+type KnowledgeServiceUpdateFolderResult struct {
+	Success *Folder `thrift:"success,0,optional" frugal:"0,optional,Folder" json:"success,omitempty"`
+}
+
+func NewKnowledgeServiceUpdateFolderResult() *KnowledgeServiceUpdateFolderResult {
+	return &KnowledgeServiceUpdateFolderResult{}
+}
+
+func (p *KnowledgeServiceUpdateFolderResult) InitDefault() {
+}
+
+var KnowledgeServiceUpdateFolderResult_Success_DEFAULT *Folder
+
+func (p *KnowledgeServiceUpdateFolderResult) GetSuccess() (v *Folder) {
+	if !p.IsSetSuccess() {
+		return KnowledgeServiceUpdateFolderResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *KnowledgeServiceUpdateFolderResult) SetSuccess(x interface{}) {
+	p.Success = x.(*Folder)
+}
+
+func (p *KnowledgeServiceUpdateFolderResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *KnowledgeServiceUpdateFolderResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("KnowledgeServiceUpdateFolderResult(%+v)", *p)
+}
+
+var fieldIDToName_KnowledgeServiceUpdateFolderResult = map[int16]string{
+	0: "success",
+}
+
+type KnowledgeServiceDeleteFolderArgs struct {
+	Request *DeleteFolderRequest `thrift:"request,1" frugal:"1,default,DeleteFolderRequest" json:"request"`
+}
+
+func NewKnowledgeServiceDeleteFolderArgs() *KnowledgeServiceDeleteFolderArgs {
+	return &KnowledgeServiceDeleteFolderArgs{}
+}
+
+func (p *KnowledgeServiceDeleteFolderArgs) InitDefault() {
+}
+
+var KnowledgeServiceDeleteFolderArgs_Request_DEFAULT *DeleteFolderRequest
+
+func (p *KnowledgeServiceDeleteFolderArgs) GetRequest() (v *DeleteFolderRequest) {
+	if !p.IsSetRequest() {
+		return KnowledgeServiceDeleteFolderArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+func (p *KnowledgeServiceDeleteFolderArgs) SetRequest(val *DeleteFolderRequest) {
+	p.Request = val
+}
+
+func (p *KnowledgeServiceDeleteFolderArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *KnowledgeServiceDeleteFolderArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("KnowledgeServiceDeleteFolderArgs(%+v)", *p)
+}
+
+var fieldIDToName_KnowledgeServiceDeleteFolderArgs = map[int16]string{
+	1: "request",
+}
+
+type KnowledgeServiceDeleteFolderResult struct {
+}
+
+func NewKnowledgeServiceDeleteFolderResult() *KnowledgeServiceDeleteFolderResult {
+	return &KnowledgeServiceDeleteFolderResult{}
+}
+
+func (p *KnowledgeServiceDeleteFolderResult) InitDefault() {
+}
+
+func (p *KnowledgeServiceDeleteFolderResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("KnowledgeServiceDeleteFolderResult(%+v)", *p)
+}
+
+var fieldIDToName_KnowledgeServiceDeleteFolderResult = map[int16]string{}
 
 type KnowledgeServiceSetPublicationArgs struct {
 	Request *SetPublicationRequest `thrift:"request,1" frugal:"1,default,SetPublicationRequest" json:"request"`

@@ -5428,6 +5428,9 @@ type DocumentData struct {
 	ProjectedAt      *string         `thrift:"projected_at,12,optional" form:"projected_at" json:"projected_at,omitempty"`
 	CreatedAt        string          `thrift:"created_at,13,required" form:"created_at,required" json:"created_at,required"`
 	UpdatedAt        string          `thrift:"updated_at,14,required" form:"updated_at,required" json:"updated_at,required"`
+	Language         *string         `thrift:"language,15,optional" form:"language" json:"language,omitempty"`
+	Tags             []string        `thrift:"tags,16,optional,list<string>" form:"tags" json:"tags,omitempty"`
+	FolderID         *string         `thrift:"folder_id,17,optional" form:"folder_id" json:"folder_id,omitempty"`
 }
 
 func NewDocumentData() *DocumentData {
@@ -5513,6 +5516,33 @@ func (p *DocumentData) GetUpdatedAt() (v string) {
 	return p.UpdatedAt
 }
 
+var DocumentData_Language_DEFAULT string
+
+func (p *DocumentData) GetLanguage() (v string) {
+	if !p.IsSetLanguage() {
+		return DocumentData_Language_DEFAULT
+	}
+	return *p.Language
+}
+
+var DocumentData_Tags_DEFAULT []string
+
+func (p *DocumentData) GetTags() (v []string) {
+	if !p.IsSetTags() {
+		return DocumentData_Tags_DEFAULT
+	}
+	return p.Tags
+}
+
+var DocumentData_FolderID_DEFAULT string
+
+func (p *DocumentData) GetFolderID() (v string) {
+	if !p.IsSetFolderID() {
+		return DocumentData_FolderID_DEFAULT
+	}
+	return *p.FolderID
+}
+
 var fieldIDToName_DocumentData = map[int16]string{
 	1:  "id",
 	2:  "title",
@@ -5528,6 +5558,9 @@ var fieldIDToName_DocumentData = map[int16]string{
 	12: "projected_at",
 	13: "created_at",
 	14: "updated_at",
+	15: "language",
+	16: "tags",
+	17: "folder_id",
 }
 
 func (p *DocumentData) IsSetOwner() bool {
@@ -5544,6 +5577,18 @@ func (p *DocumentData) IsSetDeletedAt() bool {
 
 func (p *DocumentData) IsSetProjectedAt() bool {
 	return p.ProjectedAt != nil
+}
+
+func (p *DocumentData) IsSetLanguage() bool {
+	return p.Language != nil
+}
+
+func (p *DocumentData) IsSetTags() bool {
+	return p.Tags != nil
+}
+
+func (p *DocumentData) IsSetFolderID() bool {
+	return p.FolderID != nil
 }
 
 func (p *DocumentData) Read(iprot thrift.TProtocol) (err error) {
@@ -5696,6 +5741,30 @@ func (p *DocumentData) Read(iprot thrift.TProtocol) (err error) {
 					goto ReadFieldError
 				}
 				issetUpdatedAt = true
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		case 15:
+			if fieldTypeId == thrift.STRING {
+				if err = p.ReadField15(iprot); err != nil {
+					goto ReadFieldError
+				}
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		case 16:
+			if fieldTypeId == thrift.LIST {
+				if err = p.ReadField16(iprot); err != nil {
+					goto ReadFieldError
+				}
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		case 17:
+			if fieldTypeId == thrift.STRING {
+				if err = p.ReadField17(iprot); err != nil {
+					goto ReadFieldError
+				}
 			} else if err = iprot.Skip(fieldTypeId); err != nil {
 				goto SkipFieldError
 			}
@@ -5935,6 +6004,51 @@ func (p *DocumentData) ReadField14(iprot thrift.TProtocol) error {
 	p.UpdatedAt = _field
 	return nil
 }
+func (p *DocumentData) ReadField15(iprot thrift.TProtocol) error {
+
+	var _field *string
+	if v, err := iprot.ReadString(); err != nil {
+		return err
+	} else {
+		_field = &v
+	}
+	p.Language = _field
+	return nil
+}
+func (p *DocumentData) ReadField16(iprot thrift.TProtocol) error {
+	_, size, err := iprot.ReadListBegin()
+	if err != nil {
+		return err
+	}
+	_field := make([]string, 0, size)
+	for i := 0; i < size; i++ {
+
+		var _elem string
+		if v, err := iprot.ReadString(); err != nil {
+			return err
+		} else {
+			_elem = v
+		}
+
+		_field = append(_field, _elem)
+	}
+	if err := iprot.ReadListEnd(); err != nil {
+		return err
+	}
+	p.Tags = _field
+	return nil
+}
+func (p *DocumentData) ReadField17(iprot thrift.TProtocol) error {
+
+	var _field *string
+	if v, err := iprot.ReadString(); err != nil {
+		return err
+	} else {
+		_field = &v
+	}
+	p.FolderID = _field
+	return nil
+}
 
 func (p *DocumentData) Write(oprot thrift.TProtocol) (err error) {
 	var fieldId int16
@@ -5996,6 +6110,18 @@ func (p *DocumentData) Write(oprot thrift.TProtocol) (err error) {
 		}
 		if err = p.writeField14(oprot); err != nil {
 			fieldId = 14
+			goto WriteFieldError
+		}
+		if err = p.writeField15(oprot); err != nil {
+			fieldId = 15
+			goto WriteFieldError
+		}
+		if err = p.writeField16(oprot); err != nil {
+			fieldId = 16
+			goto WriteFieldError
+		}
+		if err = p.writeField17(oprot); err != nil {
+			fieldId = 17
 			goto WriteFieldError
 		}
 	}
@@ -6258,6 +6384,71 @@ WriteFieldBeginError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 14 begin error: ", p), err)
 WriteFieldEndError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 14 end error: ", p), err)
+}
+
+func (p *DocumentData) writeField15(oprot thrift.TProtocol) (err error) {
+	if p.IsSetLanguage() {
+		if err = oprot.WriteFieldBegin("language", thrift.STRING, 15); err != nil {
+			goto WriteFieldBeginError
+		}
+		if err := oprot.WriteString(*p.Language); err != nil {
+			return err
+		}
+		if err = oprot.WriteFieldEnd(); err != nil {
+			goto WriteFieldEndError
+		}
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 15 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 15 end error: ", p), err)
+}
+
+func (p *DocumentData) writeField16(oprot thrift.TProtocol) (err error) {
+	if p.IsSetTags() {
+		if err = oprot.WriteFieldBegin("tags", thrift.LIST, 16); err != nil {
+			goto WriteFieldBeginError
+		}
+		if err := oprot.WriteListBegin(thrift.STRING, len(p.Tags)); err != nil {
+			return err
+		}
+		for _, v := range p.Tags {
+			if err := oprot.WriteString(v); err != nil {
+				return err
+			}
+		}
+		if err := oprot.WriteListEnd(); err != nil {
+			return err
+		}
+		if err = oprot.WriteFieldEnd(); err != nil {
+			goto WriteFieldEndError
+		}
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 16 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 16 end error: ", p), err)
+}
+
+func (p *DocumentData) writeField17(oprot thrift.TProtocol) (err error) {
+	if p.IsSetFolderID() {
+		if err = oprot.WriteFieldBegin("folder_id", thrift.STRING, 17); err != nil {
+			goto WriteFieldBeginError
+		}
+		if err := oprot.WriteString(*p.FolderID); err != nil {
+			return err
+		}
+		if err = oprot.WriteFieldEnd(); err != nil {
+			goto WriteFieldEndError
+		}
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 17 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 17 end error: ", p), err)
 }
 
 func (p *DocumentData) String() string {
@@ -8024,6 +8215,644 @@ func (p *DocumentPageData) String() string {
 
 }
 
+type FolderData struct {
+	ID        string  `thrift:"id,1,required" form:"id,required" json:"id,required"`
+	ParentID  *string `thrift:"parent_id,2,optional" form:"parent_id" json:"parent_id,omitempty"`
+	Name      string  `thrift:"name,3,required" form:"name,required" json:"name,required"`
+	Depth     int32   `thrift:"depth,4,required" form:"depth,required" json:"depth,required"`
+	Revision  int64   `thrift:"revision,5,required" form:"revision,required" json:"revision,required"`
+	CreatedAt string  `thrift:"created_at,6,required" form:"created_at,required" json:"created_at,required"`
+	UpdatedAt string  `thrift:"updated_at,7,required" form:"updated_at,required" json:"updated_at,required"`
+}
+
+func NewFolderData() *FolderData {
+	return &FolderData{}
+}
+
+func (p *FolderData) InitDefault() {
+}
+
+func (p *FolderData) GetID() (v string) {
+	return p.ID
+}
+
+var FolderData_ParentID_DEFAULT string
+
+func (p *FolderData) GetParentID() (v string) {
+	if !p.IsSetParentID() {
+		return FolderData_ParentID_DEFAULT
+	}
+	return *p.ParentID
+}
+
+func (p *FolderData) GetName() (v string) {
+	return p.Name
+}
+
+func (p *FolderData) GetDepth() (v int32) {
+	return p.Depth
+}
+
+func (p *FolderData) GetRevision() (v int64) {
+	return p.Revision
+}
+
+func (p *FolderData) GetCreatedAt() (v string) {
+	return p.CreatedAt
+}
+
+func (p *FolderData) GetUpdatedAt() (v string) {
+	return p.UpdatedAt
+}
+
+var fieldIDToName_FolderData = map[int16]string{
+	1: "id",
+	2: "parent_id",
+	3: "name",
+	4: "depth",
+	5: "revision",
+	6: "created_at",
+	7: "updated_at",
+}
+
+func (p *FolderData) IsSetParentID() bool {
+	return p.ParentID != nil
+}
+
+func (p *FolderData) Read(iprot thrift.TProtocol) (err error) {
+
+	var fieldTypeId thrift.TType
+	var fieldId int16
+	var issetID bool = false
+	var issetName bool = false
+	var issetDepth bool = false
+	var issetRevision bool = false
+	var issetCreatedAt bool = false
+	var issetUpdatedAt bool = false
+
+	if _, err = iprot.ReadStructBegin(); err != nil {
+		goto ReadStructBeginError
+	}
+
+	for {
+		_, fieldTypeId, fieldId, err = iprot.ReadFieldBegin()
+		if err != nil {
+			goto ReadFieldBeginError
+		}
+		if fieldTypeId == thrift.STOP {
+			break
+		}
+
+		switch fieldId {
+		case 1:
+			if fieldTypeId == thrift.STRING {
+				if err = p.ReadField1(iprot); err != nil {
+					goto ReadFieldError
+				}
+				issetID = true
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		case 2:
+			if fieldTypeId == thrift.STRING {
+				if err = p.ReadField2(iprot); err != nil {
+					goto ReadFieldError
+				}
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		case 3:
+			if fieldTypeId == thrift.STRING {
+				if err = p.ReadField3(iprot); err != nil {
+					goto ReadFieldError
+				}
+				issetName = true
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		case 4:
+			if fieldTypeId == thrift.I32 {
+				if err = p.ReadField4(iprot); err != nil {
+					goto ReadFieldError
+				}
+				issetDepth = true
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		case 5:
+			if fieldTypeId == thrift.I64 {
+				if err = p.ReadField5(iprot); err != nil {
+					goto ReadFieldError
+				}
+				issetRevision = true
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		case 6:
+			if fieldTypeId == thrift.STRING {
+				if err = p.ReadField6(iprot); err != nil {
+					goto ReadFieldError
+				}
+				issetCreatedAt = true
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		case 7:
+			if fieldTypeId == thrift.STRING {
+				if err = p.ReadField7(iprot); err != nil {
+					goto ReadFieldError
+				}
+				issetUpdatedAt = true
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		default:
+			if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		}
+		if err = iprot.ReadFieldEnd(); err != nil {
+			goto ReadFieldEndError
+		}
+	}
+	if err = iprot.ReadStructEnd(); err != nil {
+		goto ReadStructEndError
+	}
+
+	if !issetID {
+		fieldId = 1
+		goto RequiredFieldNotSetError
+	}
+
+	if !issetName {
+		fieldId = 3
+		goto RequiredFieldNotSetError
+	}
+
+	if !issetDepth {
+		fieldId = 4
+		goto RequiredFieldNotSetError
+	}
+
+	if !issetRevision {
+		fieldId = 5
+		goto RequiredFieldNotSetError
+	}
+
+	if !issetCreatedAt {
+		fieldId = 6
+		goto RequiredFieldNotSetError
+	}
+
+	if !issetUpdatedAt {
+		fieldId = 7
+		goto RequiredFieldNotSetError
+	}
+	return nil
+ReadStructBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T read struct begin error: ", p), err)
+ReadFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
+ReadFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_FolderData[fieldId]), err)
+SkipFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T field %d skip type %d error: ", p, fieldId, fieldTypeId), err)
+
+ReadFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T read field end error", p), err)
+ReadStructEndError:
+	return thrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
+RequiredFieldNotSetError:
+	return thrift.NewTProtocolExceptionWithType(thrift.INVALID_DATA, fmt.Errorf("required field %s is not set", fieldIDToName_FolderData[fieldId]))
+}
+
+func (p *FolderData) ReadField1(iprot thrift.TProtocol) error {
+
+	var _field string
+	if v, err := iprot.ReadString(); err != nil {
+		return err
+	} else {
+		_field = v
+	}
+	p.ID = _field
+	return nil
+}
+func (p *FolderData) ReadField2(iprot thrift.TProtocol) error {
+
+	var _field *string
+	if v, err := iprot.ReadString(); err != nil {
+		return err
+	} else {
+		_field = &v
+	}
+	p.ParentID = _field
+	return nil
+}
+func (p *FolderData) ReadField3(iprot thrift.TProtocol) error {
+
+	var _field string
+	if v, err := iprot.ReadString(); err != nil {
+		return err
+	} else {
+		_field = v
+	}
+	p.Name = _field
+	return nil
+}
+func (p *FolderData) ReadField4(iprot thrift.TProtocol) error {
+
+	var _field int32
+	if v, err := iprot.ReadI32(); err != nil {
+		return err
+	} else {
+		_field = v
+	}
+	p.Depth = _field
+	return nil
+}
+func (p *FolderData) ReadField5(iprot thrift.TProtocol) error {
+
+	var _field int64
+	if v, err := iprot.ReadI64(); err != nil {
+		return err
+	} else {
+		_field = v
+	}
+	p.Revision = _field
+	return nil
+}
+func (p *FolderData) ReadField6(iprot thrift.TProtocol) error {
+
+	var _field string
+	if v, err := iprot.ReadString(); err != nil {
+		return err
+	} else {
+		_field = v
+	}
+	p.CreatedAt = _field
+	return nil
+}
+func (p *FolderData) ReadField7(iprot thrift.TProtocol) error {
+
+	var _field string
+	if v, err := iprot.ReadString(); err != nil {
+		return err
+	} else {
+		_field = v
+	}
+	p.UpdatedAt = _field
+	return nil
+}
+
+func (p *FolderData) Write(oprot thrift.TProtocol) (err error) {
+	var fieldId int16
+	if err = oprot.WriteStructBegin("FolderData"); err != nil {
+		goto WriteStructBeginError
+	}
+	if p != nil {
+		if err = p.writeField1(oprot); err != nil {
+			fieldId = 1
+			goto WriteFieldError
+		}
+		if err = p.writeField2(oprot); err != nil {
+			fieldId = 2
+			goto WriteFieldError
+		}
+		if err = p.writeField3(oprot); err != nil {
+			fieldId = 3
+			goto WriteFieldError
+		}
+		if err = p.writeField4(oprot); err != nil {
+			fieldId = 4
+			goto WriteFieldError
+		}
+		if err = p.writeField5(oprot); err != nil {
+			fieldId = 5
+			goto WriteFieldError
+		}
+		if err = p.writeField6(oprot); err != nil {
+			fieldId = 6
+			goto WriteFieldError
+		}
+		if err = p.writeField7(oprot); err != nil {
+			fieldId = 7
+			goto WriteFieldError
+		}
+	}
+	if err = oprot.WriteFieldStop(); err != nil {
+		goto WriteFieldStopError
+	}
+	if err = oprot.WriteStructEnd(); err != nil {
+		goto WriteStructEndError
+	}
+	return nil
+WriteStructBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
+WriteFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T write field %d error: ", p, fieldId), err)
+WriteFieldStopError:
+	return thrift.PrependError(fmt.Sprintf("%T write field stop error: ", p), err)
+WriteStructEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write struct end error: ", p), err)
+}
+
+func (p *FolderData) writeField1(oprot thrift.TProtocol) (err error) {
+	if err = oprot.WriteFieldBegin("id", thrift.STRING, 1); err != nil {
+		goto WriteFieldBeginError
+	}
+	if err := oprot.WriteString(p.ID); err != nil {
+		return err
+	}
+	if err = oprot.WriteFieldEnd(); err != nil {
+		goto WriteFieldEndError
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 1 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 1 end error: ", p), err)
+}
+
+func (p *FolderData) writeField2(oprot thrift.TProtocol) (err error) {
+	if p.IsSetParentID() {
+		if err = oprot.WriteFieldBegin("parent_id", thrift.STRING, 2); err != nil {
+			goto WriteFieldBeginError
+		}
+		if err := oprot.WriteString(*p.ParentID); err != nil {
+			return err
+		}
+		if err = oprot.WriteFieldEnd(); err != nil {
+			goto WriteFieldEndError
+		}
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 2 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 2 end error: ", p), err)
+}
+
+func (p *FolderData) writeField3(oprot thrift.TProtocol) (err error) {
+	if err = oprot.WriteFieldBegin("name", thrift.STRING, 3); err != nil {
+		goto WriteFieldBeginError
+	}
+	if err := oprot.WriteString(p.Name); err != nil {
+		return err
+	}
+	if err = oprot.WriteFieldEnd(); err != nil {
+		goto WriteFieldEndError
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 3 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 3 end error: ", p), err)
+}
+
+func (p *FolderData) writeField4(oprot thrift.TProtocol) (err error) {
+	if err = oprot.WriteFieldBegin("depth", thrift.I32, 4); err != nil {
+		goto WriteFieldBeginError
+	}
+	if err := oprot.WriteI32(p.Depth); err != nil {
+		return err
+	}
+	if err = oprot.WriteFieldEnd(); err != nil {
+		goto WriteFieldEndError
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 4 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 4 end error: ", p), err)
+}
+
+func (p *FolderData) writeField5(oprot thrift.TProtocol) (err error) {
+	if err = oprot.WriteFieldBegin("revision", thrift.I64, 5); err != nil {
+		goto WriteFieldBeginError
+	}
+	if err := oprot.WriteI64(p.Revision); err != nil {
+		return err
+	}
+	if err = oprot.WriteFieldEnd(); err != nil {
+		goto WriteFieldEndError
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 5 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 5 end error: ", p), err)
+}
+
+func (p *FolderData) writeField6(oprot thrift.TProtocol) (err error) {
+	if err = oprot.WriteFieldBegin("created_at", thrift.STRING, 6); err != nil {
+		goto WriteFieldBeginError
+	}
+	if err := oprot.WriteString(p.CreatedAt); err != nil {
+		return err
+	}
+	if err = oprot.WriteFieldEnd(); err != nil {
+		goto WriteFieldEndError
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 6 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 6 end error: ", p), err)
+}
+
+func (p *FolderData) writeField7(oprot thrift.TProtocol) (err error) {
+	if err = oprot.WriteFieldBegin("updated_at", thrift.STRING, 7); err != nil {
+		goto WriteFieldBeginError
+	}
+	if err := oprot.WriteString(p.UpdatedAt); err != nil {
+		return err
+	}
+	if err = oprot.WriteFieldEnd(); err != nil {
+		goto WriteFieldEndError
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 7 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 7 end error: ", p), err)
+}
+
+func (p *FolderData) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("FolderData(%+v)", *p)
+
+}
+
+type FolderListData struct {
+	Items []*FolderData `thrift:"items,1,required,list<FolderData>" form:"items,required" json:"items,required"`
+}
+
+func NewFolderListData() *FolderListData {
+	return &FolderListData{}
+}
+
+func (p *FolderListData) InitDefault() {
+}
+
+func (p *FolderListData) GetItems() (v []*FolderData) {
+	return p.Items
+}
+
+var fieldIDToName_FolderListData = map[int16]string{
+	1: "items",
+}
+
+func (p *FolderListData) Read(iprot thrift.TProtocol) (err error) {
+
+	var fieldTypeId thrift.TType
+	var fieldId int16
+	var issetItems bool = false
+
+	if _, err = iprot.ReadStructBegin(); err != nil {
+		goto ReadStructBeginError
+	}
+
+	for {
+		_, fieldTypeId, fieldId, err = iprot.ReadFieldBegin()
+		if err != nil {
+			goto ReadFieldBeginError
+		}
+		if fieldTypeId == thrift.STOP {
+			break
+		}
+
+		switch fieldId {
+		case 1:
+			if fieldTypeId == thrift.LIST {
+				if err = p.ReadField1(iprot); err != nil {
+					goto ReadFieldError
+				}
+				issetItems = true
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		default:
+			if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		}
+		if err = iprot.ReadFieldEnd(); err != nil {
+			goto ReadFieldEndError
+		}
+	}
+	if err = iprot.ReadStructEnd(); err != nil {
+		goto ReadStructEndError
+	}
+
+	if !issetItems {
+		fieldId = 1
+		goto RequiredFieldNotSetError
+	}
+	return nil
+ReadStructBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T read struct begin error: ", p), err)
+ReadFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
+ReadFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_FolderListData[fieldId]), err)
+SkipFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T field %d skip type %d error: ", p, fieldId, fieldTypeId), err)
+
+ReadFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T read field end error", p), err)
+ReadStructEndError:
+	return thrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
+RequiredFieldNotSetError:
+	return thrift.NewTProtocolExceptionWithType(thrift.INVALID_DATA, fmt.Errorf("required field %s is not set", fieldIDToName_FolderListData[fieldId]))
+}
+
+func (p *FolderListData) ReadField1(iprot thrift.TProtocol) error {
+	_, size, err := iprot.ReadListBegin()
+	if err != nil {
+		return err
+	}
+	_field := make([]*FolderData, 0, size)
+	values := make([]FolderData, size)
+	for i := 0; i < size; i++ {
+		_elem := &values[i]
+		_elem.InitDefault()
+
+		if err := _elem.Read(iprot); err != nil {
+			return err
+		}
+
+		_field = append(_field, _elem)
+	}
+	if err := iprot.ReadListEnd(); err != nil {
+		return err
+	}
+	p.Items = _field
+	return nil
+}
+
+func (p *FolderListData) Write(oprot thrift.TProtocol) (err error) {
+	var fieldId int16
+	if err = oprot.WriteStructBegin("FolderListData"); err != nil {
+		goto WriteStructBeginError
+	}
+	if p != nil {
+		if err = p.writeField1(oprot); err != nil {
+			fieldId = 1
+			goto WriteFieldError
+		}
+	}
+	if err = oprot.WriteFieldStop(); err != nil {
+		goto WriteFieldStopError
+	}
+	if err = oprot.WriteStructEnd(); err != nil {
+		goto WriteStructEndError
+	}
+	return nil
+WriteStructBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
+WriteFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T write field %d error: ", p, fieldId), err)
+WriteFieldStopError:
+	return thrift.PrependError(fmt.Sprintf("%T write field stop error: ", p), err)
+WriteStructEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write struct end error: ", p), err)
+}
+
+func (p *FolderListData) writeField1(oprot thrift.TProtocol) (err error) {
+	if err = oprot.WriteFieldBegin("items", thrift.LIST, 1); err != nil {
+		goto WriteFieldBeginError
+	}
+	if err := oprot.WriteListBegin(thrift.STRUCT, len(p.Items)); err != nil {
+		return err
+	}
+	for _, v := range p.Items {
+		if err := v.Write(oprot); err != nil {
+			return err
+		}
+	}
+	if err := oprot.WriteListEnd(); err != nil {
+		return err
+	}
+	if err = oprot.WriteFieldEnd(); err != nil {
+		goto WriteFieldEndError
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 1 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 1 end error: ", p), err)
+}
+
+func (p *FolderListData) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("FolderListData(%+v)", *p)
+
+}
+
 type ListDocumentsRequest struct {
 	Query       *string `thrift:"query,1,optional" json:"query,omitempty" query:"q"`
 	Cursor      *string `thrift:"cursor,2,optional" json:"cursor,omitempty" query:"cursor"`
@@ -8400,6 +9229,935 @@ func (p *ListDocumentsRequest) String() string {
 		return "<nil>"
 	}
 	return fmt.Sprintf("ListDocumentsRequest(%+v)", *p)
+
+}
+
+type ListFoldersRequest struct {
+	ParentID *string `thrift:"parent_id,1,optional" json:"parent_id,omitempty" query:"parent_id"`
+}
+
+func NewListFoldersRequest() *ListFoldersRequest {
+	return &ListFoldersRequest{}
+}
+
+func (p *ListFoldersRequest) InitDefault() {
+}
+
+var ListFoldersRequest_ParentID_DEFAULT string
+
+func (p *ListFoldersRequest) GetParentID() (v string) {
+	if !p.IsSetParentID() {
+		return ListFoldersRequest_ParentID_DEFAULT
+	}
+	return *p.ParentID
+}
+
+var fieldIDToName_ListFoldersRequest = map[int16]string{
+	1: "parent_id",
+}
+
+func (p *ListFoldersRequest) IsSetParentID() bool {
+	return p.ParentID != nil
+}
+
+func (p *ListFoldersRequest) Read(iprot thrift.TProtocol) (err error) {
+
+	var fieldTypeId thrift.TType
+	var fieldId int16
+
+	if _, err = iprot.ReadStructBegin(); err != nil {
+		goto ReadStructBeginError
+	}
+
+	for {
+		_, fieldTypeId, fieldId, err = iprot.ReadFieldBegin()
+		if err != nil {
+			goto ReadFieldBeginError
+		}
+		if fieldTypeId == thrift.STOP {
+			break
+		}
+
+		switch fieldId {
+		case 1:
+			if fieldTypeId == thrift.STRING {
+				if err = p.ReadField1(iprot); err != nil {
+					goto ReadFieldError
+				}
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		default:
+			if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		}
+		if err = iprot.ReadFieldEnd(); err != nil {
+			goto ReadFieldEndError
+		}
+	}
+	if err = iprot.ReadStructEnd(); err != nil {
+		goto ReadStructEndError
+	}
+
+	return nil
+ReadStructBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T read struct begin error: ", p), err)
+ReadFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
+ReadFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_ListFoldersRequest[fieldId]), err)
+SkipFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T field %d skip type %d error: ", p, fieldId, fieldTypeId), err)
+
+ReadFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T read field end error", p), err)
+ReadStructEndError:
+	return thrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
+}
+
+func (p *ListFoldersRequest) ReadField1(iprot thrift.TProtocol) error {
+
+	var _field *string
+	if v, err := iprot.ReadString(); err != nil {
+		return err
+	} else {
+		_field = &v
+	}
+	p.ParentID = _field
+	return nil
+}
+
+func (p *ListFoldersRequest) Write(oprot thrift.TProtocol) (err error) {
+	var fieldId int16
+	if err = oprot.WriteStructBegin("ListFoldersRequest"); err != nil {
+		goto WriteStructBeginError
+	}
+	if p != nil {
+		if err = p.writeField1(oprot); err != nil {
+			fieldId = 1
+			goto WriteFieldError
+		}
+	}
+	if err = oprot.WriteFieldStop(); err != nil {
+		goto WriteFieldStopError
+	}
+	if err = oprot.WriteStructEnd(); err != nil {
+		goto WriteStructEndError
+	}
+	return nil
+WriteStructBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
+WriteFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T write field %d error: ", p, fieldId), err)
+WriteFieldStopError:
+	return thrift.PrependError(fmt.Sprintf("%T write field stop error: ", p), err)
+WriteStructEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write struct end error: ", p), err)
+}
+
+func (p *ListFoldersRequest) writeField1(oprot thrift.TProtocol) (err error) {
+	if p.IsSetParentID() {
+		if err = oprot.WriteFieldBegin("parent_id", thrift.STRING, 1); err != nil {
+			goto WriteFieldBeginError
+		}
+		if err := oprot.WriteString(*p.ParentID); err != nil {
+			return err
+		}
+		if err = oprot.WriteFieldEnd(); err != nil {
+			goto WriteFieldEndError
+		}
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 1 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 1 end error: ", p), err)
+}
+
+func (p *ListFoldersRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("ListFoldersRequest(%+v)", *p)
+
+}
+
+type CreateFolderRequest struct {
+	Name           string  `thrift:"name,1,required" form:"name,required" json:"name,required"`
+	ParentID       *string `thrift:"parent_id,2,optional" form:"parent_id" json:"parent_id,omitempty"`
+	IdempotencyKey *string `thrift:"idempotency_key,3,optional" header:"Idempotency-Key" json:"idempotency_key,omitempty"`
+}
+
+func NewCreateFolderRequest() *CreateFolderRequest {
+	return &CreateFolderRequest{}
+}
+
+func (p *CreateFolderRequest) InitDefault() {
+}
+
+func (p *CreateFolderRequest) GetName() (v string) {
+	return p.Name
+}
+
+var CreateFolderRequest_ParentID_DEFAULT string
+
+func (p *CreateFolderRequest) GetParentID() (v string) {
+	if !p.IsSetParentID() {
+		return CreateFolderRequest_ParentID_DEFAULT
+	}
+	return *p.ParentID
+}
+
+var CreateFolderRequest_IdempotencyKey_DEFAULT string
+
+func (p *CreateFolderRequest) GetIdempotencyKey() (v string) {
+	if !p.IsSetIdempotencyKey() {
+		return CreateFolderRequest_IdempotencyKey_DEFAULT
+	}
+	return *p.IdempotencyKey
+}
+
+var fieldIDToName_CreateFolderRequest = map[int16]string{
+	1: "name",
+	2: "parent_id",
+	3: "idempotency_key",
+}
+
+func (p *CreateFolderRequest) IsSetParentID() bool {
+	return p.ParentID != nil
+}
+
+func (p *CreateFolderRequest) IsSetIdempotencyKey() bool {
+	return p.IdempotencyKey != nil
+}
+
+func (p *CreateFolderRequest) Read(iprot thrift.TProtocol) (err error) {
+
+	var fieldTypeId thrift.TType
+	var fieldId int16
+	var issetName bool = false
+
+	if _, err = iprot.ReadStructBegin(); err != nil {
+		goto ReadStructBeginError
+	}
+
+	for {
+		_, fieldTypeId, fieldId, err = iprot.ReadFieldBegin()
+		if err != nil {
+			goto ReadFieldBeginError
+		}
+		if fieldTypeId == thrift.STOP {
+			break
+		}
+
+		switch fieldId {
+		case 1:
+			if fieldTypeId == thrift.STRING {
+				if err = p.ReadField1(iprot); err != nil {
+					goto ReadFieldError
+				}
+				issetName = true
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		case 2:
+			if fieldTypeId == thrift.STRING {
+				if err = p.ReadField2(iprot); err != nil {
+					goto ReadFieldError
+				}
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		case 3:
+			if fieldTypeId == thrift.STRING {
+				if err = p.ReadField3(iprot); err != nil {
+					goto ReadFieldError
+				}
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		default:
+			if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		}
+		if err = iprot.ReadFieldEnd(); err != nil {
+			goto ReadFieldEndError
+		}
+	}
+	if err = iprot.ReadStructEnd(); err != nil {
+		goto ReadStructEndError
+	}
+
+	if !issetName {
+		fieldId = 1
+		goto RequiredFieldNotSetError
+	}
+	return nil
+ReadStructBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T read struct begin error: ", p), err)
+ReadFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
+ReadFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_CreateFolderRequest[fieldId]), err)
+SkipFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T field %d skip type %d error: ", p, fieldId, fieldTypeId), err)
+
+ReadFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T read field end error", p), err)
+ReadStructEndError:
+	return thrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
+RequiredFieldNotSetError:
+	return thrift.NewTProtocolExceptionWithType(thrift.INVALID_DATA, fmt.Errorf("required field %s is not set", fieldIDToName_CreateFolderRequest[fieldId]))
+}
+
+func (p *CreateFolderRequest) ReadField1(iprot thrift.TProtocol) error {
+
+	var _field string
+	if v, err := iprot.ReadString(); err != nil {
+		return err
+	} else {
+		_field = v
+	}
+	p.Name = _field
+	return nil
+}
+func (p *CreateFolderRequest) ReadField2(iprot thrift.TProtocol) error {
+
+	var _field *string
+	if v, err := iprot.ReadString(); err != nil {
+		return err
+	} else {
+		_field = &v
+	}
+	p.ParentID = _field
+	return nil
+}
+func (p *CreateFolderRequest) ReadField3(iprot thrift.TProtocol) error {
+
+	var _field *string
+	if v, err := iprot.ReadString(); err != nil {
+		return err
+	} else {
+		_field = &v
+	}
+	p.IdempotencyKey = _field
+	return nil
+}
+
+func (p *CreateFolderRequest) Write(oprot thrift.TProtocol) (err error) {
+	var fieldId int16
+	if err = oprot.WriteStructBegin("CreateFolderRequest"); err != nil {
+		goto WriteStructBeginError
+	}
+	if p != nil {
+		if err = p.writeField1(oprot); err != nil {
+			fieldId = 1
+			goto WriteFieldError
+		}
+		if err = p.writeField2(oprot); err != nil {
+			fieldId = 2
+			goto WriteFieldError
+		}
+		if err = p.writeField3(oprot); err != nil {
+			fieldId = 3
+			goto WriteFieldError
+		}
+	}
+	if err = oprot.WriteFieldStop(); err != nil {
+		goto WriteFieldStopError
+	}
+	if err = oprot.WriteStructEnd(); err != nil {
+		goto WriteStructEndError
+	}
+	return nil
+WriteStructBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
+WriteFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T write field %d error: ", p, fieldId), err)
+WriteFieldStopError:
+	return thrift.PrependError(fmt.Sprintf("%T write field stop error: ", p), err)
+WriteStructEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write struct end error: ", p), err)
+}
+
+func (p *CreateFolderRequest) writeField1(oprot thrift.TProtocol) (err error) {
+	if err = oprot.WriteFieldBegin("name", thrift.STRING, 1); err != nil {
+		goto WriteFieldBeginError
+	}
+	if err := oprot.WriteString(p.Name); err != nil {
+		return err
+	}
+	if err = oprot.WriteFieldEnd(); err != nil {
+		goto WriteFieldEndError
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 1 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 1 end error: ", p), err)
+}
+
+func (p *CreateFolderRequest) writeField2(oprot thrift.TProtocol) (err error) {
+	if p.IsSetParentID() {
+		if err = oprot.WriteFieldBegin("parent_id", thrift.STRING, 2); err != nil {
+			goto WriteFieldBeginError
+		}
+		if err := oprot.WriteString(*p.ParentID); err != nil {
+			return err
+		}
+		if err = oprot.WriteFieldEnd(); err != nil {
+			goto WriteFieldEndError
+		}
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 2 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 2 end error: ", p), err)
+}
+
+func (p *CreateFolderRequest) writeField3(oprot thrift.TProtocol) (err error) {
+	if p.IsSetIdempotencyKey() {
+		if err = oprot.WriteFieldBegin("idempotency_key", thrift.STRING, 3); err != nil {
+			goto WriteFieldBeginError
+		}
+		if err := oprot.WriteString(*p.IdempotencyKey); err != nil {
+			return err
+		}
+		if err = oprot.WriteFieldEnd(); err != nil {
+			goto WriteFieldEndError
+		}
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 3 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 3 end error: ", p), err)
+}
+
+func (p *CreateFolderRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("CreateFolderRequest(%+v)", *p)
+
+}
+
+type UpdateFolderRequest struct {
+	FolderID string  `thrift:"folder_id,1,required" json:"folder_id,required" path:"folder_id,required"`
+	IfMatch  string  `thrift:"if_match,2,required" header:"If-Match,required" json:"if_match,required"`
+	Name     *string `thrift:"name,3,optional" form:"name" json:"name,omitempty"`
+	ParentID *string `thrift:"parent_id,4,optional" form:"parent_id" json:"parent_id,omitempty"`
+}
+
+func NewUpdateFolderRequest() *UpdateFolderRequest {
+	return &UpdateFolderRequest{}
+}
+
+func (p *UpdateFolderRequest) InitDefault() {
+}
+
+func (p *UpdateFolderRequest) GetFolderID() (v string) {
+	return p.FolderID
+}
+
+func (p *UpdateFolderRequest) GetIfMatch() (v string) {
+	return p.IfMatch
+}
+
+var UpdateFolderRequest_Name_DEFAULT string
+
+func (p *UpdateFolderRequest) GetName() (v string) {
+	if !p.IsSetName() {
+		return UpdateFolderRequest_Name_DEFAULT
+	}
+	return *p.Name
+}
+
+var UpdateFolderRequest_ParentID_DEFAULT string
+
+func (p *UpdateFolderRequest) GetParentID() (v string) {
+	if !p.IsSetParentID() {
+		return UpdateFolderRequest_ParentID_DEFAULT
+	}
+	return *p.ParentID
+}
+
+var fieldIDToName_UpdateFolderRequest = map[int16]string{
+	1: "folder_id",
+	2: "if_match",
+	3: "name",
+	4: "parent_id",
+}
+
+func (p *UpdateFolderRequest) IsSetName() bool {
+	return p.Name != nil
+}
+
+func (p *UpdateFolderRequest) IsSetParentID() bool {
+	return p.ParentID != nil
+}
+
+func (p *UpdateFolderRequest) Read(iprot thrift.TProtocol) (err error) {
+
+	var fieldTypeId thrift.TType
+	var fieldId int16
+	var issetFolderID bool = false
+	var issetIfMatch bool = false
+
+	if _, err = iprot.ReadStructBegin(); err != nil {
+		goto ReadStructBeginError
+	}
+
+	for {
+		_, fieldTypeId, fieldId, err = iprot.ReadFieldBegin()
+		if err != nil {
+			goto ReadFieldBeginError
+		}
+		if fieldTypeId == thrift.STOP {
+			break
+		}
+
+		switch fieldId {
+		case 1:
+			if fieldTypeId == thrift.STRING {
+				if err = p.ReadField1(iprot); err != nil {
+					goto ReadFieldError
+				}
+				issetFolderID = true
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		case 2:
+			if fieldTypeId == thrift.STRING {
+				if err = p.ReadField2(iprot); err != nil {
+					goto ReadFieldError
+				}
+				issetIfMatch = true
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		case 3:
+			if fieldTypeId == thrift.STRING {
+				if err = p.ReadField3(iprot); err != nil {
+					goto ReadFieldError
+				}
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		case 4:
+			if fieldTypeId == thrift.STRING {
+				if err = p.ReadField4(iprot); err != nil {
+					goto ReadFieldError
+				}
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		default:
+			if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		}
+		if err = iprot.ReadFieldEnd(); err != nil {
+			goto ReadFieldEndError
+		}
+	}
+	if err = iprot.ReadStructEnd(); err != nil {
+		goto ReadStructEndError
+	}
+
+	if !issetFolderID {
+		fieldId = 1
+		goto RequiredFieldNotSetError
+	}
+
+	if !issetIfMatch {
+		fieldId = 2
+		goto RequiredFieldNotSetError
+	}
+	return nil
+ReadStructBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T read struct begin error: ", p), err)
+ReadFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
+ReadFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_UpdateFolderRequest[fieldId]), err)
+SkipFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T field %d skip type %d error: ", p, fieldId, fieldTypeId), err)
+
+ReadFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T read field end error", p), err)
+ReadStructEndError:
+	return thrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
+RequiredFieldNotSetError:
+	return thrift.NewTProtocolExceptionWithType(thrift.INVALID_DATA, fmt.Errorf("required field %s is not set", fieldIDToName_UpdateFolderRequest[fieldId]))
+}
+
+func (p *UpdateFolderRequest) ReadField1(iprot thrift.TProtocol) error {
+
+	var _field string
+	if v, err := iprot.ReadString(); err != nil {
+		return err
+	} else {
+		_field = v
+	}
+	p.FolderID = _field
+	return nil
+}
+func (p *UpdateFolderRequest) ReadField2(iprot thrift.TProtocol) error {
+
+	var _field string
+	if v, err := iprot.ReadString(); err != nil {
+		return err
+	} else {
+		_field = v
+	}
+	p.IfMatch = _field
+	return nil
+}
+func (p *UpdateFolderRequest) ReadField3(iprot thrift.TProtocol) error {
+
+	var _field *string
+	if v, err := iprot.ReadString(); err != nil {
+		return err
+	} else {
+		_field = &v
+	}
+	p.Name = _field
+	return nil
+}
+func (p *UpdateFolderRequest) ReadField4(iprot thrift.TProtocol) error {
+
+	var _field *string
+	if v, err := iprot.ReadString(); err != nil {
+		return err
+	} else {
+		_field = &v
+	}
+	p.ParentID = _field
+	return nil
+}
+
+func (p *UpdateFolderRequest) Write(oprot thrift.TProtocol) (err error) {
+	var fieldId int16
+	if err = oprot.WriteStructBegin("UpdateFolderRequest"); err != nil {
+		goto WriteStructBeginError
+	}
+	if p != nil {
+		if err = p.writeField1(oprot); err != nil {
+			fieldId = 1
+			goto WriteFieldError
+		}
+		if err = p.writeField2(oprot); err != nil {
+			fieldId = 2
+			goto WriteFieldError
+		}
+		if err = p.writeField3(oprot); err != nil {
+			fieldId = 3
+			goto WriteFieldError
+		}
+		if err = p.writeField4(oprot); err != nil {
+			fieldId = 4
+			goto WriteFieldError
+		}
+	}
+	if err = oprot.WriteFieldStop(); err != nil {
+		goto WriteFieldStopError
+	}
+	if err = oprot.WriteStructEnd(); err != nil {
+		goto WriteStructEndError
+	}
+	return nil
+WriteStructBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
+WriteFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T write field %d error: ", p, fieldId), err)
+WriteFieldStopError:
+	return thrift.PrependError(fmt.Sprintf("%T write field stop error: ", p), err)
+WriteStructEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write struct end error: ", p), err)
+}
+
+func (p *UpdateFolderRequest) writeField1(oprot thrift.TProtocol) (err error) {
+	if err = oprot.WriteFieldBegin("folder_id", thrift.STRING, 1); err != nil {
+		goto WriteFieldBeginError
+	}
+	if err := oprot.WriteString(p.FolderID); err != nil {
+		return err
+	}
+	if err = oprot.WriteFieldEnd(); err != nil {
+		goto WriteFieldEndError
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 1 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 1 end error: ", p), err)
+}
+
+func (p *UpdateFolderRequest) writeField2(oprot thrift.TProtocol) (err error) {
+	if err = oprot.WriteFieldBegin("if_match", thrift.STRING, 2); err != nil {
+		goto WriteFieldBeginError
+	}
+	if err := oprot.WriteString(p.IfMatch); err != nil {
+		return err
+	}
+	if err = oprot.WriteFieldEnd(); err != nil {
+		goto WriteFieldEndError
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 2 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 2 end error: ", p), err)
+}
+
+func (p *UpdateFolderRequest) writeField3(oprot thrift.TProtocol) (err error) {
+	if p.IsSetName() {
+		if err = oprot.WriteFieldBegin("name", thrift.STRING, 3); err != nil {
+			goto WriteFieldBeginError
+		}
+		if err := oprot.WriteString(*p.Name); err != nil {
+			return err
+		}
+		if err = oprot.WriteFieldEnd(); err != nil {
+			goto WriteFieldEndError
+		}
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 3 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 3 end error: ", p), err)
+}
+
+func (p *UpdateFolderRequest) writeField4(oprot thrift.TProtocol) (err error) {
+	if p.IsSetParentID() {
+		if err = oprot.WriteFieldBegin("parent_id", thrift.STRING, 4); err != nil {
+			goto WriteFieldBeginError
+		}
+		if err := oprot.WriteString(*p.ParentID); err != nil {
+			return err
+		}
+		if err = oprot.WriteFieldEnd(); err != nil {
+			goto WriteFieldEndError
+		}
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 4 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 4 end error: ", p), err)
+}
+
+func (p *UpdateFolderRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("UpdateFolderRequest(%+v)", *p)
+
+}
+
+type DeleteFolderRequest struct {
+	FolderID string `thrift:"folder_id,1,required" json:"folder_id,required" path:"folder_id,required"`
+	IfMatch  string `thrift:"if_match,2,required" header:"If-Match,required" json:"if_match,required"`
+}
+
+func NewDeleteFolderRequest() *DeleteFolderRequest {
+	return &DeleteFolderRequest{}
+}
+
+func (p *DeleteFolderRequest) InitDefault() {
+}
+
+func (p *DeleteFolderRequest) GetFolderID() (v string) {
+	return p.FolderID
+}
+
+func (p *DeleteFolderRequest) GetIfMatch() (v string) {
+	return p.IfMatch
+}
+
+var fieldIDToName_DeleteFolderRequest = map[int16]string{
+	1: "folder_id",
+	2: "if_match",
+}
+
+func (p *DeleteFolderRequest) Read(iprot thrift.TProtocol) (err error) {
+
+	var fieldTypeId thrift.TType
+	var fieldId int16
+	var issetFolderID bool = false
+	var issetIfMatch bool = false
+
+	if _, err = iprot.ReadStructBegin(); err != nil {
+		goto ReadStructBeginError
+	}
+
+	for {
+		_, fieldTypeId, fieldId, err = iprot.ReadFieldBegin()
+		if err != nil {
+			goto ReadFieldBeginError
+		}
+		if fieldTypeId == thrift.STOP {
+			break
+		}
+
+		switch fieldId {
+		case 1:
+			if fieldTypeId == thrift.STRING {
+				if err = p.ReadField1(iprot); err != nil {
+					goto ReadFieldError
+				}
+				issetFolderID = true
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		case 2:
+			if fieldTypeId == thrift.STRING {
+				if err = p.ReadField2(iprot); err != nil {
+					goto ReadFieldError
+				}
+				issetIfMatch = true
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		default:
+			if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		}
+		if err = iprot.ReadFieldEnd(); err != nil {
+			goto ReadFieldEndError
+		}
+	}
+	if err = iprot.ReadStructEnd(); err != nil {
+		goto ReadStructEndError
+	}
+
+	if !issetFolderID {
+		fieldId = 1
+		goto RequiredFieldNotSetError
+	}
+
+	if !issetIfMatch {
+		fieldId = 2
+		goto RequiredFieldNotSetError
+	}
+	return nil
+ReadStructBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T read struct begin error: ", p), err)
+ReadFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
+ReadFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_DeleteFolderRequest[fieldId]), err)
+SkipFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T field %d skip type %d error: ", p, fieldId, fieldTypeId), err)
+
+ReadFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T read field end error", p), err)
+ReadStructEndError:
+	return thrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
+RequiredFieldNotSetError:
+	return thrift.NewTProtocolExceptionWithType(thrift.INVALID_DATA, fmt.Errorf("required field %s is not set", fieldIDToName_DeleteFolderRequest[fieldId]))
+}
+
+func (p *DeleteFolderRequest) ReadField1(iprot thrift.TProtocol) error {
+
+	var _field string
+	if v, err := iprot.ReadString(); err != nil {
+		return err
+	} else {
+		_field = v
+	}
+	p.FolderID = _field
+	return nil
+}
+func (p *DeleteFolderRequest) ReadField2(iprot thrift.TProtocol) error {
+
+	var _field string
+	if v, err := iprot.ReadString(); err != nil {
+		return err
+	} else {
+		_field = v
+	}
+	p.IfMatch = _field
+	return nil
+}
+
+func (p *DeleteFolderRequest) Write(oprot thrift.TProtocol) (err error) {
+	var fieldId int16
+	if err = oprot.WriteStructBegin("DeleteFolderRequest"); err != nil {
+		goto WriteStructBeginError
+	}
+	if p != nil {
+		if err = p.writeField1(oprot); err != nil {
+			fieldId = 1
+			goto WriteFieldError
+		}
+		if err = p.writeField2(oprot); err != nil {
+			fieldId = 2
+			goto WriteFieldError
+		}
+	}
+	if err = oprot.WriteFieldStop(); err != nil {
+		goto WriteFieldStopError
+	}
+	if err = oprot.WriteStructEnd(); err != nil {
+		goto WriteStructEndError
+	}
+	return nil
+WriteStructBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
+WriteFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T write field %d error: ", p, fieldId), err)
+WriteFieldStopError:
+	return thrift.PrependError(fmt.Sprintf("%T write field stop error: ", p), err)
+WriteStructEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write struct end error: ", p), err)
+}
+
+func (p *DeleteFolderRequest) writeField1(oprot thrift.TProtocol) (err error) {
+	if err = oprot.WriteFieldBegin("folder_id", thrift.STRING, 1); err != nil {
+		goto WriteFieldBeginError
+	}
+	if err := oprot.WriteString(p.FolderID); err != nil {
+		return err
+	}
+	if err = oprot.WriteFieldEnd(); err != nil {
+		goto WriteFieldEndError
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 1 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 1 end error: ", p), err)
+}
+
+func (p *DeleteFolderRequest) writeField2(oprot thrift.TProtocol) (err error) {
+	if err = oprot.WriteFieldBegin("if_match", thrift.STRING, 2); err != nil {
+		goto WriteFieldBeginError
+	}
+	if err := oprot.WriteString(p.IfMatch); err != nil {
+		return err
+	}
+	if err = oprot.WriteFieldEnd(); err != nil {
+		goto WriteFieldEndError
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 2 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 2 end error: ", p), err)
+}
+
+func (p *DeleteFolderRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("DeleteFolderRequest(%+v)", *p)
 
 }
 
@@ -9019,11 +10777,14 @@ func (p *CreateDocumentRequest) String() string {
 }
 
 type UpdateDocumentRequest struct {
-	DocumentID string  `thrift:"document_id,1,required" json:"document_id,required" path:"document_id,required"`
-	IfMatch    string  `thrift:"if_match,2,required" header:"If-Match,required" json:"if_match,required"`
-	Title      *string `thrift:"title,3,optional" form:"title" json:"title,omitempty"`
-	Summary    *string `thrift:"summary,4,optional" form:"summary" json:"summary,omitempty"`
-	Slug       *string `thrift:"slug,5,optional" form:"slug" json:"slug,omitempty"`
+	DocumentID string   `thrift:"document_id,1,required" json:"document_id,required" path:"document_id,required"`
+	IfMatch    string   `thrift:"if_match,2,required" header:"If-Match,required" json:"if_match,required"`
+	Title      *string  `thrift:"title,3,optional" form:"title" json:"title,omitempty"`
+	Summary    *string  `thrift:"summary,4,optional" form:"summary" json:"summary,omitempty"`
+	Slug       *string  `thrift:"slug,5,optional" form:"slug" json:"slug,omitempty"`
+	Language   *string  `thrift:"language,6,optional" form:"language" json:"language,omitempty"`
+	Tags       []string `thrift:"tags,7,optional,list<string>" form:"tags" json:"tags,omitempty"`
+	FolderID   *string  `thrift:"folder_id,8,optional" form:"folder_id" json:"folder_id,omitempty"`
 }
 
 func NewUpdateDocumentRequest() *UpdateDocumentRequest {
@@ -9068,12 +10829,42 @@ func (p *UpdateDocumentRequest) GetSlug() (v string) {
 	return *p.Slug
 }
 
+var UpdateDocumentRequest_Language_DEFAULT string
+
+func (p *UpdateDocumentRequest) GetLanguage() (v string) {
+	if !p.IsSetLanguage() {
+		return UpdateDocumentRequest_Language_DEFAULT
+	}
+	return *p.Language
+}
+
+var UpdateDocumentRequest_Tags_DEFAULT []string
+
+func (p *UpdateDocumentRequest) GetTags() (v []string) {
+	if !p.IsSetTags() {
+		return UpdateDocumentRequest_Tags_DEFAULT
+	}
+	return p.Tags
+}
+
+var UpdateDocumentRequest_FolderID_DEFAULT string
+
+func (p *UpdateDocumentRequest) GetFolderID() (v string) {
+	if !p.IsSetFolderID() {
+		return UpdateDocumentRequest_FolderID_DEFAULT
+	}
+	return *p.FolderID
+}
+
 var fieldIDToName_UpdateDocumentRequest = map[int16]string{
 	1: "document_id",
 	2: "if_match",
 	3: "title",
 	4: "summary",
 	5: "slug",
+	6: "language",
+	7: "tags",
+	8: "folder_id",
 }
 
 func (p *UpdateDocumentRequest) IsSetTitle() bool {
@@ -9086,6 +10877,18 @@ func (p *UpdateDocumentRequest) IsSetSummary() bool {
 
 func (p *UpdateDocumentRequest) IsSetSlug() bool {
 	return p.Slug != nil
+}
+
+func (p *UpdateDocumentRequest) IsSetLanguage() bool {
+	return p.Language != nil
+}
+
+func (p *UpdateDocumentRequest) IsSetTags() bool {
+	return p.Tags != nil
+}
+
+func (p *UpdateDocumentRequest) IsSetFolderID() bool {
+	return p.FolderID != nil
 }
 
 func (p *UpdateDocumentRequest) Read(iprot thrift.TProtocol) (err error) {
@@ -9146,6 +10949,30 @@ func (p *UpdateDocumentRequest) Read(iprot thrift.TProtocol) (err error) {
 		case 5:
 			if fieldTypeId == thrift.STRING {
 				if err = p.ReadField5(iprot); err != nil {
+					goto ReadFieldError
+				}
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		case 6:
+			if fieldTypeId == thrift.STRING {
+				if err = p.ReadField6(iprot); err != nil {
+					goto ReadFieldError
+				}
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		case 7:
+			if fieldTypeId == thrift.LIST {
+				if err = p.ReadField7(iprot); err != nil {
+					goto ReadFieldError
+				}
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		case 8:
+			if fieldTypeId == thrift.STRING {
+				if err = p.ReadField8(iprot); err != nil {
 					goto ReadFieldError
 				}
 			} else if err = iprot.Skip(fieldTypeId); err != nil {
@@ -9246,6 +11073,51 @@ func (p *UpdateDocumentRequest) ReadField5(iprot thrift.TProtocol) error {
 	p.Slug = _field
 	return nil
 }
+func (p *UpdateDocumentRequest) ReadField6(iprot thrift.TProtocol) error {
+
+	var _field *string
+	if v, err := iprot.ReadString(); err != nil {
+		return err
+	} else {
+		_field = &v
+	}
+	p.Language = _field
+	return nil
+}
+func (p *UpdateDocumentRequest) ReadField7(iprot thrift.TProtocol) error {
+	_, size, err := iprot.ReadListBegin()
+	if err != nil {
+		return err
+	}
+	_field := make([]string, 0, size)
+	for i := 0; i < size; i++ {
+
+		var _elem string
+		if v, err := iprot.ReadString(); err != nil {
+			return err
+		} else {
+			_elem = v
+		}
+
+		_field = append(_field, _elem)
+	}
+	if err := iprot.ReadListEnd(); err != nil {
+		return err
+	}
+	p.Tags = _field
+	return nil
+}
+func (p *UpdateDocumentRequest) ReadField8(iprot thrift.TProtocol) error {
+
+	var _field *string
+	if v, err := iprot.ReadString(); err != nil {
+		return err
+	} else {
+		_field = &v
+	}
+	p.FolderID = _field
+	return nil
+}
 
 func (p *UpdateDocumentRequest) Write(oprot thrift.TProtocol) (err error) {
 	var fieldId int16
@@ -9271,6 +11143,18 @@ func (p *UpdateDocumentRequest) Write(oprot thrift.TProtocol) (err error) {
 		}
 		if err = p.writeField5(oprot); err != nil {
 			fieldId = 5
+			goto WriteFieldError
+		}
+		if err = p.writeField6(oprot); err != nil {
+			fieldId = 6
+			goto WriteFieldError
+		}
+		if err = p.writeField7(oprot); err != nil {
+			fieldId = 7
+			goto WriteFieldError
+		}
+		if err = p.writeField8(oprot); err != nil {
+			fieldId = 8
 			goto WriteFieldError
 		}
 	}
@@ -9382,6 +11266,71 @@ WriteFieldEndError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 5 end error: ", p), err)
 }
 
+func (p *UpdateDocumentRequest) writeField6(oprot thrift.TProtocol) (err error) {
+	if p.IsSetLanguage() {
+		if err = oprot.WriteFieldBegin("language", thrift.STRING, 6); err != nil {
+			goto WriteFieldBeginError
+		}
+		if err := oprot.WriteString(*p.Language); err != nil {
+			return err
+		}
+		if err = oprot.WriteFieldEnd(); err != nil {
+			goto WriteFieldEndError
+		}
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 6 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 6 end error: ", p), err)
+}
+
+func (p *UpdateDocumentRequest) writeField7(oprot thrift.TProtocol) (err error) {
+	if p.IsSetTags() {
+		if err = oprot.WriteFieldBegin("tags", thrift.LIST, 7); err != nil {
+			goto WriteFieldBeginError
+		}
+		if err := oprot.WriteListBegin(thrift.STRING, len(p.Tags)); err != nil {
+			return err
+		}
+		for _, v := range p.Tags {
+			if err := oprot.WriteString(v); err != nil {
+				return err
+			}
+		}
+		if err := oprot.WriteListEnd(); err != nil {
+			return err
+		}
+		if err = oprot.WriteFieldEnd(); err != nil {
+			goto WriteFieldEndError
+		}
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 7 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 7 end error: ", p), err)
+}
+
+func (p *UpdateDocumentRequest) writeField8(oprot thrift.TProtocol) (err error) {
+	if p.IsSetFolderID() {
+		if err = oprot.WriteFieldBegin("folder_id", thrift.STRING, 8); err != nil {
+			goto WriteFieldBeginError
+		}
+		if err := oprot.WriteString(*p.FolderID); err != nil {
+			return err
+		}
+		if err = oprot.WriteFieldEnd(); err != nil {
+			goto WriteFieldEndError
+		}
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 8 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 8 end error: ", p), err)
+}
+
 func (p *UpdateDocumentRequest) String() string {
 	if p == nil {
 		return "<nil>"
@@ -9391,8 +11340,10 @@ func (p *UpdateDocumentRequest) String() string {
 }
 
 type PublicationRequest struct {
-	DocumentID string `thrift:"document_id,1,required" json:"document_id,required" path:"document_id,required"`
-	IfMatch    string `thrift:"if_match,2,required" header:"If-Match,required" json:"if_match,required"`
+	DocumentID     string  `thrift:"document_id,1,required" json:"document_id,required" path:"document_id,required"`
+	IfMatch        string  `thrift:"if_match,2,required" header:"If-Match,required" json:"if_match,required"`
+	StateVector    *string `thrift:"state_vector,3,optional" form:"state_vector" json:"state_vector,omitempty"`
+	IdempotencyKey *string `thrift:"idempotency_key,4,optional" header:"Idempotency-Key" json:"idempotency_key,omitempty"`
 }
 
 func NewPublicationRequest() *PublicationRequest {
@@ -9410,9 +11361,37 @@ func (p *PublicationRequest) GetIfMatch() (v string) {
 	return p.IfMatch
 }
 
+var PublicationRequest_StateVector_DEFAULT string
+
+func (p *PublicationRequest) GetStateVector() (v string) {
+	if !p.IsSetStateVector() {
+		return PublicationRequest_StateVector_DEFAULT
+	}
+	return *p.StateVector
+}
+
+var PublicationRequest_IdempotencyKey_DEFAULT string
+
+func (p *PublicationRequest) GetIdempotencyKey() (v string) {
+	if !p.IsSetIdempotencyKey() {
+		return PublicationRequest_IdempotencyKey_DEFAULT
+	}
+	return *p.IdempotencyKey
+}
+
 var fieldIDToName_PublicationRequest = map[int16]string{
 	1: "document_id",
 	2: "if_match",
+	3: "state_vector",
+	4: "idempotency_key",
+}
+
+func (p *PublicationRequest) IsSetStateVector() bool {
+	return p.StateVector != nil
+}
+
+func (p *PublicationRequest) IsSetIdempotencyKey() bool {
+	return p.IdempotencyKey != nil
 }
 
 func (p *PublicationRequest) Read(iprot thrift.TProtocol) (err error) {
@@ -9451,6 +11430,22 @@ func (p *PublicationRequest) Read(iprot thrift.TProtocol) (err error) {
 					goto ReadFieldError
 				}
 				issetIfMatch = true
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		case 3:
+			if fieldTypeId == thrift.STRING {
+				if err = p.ReadField3(iprot); err != nil {
+					goto ReadFieldError
+				}
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		case 4:
+			if fieldTypeId == thrift.STRING {
+				if err = p.ReadField4(iprot); err != nil {
+					goto ReadFieldError
+				}
 			} else if err = iprot.Skip(fieldTypeId); err != nil {
 				goto SkipFieldError
 			}
@@ -9516,6 +11511,28 @@ func (p *PublicationRequest) ReadField2(iprot thrift.TProtocol) error {
 	p.IfMatch = _field
 	return nil
 }
+func (p *PublicationRequest) ReadField3(iprot thrift.TProtocol) error {
+
+	var _field *string
+	if v, err := iprot.ReadString(); err != nil {
+		return err
+	} else {
+		_field = &v
+	}
+	p.StateVector = _field
+	return nil
+}
+func (p *PublicationRequest) ReadField4(iprot thrift.TProtocol) error {
+
+	var _field *string
+	if v, err := iprot.ReadString(); err != nil {
+		return err
+	} else {
+		_field = &v
+	}
+	p.IdempotencyKey = _field
+	return nil
+}
 
 func (p *PublicationRequest) Write(oprot thrift.TProtocol) (err error) {
 	var fieldId int16
@@ -9529,6 +11546,14 @@ func (p *PublicationRequest) Write(oprot thrift.TProtocol) (err error) {
 		}
 		if err = p.writeField2(oprot); err != nil {
 			fieldId = 2
+			goto WriteFieldError
+		}
+		if err = p.writeField3(oprot); err != nil {
+			fieldId = 3
+			goto WriteFieldError
+		}
+		if err = p.writeField4(oprot); err != nil {
+			fieldId = 4
 			goto WriteFieldError
 		}
 	}
@@ -9581,6 +11606,44 @@ WriteFieldBeginError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 2 begin error: ", p), err)
 WriteFieldEndError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 2 end error: ", p), err)
+}
+
+func (p *PublicationRequest) writeField3(oprot thrift.TProtocol) (err error) {
+	if p.IsSetStateVector() {
+		if err = oprot.WriteFieldBegin("state_vector", thrift.STRING, 3); err != nil {
+			goto WriteFieldBeginError
+		}
+		if err := oprot.WriteString(*p.StateVector); err != nil {
+			return err
+		}
+		if err = oprot.WriteFieldEnd(); err != nil {
+			goto WriteFieldEndError
+		}
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 3 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 3 end error: ", p), err)
+}
+
+func (p *PublicationRequest) writeField4(oprot thrift.TProtocol) (err error) {
+	if p.IsSetIdempotencyKey() {
+		if err = oprot.WriteFieldBegin("idempotency_key", thrift.STRING, 4); err != nil {
+			goto WriteFieldBeginError
+		}
+		if err := oprot.WriteString(*p.IdempotencyKey); err != nil {
+			return err
+		}
+		if err = oprot.WriteFieldEnd(); err != nil {
+			goto WriteFieldEndError
+		}
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 4 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 4 end error: ", p), err)
 }
 
 func (p *PublicationRequest) String() string {
@@ -14518,6 +16581,14 @@ type GatewayService interface {
 
 	ListDocuments(ctx context.Context, request *ListDocumentsRequest) (r *DocumentPageData, err error)
 
+	ListFolders(ctx context.Context, request *ListFoldersRequest) (r *FolderListData, err error)
+
+	CreateFolder(ctx context.Context, request *CreateFolderRequest) (r *FolderData, err error)
+
+	UpdateFolder(ctx context.Context, request *UpdateFolderRequest) (r *FolderData, err error)
+
+	DeleteFolder(ctx context.Context, request *DeleteFolderRequest) (r *EmptyResponse, err error)
+
 	CreateDocument(ctx context.Context, request *CreateDocumentRequest) (r *DocumentData, err error)
 
 	GetDocument(ctx context.Context, request *DocumentIDRequest) (r *DocumentData, err error)
@@ -14758,6 +16829,42 @@ func (p *GatewayServiceClient) ListDocuments(ctx context.Context, request *ListD
 	}
 	return _result.GetSuccess(), nil
 }
+func (p *GatewayServiceClient) ListFolders(ctx context.Context, request *ListFoldersRequest) (r *FolderListData, err error) {
+	var _args GatewayServiceListFoldersArgs
+	_args.Request = request
+	var _result GatewayServiceListFoldersResult
+	if err = p.Client_().Call(ctx, "ListFolders", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+func (p *GatewayServiceClient) CreateFolder(ctx context.Context, request *CreateFolderRequest) (r *FolderData, err error) {
+	var _args GatewayServiceCreateFolderArgs
+	_args.Request = request
+	var _result GatewayServiceCreateFolderResult
+	if err = p.Client_().Call(ctx, "CreateFolder", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+func (p *GatewayServiceClient) UpdateFolder(ctx context.Context, request *UpdateFolderRequest) (r *FolderData, err error) {
+	var _args GatewayServiceUpdateFolderArgs
+	_args.Request = request
+	var _result GatewayServiceUpdateFolderResult
+	if err = p.Client_().Call(ctx, "UpdateFolder", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+func (p *GatewayServiceClient) DeleteFolder(ctx context.Context, request *DeleteFolderRequest) (r *EmptyResponse, err error) {
+	var _args GatewayServiceDeleteFolderArgs
+	_args.Request = request
+	var _result GatewayServiceDeleteFolderResult
+	if err = p.Client_().Call(ctx, "DeleteFolder", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
 func (p *GatewayServiceClient) CreateDocument(ctx context.Context, request *CreateDocumentRequest) (r *DocumentData, err error) {
 	var _args GatewayServiceCreateDocumentArgs
 	_args.Request = request
@@ -14987,6 +17094,10 @@ func NewGatewayServiceProcessor(handler GatewayService) *GatewayServiceProcessor
 	self.AddToProcessorMap("GetPublishedDocument", &gatewayServiceProcessorGetPublishedDocument{handler: handler})
 	self.AddToProcessorMap("GetAttachmentContent", &gatewayServiceProcessorGetAttachmentContent{handler: handler})
 	self.AddToProcessorMap("ListDocuments", &gatewayServiceProcessorListDocuments{handler: handler})
+	self.AddToProcessorMap("ListFolders", &gatewayServiceProcessorListFolders{handler: handler})
+	self.AddToProcessorMap("CreateFolder", &gatewayServiceProcessorCreateFolder{handler: handler})
+	self.AddToProcessorMap("UpdateFolder", &gatewayServiceProcessorUpdateFolder{handler: handler})
+	self.AddToProcessorMap("DeleteFolder", &gatewayServiceProcessorDeleteFolder{handler: handler})
 	self.AddToProcessorMap("CreateDocument", &gatewayServiceProcessorCreateDocument{handler: handler})
 	self.AddToProcessorMap("GetDocument", &gatewayServiceProcessorGetDocument{handler: handler})
 	self.AddToProcessorMap("CreateCollaborationSession", &gatewayServiceProcessorCreateCollaborationSession{handler: handler})
@@ -15923,6 +18034,198 @@ func (p *gatewayServiceProcessorListDocuments) Process(ctx context.Context, seqI
 		result.Success = retval
 	}
 	if err2 = oprot.WriteMessageBegin("ListDocuments", thrift.REPLY, seqId); err2 != nil {
+		err = err2
+	}
+	if err2 = result.Write(oprot); err == nil && err2 != nil {
+		err = err2
+	}
+	if err2 = oprot.WriteMessageEnd(); err == nil && err2 != nil {
+		err = err2
+	}
+	if err2 = oprot.Flush(ctx); err == nil && err2 != nil {
+		err = err2
+	}
+	if err != nil {
+		return
+	}
+	return true, err
+}
+
+type gatewayServiceProcessorListFolders struct {
+	handler GatewayService
+}
+
+func (p *gatewayServiceProcessorListFolders) Process(ctx context.Context, seqId int32, iprot, oprot thrift.TProtocol) (success bool, err thrift.TException) {
+	args := GatewayServiceListFoldersArgs{}
+	if err = args.Read(iprot); err != nil {
+		iprot.ReadMessageEnd()
+		x := thrift.NewTApplicationException(thrift.PROTOCOL_ERROR, err.Error())
+		oprot.WriteMessageBegin("ListFolders", thrift.EXCEPTION, seqId)
+		x.Write(oprot)
+		oprot.WriteMessageEnd()
+		oprot.Flush(ctx)
+		return false, err
+	}
+
+	iprot.ReadMessageEnd()
+	var err2 error
+	result := GatewayServiceListFoldersResult{}
+	var retval *FolderListData
+	if retval, err2 = p.handler.ListFolders(ctx, args.Request); err2 != nil {
+		x := thrift.NewTApplicationException(thrift.INTERNAL_ERROR, "Internal error processing ListFolders: "+err2.Error())
+		oprot.WriteMessageBegin("ListFolders", thrift.EXCEPTION, seqId)
+		x.Write(oprot)
+		oprot.WriteMessageEnd()
+		oprot.Flush(ctx)
+		return true, err2
+	} else {
+		result.Success = retval
+	}
+	if err2 = oprot.WriteMessageBegin("ListFolders", thrift.REPLY, seqId); err2 != nil {
+		err = err2
+	}
+	if err2 = result.Write(oprot); err == nil && err2 != nil {
+		err = err2
+	}
+	if err2 = oprot.WriteMessageEnd(); err == nil && err2 != nil {
+		err = err2
+	}
+	if err2 = oprot.Flush(ctx); err == nil && err2 != nil {
+		err = err2
+	}
+	if err != nil {
+		return
+	}
+	return true, err
+}
+
+type gatewayServiceProcessorCreateFolder struct {
+	handler GatewayService
+}
+
+func (p *gatewayServiceProcessorCreateFolder) Process(ctx context.Context, seqId int32, iprot, oprot thrift.TProtocol) (success bool, err thrift.TException) {
+	args := GatewayServiceCreateFolderArgs{}
+	if err = args.Read(iprot); err != nil {
+		iprot.ReadMessageEnd()
+		x := thrift.NewTApplicationException(thrift.PROTOCOL_ERROR, err.Error())
+		oprot.WriteMessageBegin("CreateFolder", thrift.EXCEPTION, seqId)
+		x.Write(oprot)
+		oprot.WriteMessageEnd()
+		oprot.Flush(ctx)
+		return false, err
+	}
+
+	iprot.ReadMessageEnd()
+	var err2 error
+	result := GatewayServiceCreateFolderResult{}
+	var retval *FolderData
+	if retval, err2 = p.handler.CreateFolder(ctx, args.Request); err2 != nil {
+		x := thrift.NewTApplicationException(thrift.INTERNAL_ERROR, "Internal error processing CreateFolder: "+err2.Error())
+		oprot.WriteMessageBegin("CreateFolder", thrift.EXCEPTION, seqId)
+		x.Write(oprot)
+		oprot.WriteMessageEnd()
+		oprot.Flush(ctx)
+		return true, err2
+	} else {
+		result.Success = retval
+	}
+	if err2 = oprot.WriteMessageBegin("CreateFolder", thrift.REPLY, seqId); err2 != nil {
+		err = err2
+	}
+	if err2 = result.Write(oprot); err == nil && err2 != nil {
+		err = err2
+	}
+	if err2 = oprot.WriteMessageEnd(); err == nil && err2 != nil {
+		err = err2
+	}
+	if err2 = oprot.Flush(ctx); err == nil && err2 != nil {
+		err = err2
+	}
+	if err != nil {
+		return
+	}
+	return true, err
+}
+
+type gatewayServiceProcessorUpdateFolder struct {
+	handler GatewayService
+}
+
+func (p *gatewayServiceProcessorUpdateFolder) Process(ctx context.Context, seqId int32, iprot, oprot thrift.TProtocol) (success bool, err thrift.TException) {
+	args := GatewayServiceUpdateFolderArgs{}
+	if err = args.Read(iprot); err != nil {
+		iprot.ReadMessageEnd()
+		x := thrift.NewTApplicationException(thrift.PROTOCOL_ERROR, err.Error())
+		oprot.WriteMessageBegin("UpdateFolder", thrift.EXCEPTION, seqId)
+		x.Write(oprot)
+		oprot.WriteMessageEnd()
+		oprot.Flush(ctx)
+		return false, err
+	}
+
+	iprot.ReadMessageEnd()
+	var err2 error
+	result := GatewayServiceUpdateFolderResult{}
+	var retval *FolderData
+	if retval, err2 = p.handler.UpdateFolder(ctx, args.Request); err2 != nil {
+		x := thrift.NewTApplicationException(thrift.INTERNAL_ERROR, "Internal error processing UpdateFolder: "+err2.Error())
+		oprot.WriteMessageBegin("UpdateFolder", thrift.EXCEPTION, seqId)
+		x.Write(oprot)
+		oprot.WriteMessageEnd()
+		oprot.Flush(ctx)
+		return true, err2
+	} else {
+		result.Success = retval
+	}
+	if err2 = oprot.WriteMessageBegin("UpdateFolder", thrift.REPLY, seqId); err2 != nil {
+		err = err2
+	}
+	if err2 = result.Write(oprot); err == nil && err2 != nil {
+		err = err2
+	}
+	if err2 = oprot.WriteMessageEnd(); err == nil && err2 != nil {
+		err = err2
+	}
+	if err2 = oprot.Flush(ctx); err == nil && err2 != nil {
+		err = err2
+	}
+	if err != nil {
+		return
+	}
+	return true, err
+}
+
+type gatewayServiceProcessorDeleteFolder struct {
+	handler GatewayService
+}
+
+func (p *gatewayServiceProcessorDeleteFolder) Process(ctx context.Context, seqId int32, iprot, oprot thrift.TProtocol) (success bool, err thrift.TException) {
+	args := GatewayServiceDeleteFolderArgs{}
+	if err = args.Read(iprot); err != nil {
+		iprot.ReadMessageEnd()
+		x := thrift.NewTApplicationException(thrift.PROTOCOL_ERROR, err.Error())
+		oprot.WriteMessageBegin("DeleteFolder", thrift.EXCEPTION, seqId)
+		x.Write(oprot)
+		oprot.WriteMessageEnd()
+		oprot.Flush(ctx)
+		return false, err
+	}
+
+	iprot.ReadMessageEnd()
+	var err2 error
+	result := GatewayServiceDeleteFolderResult{}
+	var retval *EmptyResponse
+	if retval, err2 = p.handler.DeleteFolder(ctx, args.Request); err2 != nil {
+		x := thrift.NewTApplicationException(thrift.INTERNAL_ERROR, "Internal error processing DeleteFolder: "+err2.Error())
+		oprot.WriteMessageBegin("DeleteFolder", thrift.EXCEPTION, seqId)
+		x.Write(oprot)
+		oprot.WriteMessageEnd()
+		oprot.Flush(ctx)
+		return true, err2
+	} else {
+		result.Success = retval
+	}
+	if err2 = oprot.WriteMessageBegin("DeleteFolder", thrift.REPLY, seqId); err2 != nil {
 		err = err2
 	}
 	if err2 = result.Write(oprot); err == nil && err2 != nil {
@@ -22531,6 +24834,1182 @@ func (p *GatewayServiceListDocumentsResult) String() string {
 		return "<nil>"
 	}
 	return fmt.Sprintf("GatewayServiceListDocumentsResult(%+v)", *p)
+
+}
+
+type GatewayServiceListFoldersArgs struct {
+	Request *ListFoldersRequest `thrift:"request,1"`
+}
+
+func NewGatewayServiceListFoldersArgs() *GatewayServiceListFoldersArgs {
+	return &GatewayServiceListFoldersArgs{}
+}
+
+func (p *GatewayServiceListFoldersArgs) InitDefault() {
+}
+
+var GatewayServiceListFoldersArgs_Request_DEFAULT *ListFoldersRequest
+
+func (p *GatewayServiceListFoldersArgs) GetRequest() (v *ListFoldersRequest) {
+	if !p.IsSetRequest() {
+		return GatewayServiceListFoldersArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+
+var fieldIDToName_GatewayServiceListFoldersArgs = map[int16]string{
+	1: "request",
+}
+
+func (p *GatewayServiceListFoldersArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *GatewayServiceListFoldersArgs) Read(iprot thrift.TProtocol) (err error) {
+
+	var fieldTypeId thrift.TType
+	var fieldId int16
+
+	if _, err = iprot.ReadStructBegin(); err != nil {
+		goto ReadStructBeginError
+	}
+
+	for {
+		_, fieldTypeId, fieldId, err = iprot.ReadFieldBegin()
+		if err != nil {
+			goto ReadFieldBeginError
+		}
+		if fieldTypeId == thrift.STOP {
+			break
+		}
+
+		switch fieldId {
+		case 1:
+			if fieldTypeId == thrift.STRUCT {
+				if err = p.ReadField1(iprot); err != nil {
+					goto ReadFieldError
+				}
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		default:
+			if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		}
+		if err = iprot.ReadFieldEnd(); err != nil {
+			goto ReadFieldEndError
+		}
+	}
+	if err = iprot.ReadStructEnd(); err != nil {
+		goto ReadStructEndError
+	}
+
+	return nil
+ReadStructBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T read struct begin error: ", p), err)
+ReadFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
+ReadFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_GatewayServiceListFoldersArgs[fieldId]), err)
+SkipFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T field %d skip type %d error: ", p, fieldId, fieldTypeId), err)
+
+ReadFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T read field end error", p), err)
+ReadStructEndError:
+	return thrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
+}
+
+func (p *GatewayServiceListFoldersArgs) ReadField1(iprot thrift.TProtocol) error {
+	_field := NewListFoldersRequest()
+	if err := _field.Read(iprot); err != nil {
+		return err
+	}
+	p.Request = _field
+	return nil
+}
+
+func (p *GatewayServiceListFoldersArgs) Write(oprot thrift.TProtocol) (err error) {
+	var fieldId int16
+	if err = oprot.WriteStructBegin("ListFolders_args"); err != nil {
+		goto WriteStructBeginError
+	}
+	if p != nil {
+		if err = p.writeField1(oprot); err != nil {
+			fieldId = 1
+			goto WriteFieldError
+		}
+	}
+	if err = oprot.WriteFieldStop(); err != nil {
+		goto WriteFieldStopError
+	}
+	if err = oprot.WriteStructEnd(); err != nil {
+		goto WriteStructEndError
+	}
+	return nil
+WriteStructBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
+WriteFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T write field %d error: ", p, fieldId), err)
+WriteFieldStopError:
+	return thrift.PrependError(fmt.Sprintf("%T write field stop error: ", p), err)
+WriteStructEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write struct end error: ", p), err)
+}
+
+func (p *GatewayServiceListFoldersArgs) writeField1(oprot thrift.TProtocol) (err error) {
+	if err = oprot.WriteFieldBegin("request", thrift.STRUCT, 1); err != nil {
+		goto WriteFieldBeginError
+	}
+	if err := p.Request.Write(oprot); err != nil {
+		return err
+	}
+	if err = oprot.WriteFieldEnd(); err != nil {
+		goto WriteFieldEndError
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 1 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 1 end error: ", p), err)
+}
+
+func (p *GatewayServiceListFoldersArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("GatewayServiceListFoldersArgs(%+v)", *p)
+
+}
+
+type GatewayServiceListFoldersResult struct {
+	Success *FolderListData `thrift:"success,0,optional"`
+}
+
+func NewGatewayServiceListFoldersResult() *GatewayServiceListFoldersResult {
+	return &GatewayServiceListFoldersResult{}
+}
+
+func (p *GatewayServiceListFoldersResult) InitDefault() {
+}
+
+var GatewayServiceListFoldersResult_Success_DEFAULT *FolderListData
+
+func (p *GatewayServiceListFoldersResult) GetSuccess() (v *FolderListData) {
+	if !p.IsSetSuccess() {
+		return GatewayServiceListFoldersResult_Success_DEFAULT
+	}
+	return p.Success
+}
+
+var fieldIDToName_GatewayServiceListFoldersResult = map[int16]string{
+	0: "success",
+}
+
+func (p *GatewayServiceListFoldersResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *GatewayServiceListFoldersResult) Read(iprot thrift.TProtocol) (err error) {
+
+	var fieldTypeId thrift.TType
+	var fieldId int16
+
+	if _, err = iprot.ReadStructBegin(); err != nil {
+		goto ReadStructBeginError
+	}
+
+	for {
+		_, fieldTypeId, fieldId, err = iprot.ReadFieldBegin()
+		if err != nil {
+			goto ReadFieldBeginError
+		}
+		if fieldTypeId == thrift.STOP {
+			break
+		}
+
+		switch fieldId {
+		case 0:
+			if fieldTypeId == thrift.STRUCT {
+				if err = p.ReadField0(iprot); err != nil {
+					goto ReadFieldError
+				}
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		default:
+			if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		}
+		if err = iprot.ReadFieldEnd(); err != nil {
+			goto ReadFieldEndError
+		}
+	}
+	if err = iprot.ReadStructEnd(); err != nil {
+		goto ReadStructEndError
+	}
+
+	return nil
+ReadStructBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T read struct begin error: ", p), err)
+ReadFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
+ReadFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_GatewayServiceListFoldersResult[fieldId]), err)
+SkipFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T field %d skip type %d error: ", p, fieldId, fieldTypeId), err)
+
+ReadFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T read field end error", p), err)
+ReadStructEndError:
+	return thrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
+}
+
+func (p *GatewayServiceListFoldersResult) ReadField0(iprot thrift.TProtocol) error {
+	_field := NewFolderListData()
+	if err := _field.Read(iprot); err != nil {
+		return err
+	}
+	p.Success = _field
+	return nil
+}
+
+func (p *GatewayServiceListFoldersResult) Write(oprot thrift.TProtocol) (err error) {
+	var fieldId int16
+	if err = oprot.WriteStructBegin("ListFolders_result"); err != nil {
+		goto WriteStructBeginError
+	}
+	if p != nil {
+		if err = p.writeField0(oprot); err != nil {
+			fieldId = 0
+			goto WriteFieldError
+		}
+	}
+	if err = oprot.WriteFieldStop(); err != nil {
+		goto WriteFieldStopError
+	}
+	if err = oprot.WriteStructEnd(); err != nil {
+		goto WriteStructEndError
+	}
+	return nil
+WriteStructBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
+WriteFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T write field %d error: ", p, fieldId), err)
+WriteFieldStopError:
+	return thrift.PrependError(fmt.Sprintf("%T write field stop error: ", p), err)
+WriteStructEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write struct end error: ", p), err)
+}
+
+func (p *GatewayServiceListFoldersResult) writeField0(oprot thrift.TProtocol) (err error) {
+	if p.IsSetSuccess() {
+		if err = oprot.WriteFieldBegin("success", thrift.STRUCT, 0); err != nil {
+			goto WriteFieldBeginError
+		}
+		if err := p.Success.Write(oprot); err != nil {
+			return err
+		}
+		if err = oprot.WriteFieldEnd(); err != nil {
+			goto WriteFieldEndError
+		}
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 0 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 0 end error: ", p), err)
+}
+
+func (p *GatewayServiceListFoldersResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("GatewayServiceListFoldersResult(%+v)", *p)
+
+}
+
+type GatewayServiceCreateFolderArgs struct {
+	Request *CreateFolderRequest `thrift:"request,1"`
+}
+
+func NewGatewayServiceCreateFolderArgs() *GatewayServiceCreateFolderArgs {
+	return &GatewayServiceCreateFolderArgs{}
+}
+
+func (p *GatewayServiceCreateFolderArgs) InitDefault() {
+}
+
+var GatewayServiceCreateFolderArgs_Request_DEFAULT *CreateFolderRequest
+
+func (p *GatewayServiceCreateFolderArgs) GetRequest() (v *CreateFolderRequest) {
+	if !p.IsSetRequest() {
+		return GatewayServiceCreateFolderArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+
+var fieldIDToName_GatewayServiceCreateFolderArgs = map[int16]string{
+	1: "request",
+}
+
+func (p *GatewayServiceCreateFolderArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *GatewayServiceCreateFolderArgs) Read(iprot thrift.TProtocol) (err error) {
+
+	var fieldTypeId thrift.TType
+	var fieldId int16
+
+	if _, err = iprot.ReadStructBegin(); err != nil {
+		goto ReadStructBeginError
+	}
+
+	for {
+		_, fieldTypeId, fieldId, err = iprot.ReadFieldBegin()
+		if err != nil {
+			goto ReadFieldBeginError
+		}
+		if fieldTypeId == thrift.STOP {
+			break
+		}
+
+		switch fieldId {
+		case 1:
+			if fieldTypeId == thrift.STRUCT {
+				if err = p.ReadField1(iprot); err != nil {
+					goto ReadFieldError
+				}
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		default:
+			if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		}
+		if err = iprot.ReadFieldEnd(); err != nil {
+			goto ReadFieldEndError
+		}
+	}
+	if err = iprot.ReadStructEnd(); err != nil {
+		goto ReadStructEndError
+	}
+
+	return nil
+ReadStructBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T read struct begin error: ", p), err)
+ReadFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
+ReadFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_GatewayServiceCreateFolderArgs[fieldId]), err)
+SkipFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T field %d skip type %d error: ", p, fieldId, fieldTypeId), err)
+
+ReadFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T read field end error", p), err)
+ReadStructEndError:
+	return thrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
+}
+
+func (p *GatewayServiceCreateFolderArgs) ReadField1(iprot thrift.TProtocol) error {
+	_field := NewCreateFolderRequest()
+	if err := _field.Read(iprot); err != nil {
+		return err
+	}
+	p.Request = _field
+	return nil
+}
+
+func (p *GatewayServiceCreateFolderArgs) Write(oprot thrift.TProtocol) (err error) {
+	var fieldId int16
+	if err = oprot.WriteStructBegin("CreateFolder_args"); err != nil {
+		goto WriteStructBeginError
+	}
+	if p != nil {
+		if err = p.writeField1(oprot); err != nil {
+			fieldId = 1
+			goto WriteFieldError
+		}
+	}
+	if err = oprot.WriteFieldStop(); err != nil {
+		goto WriteFieldStopError
+	}
+	if err = oprot.WriteStructEnd(); err != nil {
+		goto WriteStructEndError
+	}
+	return nil
+WriteStructBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
+WriteFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T write field %d error: ", p, fieldId), err)
+WriteFieldStopError:
+	return thrift.PrependError(fmt.Sprintf("%T write field stop error: ", p), err)
+WriteStructEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write struct end error: ", p), err)
+}
+
+func (p *GatewayServiceCreateFolderArgs) writeField1(oprot thrift.TProtocol) (err error) {
+	if err = oprot.WriteFieldBegin("request", thrift.STRUCT, 1); err != nil {
+		goto WriteFieldBeginError
+	}
+	if err := p.Request.Write(oprot); err != nil {
+		return err
+	}
+	if err = oprot.WriteFieldEnd(); err != nil {
+		goto WriteFieldEndError
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 1 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 1 end error: ", p), err)
+}
+
+func (p *GatewayServiceCreateFolderArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("GatewayServiceCreateFolderArgs(%+v)", *p)
+
+}
+
+type GatewayServiceCreateFolderResult struct {
+	Success *FolderData `thrift:"success,0,optional"`
+}
+
+func NewGatewayServiceCreateFolderResult() *GatewayServiceCreateFolderResult {
+	return &GatewayServiceCreateFolderResult{}
+}
+
+func (p *GatewayServiceCreateFolderResult) InitDefault() {
+}
+
+var GatewayServiceCreateFolderResult_Success_DEFAULT *FolderData
+
+func (p *GatewayServiceCreateFolderResult) GetSuccess() (v *FolderData) {
+	if !p.IsSetSuccess() {
+		return GatewayServiceCreateFolderResult_Success_DEFAULT
+	}
+	return p.Success
+}
+
+var fieldIDToName_GatewayServiceCreateFolderResult = map[int16]string{
+	0: "success",
+}
+
+func (p *GatewayServiceCreateFolderResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *GatewayServiceCreateFolderResult) Read(iprot thrift.TProtocol) (err error) {
+
+	var fieldTypeId thrift.TType
+	var fieldId int16
+
+	if _, err = iprot.ReadStructBegin(); err != nil {
+		goto ReadStructBeginError
+	}
+
+	for {
+		_, fieldTypeId, fieldId, err = iprot.ReadFieldBegin()
+		if err != nil {
+			goto ReadFieldBeginError
+		}
+		if fieldTypeId == thrift.STOP {
+			break
+		}
+
+		switch fieldId {
+		case 0:
+			if fieldTypeId == thrift.STRUCT {
+				if err = p.ReadField0(iprot); err != nil {
+					goto ReadFieldError
+				}
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		default:
+			if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		}
+		if err = iprot.ReadFieldEnd(); err != nil {
+			goto ReadFieldEndError
+		}
+	}
+	if err = iprot.ReadStructEnd(); err != nil {
+		goto ReadStructEndError
+	}
+
+	return nil
+ReadStructBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T read struct begin error: ", p), err)
+ReadFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
+ReadFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_GatewayServiceCreateFolderResult[fieldId]), err)
+SkipFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T field %d skip type %d error: ", p, fieldId, fieldTypeId), err)
+
+ReadFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T read field end error", p), err)
+ReadStructEndError:
+	return thrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
+}
+
+func (p *GatewayServiceCreateFolderResult) ReadField0(iprot thrift.TProtocol) error {
+	_field := NewFolderData()
+	if err := _field.Read(iprot); err != nil {
+		return err
+	}
+	p.Success = _field
+	return nil
+}
+
+func (p *GatewayServiceCreateFolderResult) Write(oprot thrift.TProtocol) (err error) {
+	var fieldId int16
+	if err = oprot.WriteStructBegin("CreateFolder_result"); err != nil {
+		goto WriteStructBeginError
+	}
+	if p != nil {
+		if err = p.writeField0(oprot); err != nil {
+			fieldId = 0
+			goto WriteFieldError
+		}
+	}
+	if err = oprot.WriteFieldStop(); err != nil {
+		goto WriteFieldStopError
+	}
+	if err = oprot.WriteStructEnd(); err != nil {
+		goto WriteStructEndError
+	}
+	return nil
+WriteStructBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
+WriteFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T write field %d error: ", p, fieldId), err)
+WriteFieldStopError:
+	return thrift.PrependError(fmt.Sprintf("%T write field stop error: ", p), err)
+WriteStructEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write struct end error: ", p), err)
+}
+
+func (p *GatewayServiceCreateFolderResult) writeField0(oprot thrift.TProtocol) (err error) {
+	if p.IsSetSuccess() {
+		if err = oprot.WriteFieldBegin("success", thrift.STRUCT, 0); err != nil {
+			goto WriteFieldBeginError
+		}
+		if err := p.Success.Write(oprot); err != nil {
+			return err
+		}
+		if err = oprot.WriteFieldEnd(); err != nil {
+			goto WriteFieldEndError
+		}
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 0 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 0 end error: ", p), err)
+}
+
+func (p *GatewayServiceCreateFolderResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("GatewayServiceCreateFolderResult(%+v)", *p)
+
+}
+
+type GatewayServiceUpdateFolderArgs struct {
+	Request *UpdateFolderRequest `thrift:"request,1"`
+}
+
+func NewGatewayServiceUpdateFolderArgs() *GatewayServiceUpdateFolderArgs {
+	return &GatewayServiceUpdateFolderArgs{}
+}
+
+func (p *GatewayServiceUpdateFolderArgs) InitDefault() {
+}
+
+var GatewayServiceUpdateFolderArgs_Request_DEFAULT *UpdateFolderRequest
+
+func (p *GatewayServiceUpdateFolderArgs) GetRequest() (v *UpdateFolderRequest) {
+	if !p.IsSetRequest() {
+		return GatewayServiceUpdateFolderArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+
+var fieldIDToName_GatewayServiceUpdateFolderArgs = map[int16]string{
+	1: "request",
+}
+
+func (p *GatewayServiceUpdateFolderArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *GatewayServiceUpdateFolderArgs) Read(iprot thrift.TProtocol) (err error) {
+
+	var fieldTypeId thrift.TType
+	var fieldId int16
+
+	if _, err = iprot.ReadStructBegin(); err != nil {
+		goto ReadStructBeginError
+	}
+
+	for {
+		_, fieldTypeId, fieldId, err = iprot.ReadFieldBegin()
+		if err != nil {
+			goto ReadFieldBeginError
+		}
+		if fieldTypeId == thrift.STOP {
+			break
+		}
+
+		switch fieldId {
+		case 1:
+			if fieldTypeId == thrift.STRUCT {
+				if err = p.ReadField1(iprot); err != nil {
+					goto ReadFieldError
+				}
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		default:
+			if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		}
+		if err = iprot.ReadFieldEnd(); err != nil {
+			goto ReadFieldEndError
+		}
+	}
+	if err = iprot.ReadStructEnd(); err != nil {
+		goto ReadStructEndError
+	}
+
+	return nil
+ReadStructBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T read struct begin error: ", p), err)
+ReadFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
+ReadFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_GatewayServiceUpdateFolderArgs[fieldId]), err)
+SkipFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T field %d skip type %d error: ", p, fieldId, fieldTypeId), err)
+
+ReadFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T read field end error", p), err)
+ReadStructEndError:
+	return thrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
+}
+
+func (p *GatewayServiceUpdateFolderArgs) ReadField1(iprot thrift.TProtocol) error {
+	_field := NewUpdateFolderRequest()
+	if err := _field.Read(iprot); err != nil {
+		return err
+	}
+	p.Request = _field
+	return nil
+}
+
+func (p *GatewayServiceUpdateFolderArgs) Write(oprot thrift.TProtocol) (err error) {
+	var fieldId int16
+	if err = oprot.WriteStructBegin("UpdateFolder_args"); err != nil {
+		goto WriteStructBeginError
+	}
+	if p != nil {
+		if err = p.writeField1(oprot); err != nil {
+			fieldId = 1
+			goto WriteFieldError
+		}
+	}
+	if err = oprot.WriteFieldStop(); err != nil {
+		goto WriteFieldStopError
+	}
+	if err = oprot.WriteStructEnd(); err != nil {
+		goto WriteStructEndError
+	}
+	return nil
+WriteStructBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
+WriteFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T write field %d error: ", p, fieldId), err)
+WriteFieldStopError:
+	return thrift.PrependError(fmt.Sprintf("%T write field stop error: ", p), err)
+WriteStructEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write struct end error: ", p), err)
+}
+
+func (p *GatewayServiceUpdateFolderArgs) writeField1(oprot thrift.TProtocol) (err error) {
+	if err = oprot.WriteFieldBegin("request", thrift.STRUCT, 1); err != nil {
+		goto WriteFieldBeginError
+	}
+	if err := p.Request.Write(oprot); err != nil {
+		return err
+	}
+	if err = oprot.WriteFieldEnd(); err != nil {
+		goto WriteFieldEndError
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 1 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 1 end error: ", p), err)
+}
+
+func (p *GatewayServiceUpdateFolderArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("GatewayServiceUpdateFolderArgs(%+v)", *p)
+
+}
+
+type GatewayServiceUpdateFolderResult struct {
+	Success *FolderData `thrift:"success,0,optional"`
+}
+
+func NewGatewayServiceUpdateFolderResult() *GatewayServiceUpdateFolderResult {
+	return &GatewayServiceUpdateFolderResult{}
+}
+
+func (p *GatewayServiceUpdateFolderResult) InitDefault() {
+}
+
+var GatewayServiceUpdateFolderResult_Success_DEFAULT *FolderData
+
+func (p *GatewayServiceUpdateFolderResult) GetSuccess() (v *FolderData) {
+	if !p.IsSetSuccess() {
+		return GatewayServiceUpdateFolderResult_Success_DEFAULT
+	}
+	return p.Success
+}
+
+var fieldIDToName_GatewayServiceUpdateFolderResult = map[int16]string{
+	0: "success",
+}
+
+func (p *GatewayServiceUpdateFolderResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *GatewayServiceUpdateFolderResult) Read(iprot thrift.TProtocol) (err error) {
+
+	var fieldTypeId thrift.TType
+	var fieldId int16
+
+	if _, err = iprot.ReadStructBegin(); err != nil {
+		goto ReadStructBeginError
+	}
+
+	for {
+		_, fieldTypeId, fieldId, err = iprot.ReadFieldBegin()
+		if err != nil {
+			goto ReadFieldBeginError
+		}
+		if fieldTypeId == thrift.STOP {
+			break
+		}
+
+		switch fieldId {
+		case 0:
+			if fieldTypeId == thrift.STRUCT {
+				if err = p.ReadField0(iprot); err != nil {
+					goto ReadFieldError
+				}
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		default:
+			if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		}
+		if err = iprot.ReadFieldEnd(); err != nil {
+			goto ReadFieldEndError
+		}
+	}
+	if err = iprot.ReadStructEnd(); err != nil {
+		goto ReadStructEndError
+	}
+
+	return nil
+ReadStructBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T read struct begin error: ", p), err)
+ReadFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
+ReadFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_GatewayServiceUpdateFolderResult[fieldId]), err)
+SkipFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T field %d skip type %d error: ", p, fieldId, fieldTypeId), err)
+
+ReadFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T read field end error", p), err)
+ReadStructEndError:
+	return thrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
+}
+
+func (p *GatewayServiceUpdateFolderResult) ReadField0(iprot thrift.TProtocol) error {
+	_field := NewFolderData()
+	if err := _field.Read(iprot); err != nil {
+		return err
+	}
+	p.Success = _field
+	return nil
+}
+
+func (p *GatewayServiceUpdateFolderResult) Write(oprot thrift.TProtocol) (err error) {
+	var fieldId int16
+	if err = oprot.WriteStructBegin("UpdateFolder_result"); err != nil {
+		goto WriteStructBeginError
+	}
+	if p != nil {
+		if err = p.writeField0(oprot); err != nil {
+			fieldId = 0
+			goto WriteFieldError
+		}
+	}
+	if err = oprot.WriteFieldStop(); err != nil {
+		goto WriteFieldStopError
+	}
+	if err = oprot.WriteStructEnd(); err != nil {
+		goto WriteStructEndError
+	}
+	return nil
+WriteStructBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
+WriteFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T write field %d error: ", p, fieldId), err)
+WriteFieldStopError:
+	return thrift.PrependError(fmt.Sprintf("%T write field stop error: ", p), err)
+WriteStructEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write struct end error: ", p), err)
+}
+
+func (p *GatewayServiceUpdateFolderResult) writeField0(oprot thrift.TProtocol) (err error) {
+	if p.IsSetSuccess() {
+		if err = oprot.WriteFieldBegin("success", thrift.STRUCT, 0); err != nil {
+			goto WriteFieldBeginError
+		}
+		if err := p.Success.Write(oprot); err != nil {
+			return err
+		}
+		if err = oprot.WriteFieldEnd(); err != nil {
+			goto WriteFieldEndError
+		}
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 0 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 0 end error: ", p), err)
+}
+
+func (p *GatewayServiceUpdateFolderResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("GatewayServiceUpdateFolderResult(%+v)", *p)
+
+}
+
+type GatewayServiceDeleteFolderArgs struct {
+	Request *DeleteFolderRequest `thrift:"request,1"`
+}
+
+func NewGatewayServiceDeleteFolderArgs() *GatewayServiceDeleteFolderArgs {
+	return &GatewayServiceDeleteFolderArgs{}
+}
+
+func (p *GatewayServiceDeleteFolderArgs) InitDefault() {
+}
+
+var GatewayServiceDeleteFolderArgs_Request_DEFAULT *DeleteFolderRequest
+
+func (p *GatewayServiceDeleteFolderArgs) GetRequest() (v *DeleteFolderRequest) {
+	if !p.IsSetRequest() {
+		return GatewayServiceDeleteFolderArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+
+var fieldIDToName_GatewayServiceDeleteFolderArgs = map[int16]string{
+	1: "request",
+}
+
+func (p *GatewayServiceDeleteFolderArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *GatewayServiceDeleteFolderArgs) Read(iprot thrift.TProtocol) (err error) {
+
+	var fieldTypeId thrift.TType
+	var fieldId int16
+
+	if _, err = iprot.ReadStructBegin(); err != nil {
+		goto ReadStructBeginError
+	}
+
+	for {
+		_, fieldTypeId, fieldId, err = iprot.ReadFieldBegin()
+		if err != nil {
+			goto ReadFieldBeginError
+		}
+		if fieldTypeId == thrift.STOP {
+			break
+		}
+
+		switch fieldId {
+		case 1:
+			if fieldTypeId == thrift.STRUCT {
+				if err = p.ReadField1(iprot); err != nil {
+					goto ReadFieldError
+				}
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		default:
+			if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		}
+		if err = iprot.ReadFieldEnd(); err != nil {
+			goto ReadFieldEndError
+		}
+	}
+	if err = iprot.ReadStructEnd(); err != nil {
+		goto ReadStructEndError
+	}
+
+	return nil
+ReadStructBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T read struct begin error: ", p), err)
+ReadFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
+ReadFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_GatewayServiceDeleteFolderArgs[fieldId]), err)
+SkipFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T field %d skip type %d error: ", p, fieldId, fieldTypeId), err)
+
+ReadFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T read field end error", p), err)
+ReadStructEndError:
+	return thrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
+}
+
+func (p *GatewayServiceDeleteFolderArgs) ReadField1(iprot thrift.TProtocol) error {
+	_field := NewDeleteFolderRequest()
+	if err := _field.Read(iprot); err != nil {
+		return err
+	}
+	p.Request = _field
+	return nil
+}
+
+func (p *GatewayServiceDeleteFolderArgs) Write(oprot thrift.TProtocol) (err error) {
+	var fieldId int16
+	if err = oprot.WriteStructBegin("DeleteFolder_args"); err != nil {
+		goto WriteStructBeginError
+	}
+	if p != nil {
+		if err = p.writeField1(oprot); err != nil {
+			fieldId = 1
+			goto WriteFieldError
+		}
+	}
+	if err = oprot.WriteFieldStop(); err != nil {
+		goto WriteFieldStopError
+	}
+	if err = oprot.WriteStructEnd(); err != nil {
+		goto WriteStructEndError
+	}
+	return nil
+WriteStructBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
+WriteFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T write field %d error: ", p, fieldId), err)
+WriteFieldStopError:
+	return thrift.PrependError(fmt.Sprintf("%T write field stop error: ", p), err)
+WriteStructEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write struct end error: ", p), err)
+}
+
+func (p *GatewayServiceDeleteFolderArgs) writeField1(oprot thrift.TProtocol) (err error) {
+	if err = oprot.WriteFieldBegin("request", thrift.STRUCT, 1); err != nil {
+		goto WriteFieldBeginError
+	}
+	if err := p.Request.Write(oprot); err != nil {
+		return err
+	}
+	if err = oprot.WriteFieldEnd(); err != nil {
+		goto WriteFieldEndError
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 1 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 1 end error: ", p), err)
+}
+
+func (p *GatewayServiceDeleteFolderArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("GatewayServiceDeleteFolderArgs(%+v)", *p)
+
+}
+
+type GatewayServiceDeleteFolderResult struct {
+	Success *EmptyResponse `thrift:"success,0,optional"`
+}
+
+func NewGatewayServiceDeleteFolderResult() *GatewayServiceDeleteFolderResult {
+	return &GatewayServiceDeleteFolderResult{}
+}
+
+func (p *GatewayServiceDeleteFolderResult) InitDefault() {
+}
+
+var GatewayServiceDeleteFolderResult_Success_DEFAULT *EmptyResponse
+
+func (p *GatewayServiceDeleteFolderResult) GetSuccess() (v *EmptyResponse) {
+	if !p.IsSetSuccess() {
+		return GatewayServiceDeleteFolderResult_Success_DEFAULT
+	}
+	return p.Success
+}
+
+var fieldIDToName_GatewayServiceDeleteFolderResult = map[int16]string{
+	0: "success",
+}
+
+func (p *GatewayServiceDeleteFolderResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *GatewayServiceDeleteFolderResult) Read(iprot thrift.TProtocol) (err error) {
+
+	var fieldTypeId thrift.TType
+	var fieldId int16
+
+	if _, err = iprot.ReadStructBegin(); err != nil {
+		goto ReadStructBeginError
+	}
+
+	for {
+		_, fieldTypeId, fieldId, err = iprot.ReadFieldBegin()
+		if err != nil {
+			goto ReadFieldBeginError
+		}
+		if fieldTypeId == thrift.STOP {
+			break
+		}
+
+		switch fieldId {
+		case 0:
+			if fieldTypeId == thrift.STRUCT {
+				if err = p.ReadField0(iprot); err != nil {
+					goto ReadFieldError
+				}
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		default:
+			if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		}
+		if err = iprot.ReadFieldEnd(); err != nil {
+			goto ReadFieldEndError
+		}
+	}
+	if err = iprot.ReadStructEnd(); err != nil {
+		goto ReadStructEndError
+	}
+
+	return nil
+ReadStructBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T read struct begin error: ", p), err)
+ReadFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
+ReadFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_GatewayServiceDeleteFolderResult[fieldId]), err)
+SkipFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T field %d skip type %d error: ", p, fieldId, fieldTypeId), err)
+
+ReadFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T read field end error", p), err)
+ReadStructEndError:
+	return thrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
+}
+
+func (p *GatewayServiceDeleteFolderResult) ReadField0(iprot thrift.TProtocol) error {
+	_field := NewEmptyResponse()
+	if err := _field.Read(iprot); err != nil {
+		return err
+	}
+	p.Success = _field
+	return nil
+}
+
+func (p *GatewayServiceDeleteFolderResult) Write(oprot thrift.TProtocol) (err error) {
+	var fieldId int16
+	if err = oprot.WriteStructBegin("DeleteFolder_result"); err != nil {
+		goto WriteStructBeginError
+	}
+	if p != nil {
+		if err = p.writeField0(oprot); err != nil {
+			fieldId = 0
+			goto WriteFieldError
+		}
+	}
+	if err = oprot.WriteFieldStop(); err != nil {
+		goto WriteFieldStopError
+	}
+	if err = oprot.WriteStructEnd(); err != nil {
+		goto WriteStructEndError
+	}
+	return nil
+WriteStructBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
+WriteFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T write field %d error: ", p, fieldId), err)
+WriteFieldStopError:
+	return thrift.PrependError(fmt.Sprintf("%T write field stop error: ", p), err)
+WriteStructEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write struct end error: ", p), err)
+}
+
+func (p *GatewayServiceDeleteFolderResult) writeField0(oprot thrift.TProtocol) (err error) {
+	if p.IsSetSuccess() {
+		if err = oprot.WriteFieldBegin("success", thrift.STRUCT, 0); err != nil {
+			goto WriteFieldBeginError
+		}
+		if err := p.Success.Write(oprot); err != nil {
+			return err
+		}
+		if err = oprot.WriteFieldEnd(); err != nil {
+			goto WriteFieldEndError
+		}
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 0 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 0 end error: ", p), err)
+}
+
+func (p *GatewayServiceDeleteFolderResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("GatewayServiceDeleteFolderResult(%+v)", *p)
 
 }
 

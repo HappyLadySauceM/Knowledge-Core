@@ -70,6 +70,41 @@ var serviceMethods = map[string]kitex.MethodInfo{
 		false,
 		kitex.WithStreamingMode(kitex.StreamingNone),
 	),
+	"PublishSnapshot": kitex.NewMethodInfo(
+		publishSnapshotHandler,
+		newKnowledgeServicePublishSnapshotArgs,
+		newKnowledgeServicePublishSnapshotResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
+	"ListFolders": kitex.NewMethodInfo(
+		listFoldersHandler,
+		newKnowledgeServiceListFoldersArgs,
+		newKnowledgeServiceListFoldersResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
+	"CreateFolder": kitex.NewMethodInfo(
+		createFolderHandler,
+		newKnowledgeServiceCreateFolderArgs,
+		newKnowledgeServiceCreateFolderResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
+	"UpdateFolder": kitex.NewMethodInfo(
+		updateFolderHandler,
+		newKnowledgeServiceUpdateFolderArgs,
+		newKnowledgeServiceUpdateFolderResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
+	"DeleteFolder": kitex.NewMethodInfo(
+		deleteFolderHandler,
+		newKnowledgeServiceDeleteFolderArgs,
+		newKnowledgeServiceDeleteFolderResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
 	"SetPublication": kitex.NewMethodInfo(
 		setPublicationHandler,
 		newKnowledgeServiceSetPublicationArgs,
@@ -383,6 +418,96 @@ func newKnowledgeServiceUpdateDocumentArgs() interface{} {
 
 func newKnowledgeServiceUpdateDocumentResult() interface{} {
 	return knowledge.NewKnowledgeServiceUpdateDocumentResult()
+}
+
+func publishSnapshotHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*knowledge.KnowledgeServicePublishSnapshotArgs)
+	realResult := result.(*knowledge.KnowledgeServicePublishSnapshotResult)
+	success, err := handler.(knowledge.KnowledgeService).PublishSnapshot(ctx, realArg.Request)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newKnowledgeServicePublishSnapshotArgs() interface{} {
+	return knowledge.NewKnowledgeServicePublishSnapshotArgs()
+}
+
+func newKnowledgeServicePublishSnapshotResult() interface{} {
+	return knowledge.NewKnowledgeServicePublishSnapshotResult()
+}
+
+func listFoldersHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*knowledge.KnowledgeServiceListFoldersArgs)
+	realResult := result.(*knowledge.KnowledgeServiceListFoldersResult)
+	success, err := handler.(knowledge.KnowledgeService).ListFolders(ctx, realArg.Request)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newKnowledgeServiceListFoldersArgs() interface{} {
+	return knowledge.NewKnowledgeServiceListFoldersArgs()
+}
+
+func newKnowledgeServiceListFoldersResult() interface{} {
+	return knowledge.NewKnowledgeServiceListFoldersResult()
+}
+
+func createFolderHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*knowledge.KnowledgeServiceCreateFolderArgs)
+	realResult := result.(*knowledge.KnowledgeServiceCreateFolderResult)
+	success, err := handler.(knowledge.KnowledgeService).CreateFolder(ctx, realArg.Request)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newKnowledgeServiceCreateFolderArgs() interface{} {
+	return knowledge.NewKnowledgeServiceCreateFolderArgs()
+}
+
+func newKnowledgeServiceCreateFolderResult() interface{} {
+	return knowledge.NewKnowledgeServiceCreateFolderResult()
+}
+
+func updateFolderHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*knowledge.KnowledgeServiceUpdateFolderArgs)
+	realResult := result.(*knowledge.KnowledgeServiceUpdateFolderResult)
+	success, err := handler.(knowledge.KnowledgeService).UpdateFolder(ctx, realArg.Request)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newKnowledgeServiceUpdateFolderArgs() interface{} {
+	return knowledge.NewKnowledgeServiceUpdateFolderArgs()
+}
+
+func newKnowledgeServiceUpdateFolderResult() interface{} {
+	return knowledge.NewKnowledgeServiceUpdateFolderResult()
+}
+
+func deleteFolderHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*knowledge.KnowledgeServiceDeleteFolderArgs)
+
+	err := handler.(knowledge.KnowledgeService).DeleteFolder(ctx, realArg.Request)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+func newKnowledgeServiceDeleteFolderArgs() interface{} {
+	return knowledge.NewKnowledgeServiceDeleteFolderArgs()
+}
+
+func newKnowledgeServiceDeleteFolderResult() interface{} {
+	return knowledge.NewKnowledgeServiceDeleteFolderResult()
 }
 
 func setPublicationHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
@@ -743,6 +868,56 @@ func (p *kClient) UpdateDocument(ctx context.Context, request *knowledge.UpdateD
 		return
 	}
 	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) PublishSnapshot(ctx context.Context, request *knowledge.PublishSnapshotRequest) (r *knowledge.Document, err error) {
+	var _args knowledge.KnowledgeServicePublishSnapshotArgs
+	_args.Request = request
+	var _result knowledge.KnowledgeServicePublishSnapshotResult
+	if err = p.c.Call(ctx, "PublishSnapshot", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) ListFolders(ctx context.Context, request *knowledge.ListFoldersRequest) (r *knowledge.FolderList, err error) {
+	var _args knowledge.KnowledgeServiceListFoldersArgs
+	_args.Request = request
+	var _result knowledge.KnowledgeServiceListFoldersResult
+	if err = p.c.Call(ctx, "ListFolders", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) CreateFolder(ctx context.Context, request *knowledge.CreateFolderRequest) (r *knowledge.Folder, err error) {
+	var _args knowledge.KnowledgeServiceCreateFolderArgs
+	_args.Request = request
+	var _result knowledge.KnowledgeServiceCreateFolderResult
+	if err = p.c.Call(ctx, "CreateFolder", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) UpdateFolder(ctx context.Context, request *knowledge.UpdateFolderRequest) (r *knowledge.Folder, err error) {
+	var _args knowledge.KnowledgeServiceUpdateFolderArgs
+	_args.Request = request
+	var _result knowledge.KnowledgeServiceUpdateFolderResult
+	if err = p.c.Call(ctx, "UpdateFolder", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) DeleteFolder(ctx context.Context, request *knowledge.DeleteFolderRequest) (err error) {
+	var _args knowledge.KnowledgeServiceDeleteFolderArgs
+	_args.Request = request
+	var _result knowledge.KnowledgeServiceDeleteFolderResult
+	if err = p.c.Call(ctx, "DeleteFolder", &_args, &_result); err != nil {
+		return
+	}
+	return nil
 }
 
 func (p *kClient) SetPublication(ctx context.Context, request *knowledge.SetPublicationRequest) (r *knowledge.Document, err error) {

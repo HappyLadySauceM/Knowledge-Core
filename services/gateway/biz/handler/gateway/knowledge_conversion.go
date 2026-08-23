@@ -54,6 +54,7 @@ func toDocumentData(value *knowledgev1.Document) (*gatewaymodel.DocumentData, er
 		Access: value.Access, Published: value.Published, MetadataRevision: value.MetadataRevision,
 		ContentRevision: value.ContentRevision, PublishedAt: copyString(value.PublishedAt), DeletedAt: copyString(value.DeletedAt),
 		ProjectedAt: copyString(value.ProjectedAt), CreatedAt: value.CreatedAt, UpdatedAt: value.UpdatedAt,
+		Language: copyString(value.Language), Tags: append([]string(nil), value.Tags...), FolderID: copyString(value.FolderId),
 	}, nil
 }
 

@@ -557,3 +557,25 @@ func DeactivateAccount(ctx context.Context, request *app.RequestContext) {
 	}
 	writeEmpty(ctx, request)
 }
+
+func ListFolders(ctx context.Context, c *app.RequestContext) {
+	handleListFolders(ctx, c)
+}
+
+// CreateFolder .
+// @router /api/v1/studio/folders [POST]
+func CreateFolder(ctx context.Context, c *app.RequestContext) {
+	handleCreateFolder(ctx, c)
+}
+
+// UpdateFolder .
+// @router /api/v1/studio/folders/:folder_id [PATCH]
+func UpdateFolder(ctx context.Context, c *app.RequestContext) {
+	handleUpdateFolder(ctx, c)
+}
+
+// DeleteFolder .
+// @router /api/v1/studio/folders/:folder_id [DELETE]
+func DeleteFolder(ctx context.Context, c *app.RequestContext) {
+	handleDeleteFolder(ctx, c)
+}

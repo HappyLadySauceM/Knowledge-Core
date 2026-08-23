@@ -51,6 +51,8 @@ func Register(r *server.Hertz) {
 				_studio := _v1.Group("/studio", _studioMw()...)
 				_studio.GET("/documents", append(_listdocumentsMw(), gateway.ListDocuments)...)
 				_studio.POST("/documents", append(_createdocumentMw(), gateway.CreateDocument)...)
+				_studio.GET("/folders", append(_listfoldersMw(), gateway.ListFolders)...)
+				_studio.POST("/folders", append(_createfolderMw(), gateway.CreateFolder)...)
 				_studio.GET("/trash", append(_listdeleteddocumentsMw(), gateway.ListDeletedDocuments)...)
 				{
 					_documents0 := _studio.Group("/documents", _documents0Mw()...)
@@ -90,6 +92,11 @@ func Register(r *server.Hertz) {
 							}
 						}
 					}
+				}
+				{
+					_folders := _studio.Group("/folders", _foldersMw()...)
+					_folders.DELETE("/:folder_id", append(_deletefolderMw(), gateway.DeleteFolder)...)
+					_folders.PATCH("/:folder_id", append(_updatefolderMw(), gateway.UpdateFolder)...)
 				}
 				{
 					_trash := _studio.Group("/trash", _trashMw()...)

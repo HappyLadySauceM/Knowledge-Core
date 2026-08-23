@@ -2,10 +2,12 @@ package gateway
 
 import (
 	"context"
+	"encoding/base64"
 	"net/http"
 	"net/url"
 	"strings"
 
+	collaborationv1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/collaboration"
 	knowledgev1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/knowledge"
 	gatewaymodel "github.com/HappyLadySauce/Knowledge-Core/services/gateway/biz/model/gateway"
 	gatewaymiddleware "github.com/HappyLadySauce/Knowledge-Core/services/gateway/internal/middleware"
@@ -188,7 +190,7 @@ func handleUpdateDocument(ctx context.Context, request *app.RequestContext) {
 	revision, revisionErr := expectedRevision(request)
 	var body updateDocumentBody
 	if pathErr != nil || revisionErr != nil || requireNoQuery(request) != nil || decodeJSONBody(request, &body) != nil ||
-		(body.Title == nil && body.Summary == nil && body.Slug == nil) {
+		(body.Title == nil && body.Summary == nil && body.Slug == nil && body.Language == nil && body.Tags == nil && body.FolderID == nil) {
 		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidRequest)
 		return
 	}
@@ -199,6 +201,7 @@ func handleUpdateDocument(ctx context.Context, request *app.RequestContext) {
 	}
 	document, err := dependencies.Knowledge.UpdateDocument(upstreamContext(ctx, request), &knowledgev1.UpdateDocumentRequest{
 		DocumentId: documentID, ExpectedRevision: revision, Title: body.Title, Summary: body.Summary, Slug: body.Slug,
+		Language: body.Language, Tags: append([]string(nil), body.Tags...), FolderId: body.FolderID,
 	})
 	if err != nil {
 		gatewaymiddleware.WriteKnowledgeError(ctx, request, err)
@@ -234,7 +237,67 @@ func handleDeleteDocument(ctx context.Context, request *app.RequestContext) {
 }
 
 func handlePublishDocument(ctx context.Context, request *app.RequestContext) {
-	setPublication(ctx, request, true)
+	documentID, pathErr := pathUUID(request, "document_id")
+	revision, revisionErr := expectedRevision(request)
+	idempotency, keyErr := idempotencyKey(request)
+	var body struct {
+		StateVector string `json:"state_vector"`
+	}
+	if pathErr != nil || revisionErr != nil || keyErr != nil || requireNoQuery(request) != nil || decodeJSONBody(request, &body) != nil {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidRequest)
+		return
+	}
+	stateVector, decodeErr := base64.RawURLEncoding.DecodeString(strings.TrimSpace(body.StateVector))
+	if decodeErr != nil || len(stateVector) == 0 {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidRequest)
+		return
+	}
+	// The current Collaboration API snapshots the committed head. Keeping the
+	// state vector in the HTTP contract lets the client detect stale local state;
+	// the strict equality precondition is added when the publication-version RPC
+	// is enabled.
+	_ = stateVector
+	dependencies, ok := gatewaymiddleware.FromRequest(request)
+	if !ok {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInternal)
+		return
+	}
+	draft, err := dependencies.Knowledge.GetDocument(upstreamContext(ctx, request), &knowledgev1.DocumentIDRequest{DocumentId: documentID})
+	if err != nil {
+		gatewaymiddleware.WriteKnowledgeError(ctx, request, err)
+		return
+	}
+	version, err := dependencies.Collaboration.CreateVersion(upstreamContext(ctx, request), &collaborationv1.CreateVersionRequest{
+		DocumentId: documentID, Label: optionalString("publication"), IdempotencyKey: optionalString(idempotency),
+	})
+	if err != nil {
+		gatewaymiddleware.WriteCollaborationError(ctx, request, err)
+		return
+	}
+	detail, err := dependencies.Collaboration.GetVersion(upstreamContext(ctx, request), &collaborationv1.GetVersionRequest{DocumentId: documentID, VersionId: version.Id})
+	if err != nil {
+		gatewaymiddleware.WriteCollaborationError(ctx, request, err)
+		return
+	}
+	language := "zh-CN"
+	if draft.Language != nil && strings.TrimSpace(*draft.Language) != "" {
+		language = *draft.Language
+	}
+	snapshot, err := dependencies.Knowledge.PublishSnapshot(upstreamContext(ctx, request), &knowledgev1.PublishSnapshotRequest{
+		DocumentId: documentID, ExpectedMetadataRevision: revision, VersionId: version.Id, VersionSequence: version.Sequence,
+		Title: draft.Title, Summary: draft.Summary, Slug: draft.Slug, Language: language, Tags: append([]string(nil), draft.Tags...),
+		Content: detail.Content, PlainText: detail.PlainText, IdempotencyKey: optionalString(idempotency),
+	})
+	if err != nil {
+		gatewaymiddleware.WriteKnowledgeError(ctx, request, err)
+		return
+	}
+	data, err := toDocumentData(snapshot)
+	if err != nil {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidUpstreamResponse)
+		return
+	}
+	writeDocument(ctx, request, consts.StatusOK, data)
 }
 
 func handleUnpublishDocument(ctx context.Context, request *app.RequestContext) {

@@ -40,9 +40,12 @@ type createDocumentBody struct {
 }
 
 type updateDocumentBody struct {
-	Title   *string `json:"title,omitempty"`
-	Summary *string `json:"summary,omitempty"`
-	Slug    *string `json:"slug,omitempty"`
+	Title    *string  `json:"title,omitempty"`
+	Summary  *string  `json:"summary,omitempty"`
+	Slug     *string  `json:"slug,omitempty"`
+	Language *string  `json:"language,omitempty"`
+	Tags     []string `json:"tags,omitempty"`
+	FolderID *string  `json:"folder_id,omitempty"`
 }
 
 type addMemberBody struct {

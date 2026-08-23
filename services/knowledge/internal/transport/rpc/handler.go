@@ -29,8 +29,16 @@ type DocumentService interface {
 	Get(context.Context, string, int64) (*domain.Document, error)
 	Update(context.Context, knowledgelogic.UpdateDocumentInput) (*domain.Document, error)
 	SetPublication(context.Context, string, int64, int64, bool) (*domain.Document, error)
+	PublishSnapshot(context.Context, string, int64, int64, knowledgelogic.PublishSnapshotInput) (*domain.Document, error)
 	Delete(context.Context, string, int64, int64) (*domain.Document, error)
 	Restore(context.Context, string, int64) (*domain.Document, error)
+}
+
+type FolderService interface {
+	ListFolders(context.Context, int64, *string) ([]*domain.Folder, error)
+	CreateFolder(context.Context, int64, string, *string, string) (*domain.Folder, error)
+	UpdateFolder(context.Context, int64, string, int64, *string, *string) (*domain.Folder, error)
+	DeleteFolder(context.Context, int64, string, int64) error
 }
 
 type MemberService interface {
@@ -70,6 +78,7 @@ type Handler struct {
 	readiness     Readiness
 	logger        *slog.Logger
 	now           func() time.Time
+	folders       FolderService
 }
 
 func NewHandler(
@@ -84,10 +93,14 @@ func NewHandler(
 	if documents == nil || members == nil || attachments == nil || collaboration == nil || verifier == nil || readiness == nil || logger == nil {
 		return nil, errors.New("create knowledge RPC handler: use cases, verifier, readiness, and logger are required")
 	}
-	return &Handler{
+	handler := &Handler{
 		documents: documents, members: members, attachments: attachments, collaboration: collaboration,
 		verifier: verifier, readiness: readiness, logger: logger, now: time.Now,
-	}, nil
+	}
+	if folders, ok := documents.(FolderService); ok {
+		handler.folders = folders
+	}
+	return handler, nil
 }
 
 func (h *Handler) Ping(ctx context.Context, request *commonv1.PingRequest) (*commonv1.PingResponse, error) {
@@ -194,7 +207,8 @@ func (h *Handler) UpdateDocument(ctx context.Context, request *knowledgev1.Updat
 	}
 	document, serviceErr := h.documents.Update(ctx, knowledgelogic.UpdateDocumentInput{
 		DocumentID: request.DocumentId, ActorID: actorID, ExpectedRevision: request.ExpectedRevision,
-		Title: request.Title, Summary: request.Summary, Slug: request.Slug,
+		Title: request.Title, Summary: request.Summary, Slug: request.Slug, Language: request.Language,
+		Tags: append([]string(nil), request.Tags...), FolderID: request.FolderId,
 	})
 	if serviceErr != nil {
 		return nil, h.transportError(ctx, "update_document_failed", serviceErr)
@@ -213,6 +227,94 @@ func (h *Handler) SetPublication(ctx context.Context, request *knowledgev1.SetPu
 		return nil, h.transportError(ctx, "set_publication_failed", serviceErr)
 	}
 	return h.documentResult(ctx, "set_publication_failed", document)
+}
+
+func (h *Handler) PublishSnapshot(ctx context.Context, request *knowledgev1.PublishSnapshotRequest) (*knowledgev1.Document, error) {
+	ctx = metadata.EnsureRequestID(ctx)
+	actorID, err := h.requireActor(ctx, request != nil)
+	if err != nil {
+		return nil, err
+	}
+	content, parseErr := fromTransportRichText(request.Content)
+	if parseErr != nil {
+		return nil, h.transportError(ctx, "publish_snapshot_failed", parseErr)
+	}
+	document, serviceErr := h.documents.PublishSnapshot(ctx, request.DocumentId, actorID, request.ExpectedMetadataRevision, knowledgelogic.PublishSnapshotInput{
+		VersionID: request.VersionId, VersionSequence: request.VersionSequence, Title: request.Title, Summary: request.Summary,
+		Slug: request.Slug, Language: request.Language, Tags: append([]string(nil), request.Tags...), Content: content,
+		PlainText: request.PlainText, IdempotencyKey: stringValue(request.IdempotencyKey),
+	})
+	if serviceErr != nil {
+		return nil, h.transportError(ctx, "publish_snapshot_failed", serviceErr)
+	}
+	return h.documentResult(ctx, "publish_snapshot_failed", document)
+}
+
+func (h *Handler) ListFolders(ctx context.Context, request *knowledgev1.ListFoldersRequest) (*knowledgev1.FolderList, error) {
+	ctx = metadata.EnsureRequestID(ctx)
+	actorID, err := h.requireActor(ctx, request != nil)
+	if err != nil {
+		return nil, err
+	}
+	if h.folders == nil {
+		return nil, h.transportError(ctx, "list_folders_failed", errors.New("folder service is unavailable"))
+	}
+	items, serviceErr := h.folders.ListFolders(ctx, actorID, request.ParentId)
+	if serviceErr != nil {
+		return nil, h.transportError(ctx, "list_folders_failed", serviceErr)
+	}
+	result := &knowledgev1.FolderList{Items: make([]*knowledgev1.Folder, 0, len(items))}
+	for _, item := range items {
+		result.Items = append(result.Items, toTransportFolder(item))
+	}
+	return result, nil
+}
+
+func (h *Handler) CreateFolder(ctx context.Context, request *knowledgev1.CreateFolderRequest) (*knowledgev1.Folder, error) {
+	ctx = metadata.EnsureRequestID(ctx)
+	actorID, err := h.requireActor(ctx, request != nil)
+	if err != nil {
+		return nil, err
+	}
+	if h.folders == nil {
+		return nil, h.transportError(ctx, "create_folder_failed", errors.New("folder service is unavailable"))
+	}
+	folder, serviceErr := h.folders.CreateFolder(ctx, actorID, request.Name, request.ParentId, stringValue(request.IdempotencyKey))
+	if serviceErr != nil {
+		return nil, h.transportError(ctx, "create_folder_failed", serviceErr)
+	}
+	return toTransportFolder(folder), nil
+}
+
+func (h *Handler) UpdateFolder(ctx context.Context, request *knowledgev1.UpdateFolderRequest) (*knowledgev1.Folder, error) {
+	ctx = metadata.EnsureRequestID(ctx)
+	actorID, err := h.requireActor(ctx, request != nil)
+	if err != nil {
+		return nil, err
+	}
+	if h.folders == nil {
+		return nil, h.transportError(ctx, "update_folder_failed", errors.New("folder service is unavailable"))
+	}
+	folder, serviceErr := h.folders.UpdateFolder(ctx, actorID, request.FolderId, request.ExpectedRevision, request.Name, request.ParentId)
+	if serviceErr != nil {
+		return nil, h.transportError(ctx, "update_folder_failed", serviceErr)
+	}
+	return toTransportFolder(folder), nil
+}
+
+func (h *Handler) DeleteFolder(ctx context.Context, request *knowledgev1.DeleteFolderRequest) error {
+	ctx = metadata.EnsureRequestID(ctx)
+	actorID, err := h.requireActor(ctx, request != nil)
+	if err != nil {
+		return err
+	}
+	if h.folders == nil {
+		return h.transportError(ctx, "delete_folder_failed", errors.New("folder service is unavailable"))
+	}
+	if serviceErr := h.folders.DeleteFolder(ctx, actorID, request.FolderId, request.ExpectedRevision); serviceErr != nil {
+		return h.transportError(ctx, "delete_folder_failed", serviceErr)
+	}
+	return nil
 }
 
 func (h *Handler) DeleteDocument(ctx context.Context, request *knowledgev1.DeleteDocumentRequest) (*knowledgev1.Document, error) {
@@ -544,7 +646,8 @@ func toTransportDocument(value *domain.Document) *knowledgev1.Document {
 		MetadataRevision: value.MetadataRevision, ContentRevision: value.ContentRevision,
 		PublishedAt: timePointer(value.PublishedAt), DeletedAt: timePointer(value.DeletedAt),
 		ProjectedAt: timePointer(value.ProjectedAt), CreatedAt: value.CreatedAt.UTC().Format(time.RFC3339Nano),
-		UpdatedAt: value.UpdatedAt.UTC().Format(time.RFC3339Nano),
+		UpdatedAt: value.UpdatedAt.UTC().Format(time.RFC3339Nano), Language: nonEmptyStringPointer(value.Language),
+		Tags: append([]string(nil), value.Tags...), FolderId: value.FolderID,
 	}
 }
 
@@ -561,6 +664,13 @@ func toTransportDocumentDetail(value *knowledgelogic.DocumentDetail) *knowledgev
 
 func toTransportUser(value domain.PublicUser) *knowledgev1.PublicUser {
 	return &knowledgev1.PublicUser{Id: value.ID, Username: value.Username, Avatar: value.Avatar}
+}
+
+func toTransportFolder(value *domain.Folder) *knowledgev1.Folder {
+	if value == nil {
+		return nil
+	}
+	return &knowledgev1.Folder{Id: value.ID, ParentId: value.ParentID, Name: value.Name, Depth: value.Depth, Revision: value.Revision, CreatedAt: value.CreatedAt.UTC().Format(time.RFC3339Nano), UpdatedAt: value.UpdatedAt.UTC().Format(time.RFC3339Nano)}
 }
 
 func toTransportMember(value *domain.Member) *knowledgev1.Member {
@@ -696,6 +806,13 @@ func stringValue(value *string) string {
 		return ""
 	}
 	return *value
+}
+
+func nonEmptyStringPointer(value string) *string {
+	if value == "" {
+		return nil
+	}
+	return &value
 }
 
 func int32Value(value *int32) int32 {

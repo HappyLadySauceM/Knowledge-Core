@@ -608,11 +608,11 @@
     "profile": "generic",
     "slug": "knowledge-core"
   },
-  "revision": 121,
+  "revision": 123,
   "scan": {
-    "fingerprint": "b657ada02dae729291cc11a09c51c06123d633c86bddaa8a26ef839a60ee1a64",
-    "inventoryCount": 354
+    "fingerprint": "293a14e19715f3e26695e50efbe0942e31498c904befe300fc19fb78cb49a9c8",
+    "inventoryCount": 357
   },
   "schemaVersion": 1,
-  "updatedAt": "2026-08-21T15:08:00Z"
+  "updatedAt": "2026-08-23T02:18:01Z"
 }
