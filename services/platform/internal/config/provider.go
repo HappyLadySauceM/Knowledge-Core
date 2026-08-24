@@ -46,6 +46,15 @@ func (p *Provider) Load(ctx context.Context, command *cobra.Command) (Config, er
 		"auth.public_key", "auth.internal_token", "encryption.key_id", "encryption.kek",
 		"sync.stream", "sync.subject", "sync.poll_interval", "sync.lease", "sync.max_attempts",
 	} {
+		// PLATFORM_INTERNAL_TOKEN is the established deployment Secret key. Keep
+		// the structured auth.internal_token field while accepting that stable
+		// external name; changing the Secret would require a coordinated rollout.
+		if key == "auth.internal_token" {
+			if err := v.BindEnv(key, "PLATFORM_INTERNAL_TOKEN"); err != nil {
+				return Config{}, fmt.Errorf("bind platform environment %q: %w", key, err)
+			}
+			continue
+		}
 		if err := v.BindEnv(key); err != nil {
 			return Config{}, fmt.Errorf("bind platform environment %q: %w", key, err)
 		}
