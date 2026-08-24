@@ -3,5 +3,17 @@ kind: Kustomization
 resources:
   - ../../base
   - config.yaml
+
+# The single-node dev cluster cannot schedule a replacement when the old
+# replica and the rest of the platform consume the full CPU request budget.
+patches:
+  - target:
+      kind: Deployment
+      name: knowledge-core-attachment
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/cpu
+        value: 100m
+
 commonAnnotations:
   argocd.argoproj.io/sync-wave: "30"

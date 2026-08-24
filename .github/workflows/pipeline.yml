@@ -325,6 +325,29 @@ jobs:
           token: ${{ steps.app-token.outputs.token }}
           fetch-depth: 1
           path: .gitops
+      - name: Validate rendered Knowledge Core images
+        run: |
+          set -euo pipefail
+          for service in gateway identity knowledge attachment platform collaboration; do
+            path=".gitops/Knowledge-Core/dev/$service"
+            echo "Validating $path"
+            images="$(kubectl kustomize "$path" | awk '$1 == "image:" {print $2}')"
+            test -n "$images"
+            while IFS= read -r image; do
+              case "$image" in
+                *:dev|*:latest|*@sha256:0000000000000000000000000000000000000000000000000000000000000000)
+                  echo "Unpinned or placeholder image in $path: $image" >&2
+                  exit 1
+                  ;;
+                *@sha256:*)
+                  ;;
+                *)
+                  echo "Image is not digest-pinned in $path: $image" >&2
+                  exit 1
+                  ;;
+              esac
+            done <<< "$images"
+          done
       - name: Apply Knowledge Core ApplicationSet
         run: kubectl apply -k .gitops/Knowledge-Core/argocd
       - name: Mark dev deployment pending

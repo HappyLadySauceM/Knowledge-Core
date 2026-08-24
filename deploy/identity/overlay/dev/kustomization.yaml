@@ -4,3 +4,15 @@ kind: Kustomization
 resources:
   - ../../base
   - config.yaml
+
+# The single-node dev cluster is request-constrained during rolling updates.
+# Keep the development request below the base service reservation while
+# retaining the production-safe limit.
+patches:
+  - target:
+      kind: Deployment
+      name: knowledge-core-identity
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/cpu
+        value: 50m

@@ -3,7 +3,3 @@ kind: Kustomization
 resources:
   - deployment.yaml
   - service.yaml
-images:
-  - name: knowledge-core-platform
-    newName: harbor.happyladysauce.local/knowledge-core/platform
-    newTag: dev
