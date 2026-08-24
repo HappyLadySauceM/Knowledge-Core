@@ -37,6 +37,9 @@ type Worker struct {
 	cancel       context.CancelFunc
 	sub          *natsresource.Subscription
 	ready        atomic.Bool
+	startupDone  chan struct{}
+	startupMu    sync.Mutex
+	startupErr   error
 	lastApplied  atomic.Int64
 	startOnce    sync.Once
 	stopOnce     sync.Once
@@ -48,12 +51,12 @@ func New(ctx context.Context, broker *natsresource.DurableBroker, platform platf
 		return nil, errors.New("create identity configuration sync worker: dependencies are required")
 	}
 	runCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
-	return &Worker{broker: broker, platform: platform, email: email, serviceToken: serviceToken, logger: logger, ctx: runCtx, cancel: cancel, done: make(chan struct{})}, nil
+	return &Worker{broker: broker, platform: platform, email: email, serviceToken: serviceToken, logger: logger, ctx: runCtx, cancel: cancel, done: make(chan struct{}), startupDone: make(chan struct{})}, nil
 }
 
 func (w *Worker) Name() string { return "identity-configuration-sync" }
 
-func (w *Worker) Serve() error {
+func (w *Worker) Serve() (serveErr error) {
 	started := false
 	w.startOnce.Do(func() { started = true })
 	if !started {
@@ -65,15 +68,18 @@ func (w *Worker) Serve() error {
 		DeadLetterSubject: "platform.config.dead.identity", AckWait: 2 * time.Minute, MaxDeliver: 8,
 	}, w.handle)
 	if err != nil {
-		return fmt.Errorf("subscribe identity configuration events: %w", err)
+		serveErr = fmt.Errorf("subscribe identity configuration events: %w", err)
+		w.signalStartup(serveErr)
+		return serveErr
 	}
 	w.sub = sub
+	w.ready.Store(true)
+	w.signalStartup(nil)
 	// Reconcile once on startup so a restart or a lost event cannot leave the
 	// process on an old last-good configuration indefinitely.
 	if err := w.reconcile(w.ctx); err != nil {
 		w.logger.WarnContext(w.ctx, "identity configuration startup reconciliation deferred", slog.String("error.type", fmt.Sprintf("%T", err)))
 	}
-	w.ready.Store(true)
 	ticker := time.NewTicker(60 * time.Second)
 	defer ticker.Stop()
 	for {
@@ -89,11 +95,29 @@ func (w *Worker) Serve() error {
 	}
 }
 
-func (w *Worker) Ready(context.Context) error {
+func (w *Worker) Ready(ctx context.Context) error {
+	select {
+	case <-w.startupDone:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+	w.startupMu.Lock()
+	startupErr := w.startupErr
+	w.startupMu.Unlock()
+	if startupErr != nil {
+		return fmt.Errorf("identity configuration sync worker startup: %w", startupErr)
+	}
 	if !w.ready.Load() {
 		return errors.New("identity configuration sync worker is not running")
 	}
 	return nil
+}
+
+func (w *Worker) signalStartup(err error) {
+	w.startupMu.Lock()
+	w.startupErr = err
+	w.startupMu.Unlock()
+	close(w.startupDone)
 }
 
 func (w *Worker) Shutdown(ctx context.Context) error {
