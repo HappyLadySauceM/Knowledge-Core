@@ -267,6 +267,11 @@ func mapCreateError(err error) error {
 }
 
 func toModel(user *domain.User) *model.User {
+	var avatarAttachmentID *string
+	if strings.TrimSpace(user.AvatarAttachmentID) != "" {
+		value := user.AvatarAttachmentID
+		avatarAttachmentID = &value
+	}
 	return &model.User{
 		ID:                  user.ID,
 		Username:            user.Username,
@@ -276,7 +281,7 @@ func toModel(user *domain.User) *model.User {
 		Status:              user.Status,
 		TokenVersion:        user.TokenVersion,
 		Avatar:              user.Avatar,
-		AvatarAttachmentID:  user.AvatarAttachmentID,
+		AvatarAttachmentID:  avatarAttachmentID,
 		Bio:                 user.Bio,
 		FailedLoginAttempts: user.FailedLoginAttempts,
 		LockedUntil:         user.LockedUntil,
@@ -294,10 +299,14 @@ func fromModel(record *model.User) *domain.User {
 	if record == nil {
 		return nil
 	}
+	avatarAttachmentID := ""
+	if record.AvatarAttachmentID != nil {
+		avatarAttachmentID = *record.AvatarAttachmentID
+	}
 	return &domain.User{
 		ID: record.ID, Username: record.Username, Email: record.Email,
 		PasswordHash: record.PasswordHash, Role: record.Role, Status: record.Status,
-		TokenVersion: record.TokenVersion, Avatar: record.Avatar, AvatarAttachmentID: record.AvatarAttachmentID, Bio: record.Bio,
+		TokenVersion: record.TokenVersion, Avatar: record.Avatar, AvatarAttachmentID: avatarAttachmentID, Bio: record.Bio,
 		FailedLoginAttempts: record.FailedLoginAttempts, LockedUntil: record.LockedUntil,
 		EmailVerifiedAt: record.EmailVerifiedAt,
 		CreatedAt:       record.CreatedAt, UpdatedAt: record.UpdatedAt,

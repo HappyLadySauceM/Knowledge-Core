@@ -13,7 +13,7 @@ type User struct {
 	Status              string     `gorm:"size:16;not null;default:active"`
 	TokenVersion        int64      `gorm:"not null;default:1"`
 	Avatar              string     `gorm:"type:text;not null;default:''"`
-	AvatarAttachmentID  string     `gorm:"type:uuid;not null;default:''"`
+	AvatarAttachmentID  *string    `gorm:"type:uuid"`
 	Bio                 string     `gorm:"size:500;not null;default:''"`
 	FailedLoginAttempts int        `gorm:"not null;default:0"`
 	LockedUntil         *time.Time `gorm:"type:timestamptz"`

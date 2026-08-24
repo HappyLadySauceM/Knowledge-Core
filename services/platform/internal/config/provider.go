@@ -43,7 +43,7 @@ func (p *Provider) Load(ctx context.Context, command *cobra.Command) (Config, er
 		"admin_http.address", "admin_http.read_timeout", "admin_http.write_timeout", "admin_http.idle_timeout", "admin_http.shutdown_timeout", "admin_http.max_request_body_size", "admin_http.tls.enabled", "admin_http.tls.ca_file", "admin_http.tls.cert_file", "admin_http.tls.key_file", "admin_http.tls.server_name", "admin_http.tls.insecure_skip_verify",
 		"postgres.host", "postgres.port", "postgres.user", "postgres.password", "postgres.database", "postgres.ssl_mode", "postgres.time_zone", "postgres.max_idle_conns", "postgres.max_open_conns", "postgres.conn_max_lifetime", "postgres.conn_max_idle_time", "postgres.connect_timeout", "postgres.slow_threshold", "postgres.prepare_stmt",
 		"nats.servers", "nats.name", "nats.username", "nats.password", "nats.token", "nats.credentials_file", "nats.connect_timeout", "nats.request_timeout", "nats.max_reconnects", "nats.reconnect_wait", "nats.ping_interval", "nats.max_pings_out", "nats.drain_timeout", "nats.tls.enabled", "nats.tls.ca_file", "nats.tls.cert_file", "nats.tls.key_file", "nats.tls.server_name", "nats.tls.insecure_skip_verify",
-		"auth.public_key", "encryption.key_id", "encryption.kek",
+		"auth.public_key", "auth.internal_token", "encryption.key_id", "encryption.kek",
 		"sync.stream", "sync.subject", "sync.poll_interval", "sync.lease", "sync.max_attempts",
 	} {
 		if err := v.BindEnv(key); err != nil {

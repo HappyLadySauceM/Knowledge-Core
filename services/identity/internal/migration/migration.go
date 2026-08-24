@@ -44,6 +44,9 @@ func AutoMigrate(ctx context.Context, db *gorm.DB) error {
 		if err := tx.Exec("CREATE SCHEMA IF NOT EXISTS identity").Error; err != nil {
 			return fmt.Errorf("create identity schema: %w", err)
 		}
+		if err := normalizeAvatarAttachmentColumn(tx); err != nil {
+			return err
+		}
 		if err := tx.AutoMigrate(&model.User{}, &model.Session{}, &model.ActionToken{}, &model.EmailOutbox{}); err != nil {
 			return fmt.Errorf("auto-migrate identity schema: %w", err)
 		}
@@ -67,6 +70,30 @@ func AutoMigrate(ctx context.Context, db *gorm.DB) error {
 		}
 		return verifySchema(tx)
 	})
+}
+
+func normalizeAvatarAttachmentColumn(tx *gorm.DB) error {
+	var exists bool
+	if err := tx.Raw(`
+SELECT EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'identity'
+      AND table_name = 'users'
+      AND column_name = 'avatar_attachment_id'
+)`).Scan(&exists).Error; err != nil {
+		return fmt.Errorf("check identity avatar attachment column: %w", err)
+	}
+	if !exists {
+		return nil
+	}
+	if err := tx.Exec(`
+ALTER TABLE identity.users
+    ALTER COLUMN avatar_attachment_id DROP DEFAULT,
+    ALTER COLUMN avatar_attachment_id DROP NOT NULL`).Error; err != nil {
+		return fmt.Errorf("normalize identity avatar attachment column: %w", err)
+	}
+	return nil
 }
 
 func ensureConstraint(tx *gorm.DB, item constraint) error {
