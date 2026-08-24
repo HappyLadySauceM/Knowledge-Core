@@ -78,3 +78,33 @@ auth:
   action_token_ttl: 30m
   failure_threshold: 5
   lock_duration: 15m
+  platform_service_token: ""
+
+smtp:
+  host: ""
+  port: 587
+  username: ""
+  password: ""
+  from: "Knowledge Core <knowledge-core@localhost>"
+  frontend_base_url: http://localhost:3000
+
+platform_rpc:
+  service_name: knowledge-core.platform
+  address: 127.0.0.1:8885
+  connect_timeout: 500ms
+  request_timeout: 5s
+  tls:
+    enabled: false
+
+nats:
+  servers: [nats://127.0.0.1:4222]
+  name: knowledge-core.identity
+  connect_timeout: 5s
+  request_timeout: 5s
+  max_reconnects: -1
+  reconnect_wait: 2s
+  ping_interval: 2m
+  max_pings_out: 2
+  drain_timeout: 10s
+  tls:
+    enabled: false

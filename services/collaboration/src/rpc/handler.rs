@@ -40,37 +40,41 @@ pub struct CollaborationHandler {
     readiness: Arc<dyn RpcReadiness>,
 }
 
+pub struct CollaborationHandlerDependencies {
+    pub knowledge: Arc<dyn KnowledgePort>,
+    pub documents: Arc<dyn DocumentStore>,
+    pub tickets: TicketService,
+    pub versions: Arc<dyn VersionStore>,
+    pub actors: ActorRegistry,
+    pub routing: RoutingService,
+    pub ticket: TicketConfig,
+    pub readiness: Arc<dyn RpcReadiness>,
+}
+
 impl CollaborationHandler {
     /// Creates the production Collaboration RPC handler.
     ///
     /// # Errors
     ///
     /// Returns an error when the public session contract is invalid.
-    pub fn new(
-        knowledge: Arc<dyn KnowledgePort>,
-        documents: Arc<dyn DocumentStore>,
-        tickets: TicketService,
-        versions: Arc<dyn VersionStore>,
-        actors: ActorRegistry,
-        routing: RoutingService,
-        ticket: &TicketConfig,
-        readiness: Arc<dyn RpcReadiness>,
-    ) -> Result<Self> {
-        if !valid_contract_token(&ticket.subprotocol) || !valid_contract_token(&ticket.fragment) {
+    pub fn new(dependencies: CollaborationHandlerDependencies) -> Result<Self> {
+        if !valid_contract_token(&dependencies.ticket.subprotocol)
+            || !valid_contract_token(&dependencies.ticket.fragment)
+        {
             return Err(ServiceError::invalid_input(
                 "Collaboration session contract is invalid",
             ));
         }
         Ok(Self {
-            knowledge,
-            documents,
-            tickets,
-            versions,
-            actors,
-            routing,
-            subprotocol: Arc::from(ticket.subprotocol.as_str()),
-            fragment: Arc::from(ticket.fragment.as_str()),
-            readiness,
+            knowledge: dependencies.knowledge,
+            documents: dependencies.documents,
+            tickets: dependencies.tickets,
+            versions: dependencies.versions,
+            actors: dependencies.actors,
+            routing: dependencies.routing,
+            subprotocol: Arc::from(dependencies.ticket.subprotocol.as_str()),
+            fragment: Arc::from(dependencies.ticket.fragment.as_str()),
+            readiness: dependencies.readiness,
         })
     }
 
@@ -476,8 +480,8 @@ mod tests {
     use volo_thrift::ServerError;
 
     use super::{
-        CollaborationHandler, decode_cursor, encode_cursor, validate_idempotency_key,
-        validate_label, version_to_wire,
+        CollaborationHandler, CollaborationHandlerDependencies, decode_cursor, encode_cursor,
+        validate_idempotency_key, validate_label, version_to_wire,
     };
     use crate::{
         actor::{ActorLimits, ActorRegistry},
@@ -891,16 +895,16 @@ mod tests {
         let routing_store = Arc::new(MemoryRoutingStore::default());
         routing_store.seed_load(0, 0);
         let routing = RoutingService::new(routing_store, 1, 0, 8).expect("routing");
-        let handler = CollaborationHandler::new(
-            knowledge_port,
+        let handler = CollaborationHandler::new(CollaborationHandlerDependencies {
+            knowledge: knowledge_port,
             documents,
             tickets,
             versions,
             actors,
             routing,
-            &ticket,
+            ticket,
             readiness,
-        )
+        })
         .expect("handler");
         (handler, store, knowledge, ticket_backend, document_id)
     }

@@ -9,3 +9,4 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
 data:
   GATEWAY_APP_ENVIRONMENT: development
+  GATEWAY_PLATFORM_RPC_ADDRESS: knowledge-core-platform:8885

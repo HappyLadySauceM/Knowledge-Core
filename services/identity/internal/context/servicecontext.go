@@ -11,10 +11,13 @@ import (
 	coreapp "github.com/HappyLadySauce/Knowledge-Core/pkg/app"
 	coreauth "github.com/HappyLadySauce/Knowledge-Core/pkg/auth"
 	"github.com/HappyLadySauce/Knowledge-Core/pkg/health"
+	natsresource "github.com/HappyLadySauce/Knowledge-Core/pkg/nats"
 	"github.com/HappyLadySauce/Knowledge-Core/pkg/postgres"
 	redisresource "github.com/HappyLadySauce/Knowledge-Core/pkg/redis"
 	hertztransport "github.com/HappyLadySauce/Knowledge-Core/pkg/transport/hertz"
+	identityclient "github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/client"
 	"github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/config"
+	identityconfigsync "github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/configsync"
 	identityemail "github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/email"
 	identitylogic "github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/logic"
 	"github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/migration"
@@ -28,6 +31,7 @@ type ServiceContext struct {
 	Config       config.Config
 	Database     *gorm.DB
 	Redis        *redisresource.Resource
+	NATS         *natsresource.DurableBroker
 	Register     *identitylogic.RegisterLogic
 	Authenticate *identitylogic.AuthenticateLogic
 	Sessions     *identitylogic.SessionLogic
@@ -73,8 +77,15 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 	if err := runtime.AddCleanup("redis", func(stdcontext.Context) error { return cache.Close() }); err != nil {
 		return nil, errors.Join(err, cache.Close())
 	}
+	events, err := natsresource.OpenDurable(ctx, *cfg.NATS, runtime.Logger)
+	if err != nil {
+		return nil, err
+	}
+	if err := runtime.AddCleanup("nats", func(stdcontext.Context) error { return events.Close() }); err != nil {
+		return nil, errors.Join(err, events.Close())
+	}
 
-	if err := addReadinessChecks(runtime.Health, cfg, db, cache); err != nil {
+	if err := addReadinessChecks(runtime.Health, cfg, db, cache, events); err != nil {
 		return nil, err
 	}
 
@@ -153,10 +164,19 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 	if err != nil {
 		return nil, err
 	}
-	if worker != nil {
-		if err := runtime.AddComponent(worker); err != nil {
-			return nil, err
-		}
+	if err := runtime.AddComponent(worker); err != nil {
+		return nil, err
+	}
+	platformClient, err := identityclient.NewPlatform(*cfg.PlatformRPC, runtime.Trace, runtime.Metrics)
+	if err != nil {
+		return nil, err
+	}
+	syncWorker, err := identityconfigsync.New(ctx, events, platformClient, worker, cfg.Auth.PlatformServiceToken, runtime.Logger)
+	if err != nil {
+		return nil, err
+	}
+	if err := runtime.AddComponent(syncWorker); err != nil {
+		return nil, err
 	}
 
 	httpTLS, err := cfg.HTTP.TLS.ServerTLSConfig()
@@ -220,6 +240,7 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 		Config:       cfg,
 		Database:     db,
 		Redis:        cache,
+		NATS:         events,
 		Register:     register,
 		Authenticate: authenticate,
 		Sessions:     sessionLogic,
@@ -245,12 +266,14 @@ func addReadinessChecks(
 	cfg config.Config,
 	db *gorm.DB,
 	cache *redisresource.Resource,
+	events *natsresource.DurableBroker,
 ) error {
 	return errors.Join(
 		registry.AddReadiness("postgres", withTimeout(cfg.PostgreSQL.ConnectTimeout, func(ctx stdcontext.Context) error {
 			return postgres.Ping(ctx, db)
 		})),
 		registry.AddReadiness("redis", withTimeout(cfg.Redis.ReadTimeout, cache.Ping)),
+		registry.AddReadiness("nats", withTimeout(cfg.NATS.RequestTimeout, events.Ping)),
 	)
 }
 

@@ -162,6 +162,21 @@ func RequireAuthenticated() app.HandlerFunc {
 	}
 }
 
+func RequireAdmin() app.HandlerFunc {
+	return func(ctx context.Context, request *app.RequestContext) {
+		principal, ok := Principal(request)
+		if !ok {
+			WriteError(ctx, request, ErrAuthenticationRequired)
+			return
+		}
+		if principal.Role != "admin" {
+			WriteError(ctx, request, ErrPermissionDenied)
+			return
+		}
+		request.Next(ctx)
+	}
+}
+
 func GlobalRateLimit() app.HandlerFunc {
 	return rateLimit("global", func(options configRateLimit) int64 { return options.global })
 }

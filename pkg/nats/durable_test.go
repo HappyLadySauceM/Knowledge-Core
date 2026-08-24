@@ -157,9 +157,45 @@ func TestOperationsRejectNewWorkAfterClosingBegins(t *testing.T) {
 	}
 }
 
+func TestEnsureStreamCreatesMissingStream(t *testing.T) {
+	t.Parallel()
+	var created *natsclient.StreamConfig
+	js := &fakeJetStream{
+		streamInfoErr: natsclient.ErrStreamNotFound,
+		addStream: func(config *natsclient.StreamConfig) (*natsclient.StreamInfo, error) {
+			created = config
+			return &natsclient.StreamInfo{Config: *config}, nil
+		},
+	}
+	broker := &DurableBroker{conn: &natsclient.Conn{}, js: js, timeout: time.Second}
+	config := StreamConfig{Name: "CONFIG", Subjects: []string{"platform.config.changed.v1"}, MaxAge: time.Hour, MaxBytes: 1024, DuplicateWindow: time.Minute}
+	if err := broker.EnsureStream(context.Background(), config); err != nil {
+		t.Fatalf("EnsureStream() error = %v", err)
+	}
+	if created == nil || created.Name != config.Name || created.Storage != natsclient.FileStorage || created.Duplicates != config.DuplicateWindow {
+		t.Fatalf("created stream = %#v", created)
+	}
+}
+
+func TestEnsureStreamRejectsContractDrift(t *testing.T) {
+	t.Parallel()
+	js := &fakeJetStream{streamInfo: &natsclient.StreamInfo{Config: natsclient.StreamConfig{
+		Name: "CONFIG", Subjects: []string{"platform.config.changed.v1"}, Retention: natsclient.LimitsPolicy,
+		Storage: natsclient.MemoryStorage, MaxAge: time.Hour, MaxBytes: 1024, Duplicates: time.Minute,
+	}}}
+	broker := &DurableBroker{conn: &natsclient.Conn{}, js: js, timeout: time.Second}
+	err := broker.EnsureStream(context.Background(), StreamConfig{Name: "CONFIG", Subjects: []string{"platform.config.changed.v1"}, MaxAge: time.Hour, MaxBytes: 1024, DuplicateWindow: time.Minute})
+	if err == nil || !strings.Contains(err.Error(), "does not match") {
+		t.Fatalf("EnsureStream() error = %v, want contract mismatch", err)
+	}
+}
+
 type fakeJetStream struct {
-	accountInfo  func(...natsclient.JSOpt) (*natsclient.AccountInfo, error)
-	subscribeErr error
+	accountInfo   func(...natsclient.JSOpt) (*natsclient.AccountInfo, error)
+	addStream     func(*natsclient.StreamConfig) (*natsclient.StreamInfo, error)
+	streamInfo    *natsclient.StreamInfo
+	streamInfoErr error
+	subscribeErr  error
 }
 
 func (f *fakeJetStream) AccountInfo(opts ...natsclient.JSOpt) (*natsclient.AccountInfo, error) {
@@ -167,6 +203,20 @@ func (f *fakeJetStream) AccountInfo(opts ...natsclient.JSOpt) (*natsclient.Accou
 		return &natsclient.AccountInfo{}, nil
 	}
 	return f.accountInfo(opts...)
+}
+
+func (f *fakeJetStream) AddStream(config *natsclient.StreamConfig, _ ...natsclient.JSOpt) (*natsclient.StreamInfo, error) {
+	if f.addStream != nil {
+		return f.addStream(config)
+	}
+	return &natsclient.StreamInfo{}, nil
+}
+
+func (f *fakeJetStream) StreamInfo(string, ...natsclient.JSOpt) (*natsclient.StreamInfo, error) {
+	if f.streamInfo != nil || f.streamInfoErr != nil {
+		return f.streamInfo, f.streamInfoErr
+	}
+	return nil, natsclient.ErrStreamNotFound
 }
 
 func (f *fakeJetStream) PublishMsg(*natsclient.Msg, ...natsclient.PubOpt) (*natsclient.PubAck, error) {

@@ -14,7 +14,7 @@ pub use context::{
     current_trace_state, scope_outgoing_metadata,
 };
 pub use discover::StaticDiscover;
-pub use handler::CollaborationHandler;
+pub use handler::{CollaborationHandler, CollaborationHandlerDependencies};
 pub use knowledge::KnowledgeClient;
 pub use server::{AlwaysReady, RpcReadiness, RpcServer};
 

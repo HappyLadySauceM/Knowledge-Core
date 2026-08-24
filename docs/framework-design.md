@@ -1,6 +1,6 @@
 # Knowledge Core 框架设计
 
-> 状态：当前代码实现基线，更新于 2026-08-21。系统由 Gateway、Identity、Knowledge 和 Rust Collaboration 四个服务组成；Rust 切换尚未在生产环境执行，性能、完整链路和切换/回滚演练仍是发布前门禁。Identity 与 Knowledge 的真实 PostgreSQL 集成测试仍未纳入当前门禁。
+> 状态：当前代码实现基线，更新于 2026-08-23。系统由 Gateway、Identity、Knowledge、Attachment、Platform 和 Rust Collaboration 六个服务组成；Rust 切换尚未在生产环境执行，性能、完整链路和切换/回滚演练仍是发布前门禁。Identity、Knowledge 与 Platform 的真实 PostgreSQL 集成测试仍未纳入当前门禁。
 >
 > Rust Collaboration 的设计决策、实现状态和未完成验证见 [`rust-collaboration-design.md`](rust-collaboration-design.md)，破坏性切换边界见 [`migrations/2026-08-rust-collaboration.md`](migrations/2026-08-rust-collaboration.md)。
 
@@ -15,23 +15,26 @@ Knowledge Core 是一个包含 Go module 与 Rust workspace 的 Monorepo。公�
 - 附件预签名上传、异步 ClamAV 扫描、短期下载地址和对象清理。
 - Yjs update 持久化、快照压缩、手工/自动版本、恢复、多实例同步和权限失效。
 - Gateway 的严格输入边界、安全中间件、限流、稳定错误映射和上游编排。
+- 管理员实时写入站点、邮件和 AI 配置；Platform 对修订、密文、审计和可靠变更事件负责。
 
 当前明确不提供：
 
 - JWKS、JWT 在线密钥轮换和多区域会话复制。
 - 跨服务数据库事务、exactly-once 消息或同步的全局强一致性。
-- 配置热更新；连接、证书和 provider 变化通过滚动重启生效。
+- 连接、证书、进程拓扑等基础设施配置的热重建；这类变化仍通过滚动重启生效。
+- 邮件和 AI 业务服务的配置事件消费者；Platform 已可靠发布变更事件，但尚未让这些消费者热加载密钥快照。
 - 任意服务共享数据库模型或绕过公开/内部契约直连其他服务的 schema。
 
 ## 2. 服务与数据所有权
 
 | 服务 | 入口 | 拥有的数据 | 必需依赖 |
 | --- | --- | --- | --- |
-| Gateway | public `:8080`，admin `:8082` | 无业务数据库 | Redis、Identity RPC、Knowledge RPC、Collaboration RPC、Attachment RPC |
+| Gateway | public `:8080`，admin `:8082` | 无业务数据库 | Redis、Identity RPC、Knowledge RPC、Collaboration RPC、Attachment RPC、Platform RPC |
 | Identity | RPC `:8881`，admin `:8081` | PostgreSQL `identity` schema | PostgreSQL、Redis |
 | Knowledge | RPC `:8882`，admin `:8083` | PostgreSQL `knowledge` schema 中的文档、成员、公开投影和 outbox；文档附件进入兼容迁移窗口 | PostgreSQL、NATS JetStream、Identity RPC、Collaboration RPC、Attachment RPC |
 | Attachment | RPC `:8884`，admin `:8085` | PostgreSQL `attachment` schema 中的通用附件、multipart 状态、扫描任务和引用 | PostgreSQL、MinIO、ClamAV |
 | Collaboration | WebSocket `:8091`，RPC `:8883`，admin `:8084` | PostgreSQL `collaboration` schema 中的 Yjs update、snapshot、version、projection job 和 outbox | PostgreSQL、Redis、NATS JetStream、Knowledge RPC |
+| Platform | RPC `:8885`，admin `:8086` | PostgreSQL `platform` schema 中的配置快照、审计、幂等记录和 outbox | PostgreSQL、NATS JetStream |
 
 所有权规则如下：
 
@@ -39,6 +42,7 @@ Knowledge Core 是一个包含 Go module 与 Rust workspace 的 Monorepo。公�
 - Identity 只拥有用户、凭据状态和 token version。其他服务通过 Identity RPC 获取当前用户或解析成员用户名。
 - Knowledge 拥有文档元数据、成员、公开投影、幂等记录和 outbox，不保存 Yjs 二进制状态或版本；图片、视频、文件和压缩包由 Attachment 统一拥有，旧文档附件接口仅保留兼容窗口。
 - Collaboration 拥有协作状态和版本，不复制文档权限规则。创建 session 时通过 Knowledge RPC 复核访问级别；短期单次 ticket 被消费后建立有明确到期时间的连接。
+- Platform 拥有网页管理员可写的业务配置。Gateway 只提供 HTTP façade；其他服务不得直写 `platform` schema。Nacos 继续拥有进程启动和基础设施连接配置，两类配置不互相覆盖。
 - `pkg/` 只承载跨服务公共能力，禁止导入 `services/*`。
 
 主要目录职责：
@@ -97,9 +101,14 @@ Knowledge
 
 Gateway
   Redis limiter
-  -> Identity/Knowledge/Collaboration typed Kitex clients (static host:port)
+  -> Identity/Knowledge/Collaboration/Attachment/Platform typed Kitex clients (static host:port)
   -> JWT verifier + HTTP middleware/handlers
   -> Hertz public + Hertz admin
+
+Platform
+  PostgreSQL -> versioned SQL migration -> configuration Store
+  -> revision/audit/idempotency/outbox transaction -> JetStream publisher
+  -> Kitex RPC + Hertz admin
 
 Collaboration
   SQLx migration + Redis ticket store + NATS JetStream
@@ -248,7 +257,7 @@ Go 服务日志统一使用 `log/slog` JSON 和 `pkg/log` 脱敏，trace 使用 
 
 本地 Compose 与 k3s dev 都把 OTel Collector 放在应用/Higress 与 Tempo 之间。Collector 通过 OTLP (`4317/4318`) 接收 trace，过滤、采样后统一以 OTLP 写入 Tempo。Go/Rust 服务只通过环境变量注入 OTLP endpoint，生产 endpoint、TLS 和鉴权由部署平台提供。Gateway CORS 允许 `traceparent`/`tracestate`，但不允许浏览器 `baggage`；W3C baggage 在内部允许完整合法字段但总长度上限为 8 KiB，既不写入日志/span attribute，也不进入业务消息 payload。
 
-四个服务各自持有独立 Prometheus registry，并在 admin listener 的 `/metrics` 暴露。标签只使用路由模板、RPC 方法、状态码、稳定业务码和依赖名等低基数字段。Go 出站 RPC 熔断暴露低基数 `knowledge_core_rpc_client_circuit_state{dependency,state}`，`state` 仅为 `closed`/`open`/`half_open`。Rust Collaboration 使用 `tracing` JSON、W3C TraceContext/Baggage 与可选 OTLP exporter；WebSocket、Volo、SQLx、Redis 和 NATS 延续 request context，且不记录 ticket、token、payload、DSN 或用户/文档 ID metric label。
+六个服务各自持有独立 Prometheus registry，并在 admin listener 的 `/metrics` 暴露。标签只使用路由模板、RPC 方法、状态码、稳定业务码和依赖名等低基数字段。Go 出站 RPC 熔断暴露低基数 `knowledge_core_rpc_client_circuit_state{dependency,state}`，`state` 仅为 `closed`/`open`/`half_open`。Rust Collaboration 使用 `tracing` JSON、W3C TraceContext/Baggage 与可选 OTLP exporter；WebSocket、Volo、SQLx、Redis 和 NATS 延续 request context，且不记录 ticket、token、payload、DSN 或用户/文档 ID metric label。
 
 面向日常排障和交接的链路追踪说明见 [`trace-architecture.md`](trace-architecture.md)。
 
@@ -310,7 +319,7 @@ Nacos、NATS、MinIO、ClamAV 位于独立 namespace，PostgreSQL 和 Redis 复�
 应用只使用项目级账号和前缀。
 
 k3s 不保存 CI cache/PVC 或构建镜像，只保留 Argo CD；其只读 repository Secret、AppProject 和
-ApplicationSet 由 GitOps 仓库声明。平台组件与四个应用服务各自拥有独立 Application，共享资源由
+ApplicationSet 由 GitOps 仓库声明。平台组件与六个应用服务各自拥有独立 Application，共享资源由
 两个 foundation Application 管理；Secret 使用独立 `ksops-v1.0` source。CI 更新统一镜像覆盖后，
 只等待受影响服务的 Application，再执行集群内冒烟。
 

@@ -2,13 +2,14 @@
 
 Knowledge Core 是一个支持文档元数据、权限、通用附件、实时协作与版本恢复的知识协作后端。仓库包含 Go module 与 Rust workspace；Collaboration 服务使用 Rust、Yrs 和标准 y-sync 协议。
 
-当前实现包含四个服务：
+当前实现包含六个服务：
 
 - Gateway：公网 HTTP edge，负责严格输入校验、JWT、CORS、安全头、限流、错误映射和上游编排。
 - Identity：用户注册、密码认证、邮箱验证、密码重置、账户锁定、Refresh Token 轮换、会话撤销、Ed25519 JWT 签发与用户状态复核。
 - Knowledge：文档元数据、成员权限、发布、回收站、投影、配额和 outbox；旧文档附件接口处于迁移兼容窗口。
 - Attachment：图片、音频、视频、文档、压缩包和普通文件的 multipart 上传、扫描、引用与生命周期。
 - Collaboration：Yrs/y-sync WebSocket、一次性 session ticket、持久化 update、快照、版本、恢复和多实例同步。
+- Platform：站点、邮件和 AI 运行时配置，负责修订控制、敏感值加密、审计与可靠变更事件发布。
 
 详细架构和运行时契约见 [docs/framework-design.md](docs/framework-design.md)，编码约束见 [AGENTS.md](AGENTS.md)。
 
@@ -24,6 +25,7 @@ Knowledge Core 是一个支持文档元数据、权限、通用附件、实时�
 | 附件下载 | `GET /api/v1/attachments/:attachment_id/content` | 返回 `303 See Other` 到短期预签名地址 |
 | 通用附件 | `/api/v1/attachments` | Attachment façade、16MiB 分片上传、幂等重试、扫描状态和回收 |
 | 站点配置 | `GET /api/v1/site-profile` | 站点标题、双语标语、首图和焦点位置 |
+| 管理员配置 | `/api/v1/admin/configuration/:namespace` | 管理员读取/写入 `site`、`email`、`ai`；使用强 ETag 和幂等键 |
 | Studio 文档 | `/api/v1/studio/documents` | 列表、创建、读取、更新、删除、发布和取消发布 |
 | 成员 | `/api/v1/studio/documents/:document_id/members` | viewer/editor 成员管理 |
 | 版本 | `/api/v1/studio/documents/:document_id/versions` | 手工版本、详情和恢复 |
@@ -75,12 +77,15 @@ flowchart LR
     Gateway --> Knowledge[Knowledge RPC :8882]
     Gateway --> CollaborationRPC[Collaboration RPC :8883]
     Gateway --> Attachment[Attachment RPC :8884]
+    Gateway --> Platform[Platform RPC :8885]
     Collaboration --> KnowledgeRPC[Knowledge RPC :8882]
     Identity --> PostgreSQL[(PostgreSQL)]
     Identity --> Redis[(Redis)]
     Knowledge --> PostgreSQL
     Attachment --> S3[(S3 / MinIO)]
     Attachment --> ClamAV[ClamAV]
+    Platform --> PostgreSQL
+    Platform --> NATS
     Knowledge --> NATS[(NATS)]
     Collaboration --> PostgreSQL
     Collaboration --> Redis
@@ -112,6 +117,8 @@ Knowledge 不保存 Yjs update、快照或版本；这些数据属于 Collaborat
 | Identity RPC/admin | `8881` / `8081` |
 | Knowledge RPC/admin | `8882` / `8083` |
 | Collaboration WebSocket/RPC/admin | `8091` / `8883` / `8084` |
+| Attachment RPC/admin | `8884` / `8085` |
+| Platform RPC/admin | `8885` / `8086` |
 | PostgreSQL/Redis/NATS | `5432` / `6379` / `4222` |
 | MinIO/console/ClamAV/Prometheus/Tempo | `9000` / `9001` / `3310` / `9090` / `3200` |
 | OTel Collector (OTLP gRPC/HTTP) | `4317` / `4318` |
@@ -176,6 +183,7 @@ $keys.Clear()
 go run ./services/identity --config services/identity/etc/config.yaml
 go run ./services/knowledge --config services/knowledge/etc/config.yaml
 go run ./services/gateway --config services/gateway/etc/config.yaml
+go run ./services/platform --config services/platform/etc/config.yaml
 ```
 
 Rust Collaboration 的配置加载器位于服务内，通过环境变量接收静态配置；先启动
@@ -258,7 +266,7 @@ GitOps 快照推送同样要求远端分支未发生变化，禁止 force-push�
 项目级聚合版本读取根目录 `VERSION`；`services/<service>/VERSION` 可作人工参考，CI 不再据此打 tag。
 
 Argo CD repository Secret、AppProject 和 ApplicationSet 由私有 GitOps 仓库声明。ApplicationSet
-为 Gateway、Identity、Knowledge、Collaboration 分别生成 Application；服务 Application 使用
+为 Gateway、Identity、Knowledge、Attachment、Collaboration、Platform 分别生成 Application；服务 Application 使用
 普通 Kustomize source，foundation Application 使用独立 `ksops-v1.0` source 解密 Secret；
 同步策略为 Automated/Prune/Self Heal，镜像始终引用不可变 Harbor digest。
 

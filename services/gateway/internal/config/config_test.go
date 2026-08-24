@@ -130,6 +130,7 @@ func TestProductionCollaborationRequiresMutualTLS(t *testing.T) {
 	cfg.Endpoints.PublicBaseURL = "https://api.example.com"
 	cfg.CollaborationRPC.TLS.Enabled = true
 	cfg.AttachmentRPC.TLS.Enabled = true
+	cfg.PlatformRPC.TLS.Enabled = true
 
 	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "requires a CA and client certificate") {
 		t.Fatalf("Validate() error = %v", err)
@@ -147,10 +148,14 @@ func TestProductionCollaborationRequiresMutualTLS(t *testing.T) {
 	cfg.AttachmentRPC.TLS.CAFile = "ca.pem"
 	cfg.AttachmentRPC.TLS.CertFile = "client.pem"
 	cfg.AttachmentRPC.TLS.KeyFile = "client-key.pem"
+	cfg.PlatformRPC.TLS.CAFile = "ca.pem"
+	cfg.PlatformRPC.TLS.CertFile = "client.pem"
+	cfg.PlatformRPC.TLS.KeyFile = "client-key.pem"
 	cfg.IdentityRPC.Address = "identity.example.svc:8881"
 	cfg.KnowledgeRPC.Address = "knowledge.example.svc:8882"
 	cfg.CollaborationRPC.Address = "collaboration.example.svc:8883"
 	cfg.AttachmentRPC.Address = "attachment.example.svc:8884"
+	cfg.PlatformRPC.Address = "platform.example.svc:8885"
 	if err := cfg.Validate(); err != nil {
 		t.Fatalf("Validate() error = %v", err)
 	}

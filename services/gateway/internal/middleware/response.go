@@ -9,6 +9,7 @@ import (
 	collaborationv1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/collaboration"
 	identityv1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/identity"
 	knowledgev1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/knowledge"
+	platformv1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/platform"
 	jsoncodec "github.com/HappyLadySauce/Knowledge-Core/pkg/codec/json"
 	apperror "github.com/HappyLadySauce/Knowledge-Core/pkg/error"
 	"github.com/HappyLadySauce/Knowledge-Core/pkg/metadata"
@@ -90,6 +91,17 @@ var collaborationErrors = []rpcErrorMapping{
 	{collaborationv1.CodeInternal, "collaboration.internal", responseErrorWithStatus(collaborationv1.CodeInternal, http.StatusBadGateway, "collaboration.internal", apperror.KindUnavailable, "collaboration service unavailable")},
 }
 
+var platformErrors = []rpcErrorMapping{
+	{platformv1.CodeInvalidInput, "platform.invalid_input", responseError(platformv1.CodeInvalidInput, "platform.invalid_input", apperror.KindInvalidArgument, "invalid configuration input")},
+	{platformv1.CodeNotFound, "platform.not_found", responseError(platformv1.CodeNotFound, "platform.not_found", apperror.KindNotFound, "configuration not found")},
+	{platformv1.CodeConflict, "platform.conflict", responseError(platformv1.CodeConflict, "platform.conflict", apperror.KindConflict, "configuration conflict")},
+	{platformv1.CodeForbidden, "platform.forbidden", responseError(platformv1.CodeForbidden, "platform.forbidden", apperror.KindPermissionDenied, "administrator access is required")},
+	{platformv1.CodeUnauthenticated, "platform.unauthenticated", responseError(platformv1.CodeUnauthenticated, "platform.unauthenticated", apperror.KindUnauthenticated, "authentication required")},
+	{platformv1.CodeUnavailable, "platform.unavailable", responseError(platformv1.CodeUnavailable, "platform.unavailable", apperror.KindUnavailable, "platform service unavailable")},
+	{platformv1.CodePreconditionFailed, "platform.precondition_failed", responseErrorWithStatus(platformv1.CodePreconditionFailed, http.StatusPreconditionFailed, "platform.precondition_failed", apperror.KindConflict, "configuration revision does not match")},
+	{platformv1.CodeInternal, "platform.internal", responseErrorWithStatus(platformv1.CodeInternal, http.StatusBadGateway, "platform.internal", apperror.KindUnavailable, "platform service unavailable")},
+}
+
 type rpcErrorMapping struct {
 	code     int32
 	key      string
@@ -121,6 +133,10 @@ func WriteAttachmentError(ctx context.Context, request *app.RequestContext, err 
 
 func WriteCollaborationError(ctx context.Context, request *app.RequestContext, err error) {
 	writeRPCError(ctx, request, err, collaborationErrors)
+}
+
+func WritePlatformError(ctx context.Context, request *app.RequestContext, err error) {
+	writeRPCError(ctx, request, err, platformErrors)
 }
 
 func writeRPCError(ctx context.Context, request *app.RequestContext, err error, mappings []rpcErrorMapping) {

@@ -12,6 +12,7 @@ import (
 	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/collaboration/collaborationservice"
 	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/identity/identityservice"
 	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/knowledge/knowledgeservice"
+	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/platform/platformservice"
 	coreapp "github.com/HappyLadySauce/Knowledge-Core/pkg/app"
 	coreauth "github.com/HappyLadySauce/Knowledge-Core/pkg/auth"
 	"github.com/HappyLadySauce/Knowledge-Core/pkg/health"
@@ -31,6 +32,7 @@ type ServiceContext struct {
 	Knowledge     knowledgeservice.Client
 	Collaboration collaborationservice.Client
 	Attachment    attachmentservice.Client
+	Platform      platformservice.Client
 	Verifier      *coreauth.Verifier
 	Limiter       *ratelimit.RedisLimiter
 	Middleware    *gatewaymiddleware.Dependencies
@@ -72,6 +74,10 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 	if err != nil {
 		return nil, err
 	}
+	platform, err := gatewayclient.NewPlatform(*cfg.PlatformRPC, runtime.Trace, runtime.Metrics)
+	if err != nil {
+		return nil, err
+	}
 	verifier, err := coreauth.NewVerifier(cfg.Auth.PublicKey)
 	if err != nil {
 		return nil, fmt.Errorf("create gateway access-token verifier: %w", err)
@@ -81,7 +87,7 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 		return nil, err
 	}
 	middlewareDependencies, err := gatewaymiddleware.NewDependencies(
-		identity, knowledge, collaboration, attachment, verifier, limiter, runtime.Health, runtime.Logger, runtime.Requests,
+		identity, knowledge, collaboration, attachment, platform, verifier, limiter, runtime.Health, runtime.Logger, runtime.Requests,
 		*cfg.CORS, *cfg.RateLimit, *cfg.Endpoints, cfg.PublicHTTP.TLS.Enabled,
 	)
 	if err != nil {
@@ -136,7 +142,7 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 		slog.String("event", "dependencies_ready"),
 	)
 	return &ServiceContext{
-		Config: cfg, Redis: cache, Identity: identity, Knowledge: knowledge, Collaboration: collaboration, Attachment: attachment, Verifier: verifier,
+		Config: cfg, Redis: cache, Identity: identity, Knowledge: knowledge, Collaboration: collaboration, Attachment: attachment, Platform: platform, Verifier: verifier,
 		Limiter: limiter, Middleware: middlewareDependencies, AdminServer: admin, PublicServer: public,
 	}, nil
 }

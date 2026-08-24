@@ -13,6 +13,7 @@ import (
 	commonv1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/common"
 	identityv1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/identity"
 	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/knowledge/knowledgeservice"
+	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/platform/platformservice"
 	coreauth "github.com/HappyLadySauce/Knowledge-Core/pkg/auth"
 	"github.com/HappyLadySauce/Knowledge-Core/pkg/health"
 	corelog "github.com/HappyLadySauce/Knowledge-Core/pkg/log"
@@ -48,6 +49,7 @@ type Dependencies struct {
 	Knowledge      knowledgeservice.Client
 	Collaboration  CollaborationClient
 	Attachment     attachmentservice.Client
+	Platform       platformservice.Client
 	Verifier       TokenVerifier
 	Limiter        RateLimiter
 	Health         *health.Registry
@@ -83,6 +85,7 @@ func NewDependencies(
 	knowledge knowledgeservice.Client,
 	collaboration CollaborationClient,
 	attachment attachmentservice.Client,
+	platform platformservice.Client,
 	verifier TokenVerifier,
 	limiter RateLimiter,
 	healthRegistry *health.Registry,
@@ -93,7 +96,7 @@ func NewDependencies(
 	endpoints config.EndpointOptions,
 	secure bool,
 ) (*Dependencies, error) {
-	if identity == nil || knowledge == nil || collaboration == nil || attachment == nil || verifier == nil || limiter == nil || healthRegistry == nil || logger == nil {
+	if identity == nil || knowledge == nil || collaboration == nil || attachment == nil || platform == nil || verifier == nil || limiter == nil || healthRegistry == nil || logger == nil {
 		return nil, errors.New("create gateway middleware dependencies: upstream clients, verifier, limiter, health, and logger are required")
 	}
 	if err := cors.Validate(); err != nil {
@@ -114,7 +117,7 @@ func NewDependencies(
 		allowedOrigins[origin] = struct{}{}
 	}
 	dependencies := &Dependencies{
-		Identity: identity, Knowledge: knowledge, Collaboration: collaboration, Attachment: attachment,
+		Identity: identity, Knowledge: knowledge, Collaboration: collaboration, Attachment: attachment, Platform: platform,
 		Verifier: verifier, Limiter: limiter, Health: healthRegistry, Logger: logger, RequestLogs: requestLogs,
 		AllowedOrigins: allowedOrigins, TrustedProxies: trustedProxies, RateLimit: rateLimit, Endpoints: endpoints, Secure: secure,
 		Now: time.Now,

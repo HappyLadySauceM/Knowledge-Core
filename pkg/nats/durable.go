@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/HappyLadySauce/Knowledge-Core/pkg/option"
@@ -17,9 +18,82 @@ import (
 
 type jetStreamClient interface {
 	AccountInfo(...natsclient.JSOpt) (*natsclient.AccountInfo, error)
+	AddStream(*natsclient.StreamConfig, ...natsclient.JSOpt) (*natsclient.StreamInfo, error)
+	StreamInfo(string, ...natsclient.JSOpt) (*natsclient.StreamInfo, error)
 	PublishMsg(*natsclient.Msg, ...natsclient.PubOpt) (*natsclient.PubAck, error)
 	Subscribe(string, natsclient.MsgHandler, ...natsclient.SubOpt) (*natsclient.Subscription, error)
 	QueueSubscribe(string, string, natsclient.MsgHandler, ...natsclient.SubOpt) (*natsclient.Subscription, error)
+}
+
+func (b *DurableBroker) EnsureStream(ctx context.Context, cfg StreamConfig) error {
+	if b == nil || b.conn == nil || b.js == nil {
+		return errors.New("ensure nats stream: broker is closed")
+	}
+	if !b.operations.begin() {
+		return errors.New("ensure nats stream: broker is closing")
+	}
+	defer b.operations.end()
+	if ctx == nil {
+		return errors.New("ensure nats stream: context is required")
+	}
+	if err := validateStreamConfig(cfg); err != nil {
+		return err
+	}
+	operationCtx, cancel := boundedContext(ctx, b.timeout)
+	defer cancel()
+	info, err := b.js.StreamInfo(cfg.Name, natsclient.Context(operationCtx))
+	if errors.Is(err, natsclient.ErrStreamNotFound) {
+		_, err = b.js.AddStream(&natsclient.StreamConfig{
+			Name: cfg.Name, Subjects: append([]string(nil), cfg.Subjects...), Retention: natsclient.LimitsPolicy,
+			Discard: natsclient.DiscardOld, Storage: natsclient.FileStorage, MaxAge: cfg.MaxAge,
+			MaxBytes: cfg.MaxBytes, Duplicates: cfg.DuplicateWindow,
+		}, natsclient.Context(operationCtx))
+		if err != nil {
+			return fmt.Errorf("create nats stream %q: %w", cfg.Name, err)
+		}
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("inspect nats stream %q: %w", cfg.Name, err)
+	}
+	if info == nil || info.Config.Name != cfg.Name || !sameSubjects(info.Config.Subjects, cfg.Subjects) || info.Config.Retention != natsclient.LimitsPolicy || info.Config.Storage != natsclient.FileStorage || info.Config.MaxAge != cfg.MaxAge || info.Config.MaxBytes != cfg.MaxBytes || info.Config.Duplicates != cfg.DuplicateWindow {
+		return fmt.Errorf("validate nats stream %q: deployed stream does not match the configured contract", cfg.Name)
+	}
+	return nil
+}
+
+func validateStreamConfig(cfg StreamConfig) error {
+	if strings.TrimSpace(cfg.Name) == "" || len(cfg.Subjects) == 0 || cfg.MaxAge <= 0 || cfg.MaxBytes <= 0 || cfg.DuplicateWindow <= 0 {
+		return errors.New("ensure nats stream: name, subjects, max age, max bytes, and duplicate window are required")
+	}
+	seen := make(map[string]struct{}, len(cfg.Subjects))
+	for _, subject := range cfg.Subjects {
+		if strings.TrimSpace(subject) == "" || strings.TrimSpace(subject) != subject {
+			return errors.New("ensure nats stream: subjects must be non-empty and trimmed")
+		}
+		if _, exists := seen[subject]; exists {
+			return errors.New("ensure nats stream: subjects must be unique")
+		}
+		seen[subject] = struct{}{}
+	}
+	return nil
+}
+
+func sameSubjects(left, right []string) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	seen := make(map[string]int, len(left))
+	for _, value := range left {
+		seen[value]++
+	}
+	for _, value := range right {
+		if seen[value] == 0 {
+			return false
+		}
+		seen[value]--
+	}
+	return true
 }
 
 type jetStreamFactory func(time.Duration) (jetStreamClient, error)

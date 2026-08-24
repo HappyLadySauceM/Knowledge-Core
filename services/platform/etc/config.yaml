@@ -1,0 +1,84 @@
+app:
+  name: platform
+  environment: development
+  version: dev
+  startup_timeout: 30s
+  shutdown_timeout: 45s
+
+log:
+  level: info
+  add_source: false
+  health_check_requests: false
+
+trace:
+  enabled: false
+  endpoint: 127.0.0.1:4317
+  sample_ratio: 0.1
+  insecure: true
+  batch_timeout: 5s
+  export_timeout: 10s
+  tls:
+    enabled: false
+
+rpc:
+  address: :8885
+  service_name: knowledge-core.platform
+  read_write_timeout: 30s
+  exit_wait_timeout: 10s
+  max_connections: 10000
+  tls:
+    enabled: false
+
+admin_http:
+  address: :8086
+  read_timeout: 10s
+  write_timeout: 30s
+  idle_timeout: 2m
+  shutdown_timeout: 15s
+  max_request_body_size: 1048576
+  tls:
+    enabled: false
+
+postgres:
+  host: 127.0.0.1
+  port: 5432
+  user: postgres
+  password: ""
+  database: knowledge_core
+  ssl_mode: disable
+  time_zone: UTC
+  max_idle_conns: 5
+  max_open_conns: 20
+  conn_max_lifetime: 30m
+  conn_max_idle_time: 5m
+  connect_timeout: 5s
+  slow_threshold: 200ms
+  prepare_stmt: false
+
+nats:
+  servers: [nats://127.0.0.1:4222]
+  name: knowledge-core.platform
+  connect_timeout: 5s
+  request_timeout: 5s
+  max_reconnects: -1
+  reconnect_wait: 2s
+  ping_interval: 2m
+  max_pings_out: 2
+  drain_timeout: 10s
+  tls:
+    enabled: false
+
+auth:
+  public_key: ""
+  internal_token: ""
+
+encryption:
+  key_id: ""
+  kek: ""
+
+sync:
+  stream: KNOWLEDGE_CORE_CONFIG
+  subject: platform.config.changed.v1
+  poll_interval: 1s
+  lease: 30s
+  max_attempts: 8

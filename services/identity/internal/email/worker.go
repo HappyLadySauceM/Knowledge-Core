@@ -11,6 +11,7 @@ import (
 	"net/smtp"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	coreapp "github.com/HappyLadySauce/Knowledge-Core/pkg/app"
@@ -21,7 +22,7 @@ import (
 )
 
 type Worker struct {
-	cfg    config.SMTPOptions
+	cfg    atomic.Pointer[config.SMTPOptions]
 	outbox repository.EmailOutboxRepository
 	key    string
 	logger *slog.Logger
@@ -30,13 +31,38 @@ type Worker struct {
 }
 
 func NewWorker(cfg config.SMTPOptions, outbox repository.EmailOutboxRepository, key string, logger *slog.Logger) (*Worker, error) {
-	if cfg.Host == "" {
-		return nil, nil
-	}
 	if outbox == nil || len(key) < 16 || logger == nil {
 		return nil, errors.New("create identity email worker: dependencies are required")
 	}
-	return &Worker{cfg: cfg, outbox: outbox, key: key, logger: logger, done: make(chan struct{})}, nil
+	worker := &Worker{outbox: outbox, key: key, logger: logger, done: make(chan struct{})}
+	worker.cfg.Store(&cfg)
+	return worker, nil
+}
+
+func (w *Worker) ApplyConfig(ctx context.Context, cfg config.SMTPOptions) error {
+	if w == nil {
+		return errors.New("apply identity email configuration: worker is required")
+	}
+	if err := cfg.Validate(); err != nil {
+		return fmt.Errorf("validate identity email configuration: %w", err)
+	}
+	if err := Probe(ctx, cfg); err != nil {
+		return err
+	}
+	candidate := cfg
+	w.cfg.Store(&candidate)
+	return nil
+}
+
+func (w *Worker) CurrentConfig() config.SMTPOptions {
+	if w == nil {
+		return config.SMTPOptions{}
+	}
+	value := w.cfg.Load()
+	if value == nil {
+		return config.SMTPOptions{}
+	}
+	return *value
 }
 func (w *Worker) Name() string                { return "identity-email" }
 func (w *Worker) Ready(context.Context) error { return nil }
@@ -70,6 +96,10 @@ func (w *Worker) Shutdown(ctx context.Context) error {
 	}
 }
 func (w *Worker) process(ctx context.Context, now time.Time) {
+	cfg := w.CurrentConfig()
+	if cfg.Host == "" {
+		return
+	}
 	record, err := w.outbox.Claim(ctx, now)
 	if errors.Is(err, repository.ErrOutboxEmpty) {
 		return
@@ -80,7 +110,7 @@ func (w *Worker) process(ctx context.Context, now time.Time) {
 	}
 	token, err := security.OpenEmailToken(record.TokenCipher, w.key)
 	if err == nil {
-		err = w.send(record, token)
+		err = w.send(cfg, record, token)
 	}
 	if err == nil {
 		if markErr := w.outbox.MarkSent(ctx, record.ID, now); markErr != nil {
@@ -92,14 +122,14 @@ func (w *Worker) process(ctx context.Context, now time.Time) {
 		w.logger.ErrorContext(ctx, "mark identity email failed", slog.String("message_id", record.MessageID), slog.Any("error", markErr))
 	}
 }
-func (w *Worker) send(record *model.EmailOutbox, token string) error {
+func (w *Worker) send(cfg config.SMTPOptions, record *model.EmailOutbox, token string) error {
 	var link string
 	if record.Kind == "email_verification" {
 		link = "verify-email?token=" + token
 	} else {
 		link = "reset-password?token=" + token
 	}
-	if base := strings.TrimRight(w.cfg.FrontendBaseURL, "/"); base != "" {
+	if base := strings.TrimRight(cfg.FrontendBaseURL, "/"); base != "" {
 		if record.Kind == "email_verification" {
 			link = base + "/zh-CN/verify-email?token=" + token
 		} else {
@@ -107,31 +137,31 @@ func (w *Worker) send(record *model.EmailOutbox, token string) error {
 		}
 	}
 	body := fmt.Sprintf("To continue, open this link: %s\n", link)
-	message := "From: " + w.cfg.From + "\r\nTo: " + record.Recipient + "\r\nSubject: " + record.Subject + "\r\n\r\n" + body
-	from, err := mail.ParseAddress(w.cfg.From)
+	message := "From: " + cfg.From + "\r\nTo: " + record.Recipient + "\r\nSubject: " + record.Subject + "\r\n\r\n" + body
+	from, err := mail.ParseAddress(cfg.From)
 	if err != nil {
 		return fmt.Errorf("parse identity SMTP sender: %w", err)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	dialer := net.Dialer{Timeout: 10 * time.Second}
-	conn, err := dialer.DialContext(ctx, "tcp", w.cfg.Host+":"+strconv.Itoa(w.cfg.Port))
+	conn, err := dialer.DialContext(ctx, "tcp", cfg.Host+":"+strconv.Itoa(cfg.Port))
 	if err != nil {
 		return fmt.Errorf("dial identity SMTP server: %w", err)
 	}
 	defer func() { _ = conn.Close() }()
 	_ = conn.SetDeadline(time.Now().Add(30 * time.Second))
 	var client *smtp.Client
-	if w.cfg.Port == 465 {
-		tlsConn := tls.Client(conn, &tls.Config{ServerName: w.cfg.Host, MinVersion: tls.VersionTLS12})
+	if cfg.Port == 465 {
+		tlsConn := tls.Client(conn, &tls.Config{ServerName: cfg.Host, MinVersion: tls.VersionTLS12})
 		if err := tlsConn.HandshakeContext(ctx); err != nil {
 			return fmt.Errorf("handshake identity SMTP TLS: %w", err)
 		}
-		client, err = smtp.NewClient(tlsConn, w.cfg.Host)
+		client, err = smtp.NewClient(tlsConn, cfg.Host)
 	} else {
-		client, err = smtp.NewClient(conn, w.cfg.Host)
+		client, err = smtp.NewClient(conn, cfg.Host)
 		if err == nil {
-			err = client.StartTLS(&tls.Config{ServerName: w.cfg.Host, MinVersion: tls.VersionTLS12})
+			err = client.StartTLS(&tls.Config{ServerName: cfg.Host, MinVersion: tls.VersionTLS12})
 		}
 	}
 	if err != nil {
@@ -139,8 +169,8 @@ func (w *Worker) send(record *model.EmailOutbox, token string) error {
 	}
 	defer func() { _ = client.Quit() }()
 	var auth smtp.Auth
-	if w.cfg.Username != "" {
-		auth = smtp.PlainAuth("", w.cfg.Username, w.cfg.Password, w.cfg.Host)
+	if cfg.Username != "" {
+		auth = smtp.PlainAuth("", cfg.Username, cfg.Password, cfg.Host)
 	}
 	if auth != nil {
 		if err := client.Auth(auth); err != nil {
@@ -163,6 +193,45 @@ func (w *Worker) send(record *model.EmailOutbox, token string) error {
 	}
 	if err := writer.Close(); err != nil {
 		return fmt.Errorf("finish identity SMTP message: %w", err)
+	}
+	return nil
+}
+
+func Probe(ctx context.Context, cfg config.SMTPOptions) error {
+	if cfg.Host == "" {
+		return nil
+	}
+	if ctx == nil {
+		return errors.New("probe identity SMTP: context is required")
+	}
+	probeCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	dialer := net.Dialer{Timeout: 10 * time.Second}
+	conn, err := dialer.DialContext(probeCtx, "tcp", cfg.Host+":"+strconv.Itoa(cfg.Port))
+	if err != nil {
+		return fmt.Errorf("probe identity SMTP dial: %w", err)
+	}
+	defer func() { _ = conn.Close() }()
+	_ = conn.SetDeadline(time.Now().Add(30 * time.Second))
+	var smtpClient *smtp.Client
+	if cfg.Port == 465 {
+		tlsConn := tls.Client(conn, &tls.Config{ServerName: cfg.Host, MinVersion: tls.VersionTLS12})
+		if err := tlsConn.HandshakeContext(probeCtx); err != nil {
+			return fmt.Errorf("probe identity SMTP TLS: %w", err)
+		}
+		smtpClient, err = smtp.NewClient(tlsConn, cfg.Host)
+	} else {
+		smtpClient, err = smtp.NewClient(conn, cfg.Host)
+		if err == nil {
+			err = smtpClient.StartTLS(&tls.Config{ServerName: cfg.Host, MinVersion: tls.VersionTLS12})
+		}
+	}
+	if err != nil {
+		return fmt.Errorf("probe identity SMTP connection: %w", err)
+	}
+	defer func() { _ = smtpClient.Quit() }()
+	if err := smtpClient.Auth(smtp.PlainAuth("", cfg.Username, cfg.Password, cfg.Host)); err != nil {
+		return fmt.Errorf("probe identity SMTP authentication: %w", err)
 	}
 	return nil
 }

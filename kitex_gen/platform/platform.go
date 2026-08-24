@@ -8,8 +8,775 @@ import (
 	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/common"
 )
 
+const (
+	CodeInvalidInput = 32001
+
+	CodeNotFound = 32002
+
+	CodeConflict = 32003
+
+	CodeForbidden = 32004
+
+	CodeUnauthenticated = 32005
+
+	CodeUnavailable = 32006
+
+	CodePreconditionFailed = 32007
+
+	CodeInternal = 32999
+)
+
+type ConfigValue struct {
+	Key      string `thrift:"key,1,required" frugal:"1,required,string" json:"key"`
+	Value    string `thrift:"value,2,required" frugal:"2,required,string" json:"value"`
+	Secret   bool   `thrift:"secret,3,required" frugal:"3,required,bool" json:"secret"`
+	Redacted bool   `thrift:"redacted,4,required" frugal:"4,required,bool" json:"redacted"`
+}
+
+func NewConfigValue() *ConfigValue {
+	return &ConfigValue{}
+}
+
+func (p *ConfigValue) InitDefault() {
+}
+
+func (p *ConfigValue) GetKey() (v string) {
+	return p.Key
+}
+
+func (p *ConfigValue) GetValue() (v string) {
+	return p.Value
+}
+
+func (p *ConfigValue) GetSecret() (v bool) {
+	return p.Secret
+}
+
+func (p *ConfigValue) GetRedacted() (v bool) {
+	return p.Redacted
+}
+func (p *ConfigValue) SetKey(val string) {
+	p.Key = val
+}
+func (p *ConfigValue) SetValue(val string) {
+	p.Value = val
+}
+func (p *ConfigValue) SetSecret(val bool) {
+	p.Secret = val
+}
+func (p *ConfigValue) SetRedacted(val bool) {
+	p.Redacted = val
+}
+
+func (p *ConfigValue) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("ConfigValue(%+v)", *p)
+}
+
+var fieldIDToName_ConfigValue = map[int16]string{
+	1: "key",
+	2: "value",
+	3: "secret",
+	4: "redacted",
+}
+
+type Configuration struct {
+	Environment   string         `thrift:"environment,1,required" frugal:"1,required,string" json:"environment"`
+	Namespace     string         `thrift:"namespace,2,required" frugal:"2,required,string" json:"namespace"`
+	Revision      int64          `thrift:"revision,3,required" frugal:"3,required,i64" json:"revision"`
+	SchemaVersion int32          `thrift:"schema_version,4,required" frugal:"4,required,i32" json:"schema_version"`
+	Values        []*ConfigValue `thrift:"values,5,required" frugal:"5,required,list<ConfigValue>" json:"values"`
+	UpdatedAt     string         `thrift:"updated_at,6,required" frugal:"6,required,string" json:"updated_at"`
+	UpdatedBy     int64          `thrift:"updated_by,7,required" frugal:"7,required,i64" json:"updated_by"`
+}
+
+func NewConfiguration() *Configuration {
+	return &Configuration{}
+}
+
+func (p *Configuration) InitDefault() {
+}
+
+func (p *Configuration) GetEnvironment() (v string) {
+	return p.Environment
+}
+
+func (p *Configuration) GetNamespace() (v string) {
+	return p.Namespace
+}
+
+func (p *Configuration) GetRevision() (v int64) {
+	return p.Revision
+}
+
+func (p *Configuration) GetSchemaVersion() (v int32) {
+	return p.SchemaVersion
+}
+
+func (p *Configuration) GetValues() (v []*ConfigValue) {
+	return p.Values
+}
+
+func (p *Configuration) GetUpdatedAt() (v string) {
+	return p.UpdatedAt
+}
+
+func (p *Configuration) GetUpdatedBy() (v int64) {
+	return p.UpdatedBy
+}
+func (p *Configuration) SetEnvironment(val string) {
+	p.Environment = val
+}
+func (p *Configuration) SetNamespace(val string) {
+	p.Namespace = val
+}
+func (p *Configuration) SetRevision(val int64) {
+	p.Revision = val
+}
+func (p *Configuration) SetSchemaVersion(val int32) {
+	p.SchemaVersion = val
+}
+func (p *Configuration) SetValues(val []*ConfigValue) {
+	p.Values = val
+}
+func (p *Configuration) SetUpdatedAt(val string) {
+	p.UpdatedAt = val
+}
+func (p *Configuration) SetUpdatedBy(val int64) {
+	p.UpdatedBy = val
+}
+
+func (p *Configuration) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("Configuration(%+v)", *p)
+}
+
+var fieldIDToName_Configuration = map[int16]string{
+	1: "environment",
+	2: "namespace",
+	3: "revision",
+	4: "schema_version",
+	5: "values",
+	6: "updated_at",
+	7: "updated_by",
+}
+
+type GetConfigurationRequest struct {
+	Namespace string `thrift:"namespace,1,required" frugal:"1,required,string" json:"namespace"`
+}
+
+func NewGetConfigurationRequest() *GetConfigurationRequest {
+	return &GetConfigurationRequest{}
+}
+
+func (p *GetConfigurationRequest) InitDefault() {
+}
+
+func (p *GetConfigurationRequest) GetNamespace() (v string) {
+	return p.Namespace
+}
+func (p *GetConfigurationRequest) SetNamespace(val string) {
+	p.Namespace = val
+}
+
+func (p *GetConfigurationRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("GetConfigurationRequest(%+v)", *p)
+}
+
+var fieldIDToName_GetConfigurationRequest = map[int16]string{
+	1: "namespace",
+}
+
+type PutConfigurationRequest struct {
+	Namespace        string            `thrift:"namespace,1,required" frugal:"1,required,string" json:"namespace"`
+	ExpectedRevision int64             `thrift:"expected_revision,2,required" frugal:"2,required,i64" json:"expected_revision"`
+	IdempotencyKey   string            `thrift:"idempotency_key,3,required" frugal:"3,required,string" json:"idempotency_key"`
+	Values           map[string]string `thrift:"values,4,required" frugal:"4,required,map<string:string>" json:"values"`
+}
+
+func NewPutConfigurationRequest() *PutConfigurationRequest {
+	return &PutConfigurationRequest{}
+}
+
+func (p *PutConfigurationRequest) InitDefault() {
+}
+
+func (p *PutConfigurationRequest) GetNamespace() (v string) {
+	return p.Namespace
+}
+
+func (p *PutConfigurationRequest) GetExpectedRevision() (v int64) {
+	return p.ExpectedRevision
+}
+
+func (p *PutConfigurationRequest) GetIdempotencyKey() (v string) {
+	return p.IdempotencyKey
+}
+
+func (p *PutConfigurationRequest) GetValues() (v map[string]string) {
+	return p.Values
+}
+func (p *PutConfigurationRequest) SetNamespace(val string) {
+	p.Namespace = val
+}
+func (p *PutConfigurationRequest) SetExpectedRevision(val int64) {
+	p.ExpectedRevision = val
+}
+func (p *PutConfigurationRequest) SetIdempotencyKey(val string) {
+	p.IdempotencyKey = val
+}
+func (p *PutConfigurationRequest) SetValues(val map[string]string) {
+	p.Values = val
+}
+
+func (p *PutConfigurationRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("PutConfigurationRequest(%+v)", *p)
+}
+
+var fieldIDToName_PutConfigurationRequest = map[int16]string{
+	1: "namespace",
+	2: "expected_revision",
+	3: "idempotency_key",
+	4: "values",
+}
+
+type SiteProfile struct {
+	Title            string  `thrift:"title,1,required" frugal:"1,required,string" json:"title"`
+	TaglineZh        string  `thrift:"tagline_zh,2,required" frugal:"2,required,string" json:"tagline_zh"`
+	TaglineEn        string  `thrift:"tagline_en,3,required" frugal:"3,required,string" json:"tagline_en"`
+	HeroImageUrl     string  `thrift:"hero_image_url,4,required" frugal:"4,required,string" json:"hero_image_url"`
+	HeroFocalX       float64 `thrift:"hero_focal_x,5,required" frugal:"5,required,double" json:"hero_focal_x"`
+	HeroFocalY       float64 `thrift:"hero_focal_y,6,required" frugal:"6,required,double" json:"hero_focal_y"`
+	Revision         int64   `thrift:"revision,7,required" frugal:"7,required,i64" json:"revision"`
+	HeroAttachmentId *string `thrift:"hero_attachment_id,8,optional" frugal:"8,optional,string" json:"hero_attachment_id,omitempty"`
+}
+
+func NewSiteProfile() *SiteProfile {
+	return &SiteProfile{}
+}
+
+func (p *SiteProfile) InitDefault() {
+}
+
+func (p *SiteProfile) GetTitle() (v string) {
+	return p.Title
+}
+
+func (p *SiteProfile) GetTaglineZh() (v string) {
+	return p.TaglineZh
+}
+
+func (p *SiteProfile) GetTaglineEn() (v string) {
+	return p.TaglineEn
+}
+
+func (p *SiteProfile) GetHeroImageUrl() (v string) {
+	return p.HeroImageUrl
+}
+
+func (p *SiteProfile) GetHeroFocalX() (v float64) {
+	return p.HeroFocalX
+}
+
+func (p *SiteProfile) GetHeroFocalY() (v float64) {
+	return p.HeroFocalY
+}
+
+func (p *SiteProfile) GetRevision() (v int64) {
+	return p.Revision
+}
+
+var SiteProfile_HeroAttachmentId_DEFAULT string
+
+func (p *SiteProfile) GetHeroAttachmentId() (v string) {
+	if !p.IsSetHeroAttachmentId() {
+		return SiteProfile_HeroAttachmentId_DEFAULT
+	}
+	return *p.HeroAttachmentId
+}
+func (p *SiteProfile) SetTitle(val string) {
+	p.Title = val
+}
+func (p *SiteProfile) SetTaglineZh(val string) {
+	p.TaglineZh = val
+}
+func (p *SiteProfile) SetTaglineEn(val string) {
+	p.TaglineEn = val
+}
+func (p *SiteProfile) SetHeroImageUrl(val string) {
+	p.HeroImageUrl = val
+}
+func (p *SiteProfile) SetHeroFocalX(val float64) {
+	p.HeroFocalX = val
+}
+func (p *SiteProfile) SetHeroFocalY(val float64) {
+	p.HeroFocalY = val
+}
+func (p *SiteProfile) SetRevision(val int64) {
+	p.Revision = val
+}
+func (p *SiteProfile) SetHeroAttachmentId(val *string) {
+	p.HeroAttachmentId = val
+}
+
+func (p *SiteProfile) IsSetHeroAttachmentId() bool {
+	return p.HeroAttachmentId != nil
+}
+
+func (p *SiteProfile) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("SiteProfile(%+v)", *p)
+}
+
+var fieldIDToName_SiteProfile = map[int16]string{
+	1: "title",
+	2: "tagline_zh",
+	3: "tagline_en",
+	4: "hero_image_url",
+	5: "hero_focal_x",
+	6: "hero_focal_y",
+	7: "revision",
+	8: "hero_attachment_id",
+}
+
+type GetConfigurationDeliveryRequest struct {
+	Namespace string `thrift:"namespace,1,required" frugal:"1,required,string" json:"namespace"`
+	Revision  int64  `thrift:"revision,2,required" frugal:"2,required,i64" json:"revision"`
+}
+
+func NewGetConfigurationDeliveryRequest() *GetConfigurationDeliveryRequest {
+	return &GetConfigurationDeliveryRequest{}
+}
+
+func (p *GetConfigurationDeliveryRequest) InitDefault() {
+}
+
+func (p *GetConfigurationDeliveryRequest) GetNamespace() (v string) {
+	return p.Namespace
+}
+
+func (p *GetConfigurationDeliveryRequest) GetRevision() (v int64) {
+	return p.Revision
+}
+func (p *GetConfigurationDeliveryRequest) SetNamespace(val string) {
+	p.Namespace = val
+}
+func (p *GetConfigurationDeliveryRequest) SetRevision(val int64) {
+	p.Revision = val
+}
+
+func (p *GetConfigurationDeliveryRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("GetConfigurationDeliveryRequest(%+v)", *p)
+}
+
+var fieldIDToName_GetConfigurationDeliveryRequest = map[int16]string{
+	1: "namespace",
+	2: "revision",
+}
+
+type GetConsumerConfigurationRequest struct {
+	Namespace string `thrift:"namespace,1,required" frugal:"1,required,string" json:"namespace"`
+	Revision  int64  `thrift:"revision,2,required" frugal:"2,required,i64" json:"revision"`
+	Consumer  string `thrift:"consumer,3,required" frugal:"3,required,string" json:"consumer"`
+}
+
+func NewGetConsumerConfigurationRequest() *GetConsumerConfigurationRequest {
+	return &GetConsumerConfigurationRequest{}
+}
+
+func (p *GetConsumerConfigurationRequest) InitDefault() {
+}
+
+func (p *GetConsumerConfigurationRequest) GetNamespace() (v string) {
+	return p.Namespace
+}
+
+func (p *GetConsumerConfigurationRequest) GetRevision() (v int64) {
+	return p.Revision
+}
+
+func (p *GetConsumerConfigurationRequest) GetConsumer() (v string) {
+	return p.Consumer
+}
+func (p *GetConsumerConfigurationRequest) SetNamespace(val string) {
+	p.Namespace = val
+}
+func (p *GetConsumerConfigurationRequest) SetRevision(val int64) {
+	p.Revision = val
+}
+func (p *GetConsumerConfigurationRequest) SetConsumer(val string) {
+	p.Consumer = val
+}
+
+func (p *GetConsumerConfigurationRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("GetConsumerConfigurationRequest(%+v)", *p)
+}
+
+var fieldIDToName_GetConsumerConfigurationRequest = map[int16]string{
+	1: "namespace",
+	2: "revision",
+	3: "consumer",
+}
+
+type GetConsumerStateRequest struct {
+	Namespace string `thrift:"namespace,1,required" frugal:"1,required,string" json:"namespace"`
+	Consumer  string `thrift:"consumer,2,required" frugal:"2,required,string" json:"consumer"`
+}
+
+func NewGetConsumerStateRequest() *GetConsumerStateRequest {
+	return &GetConsumerStateRequest{}
+}
+
+func (p *GetConsumerStateRequest) InitDefault() {
+}
+
+func (p *GetConsumerStateRequest) GetNamespace() (v string) {
+	return p.Namespace
+}
+
+func (p *GetConsumerStateRequest) GetConsumer() (v string) {
+	return p.Consumer
+}
+func (p *GetConsumerStateRequest) SetNamespace(val string) {
+	p.Namespace = val
+}
+func (p *GetConsumerStateRequest) SetConsumer(val string) {
+	p.Consumer = val
+}
+
+func (p *GetConsumerStateRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("GetConsumerStateRequest(%+v)", *p)
+}
+
+var fieldIDToName_GetConsumerStateRequest = map[int16]string{
+	1: "namespace",
+	2: "consumer",
+}
+
+type ConsumerConfigurationState struct {
+	Environment     string  `thrift:"environment,1,required" frugal:"1,required,string" json:"environment"`
+	Namespace       string  `thrift:"namespace,2,required" frugal:"2,required,string" json:"namespace"`
+	Consumer        string  `thrift:"consumer,3,required" frugal:"3,required,string" json:"consumer"`
+	DesiredRevision int64   `thrift:"desired_revision,4,required" frugal:"4,required,i64" json:"desired_revision"`
+	AppliedRevision int64   `thrift:"applied_revision,5,required" frugal:"5,required,i64" json:"applied_revision"`
+	Status          string  `thrift:"status,6,required" frugal:"6,required,string" json:"status"`
+	LastErrorKey    *string `thrift:"last_error_key,7,optional" frugal:"7,optional,string" json:"last_error_key,omitempty"`
+}
+
+func NewConsumerConfigurationState() *ConsumerConfigurationState {
+	return &ConsumerConfigurationState{}
+}
+
+func (p *ConsumerConfigurationState) InitDefault() {
+}
+
+func (p *ConsumerConfigurationState) GetEnvironment() (v string) {
+	return p.Environment
+}
+
+func (p *ConsumerConfigurationState) GetNamespace() (v string) {
+	return p.Namespace
+}
+
+func (p *ConsumerConfigurationState) GetConsumer() (v string) {
+	return p.Consumer
+}
+
+func (p *ConsumerConfigurationState) GetDesiredRevision() (v int64) {
+	return p.DesiredRevision
+}
+
+func (p *ConsumerConfigurationState) GetAppliedRevision() (v int64) {
+	return p.AppliedRevision
+}
+
+func (p *ConsumerConfigurationState) GetStatus() (v string) {
+	return p.Status
+}
+
+var ConsumerConfigurationState_LastErrorKey_DEFAULT string
+
+func (p *ConsumerConfigurationState) GetLastErrorKey() (v string) {
+	if !p.IsSetLastErrorKey() {
+		return ConsumerConfigurationState_LastErrorKey_DEFAULT
+	}
+	return *p.LastErrorKey
+}
+func (p *ConsumerConfigurationState) SetEnvironment(val string) {
+	p.Environment = val
+}
+func (p *ConsumerConfigurationState) SetNamespace(val string) {
+	p.Namespace = val
+}
+func (p *ConsumerConfigurationState) SetConsumer(val string) {
+	p.Consumer = val
+}
+func (p *ConsumerConfigurationState) SetDesiredRevision(val int64) {
+	p.DesiredRevision = val
+}
+func (p *ConsumerConfigurationState) SetAppliedRevision(val int64) {
+	p.AppliedRevision = val
+}
+func (p *ConsumerConfigurationState) SetStatus(val string) {
+	p.Status = val
+}
+func (p *ConsumerConfigurationState) SetLastErrorKey(val *string) {
+	p.LastErrorKey = val
+}
+
+func (p *ConsumerConfigurationState) IsSetLastErrorKey() bool {
+	return p.LastErrorKey != nil
+}
+
+func (p *ConsumerConfigurationState) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("ConsumerConfigurationState(%+v)", *p)
+}
+
+var fieldIDToName_ConsumerConfigurationState = map[int16]string{
+	1: "environment",
+	2: "namespace",
+	3: "consumer",
+	4: "desired_revision",
+	5: "applied_revision",
+	6: "status",
+	7: "last_error_key",
+}
+
+type ReportConfigurationApplyRequest struct {
+	MessageId    string  `thrift:"message_id,1,required" frugal:"1,required,string" json:"message_id"`
+	Namespace    string  `thrift:"namespace,2,required" frugal:"2,required,string" json:"namespace"`
+	Revision     int64   `thrift:"revision,3,required" frugal:"3,required,i64" json:"revision"`
+	Consumer     string  `thrift:"consumer,4,required" frugal:"4,required,string" json:"consumer"`
+	Status       string  `thrift:"status,5,required" frugal:"5,required,string" json:"status"`
+	Attempts     int32   `thrift:"attempts,6,required" frugal:"6,required,i32" json:"attempts"`
+	LastErrorKey *string `thrift:"last_error_key,7,optional" frugal:"7,optional,string" json:"last_error_key,omitempty"`
+}
+
+func NewReportConfigurationApplyRequest() *ReportConfigurationApplyRequest {
+	return &ReportConfigurationApplyRequest{}
+}
+
+func (p *ReportConfigurationApplyRequest) InitDefault() {
+}
+
+func (p *ReportConfigurationApplyRequest) GetMessageId() (v string) {
+	return p.MessageId
+}
+
+func (p *ReportConfigurationApplyRequest) GetNamespace() (v string) {
+	return p.Namespace
+}
+
+func (p *ReportConfigurationApplyRequest) GetRevision() (v int64) {
+	return p.Revision
+}
+
+func (p *ReportConfigurationApplyRequest) GetConsumer() (v string) {
+	return p.Consumer
+}
+
+func (p *ReportConfigurationApplyRequest) GetStatus() (v string) {
+	return p.Status
+}
+
+func (p *ReportConfigurationApplyRequest) GetAttempts() (v int32) {
+	return p.Attempts
+}
+
+var ReportConfigurationApplyRequest_LastErrorKey_DEFAULT string
+
+func (p *ReportConfigurationApplyRequest) GetLastErrorKey() (v string) {
+	if !p.IsSetLastErrorKey() {
+		return ReportConfigurationApplyRequest_LastErrorKey_DEFAULT
+	}
+	return *p.LastErrorKey
+}
+func (p *ReportConfigurationApplyRequest) SetMessageId(val string) {
+	p.MessageId = val
+}
+func (p *ReportConfigurationApplyRequest) SetNamespace(val string) {
+	p.Namespace = val
+}
+func (p *ReportConfigurationApplyRequest) SetRevision(val int64) {
+	p.Revision = val
+}
+func (p *ReportConfigurationApplyRequest) SetConsumer(val string) {
+	p.Consumer = val
+}
+func (p *ReportConfigurationApplyRequest) SetStatus(val string) {
+	p.Status = val
+}
+func (p *ReportConfigurationApplyRequest) SetAttempts(val int32) {
+	p.Attempts = val
+}
+func (p *ReportConfigurationApplyRequest) SetLastErrorKey(val *string) {
+	p.LastErrorKey = val
+}
+
+func (p *ReportConfigurationApplyRequest) IsSetLastErrorKey() bool {
+	return p.LastErrorKey != nil
+}
+
+func (p *ReportConfigurationApplyRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("ReportConfigurationApplyRequest(%+v)", *p)
+}
+
+var fieldIDToName_ReportConfigurationApplyRequest = map[int16]string{
+	1: "message_id",
+	2: "namespace",
+	3: "revision",
+	4: "consumer",
+	5: "status",
+	6: "attempts",
+	7: "last_error_key",
+}
+
+type ConfigurationDelivery struct {
+	MessageId    string  `thrift:"message_id,1,required" frugal:"1,required,string" json:"message_id"`
+	Namespace    string  `thrift:"namespace,2,required" frugal:"2,required,string" json:"namespace"`
+	Revision     int64   `thrift:"revision,3,required" frugal:"3,required,i64" json:"revision"`
+	Status       string  `thrift:"status,4,required" frugal:"4,required,string" json:"status"`
+	Attempts     int32   `thrift:"attempts,5,required" frugal:"5,required,i32" json:"attempts"`
+	LastErrorKey *string `thrift:"last_error_key,6,optional" frugal:"6,optional,string" json:"last_error_key,omitempty"`
+	PublishedAt  *string `thrift:"published_at,7,optional" frugal:"7,optional,string" json:"published_at,omitempty"`
+}
+
+func NewConfigurationDelivery() *ConfigurationDelivery {
+	return &ConfigurationDelivery{}
+}
+
+func (p *ConfigurationDelivery) InitDefault() {
+}
+
+func (p *ConfigurationDelivery) GetMessageId() (v string) {
+	return p.MessageId
+}
+
+func (p *ConfigurationDelivery) GetNamespace() (v string) {
+	return p.Namespace
+}
+
+func (p *ConfigurationDelivery) GetRevision() (v int64) {
+	return p.Revision
+}
+
+func (p *ConfigurationDelivery) GetStatus() (v string) {
+	return p.Status
+}
+
+func (p *ConfigurationDelivery) GetAttempts() (v int32) {
+	return p.Attempts
+}
+
+var ConfigurationDelivery_LastErrorKey_DEFAULT string
+
+func (p *ConfigurationDelivery) GetLastErrorKey() (v string) {
+	if !p.IsSetLastErrorKey() {
+		return ConfigurationDelivery_LastErrorKey_DEFAULT
+	}
+	return *p.LastErrorKey
+}
+
+var ConfigurationDelivery_PublishedAt_DEFAULT string
+
+func (p *ConfigurationDelivery) GetPublishedAt() (v string) {
+	if !p.IsSetPublishedAt() {
+		return ConfigurationDelivery_PublishedAt_DEFAULT
+	}
+	return *p.PublishedAt
+}
+func (p *ConfigurationDelivery) SetMessageId(val string) {
+	p.MessageId = val
+}
+func (p *ConfigurationDelivery) SetNamespace(val string) {
+	p.Namespace = val
+}
+func (p *ConfigurationDelivery) SetRevision(val int64) {
+	p.Revision = val
+}
+func (p *ConfigurationDelivery) SetStatus(val string) {
+	p.Status = val
+}
+func (p *ConfigurationDelivery) SetAttempts(val int32) {
+	p.Attempts = val
+}
+func (p *ConfigurationDelivery) SetLastErrorKey(val *string) {
+	p.LastErrorKey = val
+}
+func (p *ConfigurationDelivery) SetPublishedAt(val *string) {
+	p.PublishedAt = val
+}
+
+func (p *ConfigurationDelivery) IsSetLastErrorKey() bool {
+	return p.LastErrorKey != nil
+}
+
+func (p *ConfigurationDelivery) IsSetPublishedAt() bool {
+	return p.PublishedAt != nil
+}
+
+func (p *ConfigurationDelivery) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("ConfigurationDelivery(%+v)", *p)
+}
+
+var fieldIDToName_ConfigurationDelivery = map[int16]string{
+	1: "message_id",
+	2: "namespace",
+	3: "revision",
+	4: "status",
+	5: "attempts",
+	6: "last_error_key",
+	7: "published_at",
+}
+
 type PlatformService interface {
 	Ping(ctx context.Context, request *common.PingRequest) (r *common.PingResponse, err error)
+
+	Live(ctx context.Context, request *common.PingRequest) (r *common.PingResponse, err error)
+
+	GetSiteProfile(ctx context.Context, request *common.EmptyResponse) (r *SiteProfile, err error)
+
+	GetConfiguration(ctx context.Context, request *GetConfigurationRequest) (r *Configuration, err error)
+
+	PutConfiguration(ctx context.Context, request *PutConfigurationRequest) (r *Configuration, err error)
+
+	GetConfigurationDelivery(ctx context.Context, request *GetConfigurationDeliveryRequest) (r *ConfigurationDelivery, err error)
+
+	GetConsumerConfiguration(ctx context.Context, request *GetConsumerConfigurationRequest) (r *Configuration, err error)
+
+	GetConsumerState(ctx context.Context, request *GetConsumerStateRequest) (r *ConsumerConfigurationState, err error)
+
+	ReportConfigurationApply(ctx context.Context, request *ReportConfigurationApplyRequest) (r *common.EmptyResponse, err error)
 }
 
 type PlatformServicePingArgs struct {
@@ -85,5 +852,613 @@ func (p *PlatformServicePingResult) String() string {
 }
 
 var fieldIDToName_PlatformServicePingResult = map[int16]string{
+	0: "success",
+}
+
+type PlatformServiceLiveArgs struct {
+	Request *common.PingRequest `thrift:"request,1" frugal:"1,default,common.PingRequest" json:"request"`
+}
+
+func NewPlatformServiceLiveArgs() *PlatformServiceLiveArgs {
+	return &PlatformServiceLiveArgs{}
+}
+
+func (p *PlatformServiceLiveArgs) InitDefault() {
+}
+
+var PlatformServiceLiveArgs_Request_DEFAULT *common.PingRequest
+
+func (p *PlatformServiceLiveArgs) GetRequest() (v *common.PingRequest) {
+	if !p.IsSetRequest() {
+		return PlatformServiceLiveArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+func (p *PlatformServiceLiveArgs) SetRequest(val *common.PingRequest) {
+	p.Request = val
+}
+
+func (p *PlatformServiceLiveArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *PlatformServiceLiveArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("PlatformServiceLiveArgs(%+v)", *p)
+}
+
+var fieldIDToName_PlatformServiceLiveArgs = map[int16]string{
+	1: "request",
+}
+
+type PlatformServiceLiveResult struct {
+	Success *common.PingResponse `thrift:"success,0,optional" frugal:"0,optional,common.PingResponse" json:"success,omitempty"`
+}
+
+func NewPlatformServiceLiveResult() *PlatformServiceLiveResult {
+	return &PlatformServiceLiveResult{}
+}
+
+func (p *PlatformServiceLiveResult) InitDefault() {
+}
+
+var PlatformServiceLiveResult_Success_DEFAULT *common.PingResponse
+
+func (p *PlatformServiceLiveResult) GetSuccess() (v *common.PingResponse) {
+	if !p.IsSetSuccess() {
+		return PlatformServiceLiveResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *PlatformServiceLiveResult) SetSuccess(x interface{}) {
+	p.Success = x.(*common.PingResponse)
+}
+
+func (p *PlatformServiceLiveResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *PlatformServiceLiveResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("PlatformServiceLiveResult(%+v)", *p)
+}
+
+var fieldIDToName_PlatformServiceLiveResult = map[int16]string{
+	0: "success",
+}
+
+type PlatformServiceGetSiteProfileArgs struct {
+	Request *common.EmptyResponse `thrift:"request,1" frugal:"1,default,common.EmptyResponse" json:"request"`
+}
+
+func NewPlatformServiceGetSiteProfileArgs() *PlatformServiceGetSiteProfileArgs {
+	return &PlatformServiceGetSiteProfileArgs{}
+}
+
+func (p *PlatformServiceGetSiteProfileArgs) InitDefault() {
+}
+
+var PlatformServiceGetSiteProfileArgs_Request_DEFAULT *common.EmptyResponse
+
+func (p *PlatformServiceGetSiteProfileArgs) GetRequest() (v *common.EmptyResponse) {
+	if !p.IsSetRequest() {
+		return PlatformServiceGetSiteProfileArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+func (p *PlatformServiceGetSiteProfileArgs) SetRequest(val *common.EmptyResponse) {
+	p.Request = val
+}
+
+func (p *PlatformServiceGetSiteProfileArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *PlatformServiceGetSiteProfileArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("PlatformServiceGetSiteProfileArgs(%+v)", *p)
+}
+
+var fieldIDToName_PlatformServiceGetSiteProfileArgs = map[int16]string{
+	1: "request",
+}
+
+type PlatformServiceGetSiteProfileResult struct {
+	Success *SiteProfile `thrift:"success,0,optional" frugal:"0,optional,SiteProfile" json:"success,omitempty"`
+}
+
+func NewPlatformServiceGetSiteProfileResult() *PlatformServiceGetSiteProfileResult {
+	return &PlatformServiceGetSiteProfileResult{}
+}
+
+func (p *PlatformServiceGetSiteProfileResult) InitDefault() {
+}
+
+var PlatformServiceGetSiteProfileResult_Success_DEFAULT *SiteProfile
+
+func (p *PlatformServiceGetSiteProfileResult) GetSuccess() (v *SiteProfile) {
+	if !p.IsSetSuccess() {
+		return PlatformServiceGetSiteProfileResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *PlatformServiceGetSiteProfileResult) SetSuccess(x interface{}) {
+	p.Success = x.(*SiteProfile)
+}
+
+func (p *PlatformServiceGetSiteProfileResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *PlatformServiceGetSiteProfileResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("PlatformServiceGetSiteProfileResult(%+v)", *p)
+}
+
+var fieldIDToName_PlatformServiceGetSiteProfileResult = map[int16]string{
+	0: "success",
+}
+
+type PlatformServiceGetConfigurationArgs struct {
+	Request *GetConfigurationRequest `thrift:"request,1" frugal:"1,default,GetConfigurationRequest" json:"request"`
+}
+
+func NewPlatformServiceGetConfigurationArgs() *PlatformServiceGetConfigurationArgs {
+	return &PlatformServiceGetConfigurationArgs{}
+}
+
+func (p *PlatformServiceGetConfigurationArgs) InitDefault() {
+}
+
+var PlatformServiceGetConfigurationArgs_Request_DEFAULT *GetConfigurationRequest
+
+func (p *PlatformServiceGetConfigurationArgs) GetRequest() (v *GetConfigurationRequest) {
+	if !p.IsSetRequest() {
+		return PlatformServiceGetConfigurationArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+func (p *PlatformServiceGetConfigurationArgs) SetRequest(val *GetConfigurationRequest) {
+	p.Request = val
+}
+
+func (p *PlatformServiceGetConfigurationArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *PlatformServiceGetConfigurationArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("PlatformServiceGetConfigurationArgs(%+v)", *p)
+}
+
+var fieldIDToName_PlatformServiceGetConfigurationArgs = map[int16]string{
+	1: "request",
+}
+
+type PlatformServiceGetConfigurationResult struct {
+	Success *Configuration `thrift:"success,0,optional" frugal:"0,optional,Configuration" json:"success,omitempty"`
+}
+
+func NewPlatformServiceGetConfigurationResult() *PlatformServiceGetConfigurationResult {
+	return &PlatformServiceGetConfigurationResult{}
+}
+
+func (p *PlatformServiceGetConfigurationResult) InitDefault() {
+}
+
+var PlatformServiceGetConfigurationResult_Success_DEFAULT *Configuration
+
+func (p *PlatformServiceGetConfigurationResult) GetSuccess() (v *Configuration) {
+	if !p.IsSetSuccess() {
+		return PlatformServiceGetConfigurationResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *PlatformServiceGetConfigurationResult) SetSuccess(x interface{}) {
+	p.Success = x.(*Configuration)
+}
+
+func (p *PlatformServiceGetConfigurationResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *PlatformServiceGetConfigurationResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("PlatformServiceGetConfigurationResult(%+v)", *p)
+}
+
+var fieldIDToName_PlatformServiceGetConfigurationResult = map[int16]string{
+	0: "success",
+}
+
+type PlatformServicePutConfigurationArgs struct {
+	Request *PutConfigurationRequest `thrift:"request,1" frugal:"1,default,PutConfigurationRequest" json:"request"`
+}
+
+func NewPlatformServicePutConfigurationArgs() *PlatformServicePutConfigurationArgs {
+	return &PlatformServicePutConfigurationArgs{}
+}
+
+func (p *PlatformServicePutConfigurationArgs) InitDefault() {
+}
+
+var PlatformServicePutConfigurationArgs_Request_DEFAULT *PutConfigurationRequest
+
+func (p *PlatformServicePutConfigurationArgs) GetRequest() (v *PutConfigurationRequest) {
+	if !p.IsSetRequest() {
+		return PlatformServicePutConfigurationArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+func (p *PlatformServicePutConfigurationArgs) SetRequest(val *PutConfigurationRequest) {
+	p.Request = val
+}
+
+func (p *PlatformServicePutConfigurationArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *PlatformServicePutConfigurationArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("PlatformServicePutConfigurationArgs(%+v)", *p)
+}
+
+var fieldIDToName_PlatformServicePutConfigurationArgs = map[int16]string{
+	1: "request",
+}
+
+type PlatformServicePutConfigurationResult struct {
+	Success *Configuration `thrift:"success,0,optional" frugal:"0,optional,Configuration" json:"success,omitempty"`
+}
+
+func NewPlatformServicePutConfigurationResult() *PlatformServicePutConfigurationResult {
+	return &PlatformServicePutConfigurationResult{}
+}
+
+func (p *PlatformServicePutConfigurationResult) InitDefault() {
+}
+
+var PlatformServicePutConfigurationResult_Success_DEFAULT *Configuration
+
+func (p *PlatformServicePutConfigurationResult) GetSuccess() (v *Configuration) {
+	if !p.IsSetSuccess() {
+		return PlatformServicePutConfigurationResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *PlatformServicePutConfigurationResult) SetSuccess(x interface{}) {
+	p.Success = x.(*Configuration)
+}
+
+func (p *PlatformServicePutConfigurationResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *PlatformServicePutConfigurationResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("PlatformServicePutConfigurationResult(%+v)", *p)
+}
+
+var fieldIDToName_PlatformServicePutConfigurationResult = map[int16]string{
+	0: "success",
+}
+
+type PlatformServiceGetConfigurationDeliveryArgs struct {
+	Request *GetConfigurationDeliveryRequest `thrift:"request,1" frugal:"1,default,GetConfigurationDeliveryRequest" json:"request"`
+}
+
+func NewPlatformServiceGetConfigurationDeliveryArgs() *PlatformServiceGetConfigurationDeliveryArgs {
+	return &PlatformServiceGetConfigurationDeliveryArgs{}
+}
+
+func (p *PlatformServiceGetConfigurationDeliveryArgs) InitDefault() {
+}
+
+var PlatformServiceGetConfigurationDeliveryArgs_Request_DEFAULT *GetConfigurationDeliveryRequest
+
+func (p *PlatformServiceGetConfigurationDeliveryArgs) GetRequest() (v *GetConfigurationDeliveryRequest) {
+	if !p.IsSetRequest() {
+		return PlatformServiceGetConfigurationDeliveryArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+func (p *PlatformServiceGetConfigurationDeliveryArgs) SetRequest(val *GetConfigurationDeliveryRequest) {
+	p.Request = val
+}
+
+func (p *PlatformServiceGetConfigurationDeliveryArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *PlatformServiceGetConfigurationDeliveryArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("PlatformServiceGetConfigurationDeliveryArgs(%+v)", *p)
+}
+
+var fieldIDToName_PlatformServiceGetConfigurationDeliveryArgs = map[int16]string{
+	1: "request",
+}
+
+type PlatformServiceGetConfigurationDeliveryResult struct {
+	Success *ConfigurationDelivery `thrift:"success,0,optional" frugal:"0,optional,ConfigurationDelivery" json:"success,omitempty"`
+}
+
+func NewPlatformServiceGetConfigurationDeliveryResult() *PlatformServiceGetConfigurationDeliveryResult {
+	return &PlatformServiceGetConfigurationDeliveryResult{}
+}
+
+func (p *PlatformServiceGetConfigurationDeliveryResult) InitDefault() {
+}
+
+var PlatformServiceGetConfigurationDeliveryResult_Success_DEFAULT *ConfigurationDelivery
+
+func (p *PlatformServiceGetConfigurationDeliveryResult) GetSuccess() (v *ConfigurationDelivery) {
+	if !p.IsSetSuccess() {
+		return PlatformServiceGetConfigurationDeliveryResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *PlatformServiceGetConfigurationDeliveryResult) SetSuccess(x interface{}) {
+	p.Success = x.(*ConfigurationDelivery)
+}
+
+func (p *PlatformServiceGetConfigurationDeliveryResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *PlatformServiceGetConfigurationDeliveryResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("PlatformServiceGetConfigurationDeliveryResult(%+v)", *p)
+}
+
+var fieldIDToName_PlatformServiceGetConfigurationDeliveryResult = map[int16]string{
+	0: "success",
+}
+
+type PlatformServiceGetConsumerConfigurationArgs struct {
+	Request *GetConsumerConfigurationRequest `thrift:"request,1" frugal:"1,default,GetConsumerConfigurationRequest" json:"request"`
+}
+
+func NewPlatformServiceGetConsumerConfigurationArgs() *PlatformServiceGetConsumerConfigurationArgs {
+	return &PlatformServiceGetConsumerConfigurationArgs{}
+}
+
+func (p *PlatformServiceGetConsumerConfigurationArgs) InitDefault() {
+}
+
+var PlatformServiceGetConsumerConfigurationArgs_Request_DEFAULT *GetConsumerConfigurationRequest
+
+func (p *PlatformServiceGetConsumerConfigurationArgs) GetRequest() (v *GetConsumerConfigurationRequest) {
+	if !p.IsSetRequest() {
+		return PlatformServiceGetConsumerConfigurationArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+func (p *PlatformServiceGetConsumerConfigurationArgs) SetRequest(val *GetConsumerConfigurationRequest) {
+	p.Request = val
+}
+
+func (p *PlatformServiceGetConsumerConfigurationArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *PlatformServiceGetConsumerConfigurationArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("PlatformServiceGetConsumerConfigurationArgs(%+v)", *p)
+}
+
+var fieldIDToName_PlatformServiceGetConsumerConfigurationArgs = map[int16]string{
+	1: "request",
+}
+
+type PlatformServiceGetConsumerConfigurationResult struct {
+	Success *Configuration `thrift:"success,0,optional" frugal:"0,optional,Configuration" json:"success,omitempty"`
+}
+
+func NewPlatformServiceGetConsumerConfigurationResult() *PlatformServiceGetConsumerConfigurationResult {
+	return &PlatformServiceGetConsumerConfigurationResult{}
+}
+
+func (p *PlatformServiceGetConsumerConfigurationResult) InitDefault() {
+}
+
+var PlatformServiceGetConsumerConfigurationResult_Success_DEFAULT *Configuration
+
+func (p *PlatformServiceGetConsumerConfigurationResult) GetSuccess() (v *Configuration) {
+	if !p.IsSetSuccess() {
+		return PlatformServiceGetConsumerConfigurationResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *PlatformServiceGetConsumerConfigurationResult) SetSuccess(x interface{}) {
+	p.Success = x.(*Configuration)
+}
+
+func (p *PlatformServiceGetConsumerConfigurationResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *PlatformServiceGetConsumerConfigurationResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("PlatformServiceGetConsumerConfigurationResult(%+v)", *p)
+}
+
+var fieldIDToName_PlatformServiceGetConsumerConfigurationResult = map[int16]string{
+	0: "success",
+}
+
+type PlatformServiceGetConsumerStateArgs struct {
+	Request *GetConsumerStateRequest `thrift:"request,1" frugal:"1,default,GetConsumerStateRequest" json:"request"`
+}
+
+func NewPlatformServiceGetConsumerStateArgs() *PlatformServiceGetConsumerStateArgs {
+	return &PlatformServiceGetConsumerStateArgs{}
+}
+
+func (p *PlatformServiceGetConsumerStateArgs) InitDefault() {
+}
+
+var PlatformServiceGetConsumerStateArgs_Request_DEFAULT *GetConsumerStateRequest
+
+func (p *PlatformServiceGetConsumerStateArgs) GetRequest() (v *GetConsumerStateRequest) {
+	if !p.IsSetRequest() {
+		return PlatformServiceGetConsumerStateArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+func (p *PlatformServiceGetConsumerStateArgs) SetRequest(val *GetConsumerStateRequest) {
+	p.Request = val
+}
+
+func (p *PlatformServiceGetConsumerStateArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *PlatformServiceGetConsumerStateArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("PlatformServiceGetConsumerStateArgs(%+v)", *p)
+}
+
+var fieldIDToName_PlatformServiceGetConsumerStateArgs = map[int16]string{
+	1: "request",
+}
+
+type PlatformServiceGetConsumerStateResult struct {
+	Success *ConsumerConfigurationState `thrift:"success,0,optional" frugal:"0,optional,ConsumerConfigurationState" json:"success,omitempty"`
+}
+
+func NewPlatformServiceGetConsumerStateResult() *PlatformServiceGetConsumerStateResult {
+	return &PlatformServiceGetConsumerStateResult{}
+}
+
+func (p *PlatformServiceGetConsumerStateResult) InitDefault() {
+}
+
+var PlatformServiceGetConsumerStateResult_Success_DEFAULT *ConsumerConfigurationState
+
+func (p *PlatformServiceGetConsumerStateResult) GetSuccess() (v *ConsumerConfigurationState) {
+	if !p.IsSetSuccess() {
+		return PlatformServiceGetConsumerStateResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *PlatformServiceGetConsumerStateResult) SetSuccess(x interface{}) {
+	p.Success = x.(*ConsumerConfigurationState)
+}
+
+func (p *PlatformServiceGetConsumerStateResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *PlatformServiceGetConsumerStateResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("PlatformServiceGetConsumerStateResult(%+v)", *p)
+}
+
+var fieldIDToName_PlatformServiceGetConsumerStateResult = map[int16]string{
+	0: "success",
+}
+
+type PlatformServiceReportConfigurationApplyArgs struct {
+	Request *ReportConfigurationApplyRequest `thrift:"request,1" frugal:"1,default,ReportConfigurationApplyRequest" json:"request"`
+}
+
+func NewPlatformServiceReportConfigurationApplyArgs() *PlatformServiceReportConfigurationApplyArgs {
+	return &PlatformServiceReportConfigurationApplyArgs{}
+}
+
+func (p *PlatformServiceReportConfigurationApplyArgs) InitDefault() {
+}
+
+var PlatformServiceReportConfigurationApplyArgs_Request_DEFAULT *ReportConfigurationApplyRequest
+
+func (p *PlatformServiceReportConfigurationApplyArgs) GetRequest() (v *ReportConfigurationApplyRequest) {
+	if !p.IsSetRequest() {
+		return PlatformServiceReportConfigurationApplyArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+func (p *PlatformServiceReportConfigurationApplyArgs) SetRequest(val *ReportConfigurationApplyRequest) {
+	p.Request = val
+}
+
+func (p *PlatformServiceReportConfigurationApplyArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *PlatformServiceReportConfigurationApplyArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("PlatformServiceReportConfigurationApplyArgs(%+v)", *p)
+}
+
+var fieldIDToName_PlatformServiceReportConfigurationApplyArgs = map[int16]string{
+	1: "request",
+}
+
+type PlatformServiceReportConfigurationApplyResult struct {
+	Success *common.EmptyResponse `thrift:"success,0,optional" frugal:"0,optional,common.EmptyResponse" json:"success,omitempty"`
+}
+
+func NewPlatformServiceReportConfigurationApplyResult() *PlatformServiceReportConfigurationApplyResult {
+	return &PlatformServiceReportConfigurationApplyResult{}
+}
+
+func (p *PlatformServiceReportConfigurationApplyResult) InitDefault() {
+}
+
+var PlatformServiceReportConfigurationApplyResult_Success_DEFAULT *common.EmptyResponse
+
+func (p *PlatformServiceReportConfigurationApplyResult) GetSuccess() (v *common.EmptyResponse) {
+	if !p.IsSetSuccess() {
+		return PlatformServiceReportConfigurationApplyResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *PlatformServiceReportConfigurationApplyResult) SetSuccess(x interface{}) {
+	p.Success = x.(*common.EmptyResponse)
+}
+
+func (p *PlatformServiceReportConfigurationApplyResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *PlatformServiceReportConfigurationApplyResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("PlatformServiceReportConfigurationApplyResult(%+v)", *p)
+}
+
+var fieldIDToName_PlatformServiceReportConfigurationApplyResult = map[int16]string{
 	0: "success",
 }

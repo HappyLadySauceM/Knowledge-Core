@@ -21,6 +21,16 @@ type PublishOptions struct {
 	DeduplicationID string
 }
 
+// StreamConfig declares a service-owned JetStream stream contract. Existing
+// streams are validated rather than silently mutated.
+type StreamConfig struct {
+	Name            string
+	Subjects        []string
+	MaxAge          time.Duration
+	MaxBytes        int64
+	DuplicateWindow time.Duration
+}
+
 // ConsumerConfig configures a durable JetStream consumer.
 type ConsumerConfig struct {
 	Stream            string

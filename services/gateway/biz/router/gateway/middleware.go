@@ -345,3 +345,35 @@ func _restoremediaattachmentMw() []app.HandlerFunc {
 func _getsiteprofileMw() []app.HandlerFunc {
 	return nil
 }
+
+func _adminMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _configurationMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _getconfigurationMw() []app.HandlerFunc {
+	return []app.HandlerFunc{gatewaymiddleware.RequireAuthenticated(), gatewaymiddleware.RequireAdmin()}
+}
+
+func _putconfigurationMw() []app.HandlerFunc {
+	return []app.HandlerFunc{gatewaymiddleware.RequireAuthenticated(), gatewaymiddleware.RequireAdmin()}
+}
+
+func _namespaceMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _deliveriesMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _getconfigurationdeliveryMw() []app.HandlerFunc {
+	return []app.HandlerFunc{gatewaymiddleware.RequireAuthenticated(), gatewaymiddleware.RequireAdmin()}
+}

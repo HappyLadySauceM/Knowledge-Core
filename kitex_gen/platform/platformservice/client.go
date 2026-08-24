@@ -5,6 +5,7 @@ package platformservice
 import (
 	"context"
 	common "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/common"
+	platform "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/platform"
 	client "github.com/cloudwego/kitex/client"
 	callopt "github.com/cloudwego/kitex/client/callopt"
 )
@@ -12,6 +13,14 @@ import (
 // Client is designed to provide IDL-compatible methods with call-option parameter for kitex framework.
 type Client interface {
 	Ping(ctx context.Context, request *common.PingRequest, callOptions ...callopt.Option) (r *common.PingResponse, err error)
+	Live(ctx context.Context, request *common.PingRequest, callOptions ...callopt.Option) (r *common.PingResponse, err error)
+	GetSiteProfile(ctx context.Context, request *common.EmptyResponse, callOptions ...callopt.Option) (r *platform.SiteProfile, err error)
+	GetConfiguration(ctx context.Context, request *platform.GetConfigurationRequest, callOptions ...callopt.Option) (r *platform.Configuration, err error)
+	PutConfiguration(ctx context.Context, request *platform.PutConfigurationRequest, callOptions ...callopt.Option) (r *platform.Configuration, err error)
+	GetConfigurationDelivery(ctx context.Context, request *platform.GetConfigurationDeliveryRequest, callOptions ...callopt.Option) (r *platform.ConfigurationDelivery, err error)
+	GetConsumerConfiguration(ctx context.Context, request *platform.GetConsumerConfigurationRequest, callOptions ...callopt.Option) (r *platform.Configuration, err error)
+	GetConsumerState(ctx context.Context, request *platform.GetConsumerStateRequest, callOptions ...callopt.Option) (r *platform.ConsumerConfigurationState, err error)
+	ReportConfigurationApply(ctx context.Context, request *platform.ReportConfigurationApplyRequest, callOptions ...callopt.Option) (r *common.EmptyResponse, err error)
 }
 
 // NewClient creates a client for the service defined in IDL.
@@ -46,4 +55,44 @@ type kPlatformServiceClient struct {
 func (p *kPlatformServiceClient) Ping(ctx context.Context, request *common.PingRequest, callOptions ...callopt.Option) (r *common.PingResponse, err error) {
 	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
 	return p.kClient.Ping(ctx, request)
+}
+
+func (p *kPlatformServiceClient) Live(ctx context.Context, request *common.PingRequest, callOptions ...callopt.Option) (r *common.PingResponse, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.Live(ctx, request)
+}
+
+func (p *kPlatformServiceClient) GetSiteProfile(ctx context.Context, request *common.EmptyResponse, callOptions ...callopt.Option) (r *platform.SiteProfile, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.GetSiteProfile(ctx, request)
+}
+
+func (p *kPlatformServiceClient) GetConfiguration(ctx context.Context, request *platform.GetConfigurationRequest, callOptions ...callopt.Option) (r *platform.Configuration, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.GetConfiguration(ctx, request)
+}
+
+func (p *kPlatformServiceClient) PutConfiguration(ctx context.Context, request *platform.PutConfigurationRequest, callOptions ...callopt.Option) (r *platform.Configuration, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.PutConfiguration(ctx, request)
+}
+
+func (p *kPlatformServiceClient) GetConfigurationDelivery(ctx context.Context, request *platform.GetConfigurationDeliveryRequest, callOptions ...callopt.Option) (r *platform.ConfigurationDelivery, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.GetConfigurationDelivery(ctx, request)
+}
+
+func (p *kPlatformServiceClient) GetConsumerConfiguration(ctx context.Context, request *platform.GetConsumerConfigurationRequest, callOptions ...callopt.Option) (r *platform.Configuration, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.GetConsumerConfiguration(ctx, request)
+}
+
+func (p *kPlatformServiceClient) GetConsumerState(ctx context.Context, request *platform.GetConsumerStateRequest, callOptions ...callopt.Option) (r *platform.ConsumerConfigurationState, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.GetConsumerState(ctx, request)
+}
+
+func (p *kPlatformServiceClient) ReportConfigurationApply(ctx context.Context, request *platform.ReportConfigurationApplyRequest, callOptions ...callopt.Option) (r *common.EmptyResponse, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.ReportConfigurationApply(ctx, request)
 }

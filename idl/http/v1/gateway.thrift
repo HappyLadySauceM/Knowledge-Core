@@ -28,6 +28,50 @@ struct SiteProfileData {
   5: required double hero_focal_x (api.body="hero_focal_x")
   6: required double hero_focal_y (api.body="hero_focal_y")
   7: required i64 revision (api.body="revision")
+  8: optional string hero_attachment_id (api.body="hero_attachment_id")
+}
+
+struct ConfigurationValueData {
+  1: required string key (api.body="key")
+  2: required string value (api.body="value")
+  3: required bool secret (api.body="secret")
+  4: required bool redacted (api.body="redacted")
+}
+
+struct ConfigurationData {
+  1: required string environment (api.body="environment")
+  2: required string namespace (api.body="namespace")
+  3: required i64 revision (api.body="revision")
+  4: required i32 schema_version (api.body="schema_version")
+  5: required list<ConfigurationValueData> values (api.body="values")
+  6: required string updated_at (api.body="updated_at")
+  7: required string updated_by (api.body="updated_by")
+}
+
+struct GetConfigurationRequest {
+  1: required string namespace (api.path="namespace")
+}
+
+struct PutConfigurationRequest {
+  1: required string namespace (api.path="namespace")
+  2: required string if_match (api.header="If-Match")
+  3: required string idempotency_key (api.header="Idempotency-Key")
+  4: required map<string, string> values (api.body="values")
+}
+
+struct GetConfigurationDeliveryRequest {
+  1: required string namespace (api.path="namespace")
+  2: required i64 revision (api.path="revision")
+}
+
+struct ConfigurationDeliveryData {
+  1: required string message_id (api.body="message_id")
+  2: required string namespace (api.body="namespace")
+  3: required i64 revision (api.body="revision")
+  4: required string status (api.body="status")
+  5: required i32 attempts (api.body="attempts")
+  6: optional string last_error_key (api.body="last_error_key")
+  7: optional string published_at (api.body="published_at")
 }
 
 struct UserData {
@@ -424,6 +468,9 @@ service GatewayService {
   DocumentPageData ListPublishedDocuments(1: ListDocumentsRequest request) (api.get="/api/v1/documents")
   DocumentDetailData GetPublishedDocument(1: SlugRequest request) (api.get="/api/v1/documents/:slug")
   SiteProfileData GetSiteProfile(1: EmptyRequest request) (api.get="/api/v1/site-profile")
+  ConfigurationData GetConfiguration(1: GetConfigurationRequest request) (api.get="/api/v1/admin/configuration/:namespace")
+  ConfigurationData PutConfiguration(1: PutConfigurationRequest request) (api.put="/api/v1/admin/configuration/:namespace")
+  ConfigurationDeliveryData GetConfigurationDelivery(1: GetConfigurationDeliveryRequest request) (api.get="/api/v1/admin/configuration/:namespace/deliveries/:revision")
   EmptyResponse GetAttachmentContent(1: PublicAttachmentRequest request) (api.get="/api/v1/attachments/:attachment_id/content")
   MediaAttachmentListData ListMediaAttachments(1: ListMediaAttachmentsRequest request) (api.get="/api/v1/attachments")
   MediaAttachmentUploadData CreateMediaAttachment(1: CreateMediaAttachmentRequest request) (api.post="/api/v1/attachments")

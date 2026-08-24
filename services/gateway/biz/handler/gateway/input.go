@@ -88,6 +88,10 @@ type completeMediaAttachmentBody struct {
 	Parts    []completeMediaAttachmentPartBody `json:"parts"`
 }
 
+type putConfigurationBody struct {
+	Values map[string]string `json:"values"`
+}
+
 func decodeJSONBody(request *app.RequestContext, target any) error {
 	if request == nil || target == nil {
 		return errors.New("request and target are required")
@@ -240,6 +244,51 @@ func expectedRevision(request *app.RequestContext) (int64, error) {
 		return 0, errors.New("If-Match must be a strong numeric ETag")
 	}
 	return revision, nil
+}
+
+func expectedConfigurationRevision(request *app.RequestContext) (int64, error) {
+	value, present, err := singleHeader(request, "If-Match")
+	if err != nil || !present || len(value) < 3 || value[0] != '"' || value[len(value)-1] != '"' {
+		return 0, errors.New("If-Match must be a strong non-negative numeric ETag")
+	}
+	decimal := value[1 : len(value)-1]
+	if decimal == "0" {
+		return 0, nil
+	}
+	if !positiveDecimalPattern.MatchString(decimal) {
+		return 0, errors.New("If-Match must be a strong non-negative numeric ETag")
+	}
+	revision, parseErr := strconv.ParseInt(decimal, 10, 64)
+	if parseErr != nil || formatETag(revision) != value {
+		return 0, errors.New("If-Match must be a strong non-negative numeric ETag")
+	}
+	return revision, nil
+}
+
+func configurationNamespace(request *app.RequestContext) (string, error) {
+	if request == nil {
+		return "", errors.New("request is required")
+	}
+	value := request.Param("namespace")
+	if value != "site" && value != "email" && value != "ai" {
+		return "", errors.New("configuration namespace is invalid")
+	}
+	return value, nil
+}
+
+func configurationRevision(request *app.RequestContext) (int64, error) {
+	if request == nil {
+		return 0, errors.New("request is required")
+	}
+	value := request.Param("revision")
+	if !positiveDecimalPattern.MatchString(value) {
+		return 0, errors.New("configuration revision is invalid")
+	}
+	parsed, err := strconv.ParseInt(value, 10, 64)
+	if err != nil || strconv.FormatInt(parsed, 10) != value {
+		return 0, errors.New("configuration revision is invalid")
+	}
+	return parsed, nil
 }
 
 func formatETag(revision int64) string {

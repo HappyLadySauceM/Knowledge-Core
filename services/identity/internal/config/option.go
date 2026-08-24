@@ -61,6 +61,7 @@ type AuthOptions struct {
 	RefreshTokenPepper        string        `mapstructure:"refresh_token_pepper" json:"refresh_token_pepper" yaml:"refresh_token_pepper"`
 	RefreshTokenEncryptionKey string        `mapstructure:"refresh_token_encryption_key" json:"refresh_token_encryption_key" yaml:"refresh_token_encryption_key"`
 	EmailEncryptionKey        string        `mapstructure:"email_encryption_key" json:"email_encryption_key" yaml:"email_encryption_key"`
+	PlatformServiceToken      string        `mapstructure:"platform_service_token" json:"platform_service_token" yaml:"platform_service_token"`
 }
 
 func NewAuthOptions() *AuthOptions {
@@ -75,6 +76,10 @@ func NewAuthOptions() *AuthOptions {
 }
 
 func (o AuthOptions) Validate() error {
+	var platformTokenErr error
+	if strings.TrimSpace(o.PlatformServiceToken) == "" {
+		platformTokenErr = fmt.Errorf("platform_service_token is required")
+	}
 	var thresholdErr error
 	if o.FailureThreshold < 2 || o.FailureThreshold > 100 {
 		thresholdErr = fmt.Errorf("failure_threshold must be between 2 and 100, got %d", o.FailureThreshold)
@@ -100,6 +105,7 @@ func (o AuthOptions) Validate() error {
 		actionErr = fmt.Errorf("action_token_ttl must be positive")
 	}
 	return errors.Join(
+		platformTokenErr,
 		thresholdErr,
 		ttlErr,
 		lockErr,

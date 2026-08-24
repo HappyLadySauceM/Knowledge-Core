@@ -21,6 +21,62 @@ var serviceMethods = map[string]kitex.MethodInfo{
 		false,
 		kitex.WithStreamingMode(kitex.StreamingNone),
 	),
+	"Live": kitex.NewMethodInfo(
+		liveHandler,
+		newPlatformServiceLiveArgs,
+		newPlatformServiceLiveResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
+	"GetSiteProfile": kitex.NewMethodInfo(
+		getSiteProfileHandler,
+		newPlatformServiceGetSiteProfileArgs,
+		newPlatformServiceGetSiteProfileResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
+	"GetConfiguration": kitex.NewMethodInfo(
+		getConfigurationHandler,
+		newPlatformServiceGetConfigurationArgs,
+		newPlatformServiceGetConfigurationResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
+	"PutConfiguration": kitex.NewMethodInfo(
+		putConfigurationHandler,
+		newPlatformServicePutConfigurationArgs,
+		newPlatformServicePutConfigurationResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
+	"GetConfigurationDelivery": kitex.NewMethodInfo(
+		getConfigurationDeliveryHandler,
+		newPlatformServiceGetConfigurationDeliveryArgs,
+		newPlatformServiceGetConfigurationDeliveryResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
+	"GetConsumerConfiguration": kitex.NewMethodInfo(
+		getConsumerConfigurationHandler,
+		newPlatformServiceGetConsumerConfigurationArgs,
+		newPlatformServiceGetConsumerConfigurationResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
+	"GetConsumerState": kitex.NewMethodInfo(
+		getConsumerStateHandler,
+		newPlatformServiceGetConsumerStateArgs,
+		newPlatformServiceGetConsumerStateResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
+	"ReportConfigurationApply": kitex.NewMethodInfo(
+		reportConfigurationApplyHandler,
+		newPlatformServiceReportConfigurationApplyArgs,
+		newPlatformServiceReportConfigurationApplyResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
 }
 
 var (
@@ -105,6 +161,150 @@ func newPlatformServicePingResult() interface{} {
 	return platform.NewPlatformServicePingResult()
 }
 
+func liveHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*platform.PlatformServiceLiveArgs)
+	realResult := result.(*platform.PlatformServiceLiveResult)
+	success, err := handler.(platform.PlatformService).Live(ctx, realArg.Request)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newPlatformServiceLiveArgs() interface{} {
+	return platform.NewPlatformServiceLiveArgs()
+}
+
+func newPlatformServiceLiveResult() interface{} {
+	return platform.NewPlatformServiceLiveResult()
+}
+
+func getSiteProfileHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*platform.PlatformServiceGetSiteProfileArgs)
+	realResult := result.(*platform.PlatformServiceGetSiteProfileResult)
+	success, err := handler.(platform.PlatformService).GetSiteProfile(ctx, realArg.Request)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newPlatformServiceGetSiteProfileArgs() interface{} {
+	return platform.NewPlatformServiceGetSiteProfileArgs()
+}
+
+func newPlatformServiceGetSiteProfileResult() interface{} {
+	return platform.NewPlatformServiceGetSiteProfileResult()
+}
+
+func getConfigurationHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*platform.PlatformServiceGetConfigurationArgs)
+	realResult := result.(*platform.PlatformServiceGetConfigurationResult)
+	success, err := handler.(platform.PlatformService).GetConfiguration(ctx, realArg.Request)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newPlatformServiceGetConfigurationArgs() interface{} {
+	return platform.NewPlatformServiceGetConfigurationArgs()
+}
+
+func newPlatformServiceGetConfigurationResult() interface{} {
+	return platform.NewPlatformServiceGetConfigurationResult()
+}
+
+func putConfigurationHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*platform.PlatformServicePutConfigurationArgs)
+	realResult := result.(*platform.PlatformServicePutConfigurationResult)
+	success, err := handler.(platform.PlatformService).PutConfiguration(ctx, realArg.Request)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newPlatformServicePutConfigurationArgs() interface{} {
+	return platform.NewPlatformServicePutConfigurationArgs()
+}
+
+func newPlatformServicePutConfigurationResult() interface{} {
+	return platform.NewPlatformServicePutConfigurationResult()
+}
+
+func getConfigurationDeliveryHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*platform.PlatformServiceGetConfigurationDeliveryArgs)
+	realResult := result.(*platform.PlatformServiceGetConfigurationDeliveryResult)
+	success, err := handler.(platform.PlatformService).GetConfigurationDelivery(ctx, realArg.Request)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newPlatformServiceGetConfigurationDeliveryArgs() interface{} {
+	return platform.NewPlatformServiceGetConfigurationDeliveryArgs()
+}
+
+func newPlatformServiceGetConfigurationDeliveryResult() interface{} {
+	return platform.NewPlatformServiceGetConfigurationDeliveryResult()
+}
+
+func getConsumerConfigurationHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*platform.PlatformServiceGetConsumerConfigurationArgs)
+	realResult := result.(*platform.PlatformServiceGetConsumerConfigurationResult)
+	success, err := handler.(platform.PlatformService).GetConsumerConfiguration(ctx, realArg.Request)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newPlatformServiceGetConsumerConfigurationArgs() interface{} {
+	return platform.NewPlatformServiceGetConsumerConfigurationArgs()
+}
+
+func newPlatformServiceGetConsumerConfigurationResult() interface{} {
+	return platform.NewPlatformServiceGetConsumerConfigurationResult()
+}
+
+func getConsumerStateHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*platform.PlatformServiceGetConsumerStateArgs)
+	realResult := result.(*platform.PlatformServiceGetConsumerStateResult)
+	success, err := handler.(platform.PlatformService).GetConsumerState(ctx, realArg.Request)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newPlatformServiceGetConsumerStateArgs() interface{} {
+	return platform.NewPlatformServiceGetConsumerStateArgs()
+}
+
+func newPlatformServiceGetConsumerStateResult() interface{} {
+	return platform.NewPlatformServiceGetConsumerStateResult()
+}
+
+func reportConfigurationApplyHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*platform.PlatformServiceReportConfigurationApplyArgs)
+	realResult := result.(*platform.PlatformServiceReportConfigurationApplyResult)
+	success, err := handler.(platform.PlatformService).ReportConfigurationApply(ctx, realArg.Request)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newPlatformServiceReportConfigurationApplyArgs() interface{} {
+	return platform.NewPlatformServiceReportConfigurationApplyArgs()
+}
+
+func newPlatformServiceReportConfigurationApplyResult() interface{} {
+	return platform.NewPlatformServiceReportConfigurationApplyResult()
+}
+
 type kClient struct {
 	c client.Client
 }
@@ -120,6 +320,86 @@ func (p *kClient) Ping(ctx context.Context, request *common.PingRequest) (r *com
 	_args.Request = request
 	var _result platform.PlatformServicePingResult
 	if err = p.c.Call(ctx, "Ping", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) Live(ctx context.Context, request *common.PingRequest) (r *common.PingResponse, err error) {
+	var _args platform.PlatformServiceLiveArgs
+	_args.Request = request
+	var _result platform.PlatformServiceLiveResult
+	if err = p.c.Call(ctx, "Live", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) GetSiteProfile(ctx context.Context, request *common.EmptyResponse) (r *platform.SiteProfile, err error) {
+	var _args platform.PlatformServiceGetSiteProfileArgs
+	_args.Request = request
+	var _result platform.PlatformServiceGetSiteProfileResult
+	if err = p.c.Call(ctx, "GetSiteProfile", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) GetConfiguration(ctx context.Context, request *platform.GetConfigurationRequest) (r *platform.Configuration, err error) {
+	var _args platform.PlatformServiceGetConfigurationArgs
+	_args.Request = request
+	var _result platform.PlatformServiceGetConfigurationResult
+	if err = p.c.Call(ctx, "GetConfiguration", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) PutConfiguration(ctx context.Context, request *platform.PutConfigurationRequest) (r *platform.Configuration, err error) {
+	var _args platform.PlatformServicePutConfigurationArgs
+	_args.Request = request
+	var _result platform.PlatformServicePutConfigurationResult
+	if err = p.c.Call(ctx, "PutConfiguration", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) GetConfigurationDelivery(ctx context.Context, request *platform.GetConfigurationDeliveryRequest) (r *platform.ConfigurationDelivery, err error) {
+	var _args platform.PlatformServiceGetConfigurationDeliveryArgs
+	_args.Request = request
+	var _result platform.PlatformServiceGetConfigurationDeliveryResult
+	if err = p.c.Call(ctx, "GetConfigurationDelivery", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) GetConsumerConfiguration(ctx context.Context, request *platform.GetConsumerConfigurationRequest) (r *platform.Configuration, err error) {
+	var _args platform.PlatformServiceGetConsumerConfigurationArgs
+	_args.Request = request
+	var _result platform.PlatformServiceGetConsumerConfigurationResult
+	if err = p.c.Call(ctx, "GetConsumerConfiguration", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) GetConsumerState(ctx context.Context, request *platform.GetConsumerStateRequest) (r *platform.ConsumerConfigurationState, err error) {
+	var _args platform.PlatformServiceGetConsumerStateArgs
+	_args.Request = request
+	var _result platform.PlatformServiceGetConsumerStateResult
+	if err = p.c.Call(ctx, "GetConsumerState", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) ReportConfigurationApply(ctx context.Context, request *platform.ReportConfigurationApplyRequest) (r *common.EmptyResponse, err error) {
+	var _args platform.PlatformServiceReportConfigurationApplyArgs
+	_args.Request = request
+	var _result platform.PlatformServiceReportConfigurationApplyResult
+	if err = p.c.Call(ctx, "ReportConfigurationApply", &_args, &_result); err != nil {
 		return
 	}
 	return _result.GetSuccess(), nil

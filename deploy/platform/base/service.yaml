@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: knowledge-core-platform
+  labels:
+    app.kubernetes.io/name: knowledge-core-platform
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/part-of: knowledge-core
+    app.kubernetes.io/managed-by: kustomize
+spec:
+  selector:
+    app.kubernetes.io/name: knowledge-core-platform
+  ports:
+    - name: rpc
+      port: 8885
+      targetPort: rpc
+    - name: admin
+      port: 8086
+      targetPort: admin

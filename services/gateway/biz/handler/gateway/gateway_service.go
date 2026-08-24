@@ -621,3 +621,21 @@ func RestoreMediaAttachment(ctx context.Context, c *app.RequestContext) {
 func GetSiteProfile(ctx context.Context, c *app.RequestContext) {
 	handleGetSiteProfile(ctx, c)
 }
+
+// GetConfiguration .
+// @router /api/v1/admin/configuration/:namespace [GET]
+func GetConfiguration(ctx context.Context, c *app.RequestContext) {
+	handleGetConfiguration(ctx, c)
+}
+
+// PutConfiguration .
+// @router /api/v1/admin/configuration/:namespace [PUT]
+func PutConfiguration(ctx context.Context, c *app.RequestContext) {
+	handlePutConfiguration(ctx, c)
+}
+
+// GetConfigurationDelivery .
+// @router /api/v1/admin/configuration/:namespace/deliveries/:revision [GET]
+func GetConfigurationDelivery(ctx context.Context, c *app.RequestContext) {
+	handleGetConfigurationDelivery(ctx, c)
+}

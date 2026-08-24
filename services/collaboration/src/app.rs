@@ -18,8 +18,8 @@ use crate::{
     remote_config::RemoteRuntime,
     routing::{RedisRoutingStore, RoutingService, parse_instance_ordinal},
     rpc::{
-        AlwaysReady, CollaborationHandler, KnowledgeClient, RpcReadiness, RpcServer,
-        tls::RpcIncoming,
+        AlwaysReady, CollaborationHandler, CollaborationHandlerDependencies, KnowledgeClient,
+        RpcReadiness, RpcServer, tls::RpcIncoming,
     },
     storage::{DocumentStore, EventSubjects, PostgresStore, VersionStore, WorkerStore},
     telemetry::{Metrics, Telemetry},
@@ -350,16 +350,16 @@ impl Application {
         let application_readiness: Arc<dyn RpcReadiness> =
             Arc::new(ApplicationReadiness::new(startup.health.clone()));
         let versions: Arc<dyn VersionStore> = postgres.clone();
-        let handler = CollaborationHandler::new(
-            Arc::clone(&knowledge),
-            Arc::clone(&document_store),
-            tickets.clone(),
+        let handler = CollaborationHandler::new(CollaborationHandlerDependencies {
+            knowledge: Arc::clone(&knowledge),
+            documents: Arc::clone(&document_store),
+            tickets: tickets.clone(),
             versions,
-            actors.clone(),
+            actors: actors.clone(),
             routing,
-            &config.ticket,
-            application_readiness,
-        )?;
+            ticket: config.ticket.clone(),
+            readiness: application_readiness,
+        })?;
         let rpc = Arc::new(RpcServer::new(
             &config.rpc,
             handler,

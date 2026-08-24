@@ -169,6 +169,31 @@ services:
       - "8084:8084"
     restart: unless-stopped
 
+  platform:
+    build:
+      context: ../..
+      dockerfile: docker/platform/Dockerfile
+    container_name: knowledge-core-platform
+    environment:
+      PLATFORM_TRACE_ENABLED: "true"
+      PLATFORM_TRACE_ENDPOINT: otel-collector:4317
+      PLATFORM_TRACE_SAMPLE_RATIO: "1"
+      PLATFORM_POSTGRES_HOST: postgres
+      PLATFORM_POSTGRES_PASSWORD: ${KC_POSTGRES_PASSWORD:?KC_POSTGRES_PASSWORD is required}
+      PLATFORM_NATS_SERVERS: nats://nats:4222
+      PLATFORM_AUTH_PUBLIC_KEY: ${KC_AUTH_PUBLIC_KEY:?KC_AUTH_PUBLIC_KEY is required}
+      PLATFORM_ENCRYPTION_KEY_ID: ${KC_CONFIG_KEY_ID:-config-2026-08}
+      PLATFORM_ENCRYPTION_KEK: ${KC_CONFIG_KEK:?KC_CONFIG_KEK is required}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    ports:
+      - "8086:8086"
+      - "8885:8885"
+    restart: unless-stopped
+
   gateway:
     build:
       context: ../..
@@ -182,6 +207,7 @@ services:
       GATEWAY_IDENTITY_RPC_ADDRESS: identity:8881
       GATEWAY_KNOWLEDGE_RPC_ADDRESS: knowledge:8882
       GATEWAY_COLLABORATION_RPC_ADDRESS: collaboration:8883
+      GATEWAY_PLATFORM_RPC_ADDRESS: platform:8885
       GATEWAY_AUTH_PUBLIC_KEY: ${KC_AUTH_PUBLIC_KEY:?KC_AUTH_PUBLIC_KEY is required}
       GATEWAY_ENDPOINTS_PUBLIC_BASE_URL: http://localhost:8080
       GATEWAY_ENDPOINTS_COLLABORATION_WEBSOCKET_BASE_URL: ws://localhost:8091
@@ -194,6 +220,8 @@ services:
       knowledge:
         condition: service_started
       collaboration:
+        condition: service_started
+      platform:
         condition: service_started
     ports:
       - "8080:8080"

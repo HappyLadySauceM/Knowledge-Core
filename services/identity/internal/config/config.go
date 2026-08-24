@@ -13,33 +13,42 @@ import (
 // configuration. Reusable transport and resource settings live in pkg/option;
 // service-specific settings remain in this package.
 type Config struct {
-	App        *option.AppOptions         `mapstructure:"app" json:"app" yaml:"app"`
-	Log        *option.LogOptions         `mapstructure:"log" json:"log" yaml:"log"`
-	Trace      *option.TraceOptions       `mapstructure:"trace" json:"trace" yaml:"trace"`
-	RPC        *option.KitexServerOptions `mapstructure:"rpc" json:"rpc" yaml:"rpc"`
-	HTTP       *option.HertzServerOptions `mapstructure:"http" json:"http" yaml:"http"`
-	PostgreSQL *option.PostgreSQLOptions  `mapstructure:"postgres" json:"postgres" yaml:"postgres"`
-	Redis      *option.RedisOptions       `mapstructure:"redis" json:"redis" yaml:"redis"`
-	Bcrypt     *BcryptOptions             `mapstructure:"bcrypt" json:"bcrypt" yaml:"bcrypt"`
-	SMTP       *SMTPOptions               `mapstructure:"smtp" json:"smtp" yaml:"smtp"`
-	Auth       *AuthOptions               `mapstructure:"auth" json:"auth" yaml:"auth"`
+	App         *option.AppOptions         `mapstructure:"app" json:"app" yaml:"app"`
+	Log         *option.LogOptions         `mapstructure:"log" json:"log" yaml:"log"`
+	Trace       *option.TraceOptions       `mapstructure:"trace" json:"trace" yaml:"trace"`
+	RPC         *option.KitexServerOptions `mapstructure:"rpc" json:"rpc" yaml:"rpc"`
+	HTTP        *option.HertzServerOptions `mapstructure:"http" json:"http" yaml:"http"`
+	PostgreSQL  *option.PostgreSQLOptions  `mapstructure:"postgres" json:"postgres" yaml:"postgres"`
+	Redis       *option.RedisOptions       `mapstructure:"redis" json:"redis" yaml:"redis"`
+	Bcrypt      *BcryptOptions             `mapstructure:"bcrypt" json:"bcrypt" yaml:"bcrypt"`
+	SMTP        *SMTPOptions               `mapstructure:"smtp" json:"smtp" yaml:"smtp"`
+	PlatformRPC *option.KitexClientOptions `mapstructure:"platform_rpc" json:"platform_rpc" yaml:"platform_rpc"`
+	NATS        *option.NATSOptions        `mapstructure:"nats" json:"nats" yaml:"nats"`
+	Auth        *AuthOptions               `mapstructure:"auth" json:"auth" yaml:"auth"`
 }
 
 func New() Config {
 	appOptions := option.NewAppOptions("identity")
 	rpcOptions := option.NewKitexServerOptions()
 	rpcOptions.ServiceName = "knowledge-core.identity"
+	platformRPC := option.NewKitexClientOptions()
+	platformRPC.ServiceName = "knowledge-core.platform"
+	platformRPC.Address = "127.0.0.1:8885"
+	nats := option.NewNATSOptions()
+	nats.Name = "knowledge-core.identity"
 	return Config{
-		App:        appOptions,
-		Log:        option.NewLogOptions(),
-		Trace:      option.NewTraceOptions(),
-		RPC:        rpcOptions,
-		HTTP:       option.NewHertzServerOptions(),
-		PostgreSQL: option.NewPostgreSQLOptions(),
-		Redis:      option.NewRedisOptions(),
-		Bcrypt:     NewBcryptOptions(),
-		SMTP:       NewSMTPOptions(),
-		Auth:       NewAuthOptions(),
+		App:         appOptions,
+		Log:         option.NewLogOptions(),
+		Trace:       option.NewTraceOptions(),
+		RPC:         rpcOptions,
+		HTTP:        option.NewHertzServerOptions(),
+		PostgreSQL:  option.NewPostgreSQLOptions(),
+		Redis:       option.NewRedisOptions(),
+		Bcrypt:      NewBcryptOptions(),
+		SMTP:        NewSMTPOptions(),
+		PlatformRPC: platformRPC,
+		NATS:        nats,
+		Auth:        NewAuthOptions(),
 	}
 }
 
@@ -57,6 +66,8 @@ func (c Config) Validate() error {
 		wrapValidation("redis", c.Redis.Validate()),
 		wrapValidation("bcrypt", c.Bcrypt.Validate()),
 		wrapValidation("smtp", c.SMTP.Validate()),
+		wrapValidation("platform_rpc", c.PlatformRPC.Validate()),
+		wrapValidation("nats", c.NATS.Validate()),
 		wrapValidation("auth", c.Auth.Validate()),
 		validateLifecycleBudgets(c),
 	)
@@ -84,7 +95,7 @@ func (c Config) requireSections() error {
 	sections := map[string]any{
 		"app": c.App, "log": c.Log, "trace": c.Trace, "rpc": c.RPC,
 		"http": c.HTTP, "postgres": c.PostgreSQL, "redis": c.Redis,
-		"bcrypt": c.Bcrypt, "smtp": c.SMTP,
+		"bcrypt": c.Bcrypt, "smtp": c.SMTP, "platform_rpc": c.PlatformRPC, "nats": c.NATS,
 		"auth": c.Auth,
 	}
 	var joined error

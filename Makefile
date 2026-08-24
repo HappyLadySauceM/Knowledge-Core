@@ -15,7 +15,7 @@ export GOFLAGS
 # Cap local/CI compile parallelism at three CPUs and respect cgroup affinity.
 # 将本地/CI 编译并行度限制为三个 CPU，并尊重 cgroup affinity。
 BUILD_JOBS ?= $(shell nproc 2>/dev/null | awk '{v=$$1; if (v>3) v=3; if (v<1) v=1; print v}')
-GO_RELEASE_SERVICES ?= gateway identity knowledge attachment
+GO_RELEASE_SERVICES ?= gateway identity knowledge attachment platform
 GO_ARTIFACT_DIR ?= .ci-artifacts
 RUST_ARTIFACT_DIR ?= .ci-artifacts
 RUST_TARGET_DIR ?= $(if $(CARGO_TARGET_DIR),$(CARGO_TARGET_DIR),$(RUST_ROOT)/target)
@@ -27,6 +27,7 @@ GO_PACKAGES ?= \
 	./services/identity/... \
 	./services/knowledge/... \
 	./services/attachment/... \
+	./services/platform/... \
 	./kitex_gen/... \
 	./scripts/...
 
@@ -99,7 +100,7 @@ go-release:
 	@set -eu; mkdir -p "$(GO_ARTIFACT_DIR)"; \
 	for service in $(GO_RELEASE_SERVICES); do \
 		case "$$service" in \
-			gateway|identity|knowledge|attachment) ;; \
+			gateway|identity|knowledge|attachment|platform) ;; \
 			*) echo "unsupported Go service: $$service" >&2; exit 2 ;; \
 		esac; \
 			CGO_ENABLED=0 GOOS=linux GOMAXPROCS=$(BUILD_JOBS) go build -mod=mod -trimpath -buildvcs=false -ldflags="-s -w" -o "$(GO_ARTIFACT_DIR)/$$service" "./services/$$service"; \

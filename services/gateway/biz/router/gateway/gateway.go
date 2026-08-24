@@ -34,6 +34,21 @@ func Register(r *server.Hertz) {
 			_v1.GET("/site-profile", append(_getsiteprofileMw(), gateway.GetSiteProfile)...)
 			_v1.POST("/users", append(_registerMw(), gateway.Register)...)
 			{
+				_admin := _v1.Group("/admin", _adminMw()...)
+				{
+					_configuration := _admin.Group("/configuration", _configurationMw()...)
+					_configuration.GET("/:namespace", append(_getconfigurationMw(), gateway.GetConfiguration)...)
+					_configuration.PUT("/:namespace", append(_putconfigurationMw(), gateway.PutConfiguration)...)
+					{
+						_namespace := _configuration.Group("/:namespace", _namespaceMw()...)
+						{
+							_deliveries := _namespace.Group("/deliveries", _deliveriesMw()...)
+							_deliveries.GET("/:revision", append(_getconfigurationdeliveryMw(), gateway.GetConfigurationDelivery)...)
+						}
+					}
+				}
+			}
+			{
 				_attachments := _v1.Group("/attachments", _attachmentsMw()...)
 				_attachments.DELETE("/:attachment_id", append(_deletemediaattachmentMw(), gateway.DeleteMediaAttachment)...)
 				_attachments.GET("/:attachment_id", append(_getmediaattachmentMw(), gateway.GetMediaAttachment)...)

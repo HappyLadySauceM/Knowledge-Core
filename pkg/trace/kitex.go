@@ -100,6 +100,12 @@ func rpcOutcomeError(ctx context.Context, err error) error {
 
 func injectRPCMetadata(ctx context.Context) context.Context {
 	ctx = metainfo.WithPersistentValue(ctx, RequestIDMetadataKey, metadata.RequestID(ctx))
+	if value := metainfoValue(ctx, "knowledge-core-access-token"); value != "" {
+		ctx = metainfo.WithPersistentValue(ctx, "knowledge-core-access-token", value)
+	}
+	if value := metainfoValue(ctx, "knowledge-core-service-token"); value != "" {
+		ctx = metainfo.WithPersistentValue(ctx, "knowledge-core-service-token", value)
+	}
 	carrier := propagation.MapCarrier{}
 	otel.GetTextMapPropagator().Inject(ctx, carrier)
 	for key, value := range carrier {
@@ -112,6 +118,12 @@ func extractRPCMetadata(ctx context.Context) context.Context {
 	requestID, _ := metainfo.GetPersistentValue(ctx, RequestIDMetadataKey)
 	ctx = metadata.WithRequestID(ctx, strings.TrimSpace(requestID))
 	ctx = metadata.EnsureRequestID(ctx)
+	if value, exists := metainfo.GetPersistentValue(ctx, "knowledge-core-access-token"); exists {
+		ctx = metainfo.WithPersistentValue(ctx, "knowledge-core-access-token", value)
+	}
+	if value, exists := metainfo.GetPersistentValue(ctx, "knowledge-core-service-token"); exists {
+		ctx = metainfo.WithPersistentValue(ctx, "knowledge-core-service-token", value)
+	}
 	carrier := propagation.MapCarrier{}
 	for _, key := range otel.GetTextMapPropagator().Fields() {
 		if value, exists := metainfo.GetPersistentValue(ctx, key); exists {
@@ -119,6 +131,11 @@ func extractRPCMetadata(ctx context.Context) context.Context {
 		}
 	}
 	return otel.GetTextMapPropagator().Extract(ctx, carrier)
+}
+
+func metainfoValue(ctx context.Context, key string) string {
+	value, _ := metainfo.GetPersistentValue(ctx, key)
+	return value
 }
 
 func rpcDetails(ctx context.Context) (service, method string) {

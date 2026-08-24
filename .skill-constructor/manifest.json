@@ -22,11 +22,11 @@
     },
     {
       "id": "architecture.summary",
-      "revision": 127,
+      "revision": 129,
       "section": "architecture",
       "sources": [
         {
-          "detail": "evidence-sha256:f65bfec9679bdc64955d068c0002a5176b3aa78dd6c3d24e85f788765e8a7068",
+          "detail": "evidence-sha256:985e23ae9cc132e1d4d5198ff02d5c54098c6a76e90567ee31b195224764f268",
           "kind": "documented",
           "reference": "README.md#knowledge-core"
         },
@@ -36,17 +36,17 @@
           "reference": "deploy/overlay/dev/README.md#development-overlay"
         },
         {
-          "detail": "evidence-sha256:f65bfec9679bdc64955d068c0002a5176b3aa78dd6c3d24e85f788765e8a7068",
+          "detail": "evidence-sha256:985e23ae9cc132e1d4d5198ff02d5c54098c6a76e90567ee31b195224764f268",
           "kind": "documented",
           "reference": "docs/framework-design.md#9"
         },
         {
-          "detail": "evidence-sha256:f65bfec9679bdc64955d068c0002a5176b3aa78dd6c3d24e85f788765e8a7068",
+          "detail": "evidence-sha256:985e23ae9cc132e1d4d5198ff02d5c54098c6a76e90567ee31b195224764f268",
           "kind": "documented",
           "reference": "docs/framework-design.md#knowledge-core"
         },
         {
-          "detail": "evidence-sha256:f65bfec9679bdc64955d068c0002a5176b3aa78dd6c3d24e85f788765e8a7068",
+          "detail": "evidence-sha256:985e23ae9cc132e1d4d5198ff02d5c54098c6a76e90567ee31b195224764f268",
           "kind": "documented",
           "reference": "docs/rust-collaboration-design.md#rust-collaboration"
         },
@@ -60,8 +60,8 @@
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-08-23T08:26:58Z",
-      "value": "Knowledge Core contains five explicitly composed services: Go Gateway, Identity, Knowledge, and Attachment services plus a Rust Collaboration service. Go assembly flows main/spec -> internal/config -> internal/context -> domain/logic/repository/transport. ServiceContext owns service dependencies, while pkg/app.Runtime is limited to process-level observability, health, metrics, and lifecycle orchestration. Business logic depends on service-local small interfaces; repositories own persistence and storage error mapping; transports validate and adapt protocols without domain rules."
+      "updatedAt": "2026-08-23T12:00:29Z",
+      "value": "Knowledge Core contains six explicitly composed services: Go Gateway, Identity, Knowledge, Attachment, and Platform services plus a Rust Collaboration service. Go assembly flows main/spec -> internal/config -> internal/context -> domain/logic/repository/transport. ServiceContext owns service dependencies, while pkg/app.Runtime is limited to process-level observability, health, metrics, and lifecycle orchestration. Business logic depends on service-local small interfaces; repositories own persistence and storage error mapping; transports validate and adapt protocols without domain rules. Platform owns administrator-writable site, email, and AI configuration revisions, encrypted secrets, audit records, idempotency records, and the configuration outbox; Gateway provides its HTTP fa\u00e7ade."
     },
     {
       "id": "boundaries.repository",
@@ -223,21 +223,21 @@
     },
     {
       "id": "security.secrets-and-config",
-      "revision": 121,
+      "revision": 132,
       "section": "conventions",
       "sources": [
         {
-          "detail": "evidence-sha256:0c1137198d9ad6f7822c524defc0dacdbf512f400fb63bb11a2f5adb14defa5a",
+          "detail": "evidence-sha256:09cd9b2252cf8b7995a7eaa9bd277428cead5e188c6e722da5debc110703f632",
           "kind": "documented",
           "reference": "README.md#compose"
         },
         {
-          "detail": "evidence-sha256:0c1137198d9ad6f7822c524defc0dacdbf512f400fb63bb11a2f5adb14defa5a",
+          "detail": "evidence-sha256:09cd9b2252cf8b7995a7eaa9bd277428cead5e188c6e722da5debc110703f632",
           "kind": "documented",
           "reference": "README.md#k3s-gitops"
         },
         {
-          "detail": "evidence-sha256:0c1137198d9ad6f7822c524defc0dacdbf512f400fb63bb11a2f5adb14defa5a",
+          "detail": "evidence-sha256:09cd9b2252cf8b7995a7eaa9bd277428cead5e188c6e722da5debc110703f632",
           "kind": "documented",
           "reference": "README.md#section"
         },
@@ -247,7 +247,7 @@
           "reference": "deploy/base/README.md#application-deployment-base"
         },
         {
-          "detail": "evidence-sha256:0c1137198d9ad6f7822c524defc0dacdbf512f400fb63bb11a2f5adb14defa5a",
+          "detail": "evidence-sha256:09cd9b2252cf8b7995a7eaa9bd277428cead5e188c6e722da5debc110703f632",
           "kind": "documented",
           "reference": "deploy/nacos/README.md#nacos-application-configuration"
         },
@@ -257,37 +257,47 @@
           "reference": "deploy/overlay/dev/README.md#development-overlay"
         },
         {
-          "detail": "evidence-sha256:0c1137198d9ad6f7822c524defc0dacdbf512f400fb63bb11a2f5adb14defa5a",
+          "detail": "evidence-sha256:09cd9b2252cf8b7995a7eaa9bd277428cead5e188c6e722da5debc110703f632",
           "kind": "documented",
           "reference": "docs/framework-design.md#11"
         },
         {
-          "detail": "evidence-sha256:0c1137198d9ad6f7822c524defc0dacdbf512f400fb63bb11a2f5adb14defa5a",
+          "detail": "evidence-sha256:09cd9b2252cf8b7995a7eaa9bd277428cead5e188c6e722da5debc110703f632",
           "kind": "documented",
           "reference": "docs/framework-design.md#12"
         },
         {
-          "detail": "evidence-sha256:0c1137198d9ad6f7822c524defc0dacdbf512f400fb63bb11a2f5adb14defa5a",
+          "detail": "evidence-sha256:09cd9b2252cf8b7995a7eaa9bd277428cead5e188c6e722da5debc110703f632",
           "kind": "documented",
           "reference": "docs/framework-design.md#8-secret-tls"
         },
         {
-          "detail": "evidence-sha256:0c1137198d9ad6f7822c524defc0dacdbf512f400fb63bb11a2f5adb14defa5a",
+          "detail": "evidence-sha256:09cd9b2252cf8b7995a7eaa9bd277428cead5e188c6e722da5debc110703f632",
           "kind": "documented",
           "reference": "docs/migrations/2026-08-auth-productionization.md#section"
         },
         {
-          "detail": "evidence-sha256:0c1137198d9ad6f7822c524defc0dacdbf512f400fb63bb11a2f5adb14defa5a",
+          "detail": "evidence-sha256:09cd9b2252cf8b7995a7eaa9bd277428cead5e188c6e722da5debc110703f632",
+          "kind": "documented",
+          "reference": "docs/migrations/2026-08-platform-configuration.md#platform-configuration-migration"
+        },
+        {
+          "detail": "evidence-sha256:09cd9b2252cf8b7995a7eaa9bd277428cead5e188c6e722da5debc110703f632",
+          "kind": "documented",
+          "reference": "docs/platform-configuration.md#section"
+        },
+        {
+          "detail": "evidence-sha256:09cd9b2252cf8b7995a7eaa9bd277428cead5e188c6e722da5debc110703f632",
           "kind": "documented",
           "reference": "docs/rust-collaboration-design.md#2-1"
         },
         {
-          "detail": "evidence-sha256:0c1137198d9ad6f7822c524defc0dacdbf512f400fb63bb11a2f5adb14defa5a",
+          "detail": "evidence-sha256:09cd9b2252cf8b7995a7eaa9bd277428cead5e188c6e722da5debc110703f632",
           "kind": "documented",
           "reference": "docs/rust-collaboration-design.md#7"
         },
         {
-          "detail": "evidence-sha256:0c1137198d9ad6f7822c524defc0dacdbf512f400fb63bb11a2f5adb14defa5a",
+          "detail": "evidence-sha256:09cd9b2252cf8b7995a7eaa9bd277428cead5e188c6e722da5debc110703f632",
           "kind": "documented",
           "reference": "docs/trace-architecture.md#7-collector-tempo"
         },
@@ -301,7 +311,7 @@
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-08-21T15:08:00Z",
+      "updatedAt": "2026-08-24T05:31:00Z",
       "value": "Secrets are injected only through environment variables, Kubernetes Secrets, or SOPS-encrypted GitOps manifests. Sensitive values must not be stored in plaintext source, configuration, logs, metrics, spans, or release metadata."
     },
     {
@@ -608,11 +618,11 @@
     "profile": "generic",
     "slug": "knowledge-core"
   },
-  "revision": 127,
+  "revision": 132,
   "scan": {
-    "fingerprint": "b3652f33adf65ce104c7093a9b32e17b745656c09c8c435753209d09885ec769",
-    "inventoryCount": 396
+    "fingerprint": "f90b8074385f3751b20c652f4ee4c0f1785129688103eede6964e2f4bda31174",
+    "inventoryCount": 433
   },
   "schemaVersion": 1,
-  "updatedAt": "2026-08-23T08:26:58Z"
+  "updatedAt": "2026-08-24T05:31:00Z"
 }

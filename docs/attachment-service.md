@@ -24,10 +24,10 @@ Attachment 是图片、音频、视频、文档、压缩包及普通文件的统
 - Gateway 已提供通用 `/api/v1/attachments` façade，并保留旧的文档级接口和 content 兼容窗口。
 - Web Studio 使用 IndexedDB 保存文件指纹、分片 ETag 和已完成分片；单次最多并发 3 个 16MiB 分片，刷新后在签名仍有效时续传。
 - Tiptap/Yjs 编辑器通过 Collaboration session 建立 WebSocket，发布请求携带 metadata `If-Match` 和 Yjs state vector；Rust Collaboration 在服务端拒绝过期 state vector。
-- 站点首图通过 `/api/v1/site-profile` 输出动态 Endpoint/Nacos 配置；Identity 用户模型已增加 `avatar_attachment_id`，后续头像写入入口应只允许 ready Attachment。
+- 站点首图配置由 Platform 数据库保存并通过 `/api/v1/site-profile` 实时读取；`hero_attachment_id` 已进入配置契约，但在 Attachment 公开引用与 ready/image 校验接入前可以留空。Identity 用户模型已增加 `avatar_attachment_id`，后续头像写入入口应只允许 ready Attachment。
 
 ## 后续收口
 
 1. Knowledge 将富文本图片从任意 `src` 收敛为 `attachmentId`，发布时校验绑定集合均为 ready，并以引用 Saga 写入/解绑 Attachment 引用。
-2. 增加头像/站点首图管理员写入、引用对账、过期 multipart/orphan object reconciliation。
+2. 为头像/站点首图补齐 Attachment ready/image 校验、公开引用、引用对账，以及过期 multipart/orphan object reconciliation。
 3. 增加 1GiB 上传/扫描集成测试、ClamAV 压测和真实 MinIO/数据库故障注入。
