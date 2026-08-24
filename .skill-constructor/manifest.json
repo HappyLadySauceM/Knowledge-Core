@@ -618,11 +618,11 @@
     "profile": "generic",
     "slug": "knowledge-core"
   },
-  "revision": 132,
+  "revision": 133,
   "scan": {
-    "fingerprint": "f90b8074385f3751b20c652f4ee4c0f1785129688103eede6964e2f4bda31174",
-    "inventoryCount": 433
+    "fingerprint": "1a8fcd5b12f04459547c2d2fc4f0d71e7b765bcc214e67b2e0e0403bf2259609",
+    "inventoryCount": 434
   },
   "schemaVersion": 1,
-  "updatedAt": "2026-08-24T05:31:00Z"
+  "updatedAt": "2026-08-24T17:57:33Z"
 }
