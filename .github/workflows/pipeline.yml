@@ -404,10 +404,12 @@ jobs:
             -w /workspace "$CI_IMAGE" release --services "${{ needs.plan.outputs.services }}" \
             --changes-file /state/changes.json --summary-file /state/release.md
           for service in "${selected[@]}"; do
-            docker run --rm --network host -v "$GITHUB_WORKSPACE:/workspace" -v "$STATE_DIR:/state" \
+            if ! docker run --rm --network host -v "$GITHUB_WORKSPACE:/workspace" -v "$STATE_DIR:/state" \
               -v "$DOCKER_CONFIG:/root/.docker:ro" -v "$HARBOR_CA_FILE:/etc/harbor-ca/ca.crt:ro" \
               -e CI_PROJECT_CONFIG_JSON -e DOCKER_CONFIG=/root/.docker -e SSL_CERT_FILE=/etc/harbor-ca/ca.crt -w /workspace "$CI_IMAGE" \
-              cleanup-candidate --service "$service" --tag "sha-$GITHUB_SHA"
+              cleanup-candidate --service "$service" --tag "sha-$GITHUB_SHA"; then
+              echo "::warning::candidate cleanup failed for $service; the verified deployment remains active"
+            fi
           done
       - name: Roll back failed deployment
         if: failure() && steps.gitops.outputs.gitops_revision != '' && steps.gitops.outputs.gitops_revision != steps.gitops.outputs.gitops_base_revision
