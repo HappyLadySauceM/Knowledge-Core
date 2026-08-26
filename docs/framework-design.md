@@ -307,10 +307,10 @@ Service-specific changes；调用失败即停止。成功后仅 fast-forward `ma
 `v*` 聚合 tag 与对应 GitHub Release（不再创建各服务独立 tag）。GitOps 与源码
 仓库均使用普通 fast-forward compare-and-swap push，检测到远端分支变化即停止。
 
-Kubernetes 所有权分为三层：`k3s-home-deploy/k3s`（服务器 `/opt/k3s`）是公共基础设施真源；
+Kubernetes 所有权分为三层：`deploy/k3s`（服务器 `/opt/k3s`）是公共基础设施真源；
 应用仓库的 `deploy/<service>/base` 和 `deploy/<service>/overlay/dev` 由各服务自主
 维护工作负载与日志、运行环境、超时等服务行为配置；私有
-`k3s-home-deploy/Knowledge-Core` 保存基础设施连接配置、SOPS Secret、trust bundle 和镜像
+`deploy/Knowledge-Core` 保存基础设施连接配置、SOPS Secret、trust bundle 和镜像
 digest。`deploy/` 是应用仓库部署模板的原样快照；`dev/<service>` 分别通过独立 Kustomization
 引用服务 overlay 和连接配置，`dev/common` 统一提供运行时补丁与镜像覆盖，共享资源由
 `dev/foundation` 持有。不再使用

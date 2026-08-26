@@ -94,4 +94,4 @@ go run ./scripts/idlguard compat-git <merge-base> idl   # IDL 变更的兼容检
 
 ## 部署 / GitOps（简述）
 
-`.github/workflows/pipeline.yml` 是唯一 workflow：`dev` push 先跑 `make ci` + Collaboration Node 互操作门禁，再按变更服务从 Harbor 缓存构建镜像、更新 GitOps 快照、等 Argo CD 同步与 dev 冒烟通过后，DeepSeek 生成中文变更摘要，最后 fast-forward `main` 并打单一聚合 tag `vMAJOR.MINOR.PATCH`（读根目录 `VERSION`，GitHub Release 标题同为该版本号）。共享基础设施与集群拓扑/凭据由私有仓库 `k3s-home-deploy`（服务器 `/opt/k3s`）声明；本仓库的应用部署模板在 `deploy/<service>/`（各服务自维护 `base/` 与 `overlay/dev/`），不记录集群凭据。
+`.github/workflows/pipeline.yml` 是唯一 workflow：`dev` push 先跑 `make ci` + Collaboration Node 互操作门禁，再按变更服务从 Harbor 缓存构建镜像、更新 GitOps 快照、等 Argo CD 同步与 dev 冒烟通过后，DeepSeek 生成中文变更摘要，最后 fast-forward `main` 并打单一聚合 tag `vMAJOR.MINOR.PATCH`（读根目录 `VERSION`，GitHub Release 标题同为该版本号）。共享基础设施与集群拓扑/凭据由私有仓库 `deploy`（服务器 `/opt/k3s`）声明；本仓库的应用部署模板在 `deploy/<service>/`（各服务自维护 `base/` 与 `overlay/dev/`），不记录集群凭据。

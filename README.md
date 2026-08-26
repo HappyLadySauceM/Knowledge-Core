@@ -239,7 +239,7 @@ Dockerfile 传入 `BUILD_JOBS`（宿主机 CPU 的 3/4）；Go/Rust 构建层通
 
 ## k3s 与 GitOps
 
-共享基础设施的声明源是 `k3s-home-deploy/k3s`，服务器路径为 `/opt/k3s`。它复用已有
+共享基础设施的声明源是 `deploy/k3s`，服务器路径为 `/opt/k3s`。它复用已有
 PostgreSQL 和 Redis，并在独立 namespace 提供 Nacos、NATS、MinIO 与 ClamAV；Nacos
 使用共享 PostgreSQL。项目 namespace 只接收项目级账号，平台 root/admin Secret 不进入应用。
 
@@ -247,7 +247,7 @@ PostgreSQL 和 Redis，并在独立 namespace 提供 Nacos、NATS、MinIO 与 Cl
 中的 Deployment、Service 与 Kustomization，以及 `overlay/dev/` 中的日志、运行环境、
 超时等服务行为配置；不再使用共享的 `deploy/base` 或 `deploy/overlay/dev`。PostgreSQL、
 Redis、NATS、Nacos、MinIO 与 ClamAV 的 endpoint、账号、TLS、数据库名和前缀由私有
-`k3s-home-deploy` 维护，并在 `Knowledge-Core/dev/<service>` 中合入对应服务 ConfigMap。
+`deploy` 维护，并在 `Knowledge-Core/dev/<service>` 中合入对应服务 ConfigMap。
 `Knowledge-Core/dev/common` 统一提供运行时补丁和不可变镜像 digest；共享 Namespace、Secret、
 trust bundle、NetworkPolicy 和发布 RBAC 由 `knowledge-core-foundation-dev` 管理。
 GitOps 仓库同时保存 SOPS Secret、trust bundle 和不可变镜像 digest；应用仓库不记录具体
