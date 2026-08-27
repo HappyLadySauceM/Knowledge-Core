@@ -2,66 +2,267 @@
   "createdAt": "2026-08-08T01:12:53Z",
   "facts": [
     {
-      "id": "architecture.modules",
-      "revision": 109,
+      "id": "architecture.design",
+      "revision": 139,
       "section": "architecture",
       "sources": [
         {
-          "detail": "evidence-sha256:fb49439604caa33dc85772806bbaf1c661444c36fa63031490372ba995970e25",
-          "kind": "detected",
-          "reference": "filesystem:top-level-directories"
+          "kind": "documented",
+          "reference": "docs/framework-design.md"
         },
         {
           "kind": "user",
-          "reference": "user-confirmed"
+          "reference": "Knowledge-Core/.tmp/architecture-design.md"
+        },
+        {
+          "kind": "user",
+          "reference": "user-confirmed-en-locale-source"
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-08-08T02:16:36Z",
-      "value": "pkg contains only business-neutral cross-service capabilities and must not import services. Service-private configuration, domain, use cases, repositories, and transports remain under services/<service>. idl is the contract source, kitex_gen and services/collaboration/src/generated are generator-owned, and scripts contains repository automation. Deployment templates are owned per service under deploy/<service>/base and deploy/<service>/overlay/dev; the repository has no shared top-level config directory or centralized deploy/base and deploy/overlay/dev. docker contains local infrastructure definitions, docs records verified design, and tools contains supporting executables."
-    },
-    {
-      "id": "architecture.summary",
-      "revision": 129,
-      "section": "architecture",
-      "sources": [
-        {
-          "detail": "evidence-sha256:985e23ae9cc132e1d4d5198ff02d5c54098c6a76e90567ee31b195224764f268",
-          "kind": "documented",
-          "reference": "README.md#knowledge-core"
+      "updatedAt": "2026-08-27T11:54:55Z",
+      "value": {
+        "containers": [
+          {
+            "name": "Gateway",
+            "responsibility": "public HTTP edge, security middleware, rate limits, and typed RPC orchestration"
+          },
+          {
+            "name": "Identity",
+            "responsibility": "users, credentials, sessions, token validity, and account actions"
+          },
+          {
+            "name": "Knowledge",
+            "responsibility": "documents, folders, permissions, publication, quota, and projections"
+          },
+          {
+            "name": "Attachment",
+            "responsibility": "reusable file metadata, multipart upload, scanning, references, and trash"
+          },
+          {
+            "name": "Collaboration",
+            "responsibility": "WebSocket/Yjs state, snapshots, versions, restore, and permission invalidation"
+          },
+          {
+            "name": "Platform",
+            "responsibility": "revisioned site/email/AI configuration, audit, and reliable change events"
+          }
+        ],
+        "context": {
+          "actors": [
+            {
+              "name": "Web client"
+            },
+            {
+              "name": "Administrator"
+            }
+          ],
+          "externalSystems": [
+            {
+              "name": "PostgreSQL"
+            },
+            {
+              "name": "Redis"
+            },
+            {
+              "name": "NATS JetStream"
+            },
+            {
+              "name": "S3 compatible storage"
+            },
+            {
+              "name": "ClamAV"
+            }
+          ],
+          "relationships": [
+            {
+              "from": "Web client",
+              "purpose": "uses HTTP and realtime collaboration",
+              "to": "system"
+            },
+            {
+              "from": "Administrator",
+              "purpose": "manages audited business configuration",
+              "to": "system"
+            },
+            {
+              "from": "system",
+              "purpose": "persists service-owned state",
+              "to": "PostgreSQL"
+            },
+            {
+              "from": "system",
+              "purpose": "coordinates sessions, routing, and limits",
+              "to": "Redis"
+            },
+            {
+              "from": "system",
+              "purpose": "delivers durable asynchronous events",
+              "to": "NATS JetStream"
+            },
+            {
+              "from": "system",
+              "purpose": "stores attachment objects",
+              "to": "S3 compatible storage"
+            },
+            {
+              "from": "system",
+              "purpose": "scans uploaded content",
+              "to": "ClamAV"
+            }
+          ]
         },
-        {
-          "detail": "evidence-sha256:6cc08ddcf5525a7adc55f189cd2dadddf88fab06ae4e47bfeb47c2e58a779255",
-          "kind": "documented",
-          "reference": "deploy/overlay/dev/README.md#development-overlay"
+        "decisions": [
+          {
+            "name": "Six service boundaries",
+            "rationale": "Identity, knowledge, attachment, collaboration, platform configuration, and edge concerns have distinct ownership and scaling behavior.",
+            "tradeoffs": [
+              "More operational components",
+              "Cross-boundary workflows require RPC or messaging"
+            ]
+          },
+          {
+            "name": "Schema-per-service",
+            "rationale": "Persistence ownership stays enforceable even on one PostgreSQL instance.",
+            "tradeoffs": [
+              "No cross-service SQL joins",
+              "Distributed consistency must be explicit"
+            ]
+          },
+          {
+            "name": "Commit before collaboration broadcast",
+            "rationale": "Clients must not observe updates that were not durably ordered.",
+            "tradeoffs": [
+              "Write latency precedes fanout",
+              "Recovery requires snapshots and ordered updates"
+            ]
+          },
+          {
+            "name": "Outbox plus JetStream",
+            "rationale": "Reliable publication is required without a cross-system transaction.",
+            "tradeoffs": [
+              "At-least-once delivery",
+              "Consumers and redrive operations must be idempotent"
+            ]
+          }
+        ],
+        "format": "structured-v1",
+        "keyFlows": [
+          {
+            "description": "Gateway verifies the token locally, revalidates identity state, and calls the owning service through typed RPC.",
+            "name": "Authenticated request"
+          },
+          {
+            "description": "Collaboration obtains Knowledge authorization, consumes a one-time ticket, commits Yjs state before broadcast, and projects asynchronously.",
+            "name": "Realtime collaboration"
+          },
+          {
+            "description": "Attachment coordinates multipart storage, malware scanning, references, and retention without transferring document ownership.",
+            "name": "Attachment lifecycle"
+          },
+          {
+            "description": "Platform commits revision, audit, idempotency, and outbox atomically, then publishes coordinate-only events.",
+            "name": "Configuration change"
+          }
+        ],
+        "principles": [
+          {
+            "description": "Each business service owns its schema and makes final decisions through typed contracts.",
+            "name": "Data ownership"
+          },
+          {
+            "description": "Security, authorization, readiness, and critical dependency uncertainty deny work rather than weaken guarantees.",
+            "name": "Fail closed"
+          },
+          {
+            "description": "Domain changes and outbox records commit together; consumers are idempotent.",
+            "name": "Durable asynchronous delivery"
+          },
+          {
+            "description": "Dependencies, lifecycles, cleanup, and configuration ownership are visible at process assembly.",
+            "name": "Explicit composition"
+          }
+        ],
+        "purpose": "Knowledge Core is a knowledge-collaboration backend that separates identity, document metadata, reusable attachments, realtime CRDT collaboration, platform configuration, and edge orchestration behind typed contracts.",
+        "qualityAttributes": [
+          {
+            "measure": "Protected operations fail closed and no unauthorized session is admitted",
+            "name": "Authorization safety",
+            "scenario": "Identity, permission, or routing evidence is unavailable"
+          },
+          {
+            "measure": "Domain state and outbox share one transaction and redelivery is idempotent",
+            "name": "Consistency",
+            "scenario": "A domain write succeeds before asynchronous delivery"
+          },
+          {
+            "measure": "Its owned listeners, workers, and required dependencies can perform local work",
+            "name": "Operability",
+            "scenario": "A process is reported ready"
+          },
+          {
+            "measure": "Other services depend only on versioned HTTP/RPC/event contracts, never its tables",
+            "name": "Evolution",
+            "scenario": "One service changes implementation"
+          }
+        ],
+        "risks": [
+          {
+            "mitigation": "Do not claim production readiness until integration, restore, certificate, rollout, and performance gaps are closed.",
+            "name": "Incomplete production acceptance"
+          },
+          {
+            "mitigation": "Track remaining document attachment and configuration-consumer migrations explicitly.",
+            "name": "Compatibility windows"
+          },
+          {
+            "mitigation": "Pin IDL generation, enforce compatibility checks, and fail readiness on critical stream/subject mismatches.",
+            "name": "Distributed contract drift"
+          }
+        ],
+        "scope": {
+          "in": [
+            "Identity and session security",
+            "Document metadata and permissions",
+            "Attachments",
+            "Realtime collaboration and version restore",
+            "Platform-managed business configuration",
+            "HTTP and WebSocket edge orchestration"
+          ],
+          "out": [
+            "Cross-service database access",
+            "Exactly-once messaging",
+            "Multi-region session replication",
+            "Hot rebuilding of process topology or infrastructure connections"
+          ]
         },
-        {
-          "detail": "evidence-sha256:985e23ae9cc132e1d4d5198ff02d5c54098c6a76e90567ee31b195224764f268",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#9"
-        },
-        {
-          "detail": "evidence-sha256:985e23ae9cc132e1d4d5198ff02d5c54098c6a76e90567ee31b195224764f268",
-          "kind": "documented",
-          "reference": "docs/framework-design.md#knowledge-core"
-        },
-        {
-          "detail": "evidence-sha256:985e23ae9cc132e1d4d5198ff02d5c54098c6a76e90567ee31b195224764f268",
-          "kind": "documented",
-          "reference": "docs/rust-collaboration-design.md#rust-collaboration"
-        },
-        {
-          "kind": "user",
-          "reference": "AGENTS.md user-provided repository instructions"
-        },
-        {
-          "kind": "user",
-          "reference": "user-confirmed"
-        }
-      ],
-      "status": "verified",
-      "updatedAt": "2026-08-23T12:00:29Z",
-      "value": "Knowledge Core contains six explicitly composed services: Go Gateway, Identity, Knowledge, Attachment, and Platform services plus a Rust Collaboration service. Go assembly flows main/spec -> internal/config -> internal/context -> domain/logic/repository/transport. ServiceContext owns service dependencies, while pkg/app.Runtime is limited to process-level observability, health, metrics, and lifecycle orchestration. Business logic depends on service-local small interfaces; repositories own persistence and storage error mapping; transports validate and adapt protocols without domain rules. Platform owns administrator-writable site, email, and AI configuration revisions, encrypted secrets, audit records, idempotency records, and the configuration outbox; Gateway provides its HTTP fa\u00e7ade."
+        "stakeholders": [
+          {
+            "concerns": [
+              "availability",
+              "secure access",
+              "durable content and collaboration"
+            ],
+            "name": "Knowledge users"
+          },
+          {
+            "concerns": [
+              "fail-closed readiness",
+              "observable delivery",
+              "safe configuration and rollback"
+            ],
+            "name": "Operators"
+          },
+          {
+            "concerns": [
+              "clear ownership",
+              "typed contracts",
+              "independent change boundaries"
+            ],
+            "name": "Service developers"
+          }
+        ]
+      }
     },
     {
       "id": "boundaries.repository",
@@ -99,7 +300,7 @@
     },
     {
       "id": "cicd.pipeline",
-      "revision": 102,
+      "revision": 138,
       "section": "workflows",
       "sources": [
         {
@@ -109,43 +310,82 @@
         {
           "kind": "user",
           "reference": "user-confirmed"
+        },
+        {
+          "kind": "user",
+          "reference": "user-confirmed-en-locale-source"
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-08-13T06:43:05Z",
-      "value": "A push to dev triggers the reusable Python CI control image from ci-templates. The pipeline runs make ci and the Collaboration Node interop checks under Node 24.18.1, detects affected services, prewarms pinned base images into Harbor, builds only affected images with Harbor registry cache, and publishes the dev tag without image scanning or signing. Before replacement it preserves the current dev image as previous. Knowledge-Core/deploy is the editable deployment source; CI copies it into the Knowledge-Core/deploy snapshot in HappyLadySauceM/deploy, updates root image digests, and pushes with a fast-forward compare-and-swap check while Argo CD watches the k3s repository. Argo health and deployment smoke must pass before release. On Argo or smoke failure, CI reverts the exact GitOps snapshot commit as a normal fast-forward commit and restores each affected Harbor previous tag to dev; if the remote branch moved, rollback refuses to overwrite it. On success previous tags must be deleted for Harbor garbage collection, and cleanup failure blocks release. DeepSeek release-summary failure blocks main promotion. On success dev is fast-forwarded to main and one aggregate vMAJOR.MINOR.PATCH Git tag and GitHub Release are created targeting the exact promoted commit SHA; the Release title is the same version tag. Existing knowledge-core-v* tags still count when choosing the next patch or retrying a commit that already has a prefixed tag. Retrying the same commit reuses matching aggregate tags and existing Releases, but refuses tags that point to another commit. Shared history is never force-pushed or rebased."
+      "updatedAt": "2026-08-27T07:36:59Z",
+      "value": "Pushes to `dev` trigger the reusable Python CI control image from ci-templates. The pipeline runs `make ci` and Collaboration Node interop checks on Node 24.18.1; detects affected services; warms pinned base images into Harbor; builds affected images using only the Harbor registry cache; and publishes the `dev` tag without image scanning or signing. The current `dev` image is kept as `previous` before replacement. Knowledge-Core/deploy is the editable deploy source; CI copies it to the Knowledge-Core/deploy snapshot in HappyLadySauceM/deploy, updates root image digests, and pushes with a fast-forward compare-and-swap check. Argo CD watches that k3s repository. Release requires Argo health and deploy smoke tests. If Argo or smoke fails, CI restores the exact GitOps snapshot commit with an ordinary fast-forward and moves each affected Harbor `previous` tag back to `dev`; rollback refuses to overwrite if the remote branch moved. After success, `previous` tags must be deleted for Harbor GC; cleanup failure blocks release. DeepSeek release summary failure blocks promotion to `main`. On success, `dev` fast-forwards to `main` and creates one aggregate `vMAJOR.MINOR.PATCH` Git tag and GitHub Release, both pointing at the exact promotion commit SHA; the Release title matches the version tag. Existing knowledge-core-v* tags still count when choosing the next patch or retrying a prefixed tagged commit. Retrying the same commit reuses the matching aggregate tag and existing Release, but rejects a tag that points at another commit. Shared history is never force-pushed or rebased."
     },
     {
       "id": "constraints.project",
-      "revision": 2,
+      "revision": 136,
       "section": "constraints",
       "sources": [
         {
           "kind": "user",
           "reference": "user-confirmed"
+        },
+        {
+          "kind": "user",
+          "reference": "user-confirmed-schema-v2-rerecord"
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-08-08T01:14:27Z",
-      "value": "Preserve service ownership and explicit dependency injection; prohibit global mutable configuration or clients, service locators, unowned goroutines, unbounded retries, panic or os.Exit outside process entrypoints, and internal error leakage. scripts/generated-files.txt is the sole generated-ownership manifest; never hand-edit listed files, kitex_gen, or services/collaboration/src/generated. IDL sources are under idl/http/v1 and idl/rpc/v1 and generation must use repository scripts. Resource creation, readiness, shutdown, and cleanup follow bounded, reverse-order lifecycle rules. Documentation must describe only implemented and verified behavior and be updated when public runtime, contracts, boundaries, lifecycle, startup, or APIs change."
+      "updatedAt": "2026-08-27T06:01:01Z",
+      "value": "- Keep service data ownership: no cross-schema SQL and no bypass of typed RPC.\n- Inject dependencies explicitly. Ban global mutable config, hidden service locators, unowned goroutines, and unbounded retries.\n- Ban panic or `os.Exit` outside the process entrypoint, and do not leak internal errors across public boundaries.\n- `scripts/generated-files.txt` is the only generated-file ownership list; never hand-edit files it lists, `kitex_gen`, or `services/collaboration/src/generated`.\n- IDL sources live in `idl/http/v1` and `idl/rpc/v1`; generate only through repository scripts.\n- Resource create, ready, close, and cleanup follow bounded reverse-order lifecycle rules.\n- Documents describe only implemented and verified behavior; update them when public runtime, contracts, boundaries, lifecycle, startup, or APIs change.\n- Fail closed on Redis, identity revalidation, collaboration authorization, and permission-invalidation ACK failures.\n"
+    },
+    {
+      "id": "conventions.code-layout",
+      "revision": 138,
+      "section": "conventions",
+      "sources": [
+        {
+          "detail": "evidence-sha256:fb49439604caa33dc85772806bbaf1c661444c36fa63031490372ba995970e25",
+          "kind": "detected",
+          "reference": "filesystem:top-level-directories"
+        },
+        {
+          "kind": "user",
+          "reference": "user-confirmed"
+        },
+        {
+          "kind": "user",
+          "reference": "user-confirmed-en-locale-source"
+        },
+        {
+          "kind": "user",
+          "reference": "user-confirmed-schema-v2-rerecord"
+        }
+      ],
+      "status": "verified",
+      "updatedAt": "2026-08-27T07:36:59Z",
+      "value": "## 4. Repository modules\n\n```text\npkg/                          Cross-service shared capability; must not depend back on services\n  app/                        Process lifecycle and component orchestration\n  auth/                       Ed25519 JWT wire contract\n  codec/json/                 Strict HTTP JSON codec\n  error/                      Stable errors, Kitex/Hertz mapping, RFC 9457\n  option/                     Reusable configuration models\n  log / trace / metrics / health / metadata /\n  postgres / redis / nats /\n  circuit/                    Outbound RPC consecutive-failure circuit\n  configcenter/               Nacos ApplicationConfig envelope\n  transport/                  Hertz admin and Kitex client adapters\n\nservices/<go-service>/\n  main.go                     Only create and execute the application command\n  spec.go                     Only declare pkg/app.Spec\n  etc/config.yaml             Service-private non-sensitive static config\n  internal/config/            Config loading and dynamic revision\n  internal/context/           Explicit ServiceContext assembly\n  internal/domain|logic|repository|transport|client|worker/\n\nservices/collaboration/\n  src/actor.rs                Document actor: commit before apply/broadcast\n  src/websocket.rs            Axum WebSocket, y-sync, awareness\n  src/rpc/                    Volo server/client, static DNS, mTLS, circuit\n  src/storage/                SQLx PostgreSQL and migrations\n  src/worker.rs               Projection, snapshot, auto version, outbox, invalidation\n  src/ticket.rs / routing.rs  One-time ticket and instance stickiness\n  src/generated/              Generator-owned; do not hand-edit\n  interop/                    Node/Yjs/y-prosemirror fixtures; not in production images\n\nidl/http/v1                   Public HTTP contract source\nidl/rpc/v1                    Internal Thrift contract source\nkitex_gen/                    Go generated code, owned by the generator\nscripts/generated-files.txt   Sole generated-file ownership list\ndeploy/<service>/{base,overlay/dev}  Per-service Kustomize\ndocker/                       Local infrastructure and service images\ndocs/                         Verified design\n```\n\nGo service assembly direction is fixed:\n\n```text\nmain/spec -> internal/config -> internal/context -> domain / logic / repository / transport\n```\n\nLayer responsibilities:\n\n- `domain`: domain objects and validation.\n- `model`: GORM persistence models only; do not leak across unrelated boundaries.\n- `logic`: organized by use case; depends on small in-service interfaces.\n- `repository`: persistence, transactions, and storage error mapping.\n- `transport`: protocol validation, orchestration, and safe error mapping; does not hold domain rules.\n- `ServiceContext`: holds service dependencies explicitly. `pkg/app.Runtime` owns process-level logging, tracing, health, metrics, components, and cleanup; it is not a service locator.\n"
     },
     {
       "id": "conventions.code-style",
-      "revision": 2,
+      "revision": 136,
       "section": "conventions",
       "sources": [
         {
           "kind": "user",
           "reference": "user-confirmed"
+        },
+        {
+          "kind": "user",
+          "reference": "user-confirmed-schema-v2-rerecord"
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-08-08T01:14:27Z",
-      "value": "Go constructors validate required dependencies and return (T, error); errors add operation context, preserve causes with %w, and use errors.Is/As. Context, deadlines, request IDs, and traces propagate end to end. Use pkg/codec/json for strict HTTP JSON and reuse shared auth, error, log, metadata, trace, and metrics contracts. Rust must pass rustfmt, clippy -D warnings, and cargo deny. Tests stay near implementations and cover success, boundaries, dependency failures, error mapping, cleanup/rollback, and concurrency with deterministic synchronization. Repository text uses LF except .bat and .cmd."
+      "updatedAt": "2026-08-27T06:01:01Z",
+      "value": "## Errors\n\nGo constructors validate required dependencies and return `(T, error)`. Errors add operation context, keep the cause with `%w`, and use `errors.Is` / `errors.As`. Cross-boundary errors use `pkg/error` code/key/kind. Do not use `Must*`, panic for business failure, or `os.Exit` outside the process entrypoint.\n\n## Logging and telemetry\n\nPropagate `context.Context`, deadlines, request IDs, and W3C trace end to end. Metric labels and span attributes stay on route templates, RPC methods, status codes, stable business codes, and dependency names.\n\n## Tests\n\nTests stay close to implementation and cover success, edges, dependency failure, error mapping, cleanup/rollback, and deterministic concurrent behavior. Rust requires rustfmt, clippy `-D warnings`, and cargo deny.\n\n## Secrets and layout\n\nRepository text uses LF except `.bat` / `.cmd`. Module and directory ownership lives in `conventions.code-layout`, not architecture.\n"
     },
     {
       "id": "entrypoints.catalog",
-      "revision": 125,
+      "revision": 138,
       "section": "services",
       "sources": [
         {
@@ -156,25 +396,77 @@
         {
           "kind": "user",
           "reference": "user-confirmed"
+        },
+        {
+          "kind": "user",
+          "reference": "user-confirmed-en-locale-source"
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-08-23T05:36:03Z",
-      "value": "Service process entrypoints are services/gateway/main.go, services/identity/main.go, services/knowledge/main.go, services/attachment/main.go, and services/collaboration/src/main.rs. Service main files only create and execute application commands; Go spec files only declare application specifications. Supporting executable entrypoints include scripts/idlguard, collaboration Rust code generation, and tools/authkeys, tools/configctl, and tools/interop. Deployment definitions live under deploy and docker."
+      "updatedAt": "2026-08-27T07:36:59Z",
+      "value": "Service process entrypoints are services/gateway/main.go, services/identity/main.go, services/knowledge/main.go, services/attachment/main.go, and services/collaboration/src/main.rs. Service main files only create and execute the application command; Go spec files only declare the application spec. Auxiliary executable entrypoints include scripts/idlguard, Collaboration Rust codegen, and tools/authkeys, tools/configctl, and tools/interop. Deployment definitions live under deploy and docker."
+    },
+    {
+      "id": "environment.definitions",
+      "revision": 139,
+      "section": "environment",
+      "sources": [
+        {
+          "kind": "documented",
+          "reference": "deploy/README.md"
+        },
+        {
+          "kind": "observed",
+          "reference": "kubectl-context-default"
+        }
+      ],
+      "status": "verified",
+      "updatedAt": "2026-08-27T11:54:55Z",
+      "value": [
+        {
+          "evidenceCommand": "docker compose -f docker/infrastructure/docker-compose.yml ps",
+          "kind": "docker-compose",
+          "name": "local-compose",
+          "path": "docker/infrastructure/docker-compose.yml"
+        },
+        {
+          "evidenceCommand": "kubectl -n knowledge-core-dev get deploy,sts,svc,ingress",
+          "kind": "kubernetes",
+          "name": "k3s-dev",
+          "namespace": "knowledge-core-dev",
+          "path": "deploy"
+        },
+        {
+          "kind": "kubernetes",
+          "name": "test"
+        },
+        {
+          "kind": "kubernetes",
+          "name": "production"
+        },
+        {
+          "kind": "kubernetes",
+          "name": "canary-gray"
+        }
+      ]
     },
     {
       "id": "environment.setup",
-      "revision": 2,
+      "revision": 138,
       "section": "environment",
       "sources": [
         {
           "kind": "user",
           "reference": "user-confirmed"
+        },
+        {
+          "kind": "user",
+          "reference": "user-confirmed-en-locale-source"
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-08-08T01:14:27Z",
-      "value": "Go module plus a Rust workspace under services/collaboration. Use repository-pinned generators (Kitex 0.16.2, hz 0.9.7 via hz update only, thriftgo 0.4.5) and rustc 1.97.1 from rust-toolchain.toml. The collaboration interop fixture requires Node.js >= 24.18.1 and npm ci. Inject all non-public configuration through environment variables or deployment-platform secret management; never store secret values in repository configuration."
+      "updatedAt": "2026-08-27T07:36:59Z",
+      "value": "The project contains one Go module and a Rust workspace under services/collaboration. Use the repository-pinned generators (Kitex 0.16.2, hz 0.9.7 via `hz update` only, thriftgo 0.4.5) and rustc 1.97.1 from rust-toolchain.toml. Collaboration interop fixtures require Node.js >= 24.18.1 and `npm ci`. Inject all non-public configuration through environment variables or the deploy platform's secret store; never store secret values in repository configuration."
     },
     {
       "id": "environment.toolchains",
@@ -223,21 +515,21 @@
     },
     {
       "id": "security.secrets-and-config",
-      "revision": 132,
+      "revision": 138,
       "section": "conventions",
       "sources": [
         {
-          "detail": "evidence-sha256:09cd9b2252cf8b7995a7eaa9bd277428cead5e188c6e722da5debc110703f632",
+          "detail": "evidence-sha256:0a464b721fda7e17b58ce251824668e7825c1fd2a782ba503077d128dce3c0f4",
           "kind": "documented",
           "reference": "README.md#compose"
         },
         {
-          "detail": "evidence-sha256:09cd9b2252cf8b7995a7eaa9bd277428cead5e188c6e722da5debc110703f632",
+          "detail": "evidence-sha256:0a464b721fda7e17b58ce251824668e7825c1fd2a782ba503077d128dce3c0f4",
           "kind": "documented",
           "reference": "README.md#k3s-gitops"
         },
         {
-          "detail": "evidence-sha256:09cd9b2252cf8b7995a7eaa9bd277428cead5e188c6e722da5debc110703f632",
+          "detail": "evidence-sha256:0a464b721fda7e17b58ce251824668e7825c1fd2a782ba503077d128dce3c0f4",
           "kind": "documented",
           "reference": "README.md#section"
         },
@@ -247,7 +539,7 @@
           "reference": "deploy/base/README.md#application-deployment-base"
         },
         {
-          "detail": "evidence-sha256:09cd9b2252cf8b7995a7eaa9bd277428cead5e188c6e722da5debc110703f632",
+          "detail": "evidence-sha256:0a464b721fda7e17b58ce251824668e7825c1fd2a782ba503077d128dce3c0f4",
           "kind": "documented",
           "reference": "deploy/nacos/README.md#nacos-application-configuration"
         },
@@ -257,47 +549,47 @@
           "reference": "deploy/overlay/dev/README.md#development-overlay"
         },
         {
-          "detail": "evidence-sha256:09cd9b2252cf8b7995a7eaa9bd277428cead5e188c6e722da5debc110703f632",
+          "detail": "evidence-sha256:0a464b721fda7e17b58ce251824668e7825c1fd2a782ba503077d128dce3c0f4",
           "kind": "documented",
           "reference": "docs/framework-design.md#11"
         },
         {
-          "detail": "evidence-sha256:09cd9b2252cf8b7995a7eaa9bd277428cead5e188c6e722da5debc110703f632",
+          "detail": "evidence-sha256:0a464b721fda7e17b58ce251824668e7825c1fd2a782ba503077d128dce3c0f4",
           "kind": "documented",
           "reference": "docs/framework-design.md#12"
         },
         {
-          "detail": "evidence-sha256:09cd9b2252cf8b7995a7eaa9bd277428cead5e188c6e722da5debc110703f632",
+          "detail": "evidence-sha256:0a464b721fda7e17b58ce251824668e7825c1fd2a782ba503077d128dce3c0f4",
           "kind": "documented",
           "reference": "docs/framework-design.md#8-secret-tls"
         },
         {
-          "detail": "evidence-sha256:09cd9b2252cf8b7995a7eaa9bd277428cead5e188c6e722da5debc110703f632",
+          "detail": "evidence-sha256:0a464b721fda7e17b58ce251824668e7825c1fd2a782ba503077d128dce3c0f4",
           "kind": "documented",
           "reference": "docs/migrations/2026-08-auth-productionization.md#section"
         },
         {
-          "detail": "evidence-sha256:09cd9b2252cf8b7995a7eaa9bd277428cead5e188c6e722da5debc110703f632",
+          "detail": "evidence-sha256:0a464b721fda7e17b58ce251824668e7825c1fd2a782ba503077d128dce3c0f4",
           "kind": "documented",
           "reference": "docs/migrations/2026-08-platform-configuration.md#platform-configuration-migration"
         },
         {
-          "detail": "evidence-sha256:09cd9b2252cf8b7995a7eaa9bd277428cead5e188c6e722da5debc110703f632",
+          "detail": "evidence-sha256:0a464b721fda7e17b58ce251824668e7825c1fd2a782ba503077d128dce3c0f4",
           "kind": "documented",
           "reference": "docs/platform-configuration.md#section"
         },
         {
-          "detail": "evidence-sha256:09cd9b2252cf8b7995a7eaa9bd277428cead5e188c6e722da5debc110703f632",
+          "detail": "evidence-sha256:0a464b721fda7e17b58ce251824668e7825c1fd2a782ba503077d128dce3c0f4",
           "kind": "documented",
           "reference": "docs/rust-collaboration-design.md#2-1"
         },
         {
-          "detail": "evidence-sha256:09cd9b2252cf8b7995a7eaa9bd277428cead5e188c6e722da5debc110703f632",
+          "detail": "evidence-sha256:0a464b721fda7e17b58ce251824668e7825c1fd2a782ba503077d128dce3c0f4",
           "kind": "documented",
           "reference": "docs/rust-collaboration-design.md#7"
         },
         {
-          "detail": "evidence-sha256:09cd9b2252cf8b7995a7eaa9bd277428cead5e188c6e722da5debc110703f632",
+          "detail": "evidence-sha256:0a464b721fda7e17b58ce251824668e7825c1fd2a782ba503077d128dce3c0f4",
           "kind": "documented",
           "reference": "docs/trace-architecture.md#7-collector-tempo"
         },
@@ -308,15 +600,19 @@
         {
           "kind": "user",
           "reference": "user-confirmed"
+        },
+        {
+          "kind": "user",
+          "reference": "user-confirmed-en-locale-source"
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-08-24T05:31:00Z",
-      "value": "Secrets are injected only through environment variables, Kubernetes Secrets, or SOPS-encrypted GitOps manifests. Sensitive values must not be stored in plaintext source, configuration, logs, metrics, spans, or release metadata."
+      "updatedAt": "2026-08-27T07:36:59Z",
+      "value": "Secrets may be injected only from environment variables, Kubernetes Secrets, or SOPS-encrypted GitOps manifests. Sensitive values must not be stored in plaintext in source, configuration, logs, metrics, trace spans, or release metadata."
     },
     {
       "id": "services.catalog",
-      "revision": 125,
+      "revision": 136,
       "section": "services",
       "sources": [
         {
@@ -326,16 +622,167 @@
         },
         {
           "kind": "user",
+          "reference": "idl/rpc/v1 and architecture-design.md"
+        },
+        {
+          "kind": "user",
           "reference": "user-confirmed"
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-08-23T05:36:03Z",
-      "value": "Gateway is the HTTP edge and calls typed upstream clients without accessing service storage. Identity owns identity domain behavior and persistence. Knowledge owns document metadata, permissions, publication/public projections, document trash, quotas, outbox, and the temporary legacy document-attachment compatibility surface, but not Yjs binary state or new attachment storage. Attachment owns unified file metadata, multipart upload lifecycle, private object-storage access, malware scan state, attachment references, and attachment trash lifecycle in the PostgreSQL attachment schema. Collaboration is the Rust Volo Thrift and WebSocket/Yrs service; it owns collaboration state in its PostgreSQL schema and rechecks document access through Knowledge RPC."
+      "updatedAt": "2026-08-27T06:01:01Z",
+      "value": [
+        {
+          "apis": [
+            "HTTP idl/http/v1/gateway.thrift GatewayService",
+            "health, users/sessions, documents, studio, attachments, admin configuration"
+          ],
+          "data": "None; no domain schema",
+          "dependencies": [
+            "Redis",
+            "Identity RPC",
+            "Knowledge RPC",
+            "Collaboration RPC",
+            "Attachment RPC",
+            "Platform RPC"
+          ],
+          "doesNotOwn": "Any domain tables, Yjs state, or object bytes",
+          "language": "Go",
+          "name": "Gateway",
+          "ports": {
+            "admin": 8082,
+            "http": 8080
+          },
+          "role": "Public HTTP edge and admin fa\u00e7ade"
+        },
+        {
+          "apis": [
+            "RPC IdentityService: Register, Authenticate, RefreshSession",
+            "email/password actions, session revoke, DeactivateAccount",
+            "GetCurrentUser, ResolveUser, Ping"
+          ],
+          "data": "PostgreSQL schema identity",
+          "dependencies": [
+            "PostgreSQL",
+            "Redis",
+            "optional Platform email config"
+          ],
+          "doesNotOwn": "Documents, attachments, or collaboration CRDT state",
+          "language": "Go",
+          "name": "Identity",
+          "ports": {
+            "admin": 8081,
+            "rpc": 8881
+          },
+          "role": "Users, credentials, sessions, and token version"
+        },
+        {
+          "apis": [
+            "RPC KnowledgeService: document CRUD/publish/trash, folders, members",
+            "legacy attachments, AuthorizeCollaboration, ProjectCollaboration, Ping, Live"
+          ],
+          "data": "PostgreSQL schema knowledge; legacy document-attachment compatibility window",
+          "dependencies": [
+            "PostgreSQL",
+            "NATS JetStream",
+            "S3/MinIO",
+            "ClamAV",
+            "Identity RPC",
+            "Collaboration RPC"
+          ],
+          "doesNotOwn": "Yjs binaries, generic attachment objects, or user credentials",
+          "language": "Go",
+          "name": "Knowledge",
+          "ports": {
+            "admin": 8083,
+            "rpc": 8882
+          },
+          "role": "Document metadata, members, publication, folders, quota, outbox"
+        },
+        {
+          "apis": [
+            "RPC AttachmentService: CreateAttachment, CompleteAttachment",
+            "List/Get, TrashAttachment, RestoreAttachment, Ping, Live"
+          ],
+          "data": "PostgreSQL schema attachment",
+          "dependencies": [
+            "PostgreSQL",
+            "MinIO/S3",
+            "ClamAV"
+          ],
+          "doesNotOwn": "Document permission rules or collaboration CRDT state",
+          "language": "Go",
+          "name": "Attachment",
+          "ports": {
+            "admin": 8085,
+            "rpc": 8884
+          },
+          "role": "Reusable file metadata, multipart upload, scan, references, trash"
+        },
+        {
+          "apis": [
+            "RPC CollaborationService: CreateSession, version list/create/get/restore, PurgeDocument",
+            "WebSocket y-sync on :8091"
+          ],
+          "data": "PostgreSQL schema collaboration",
+          "dependencies": [
+            "PostgreSQL",
+            "Redis",
+            "NATS JetStream",
+            "Knowledge RPC"
+          ],
+          "doesNotOwn": "Document permission rules or user credentials",
+          "language": "Rust",
+          "name": "Collaboration",
+          "ports": {
+            "admin": 8084,
+            "rpc": 8883,
+            "websocket": 8091
+          },
+          "role": "Realtime Yjs persistence, versions, restore, multi-instance sync"
+        },
+        {
+          "apis": [
+            "RPC PlatformService: GetSiteProfile, configuration get/put",
+            "deliveries, consumer snapshot/apply, Ping, Live"
+          ],
+          "data": "PostgreSQL schema platform",
+          "dependencies": [
+            "PostgreSQL",
+            "NATS JetStream"
+          ],
+          "doesNotOwn": "Process listen addresses, certificates, or connection pools (Nacos)",
+          "language": "Go",
+          "name": "Platform",
+          "ports": {
+            "admin": 8086,
+            "rpc": 8885
+          },
+          "role": "Admin-writable site, email, and AI configuration"
+        }
+      ]
+    },
+    {
+      "id": "services.relationships",
+      "revision": 139,
+      "section": "services",
+      "sources": [
+        {
+          "kind": "documented",
+          "reference": "docs/framework-design.md"
+        },
+        {
+          "kind": "user",
+          "reference": "user-confirmed-schema-v2-rerecord"
+        }
+      ],
+      "status": "verified",
+      "updatedAt": "2026-08-27T11:54:55Z",
+      "value": "Clients enter through Gateway HTTP or Collaboration WebSocket. Gateway calls Identity, Knowledge, Collaboration, Attachment, and Platform through typed Thrift RPC. Collaboration calls Knowledge for authorization and projection. Each stateful service persists only to its own PostgreSQL schema; Redis supports ephemeral coordination, JetStream carries durable events, S3 stores objects, and ClamAV scans uploads."
     },
     {
       "id": "validation.definition-of-done",
-      "revision": 114,
+      "revision": 138,
       "section": "workflows",
       "sources": [
         {
@@ -355,11 +802,15 @@
         {
           "kind": "user",
           "reference": "user-confirmed"
+        },
+        {
+          "kind": "user",
+          "reference": "user-confirmed-en-locale-source"
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-08-14T17:01:48Z",
-      "value": "Run make ci after each change; it covers check plus generate-check, including Go and Rust formatting, vet/clippy, lint, uncached tests, build, vulnerability/supply-chain checks, and generated drift. Add make race for Go concurrency, goroutine, orchestration, or lifecycle work. Run npm ci && npm run ci under services/collaboration/interop for Node fixture changes. For IDL changes, also regenerate, review wire/API compatibility, and run go run ./scripts/idlguard compat-git <merge-base> idl."
+      "updatedAt": "2026-08-27T07:36:59Z",
+      "value": "Run `make ci` after every change; it covers check and generate-check, including Go and Rust format checks, vet/clippy, lint, non-cached tests, build, vulnerability/supply-chain checks, and generated-file drift. Go concurrency, goroutine, orchestration, or lifecycle work also runs `make race`. Node fixture changes run `npm ci && npm run ci` under `services/collaboration/interop`. IDL changes also regenerate, review wire/API compatibility, and run `go run ./scripts/idlguard compat-git <merge-base> idl`."
     },
     {
       "id": "workflows.build",
@@ -382,17 +833,21 @@
     },
     {
       "id": "workflows.development",
-      "revision": 2,
+      "revision": 136,
       "section": "workflows",
       "sources": [
         {
           "kind": "user",
           "reference": "user-confirmed"
+        },
+        {
+          "kind": "user",
+          "reference": "user-confirmed-schema-v2-rerecord"
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-08-08T01:14:27Z",
-      "value": "Work directly on the existing dev branch only. Use repository scripts or make generate for generation; use make tidy after Go dependency changes. Run make ci after every change, add make race for Go concurrency or lifecycle changes, and run npm ci followed by npm run ci in services/collaboration/interop when that fixture changes. IDL changes also require go run ./scripts/idlguard compat-git <merge-base> idl."
+      "updatedAt": "2026-08-27T06:01:01Z",
+      "value": "Work only on the existing `dev` branch. Generate with repository scripts or `make generate`; after Go module changes run `make tidy`.\n\nEvery change must pass `make ci`. Go concurrency or lifecycle changes also run `make race`. Node fixture changes under `services/collaboration/interop` run `npm ci` then `npm run ci`. IDL changes additionally run `go run ./scripts/idlguard compat-git <merge-base> idl`.\n\nCommand maps remain in the generated workflows appendix.\n"
     },
     {
       "id": "workflows.quality",
@@ -450,137 +905,6 @@
       }
     },
     {
-      "id": "workflows.scripts",
-      "revision": 116,
-      "section": "workflows",
-      "sources": [
-        {
-          "kind": "detected",
-          "reference": "detected:project-scripts"
-        }
-      ],
-      "status": "verified",
-      "updatedAt": "2026-08-15T11:07:49Z",
-      "value": {
-        "make:build": {
-          "command": "make build",
-          "source": "Makefile"
-        },
-        "make:check": {
-          "command": "make check",
-          "source": "Makefile"
-        },
-        "make:ci": {
-          "command": "make ci",
-          "source": "Makefile"
-        },
-        "make:fmt": {
-          "command": "make fmt",
-          "source": "Makefile"
-        },
-        "make:fmt-check": {
-          "command": "make fmt-check",
-          "source": "Makefile"
-        },
-        "make:generate": {
-          "command": "make generate",
-          "source": "Makefile"
-        },
-        "make:generate-check": {
-          "command": "make generate-check",
-          "source": "Makefile"
-        },
-        "make:generate-go-check": {
-          "command": "make generate-go-check",
-          "source": "Makefile"
-        },
-        "make:generate-rust-check": {
-          "command": "make generate-rust-check",
-          "source": "Makefile"
-        },
-        "make:go-ci": {
-          "command": "make go-ci",
-          "source": "Makefile"
-        },
-        "make:go-release": {
-          "command": "make go-release",
-          "source": "Makefile"
-        },
-        "make:help": {
-          "command": "make help",
-          "source": "Makefile"
-        },
-        "make:line": {
-          "command": "make line",
-          "source": "Makefile"
-        },
-        "make:lint": {
-          "command": "make lint",
-          "source": "Makefile"
-        },
-        "make:race": {
-          "command": "make race",
-          "source": "Makefile"
-        },
-        "make:rust-ci": {
-          "command": "make rust-ci",
-          "source": "Makefile"
-        },
-        "make:rust-release": {
-          "command": "make rust-release",
-          "source": "Makefile"
-        },
-        "make:smoke-ci": {
-          "command": "make smoke-ci",
-          "source": "Makefile"
-        },
-        "make:supply-chain": {
-          "command": "make supply-chain",
-          "source": "Makefile"
-        },
-        "make:test": {
-          "command": "make test",
-          "source": "Makefile"
-        },
-        "make:tidy": {
-          "command": "make tidy",
-          "source": "Makefile"
-        },
-        "make:vet": {
-          "command": "make vet",
-          "source": "Makefile"
-        },
-        "make:vuln": {
-          "command": "make vuln",
-          "source": "Makefile"
-        },
-        "npm:audit": {
-          "command": "npm audit --audit-level=high",
-          "source": "services/collaboration/interop/package.json"
-        },
-        "npm:ci": {
-          "command": "npm run format:check && npm test && npm run audit",
-          "source": "services/collaboration/interop/package.json"
-        },
-        "npm:format": {
-          "command": "prettier --write .",
-          "source": "services/collaboration/interop/package.json"
-        },
-        "npm:format:check": {
-          "command": "prettier --check .",
-          "source": "services/collaboration/interop/package.json"
-        },
-        "npm:generate:fixtures": {
-          "command": "node ./generate-fixtures.mjs",
-          "source": "services/collaboration/interop/package.json"
-        },
-        "npm:test": {
-          "command": "node --test",
-          "source": "services/collaboration/interop/package.json"
-        }
-      }
-    },
-    {
       "id": "workflows.test",
       "revision": 1,
       "section": "workflows",
@@ -610,7 +934,7 @@
   ],
   "generator": {
     "name": "skill-constructor",
-    "version": "0.4.3"
+    "version": "0.7.0"
   },
   "project": {
     "language": "en",
@@ -618,11 +942,11 @@
     "profile": "generic",
     "slug": "knowledge-core"
   },
-  "revision": 133,
+  "revision": 140,
   "scan": {
-    "fingerprint": "1a8fcd5b12f04459547c2d2fc4f0d71e7b765bcc214e67b2e0e0403bf2259609",
-    "inventoryCount": 434
+    "fingerprint": "48a5b9ceb7feea4cf5b226accedec7b2e1a8f8a57fd85dd55a06148f52dc65a9",
+    "inventoryCount": 433
   },
-  "schemaVersion": 1,
-  "updatedAt": "2026-08-24T17:57:33Z"
+  "schemaVersion": 3,
+  "updatedAt": "2026-08-27T11:56:35Z"
 }

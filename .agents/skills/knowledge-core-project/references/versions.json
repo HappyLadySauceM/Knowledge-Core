@@ -1,0 +1,42 @@
+{
+  "documents": {
+    "architecture": {
+      "enDigest": "21dc6daa8554cc80a37015b3d83fbeb17b91c8b5fb0ede044fc4b476dec535b4",
+      "syncedEnDigest": "726d29f2aa59be9441bd9ca97c7e795b74cea3111a54173ee4c56fc5acd0227c",
+      "syncedZhDigest": "d956dfb0090eb5c2b5a857e5148d195e8efbafe4c1981b0e60495586e20d597e",
+      "zhDigest": "d956dfb0090eb5c2b5a857e5148d195e8efbafe4c1981b0e60495586e20d597e"
+    },
+    "constraints": {
+      "enDigest": "210470fb3a92187b5947185f9931d5be257822405656253359a45b508c265673",
+      "syncedEnDigest": "210470fb3a92187b5947185f9931d5be257822405656253359a45b508c265673",
+      "syncedZhDigest": "0a9e33aa9c6f1c5a07b57e8a0365158275251e66364b3e5f4d628a12ef4e378d",
+      "zhDigest": "0a9e33aa9c6f1c5a07b57e8a0365158275251e66364b3e5f4d628a12ef4e378d"
+    },
+    "conventions": {
+      "enDigest": "32e720b9ea75f64fdee6219a33eb3c879c6979ea6a2ac88f4053d572302d7e97",
+      "syncedEnDigest": "32e720b9ea75f64fdee6219a33eb3c879c6979ea6a2ac88f4053d572302d7e97",
+      "syncedZhDigest": "fad468a403c445178f5a3c11ba57a37a5f1951bb246e3151f3a2c7403481d630",
+      "zhDigest": "fad468a403c445178f5a3c11ba57a37a5f1951bb246e3151f3a2c7403481d630"
+    },
+    "environment": {
+      "enDigest": "9b9cb2dcd111fe0dc6cf018bd1a244ade2e7de0eef38d0774338ec50373fb5f1",
+      "syncedEnDigest": "e81570ac844cdf46df6ddb4811b9128585f0af0b79027296cb773585701b2a04",
+      "syncedZhDigest": "f113ff85a7cde3cac7bed9811f5ccc99bc7d2033801f19c9fd218caea4f9fa97",
+      "zhDigest": "f113ff85a7cde3cac7bed9811f5ccc99bc7d2033801f19c9fd218caea4f9fa97"
+    },
+    "services": {
+      "enDigest": "221251b843fd474d2abea028515646bb19106fb3d4afe9274b413d2ed113c528",
+      "syncedEnDigest": "dceb0b8c0fde3446d3c7302a69d0d3057de533bae014dfd84aed5bb03ae89b31",
+      "syncedZhDigest": "c40103c11af58c321e55496b0400d8852ba05b6abcdf4cce5df19ec21926fece",
+      "zhDigest": "c40103c11af58c321e55496b0400d8852ba05b6abcdf4cce5df19ec21926fece"
+    },
+    "workflows": {
+      "enDigest": "6fbf82a80f4cd333227742fbc886fc92af9f467e8e482ecfa7b6c9d39122f70e",
+      "syncedEnDigest": "ff069f00c1e8b41f396d9f888e1482e5add08094603cd6b5c70e2d21377f39d0",
+      "syncedZhDigest": "01b0d0326722e79e8a4a554d850247b61af4c878e8e2ceb2562f04274317b115",
+      "zhDigest": "01b0d0326722e79e8a4a554d850247b61af4c878e8e2ceb2562f04274317b115"
+    }
+  },
+  "schemaVersion": 1,
+  "sourceLocale": "en"
+}
