@@ -92,6 +92,15 @@ jobs:
         with:
           go-version-file: go.mod
           cache: false
+      - name: Install pinned IDL generators
+        run: |
+          set -euo pipefail
+          bin_dir="$RUNNER_TEMP/knowledge-core-go-tools"
+          install -d -m 0700 "$bin_dir"
+          GOBIN="$bin_dir" go install github.com/cloudwego/kitex/tool/cmd/kitex@v0.16.2
+          GOBIN="$bin_dir" go install github.com/cloudwego/hertz/cmd/hz@v0.9.7
+          GOBIN="$bin_dir" go install github.com/cloudwego/thriftgo@v0.4.5
+          echo "$bin_dir" >> "$GITHUB_PATH"
       - name: Run Go gates and build artifacts
         env:
           STATE_DIR: ${{ needs.plan.outputs.state_dir }}
