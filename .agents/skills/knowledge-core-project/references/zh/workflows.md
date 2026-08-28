@@ -10,9 +10,9 @@
 
 <!-- fact:workflows.development status:verified sources:user-confirmed, user-confirmed-schema-v2-rerecord -->
 
-推送到 dev 会触发 ci-templates 提供的可复用 Python CI 控制镜像。流水线运行 make ci，并在 Node 24.18.1 下运行 Collaboration 的 Node 互操作检查；检测受影响的服务；将固定版本的基础镜像预热到 Harbor；仅使用 Harbor 注册表缓存构建受影响的镜像；并在不执行镜像扫描或签名的情况下发布 dev 标签。替换前，当前 dev 镜像会保留为 previous。Knowledge-Core/deploy 是可编辑的部署源；CI 将其复制到 HappyLadySauceM/deploy 中的 Knowledge-Core/deploy 快照，更新根级镜像摘要，并通过快进式比较并交换检查推送；Argo CD 监视该 k3s 仓库。发布前必须通过 Argo 健康检查和部署冒烟测试。若 Argo 或冒烟测试失败，CI 会以普通快进提交还原准确的 GitOps 快照提交，并将每个受影响镜像的 Harbor previous 标签恢复为 dev；若远程分支已移动，回滚会拒绝覆盖。成功后必须删除 previous 标签以供 Harbor 垃圾回收，清理失败会阻止发布。DeepSeek 发布摘要失败会阻止提升到 main。成功后，dev 会快进到 main，并创建一个聚合的 vMAJOR.MINOR.PATCH Git 标签和 GitHub Release，两者均指向准确的提升提交 SHA；Release 标题与版本标签相同。选择下一个补丁版本或重试已有带前缀标签的提交时，现有 knowledge-core-v* 标签仍计入。重试同一提交时会复用匹配的聚合标签和现有 Release，但拒绝指向其他提交的标签。共享历史绝不强制推送或变基。
+推送到 dev 会触发 ci-templates 提供的可复用 Python CI 控制镜像。所有受信任的发布任务均固定到组织级 self-hosted runner 标签 `self-hosted`、`Linux`、`X64` 和 `devops`；系统 Docker 的清理仅限专用 Buildx 缓存和 runner 运行状态。流水线运行 make ci，并在 Node 24.18.1 下运行 Collaboration 的 Node 互操作检查；检测受影响的服务；将固定版本的基础镜像预热到 Harbor；仅使用 Harbor 注册表缓存构建受影响的镜像；并在不执行镜像扫描或签名的情况下发布 dev 标签。替换前，当前 dev 镜像会保留为 previous。Knowledge-Core/deploy 是可编辑的部署源；CI 将其复制到 HappyLadySauceM/deploy 中的 Knowledge-Core/deploy 快照，更新根级镜像摘要，并通过快进式比较并交换检查推送；Argo CD 监视该 k3s 仓库。发布前必须通过 Argo 健康检查和部署冒烟测试。若 Argo 或冒烟测试失败，CI 会以普通快进提交还原准确的 GitOps 快照提交，并将每个受影响镜像的 Harbor previous 标签恢复为 dev；若远程分支已移动，回滚会拒绝覆盖。成功后必须删除 previous 标签以供 Harbor 垃圾回收，清理失败会阻止发布。DeepSeek 发布摘要失败会阻止提升到 main。成功后，dev 会快进到 main，并创建一个聚合的 vMAJOR.MINOR.PATCH Git 标签和 GitHub Release，两者均指向准确的提升提交 SHA；Release 标题与版本标签相同。选择下一个补丁版本或重试已有带前缀标签的提交时，现有 knowledge-core-v* 标签仍计入。重试同一提交时会复用匹配的聚合标签和现有 Release，但拒绝指向其他提交的标签。共享历史绝不强制推送或变基。
 
-<!-- fact:cicd.pipeline status:verified sources:filesystem:ci-config, user-confirmed, user-confirmed-en-locale-source -->
+<!-- fact:cicd.pipeline status:verified sources:filesystem:ci-config, user-confirmed, user-confirmed-en-locale-source, user-confirmed-runner-migration -->
 
 每次变更后运行 make ci；它覆盖 check 和 generate-check，包括 Go 与 Rust 格式检查、vet/clippy、lint、非缓存测试、构建、漏洞/供应链检查以及生成文件漂移检查。涉及 Go 并发、goroutine、编排或生命周期的工作还需运行 make race。修改 Node 夹具时，在 services/collaboration/interop 下运行 npm ci && npm run ci。修改 IDL 时，还需重新生成、审查 wire/API 兼容性，并运行 go run ./scripts/idlguard compat-git <merge-base> idl。
 

@@ -441,7 +441,7 @@ Kubernetes 三层所有权：
 
 因此：本文件描述的是可构建、可测试的当前代码架构，不能据此宣称已完成生产切换或完整生产级验收。
 
-<!-- fact:architecture.design status:verified sources:Knowledge-Core/.tmp/architecture-design.md, user-confirmed-en-locale-source -->
+<!-- fact:architecture.design status:verified sources:README.md#knowledge-core, docs/framework-design.md, docs/framework-design.md#9, docs/framework-design.md#knowledge-core, docs/rust-collaboration-design.md#rust-collaboration, Knowledge-Core/.tmp/architecture-design.md, user-confirmed-en-locale-source -->
 
 Knowledge Core 是知识协作后端，包含六个显式组装的服务：Go Gateway、Identity、Knowledge、Attachment、Platform，以及 Rust Collaboration。每个服务拥有自己的 PostgreSQL schema，通过 typed Thrift RPC 访问；Gateway 只做 HTTP 边缘。kubectl context `default` 中的现场证据显示命名空间 `knowledge-core-dev`。当前 context 看不到 production 与 canary。
 

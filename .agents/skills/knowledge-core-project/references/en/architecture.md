@@ -187,4 +187,4 @@ flowchart LR
 - **mitigation**: Pin IDL generation, enforce compatibility checks, and fail readiness on critical stream/subject mismatches.
 
 
-<!-- fact:architecture.design status:verified sources:docs/framework-design.md, Knowledge-Core/.tmp/architecture-design.md, user-confirmed-en-locale-source -->
+<!-- fact:architecture.design status:verified sources:README.md#knowledge-core, docs/framework-design.md, docs/framework-design.md#9, docs/framework-design.md#knowledge-core, docs/rust-collaboration-design.md#rust-collaboration, Knowledge-Core/.tmp/architecture-design.md, user-confirmed-en-locale-source -->
