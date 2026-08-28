@@ -64,7 +64,7 @@ jobs:
           echo "$changes"
           services=$(echo "$changes" | jq -r '.services | join(",")')
           rust_required=false
-          if jq -r '.paths[]?' "$state_dir/changes.json" \
+          if [[ ",$services," == *,collaboration,* ]] || jq -r '.paths[]?' "$state_dir/changes.json" \
             | grep -Eq '(^services/collaboration/|^idl/|^scripts/codegen|^Makefile$|^\.github/)'; then
             rust_required=true
           fi
