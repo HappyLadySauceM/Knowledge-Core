@@ -95,11 +95,11 @@ jobs:
       - name: Install pinned IDL generators
         run: |
           set -euo pipefail
-          bin_dir="$RUNNER_TEMP/knowledge-core-go-tools"
-          install -d -m 0700 "$bin_dir"
-          GOBIN="$bin_dir" go install github.com/cloudwego/kitex/tool/cmd/kitex@v0.16.2
-          GOBIN="$bin_dir" go install github.com/cloudwego/hertz/cmd/hz@v0.9.7
-          GOBIN="$bin_dir" go install github.com/cloudwego/thriftgo@v0.4.5
+          bin_dir="/opt/actions-runner/_tool/knowledge-core-go-tools"
+          install -d -m 0755 "$bin_dir"
+          [[ -x "$bin_dir/kitex" ]] || GOBIN="$bin_dir" go install github.com/cloudwego/kitex/tool/cmd/kitex@v0.16.2
+          [[ -x "$bin_dir/hz" ]] || GOBIN="$bin_dir" go install github.com/cloudwego/hertz/cmd/hz@v0.9.7
+          [[ -x "$bin_dir/thriftgo" ]] || GOBIN="$bin_dir" go install github.com/cloudwego/thriftgo@v0.4.5
           echo "$bin_dir" >> "$GITHUB_PATH"
       - name: Run Go gates and build artifacts
         env:
