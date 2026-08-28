@@ -249,6 +249,10 @@ jobs:
               -e CI_REGISTRY_CA_FILE=/etc/harbor-ca/ca.crt -e SSL_CERT_FILE=/etc/harbor-ca/ca.crt \
               -w /workspace "$CI_IMAGE" "$@"
           }
+          # Populate the private Harbor base-image cache before BuildKit starts.
+          # BuildKit cannot resolve the external registries reliably from its
+          # container network, while the runner host can reach them directly.
+          ci prewarm
           for service in "${selected[@]}"; do
             result=$(ci build --service "$service" --tag "$candidate" --artifact-manifest /state/artifact-manifest.json)
             tmp=$(mktemp)
