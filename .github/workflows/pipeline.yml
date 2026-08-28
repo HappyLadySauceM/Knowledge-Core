@@ -84,6 +84,8 @@ jobs:
       cancel-in-progress: true
     env:
       KC_RUST_GATE: "0"
+      GO111MODULE: "on"
+      GOPROXY: "https://goproxy.cn,direct"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
