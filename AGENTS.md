@@ -85,7 +85,7 @@
 ## 测试与质量门禁
 
 - 测试与实现同包就近放置，覆盖成功路径、输入边界、依赖失败、错误映射、回滚/关闭和并发语义。优先使用可控同步原语，避免依赖任意 sleep 的脆弱测试。
-- 每次改动完成后运行 `make ci`（= check + generate-check）；它包含 Go 与 Rust 的格式、vet/clippy、lint、无缓存测试、build、漏洞/供应链检查（govulncheck、cargo deny）以及 Go/Rust 生成漂移检查。
+- 每次改动完成后运行 `make ci`（= tidy + ensure-ci-tools + check + generate-check + build）；它先整理 go.mod/go.sum 并补齐缺失或过低的 CI 工具（本机更高版本直接接受），再跑 Go 与 Rust 的格式、vet/clippy、lint、无缓存测试、build、漏洞/供应链检查（govulncheck、cargo deny）以及 Go/Rust 生成漂移检查。
 - 修改 Go 并发、goroutine、组件编排或资源生命周期时额外运行 `make race`（仅覆盖 Go 包）。
 - `services/collaboration/interop/` 的 Node fixture 需在 Node >= 24.18.1 环境显式执行 `npm ci && npm run ci`（format:check、`node --test`、audit）；仓库不提供对应的根 Make 目标。
 - IDL 变更除 `make ci` 外还必须运行上一节的 `compat-git` 检查。

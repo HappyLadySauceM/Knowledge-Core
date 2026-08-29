@@ -25,7 +25,7 @@ Knowledge Core 是知识协作后端：**一个 Go module + 一个 Rust workspac
 改动完成后的门禁（同时覆盖 Go 和 Rust）：
 
 ```bash
-make ci        # = check + generate-check：fmt/vet/lint、无缓存 test、build、govulncheck、cargo deny，以及 Go/Rust 生成漂移检查
+make ci        # = tidy + ensure-ci-tools + check + generate-check + build：先整理模块并补齐 CI 工具，再跑 fmt/vet/lint、无缓存 test、build、govulncheck、cargo deny，以及 Go/Rust 生成漂移检查
 make race      # Go race 检测；改动并发/goroutine/生命周期/组件编排时必须额外跑
 make tidy      # 新增/升级依赖后规整 go.mod / go.sum
 ```

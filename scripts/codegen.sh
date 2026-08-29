@@ -43,11 +43,19 @@ tool_version() {
   return 1
 }
 
+# Return 0 when HAVE is a semantic version greater than or equal to NEED.
+# HAVE 语义版本不低于 NEED 时返回 0。
+version_ge() {
+  local have="${1#v}" need="${2#v}" lowest
+  lowest="$(printf '%s\n' "$need" "$have" | sort -V | head -n 1)"
+  [[ "$lowest" == "$need" ]]
+}
+
 assert_tool_version() {
-  local command="$1" pattern="$2" expected="$3" actual
+  local command="$1" pattern="$2" minimum="$3" actual
   actual="$(tool_version "$command" "$pattern")"
-  if [[ "$actual" != "$expected" ]]; then
-    echo "$command version $actual does not match required $expected" >&2
+  if ! version_ge "$actual" "$minimum"; then
+    echo "$command version $actual is older than required $minimum" >&2
     return 1
   fi
 }
@@ -70,20 +78,28 @@ owned_files() {
 }
 
 generate_rust() {
-  local root="$1" actual cargo_target rust_workspace generator_binary
-  rust_workspace="$root/services/collaboration"
+  local root="$1" actual cargo_target rust_workspace generator_binary rustc_found
+  rust_workspace="$repository_root/services/collaboration"
+  cargo_target="${CARGO_TARGET_DIR:-$repository_root/services/collaboration/target/codegen}"
+  # Build from the repository workspace so vendored crates stay reachable.
+  # 从仓库 workspace 编译，确保能读到 vendor 依赖。
+  cd "$rust_workspace"
   actual="$(rustc --version)"
-  if [[ "$actual" != "rustc $rust_version "* ]]; then
-    echo "rustc version does not match required $rust_version: $actual" >&2
+  if [[ "$actual" =~ rustc\ ([0-9]+\.[0-9]+\.[0-9]+) ]]; then
+    rustc_found="${BASH_REMATCH[1]}"
+    if ! version_ge "$rustc_found" "$rust_version"; then
+      echo "rustc version $rustc_found is older than required $rust_version: $actual" >&2
+      return 1
+    fi
+  else
+    echo "could not parse rustc version from: $actual" >&2
     return 1
   fi
-  cargo_target="${CARGO_TARGET_DIR:-$repository_root/services/collaboration/target/codegen}"
-  cd "$repository_root/services/collaboration"
   CARGO_TARGET_DIR="$cargo_target" cargo build --locked -p knowledge-core-rust-codegen
   generator_binary="$cargo_target/debug/knowledge-core-rust-codegen"
   [[ -x "$generator_binary" ]] || { echo "Rust codegen binary is missing: $generator_binary" >&2; return 1; }
   "$generator_binary" --root "$root"
-  cd "$rust_workspace"
+  cd "$root/services/collaboration"
   rustfmt --edition 2024 src/generated/mod.rs src/generated/volo_gen.rs
 }
 

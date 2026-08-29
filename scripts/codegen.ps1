@@ -48,9 +48,22 @@ function Assert-ToolVersion {
     if (-not $match.Success) {
         throw "could not parse $Command version from: $output"
     }
-    if ($match.Value -ne $Expected) {
-        throw "$Command version $($match.Value) does not match required $Expected"
+    if (-not (Test-VersionAtLeast -Actual $match.Value -Minimum $Expected)) {
+        throw "$Command version $($match.Value) is older than required $Expected"
     }
+}
+
+# Return true when HAVE is a semantic version greater than or equal to NEED.
+# HAVE 语义版本不低于 NEED 时返回 true。
+function Test-VersionAtLeast {
+    param(
+        [Parameter(Mandatory = $true)][string]$Actual,
+        [Parameter(Mandatory = $true)][string]$Minimum
+    )
+
+    $actualVersion = [version]($Actual.TrimStart("v"))
+    $minimumVersion = [version]($Minimum.TrimStart("v"))
+    return $actualVersion -ge $minimumVersion
 }
 
 function Get-SHA256 {
@@ -106,8 +119,12 @@ function Invoke-RustGeneration {
     try {
         $versionOutput = (& rustc --version 2>&1 | Out-String).Trim()
         Assert-NativeSuccess -Operation "read rustc version"
-        if ($versionOutput -notmatch "^rustc $([regex]::Escape($rustVersion)) ") {
-            throw "rustc version does not match required $rustVersion`: $versionOutput"
+        $rustcMatch = [regex]::Match($versionOutput, "rustc ([0-9]+\.[0-9]+\.[0-9]+)")
+        if (-not $rustcMatch.Success) {
+            throw "could not parse rustc version from: $versionOutput"
+        }
+        if (-not (Test-VersionAtLeast -Actual $rustcMatch.Groups[1].Value -Minimum $rustVersion)) {
+            throw "rustc version $($rustcMatch.Groups[1].Value) is older than required $rustVersion`: $versionOutput"
         }
         & cargo build --locked -p knowledge-core-rust-codegen
         Assert-NativeSuccess -Operation "Rust Thrift generation"
