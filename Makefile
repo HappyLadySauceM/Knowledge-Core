@@ -2,9 +2,19 @@ GOLANGCI_LINT_VERSION ?= v2.12.2
 GOLANGCI_LINT ?= go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
 GOVULNCHECK_VERSION ?= v1.6.0
 GOVULNCHECK ?= go run golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION)
+KITEX_VERSION ?= v0.16.2
+HZ_VERSION ?= v0.9.7
+THRIFTGO_VERSION ?= 0.4.5
 CARGO ?= cargo
 CARGO_DENY ?= cargo deny
+CARGO_DENY_VERSION ?= 0.20.2
+RUST_TOOLCHAIN ?= 1.97.1
 RUST_ROOT ?= services/collaboration
+# Keep freshly installed CLIs visible to later ci targets.
+# 把刚安装的 CLI 加入后续 ci target 的 PATH。
+GOBIN_DIR := $(shell go env GOPATH)/bin
+CARGO_BIN_DIR := $(if $(CARGO_HOME),$(CARGO_HOME)/bin,$(HOME)/.cargo/bin)
+export PATH := $(GOBIN_DIR):$(CARGO_BIN_DIR):$(PATH)
 IDL_COMPAT_BASE ?= HEAD^
 KC_RUST_GATE ?= 1
 # The checked-in vendor tree is intentionally not authoritative in CI; resolve
@@ -12,9 +22,16 @@ KC_RUST_GATE ?= 1
 # CI 中以 go.mod/go.sum 为准，避免旧 vendor/modules.txt 阻断验证流水线。
 GOFLAGS ?= -mod=mod
 export GOFLAGS
-# Cap local/CI compile parallelism at three CPUs and respect cgroup affinity.
-# 将本地/CI 编译并行度限制为三个 CPU，并尊重 cgroup affinity。
-BUILD_JOBS ?= $(shell nproc 2>/dev/null | awk '{v=$$1; if (v>3) v=3; if (v<1) v=1; print v}')
+# Derive local/CI compile parallelism from the effective CPU count instead of
+# pinning a machine-specific number. BUILD_JOBS remains an explicit emergency
+# override for callers that need one bounded worker count.
+# 按可用 CPU 比例计算本地/CI 编译并行度，不绑定机器核心数；BUILD_JOBS
+# 仅作为需要固定并行 worker 数时的显式覆盖。
+BUILD_CPU_PERCENT ?= 75
+ifeq ($(shell test "$(BUILD_CPU_PERCENT)" -ge 1 2>/dev/null && test "$(BUILD_CPU_PERCENT)" -le 100 2>/dev/null && echo valid),)
+$(error BUILD_CPU_PERCENT must be an integer from 1 to 100)
+endif
+BUILD_JOBS ?= $(shell nproc 2>/dev/null | awk -v p="$(BUILD_CPU_PERCENT)" '{v=int(($$1*p)/100); if (v<1) v=1; print v}')
 GO_RELEASE_SERVICES ?= gateway identity knowledge attachment platform
 GO_ARTIFACT_DIR ?= .ci-artifacts
 RUST_ARTIFACT_DIR ?= .ci-artifacts
@@ -45,7 +62,7 @@ endif
 
 .DEFAULT_GOAL := help
 
-.PHONY: help fmt fmt-check vet lint line test race build go-release rust-release vuln supply-chain tidy generate generate-check generate-go-check generate-rust-check check go-ci rust-ci ci smoke-ci
+.PHONY: help fmt fmt-check vet lint line test race build go-release rust-release vuln supply-chain tidy ensure-ci-tools ensure-kitex ensure-hz ensure-thriftgo ensure-cargo-deny ensure-rust-toolchain generate generate-check generate-go-check generate-rust-check check go-ci rust-ci ci smoke-ci
 
 help:
 	@echo Knowledge Core development targets:
@@ -60,10 +77,11 @@ help:
 	@echo   make vuln            Check reachable Go vulnerabilities
 	@echo   make supply-chain    Check Rust advisories, bans, licenses, and sources
 	@echo   make tidy            Normalize go.mod and go.sum
+	@echo   make ensure-ci-tools Install missing or older CI tools; keep newer local versions
 	@echo   make generate        Regenerate Hertz and Kitex code
 	@echo   make generate-check  Regenerate and fail on generated-code drift
 	@echo   make check           Run Go gates and the Rust gate when enabled
-	@echo   make ci              Run check plus generated-code drift detection
+	@echo   make ci              Tidy modules, ensure CI tools, then check, generate-check, and build
 
 fmt:
 	go fmt $(GO_PACKAGES)
@@ -120,6 +138,90 @@ supply-chain:
 tidy:
 	go mod tidy
 
+# Compare a parsed x.y.z against a pin after stripping an optional v prefix.
+# 去掉可选 v 前缀后，比较解析出的 x.y.z 与钉住版本。
+# HAVE >= NEED keeps the local binary; otherwise install the pin.
+# HAVE >= NEED 时保留本机二进制，否则安装钉住版本。
+define ENSURE_GO_CLI
+	@set -euo pipefail; \
+	name="$(1)"; \
+	need="$(2)"; \
+	module="$(3)"; \
+	need_norm="$${need#v}"; \
+	if command -v "$$name" >/dev/null 2>&1; then \
+		output="$$("$$name" --version 2>&1 || true)"; \
+		have="$$(printf '%s\n' "$$output" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n 1 || true)"; \
+		if [ -n "$$have" ]; then \
+			lowest="$$(printf '%s\n' "$$need_norm" "$$have" | sort -V | head -n 1)"; \
+			if [ "$$lowest" = "$$need_norm" ]; then \
+				echo "$$name $$have satisfies $$need"; \
+				exit 0; \
+			fi; \
+			echo "$$name $$have is older than $$need; upgrading"; \
+		else \
+			echo "could not parse $$name version from: $$output; reinstalling $$need"; \
+		fi; \
+	else \
+		echo "$$name is missing; installing $$need"; \
+	fi; \
+	go install "$$module"
+endef
+
+ensure-kitex:
+	$(call ENSURE_GO_CLI,kitex,$(KITEX_VERSION),github.com/cloudwego/kitex/tool/cmd/kitex@$(KITEX_VERSION))
+
+ensure-hz:
+	$(call ENSURE_GO_CLI,hz,$(HZ_VERSION),github.com/cloudwego/hertz/cmd/hz@$(HZ_VERSION))
+
+ensure-thriftgo:
+	$(call ENSURE_GO_CLI,thriftgo,$(THRIFTGO_VERSION),github.com/cloudwego/thriftgo@v$(THRIFTGO_VERSION))
+
+ensure-cargo-deny:
+	@set -euo pipefail; \
+	need="$(CARGO_DENY_VERSION)"; \
+	need_norm="$${need#v}"; \
+	if command -v cargo-deny >/dev/null 2>&1 || $(CARGO) deny --version >/dev/null 2>&1; then \
+		output="$$($(CARGO) deny --version 2>&1 || true)"; \
+		have="$$(printf '%s\n' "$$output" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n 1 || true)"; \
+		if [ -n "$$have" ]; then \
+			lowest="$$(printf '%s\n' "$$need_norm" "$$have" | sort -V | head -n 1)"; \
+			if [ "$$lowest" = "$$need_norm" ]; then \
+				echo "cargo-deny $$have satisfies $$need"; \
+				exit 0; \
+			fi; \
+			echo "cargo-deny $$have is older than $$need; upgrading"; \
+		else \
+			echo "could not parse cargo-deny version from: $$output; reinstalling $$need"; \
+		fi; \
+	else \
+		echo "cargo-deny is missing; installing $$need"; \
+	fi; \
+	$(CARGO) install cargo-deny --locked --version "$$need"
+
+ensure-rust-toolchain:
+	@set -euo pipefail; \
+	toolchain="$(RUST_TOOLCHAIN)"; \
+	if ! command -v rustup >/dev/null 2>&1; then \
+		echo "rustup is required to install Rust $$toolchain" >&2; \
+		exit 1; \
+	fi; \
+	if rustup toolchain list | grep -Eq "^$${toolchain}(-| )"; then \
+		echo "rustc $$toolchain is installed"; \
+	else \
+		echo "rustc $$toolchain is missing; installing"; \
+		rustup toolchain install "$$toolchain" --profile minimal; \
+	fi; \
+	for component in clippy rustfmt; do \
+		if rustup component list --toolchain "$$toolchain" | grep -Eq "^$${component}-.* \(installed\)$$"; then \
+			echo "$$component for $$toolchain is installed"; \
+		else \
+			echo "$$component for $$toolchain is missing; installing"; \
+			rustup component add "$$component" --toolchain "$$toolchain"; \
+		fi; \
+	done
+
+ensure-ci-tools: ensure-kitex ensure-hz ensure-thriftgo ensure-cargo-deny ensure-rust-toolchain
+
 generate:
 	$(CODEGEN)
 
@@ -156,7 +258,14 @@ else
 check: go-ci rust-ci
 endif
 
-ci: check generate-check build
+# Run tidy and tool bootstrap sequentially so `make -j ci` cannot race them.
+# 顺序执行 tidy 和工具预检，避免 `make -j ci` 把它们并行打乱。
+ci:
+	$(MAKE) tidy
+	$(MAKE) ensure-ci-tools
+	$(MAKE) check
+	$(MAKE) generate-check
+	$(MAKE) build
 
 smoke-ci:
 	@test -n "$(KC_SMOKE_BASE_URL)" || (echo "KC_SMOKE_BASE_URL is required" >&2; exit 1)

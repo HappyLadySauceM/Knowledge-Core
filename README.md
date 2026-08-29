@@ -229,7 +229,7 @@ npm run ci
 `.github/workflows/pipeline.yml` 是唯一项目 workflow；它调用 `/opt/HappyLadySauceM/ci-templates`
 发布的 Python 控制镜像。`dev` push 先运行 `make ci` 与 Collaboration Node 互操作门禁，再按
 变更服务从 Harbor 缓存构建并覆盖 `dev` 镜像 tag。控制镜像复用稳定 Buildx builder，并向
-Dockerfile 传入 `BUILD_JOBS`（宿主机 CPU 的 3/4）；Go/Rust 构建层通过固定 cache mount id
+Dockerfile 传入按 runner 有效 CPU 75% 计算的 `BUILD_JOBS`；Go/Rust 构建层通过固定 cache mount id
 跨服务复用 module/cargo 缓存。镜像不扫描、不签名；当前 `dev` tag 构建前会
 保留为 `previous`，Argo CD 同步和冒烟成功后删除 `previous`，由 Harbor 垃圾回收回收旧层。
 
@@ -253,7 +253,9 @@ trust bundle、NetworkPolicy 和发布 RBAC 由 `knowledge-core-foundation-dev` 
 GitOps 仓库同时保存 SOPS Secret、trust bundle 和不可变镜像 digest；应用仓库不记录具体
 集群拓扑或凭据。
 
-质量、镜像构建、GitOps 快照、Argo 健康和 dev 冒烟均在同一 workflow 中顺序执行。Rust 门禁只在
+质量、镜像构建、GitOps 快照、Argo 健康和 dev 冒烟均在同一 workflow 中顺序执行。仅修改
+`deploy/**` 时跳过镜像构建，执行部署模板校验、GitOps 快照、Argo 健康和 dev 冒烟，再完成
+`main` promotion；代码变更继续执行完整链路。Rust 门禁只在
 Rust、IDL、生成器、Makefile 或 workflow 变更时运行；其他提交仍执行 Go 门禁和生成漂移检查。
 `make ci` 不执行 Rust release 编译，受影响的 Collaboration 镜像构建会在 Docker 阶段完成该编译。
 冒烟成功后，DeepSeek 根据限长并脱敏的代码 diff 生成中文功能变更摘要：共享/CI/构建类变更

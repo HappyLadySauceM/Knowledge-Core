@@ -11,7 +11,8 @@ permissions:
   statuses: write
 
 env:
-  CI_IMAGE: harbor.happyladysauce.local/knowledge-core/ci-templates:v1.1.10@sha256:016de2847483bc544b00a8127bea52a0b939341654718845f29c0464b48aaa0e
+  CI_IMAGE: harbor.happyladysauce.local/knowledge-core/ci-templates:v1.1.11@sha256:26af40ffdc6efdef4d8e7a6135d8e76f2326639cda9fa21c46af7477f6ebc0bc
+  BUILD_CPU_PERCENT: "75"
   KC_CACHE_ROOT: /opt/actions-runner/_cache/knowledge-core
   CI_PROJECT_CONFIG_JSON: >-
     {"project":"Knowledge-Core","source_repo":"HappyLadySauceM/Knowledge-Core","gitops_repo":"https://github.com/HappyLadySauceM/deploy.git","gitops_path":"Knowledge-Core","gitops_kustomization":"dev/common/kustomization.yaml","gitops_branch":"main","shared_paths":[".github","pkg","idl","kitex_gen","scripts","services/collaboration/interop","Makefile","go.mod","go.sum"],"harbor_registry":"harbor.happyladysauce.local","harbor_project":"knowledge-core","argocd_server":"argocd.happyladysauce.local","argocd_application":"knowledge-core-gateway-dev","smoke_command":["make","smoke-ci"],"release_model":"git-independent-service-aggregate","aggregate_release_prefix":"knowledge-core","aggregate_version_file":"VERSION","release_language":"zh-CN","deepseek_model":"deepseek-v4-flash","base_images":[{"source":"gcr.io/distroless/static-debian12:nonroot@sha256:f5b485ea962d9bd1186b2f6b3a061191539b905b82ec395de78cbfae51f20e35","destination":"harbor.happyladysauce.local/knowledge-core/base/distroless-static-debian12:nonroot"},{"source":"docker.m.daocloud.io/library/debian:bookworm-slim@sha256:7b140f374b289a7c2befc338f42ebe6441b7ea838a042bbd5acbfca6ec875818","destination":"harbor.happyladysauce.local/knowledge-core/base/debian:bookworm-slim"}],"services":[{"name":"gateway","source_path":"services/gateway","version_file":"services/gateway/VERSION","dockerfile":"docker/gateway/Dockerfile","context":".","image_repository":"harbor.happyladysauce.local/knowledge-core/gateway","deploy_snapshot":"deploy/gateway"},{"name":"identity","source_path":"services/identity","version_file":"services/identity/VERSION","dockerfile":"docker/identity/Dockerfile","context":".","image_repository":"harbor.happyladysauce.local/knowledge-core/identity","deploy_snapshot":"deploy/identity"},{"name":"knowledge","source_path":"services/knowledge","version_file":"services/knowledge/VERSION","dockerfile":"docker/knowledge/Dockerfile","context":".","image_repository":"harbor.happyladysauce.local/knowledge-core/knowledge","deploy_snapshot":"deploy/knowledge"},{"name":"attachment","source_path":"services/attachment","version_file":"services/attachment/VERSION","dockerfile":"docker/attachment/Dockerfile","context":".","image_repository":"harbor.happyladysauce.local/knowledge-core/attachment","deploy_snapshot":"deploy/attachment"},{"name":"platform","source_path":"services/platform","version_file":"services/platform/VERSION","dockerfile":"docker/platform/Dockerfile","context":".","image_repository":"harbor.happyladysauce.local/knowledge-core/platform","deploy_snapshot":"deploy/platform"},{"name":"collaboration","source_path":"services/collaboration","version_file":"services/collaboration/VERSION","dockerfile":"docker/collaboration/Dockerfile","context":".","image_repository":"harbor.happyladysauce.local/knowledge-core/collaboration","deploy_snapshot":"deploy/collaboration"}]}
@@ -25,6 +26,11 @@ jobs:
     outputs:
       state_dir: ${{ steps.plan.outputs.state_dir }}
       services: ${{ steps.plan.outputs.services }}
+      build_services: ${{ steps.plan.outputs.build_services }}
+      deploy_services: ${{ steps.plan.outputs.deploy_services }}
+      release_services: ${{ steps.plan.outputs.release_services }}
+      deploy_changed: ${{ steps.plan.outputs.deploy_changed }}
+      has_build_changes: ${{ steps.plan.outputs.has_build_changes }}
       has_changes: ${{ steps.plan.outputs.has_changes }}
       rust_required: ${{ steps.plan.outputs.rust_required }}
     steps:
@@ -63,21 +69,59 @@ jobs:
             --base "$base" --details-file /state/changes.json)
           echo "$changes"
           services=$(echo "$changes" | jq -r '.services | join(",")')
+          build_services=$(echo "$changes" | jq -r '.build_services | join(",")')
+          deploy_services=$(echo "$changes" | jq -r '.deploy_services | join(",")')
+          release_services=$(echo "$changes" | jq -r '.release_services | join(",")')
+          deploy_changed=$(echo "$changes" | jq -r '.deploy_changed')
           rust_required=false
-          if [[ ",$services," == *,collaboration,* ]] || jq -r '.paths[]?' "$state_dir/changes.json" \
+          if [[ ",$build_services," == *,collaboration,* ]] || jq -r '.paths[]?' "$state_dir/changes.json" \
             | grep -Eq '(^services/collaboration/|^idl/|^scripts/codegen|^Makefile$|^\.github/)'; then
             rust_required=true
           fi
           has_changes=false
-          if [ -n "$services" ]; then has_changes=true; fi
+          has_build_changes=false
+          if [ -n "$build_services" ]; then has_build_changes=true; fi
+          if [ -n "$services" ] || [ "$deploy_changed" = true ]; then has_changes=true; fi
           echo "state_dir=$state_dir" >> "$GITHUB_OUTPUT"
           echo "services=$services" >> "$GITHUB_OUTPUT"
+          echo "build_services=$build_services" >> "$GITHUB_OUTPUT"
+          echo "deploy_services=$deploy_services" >> "$GITHUB_OUTPUT"
+          echo "release_services=$release_services" >> "$GITHUB_OUTPUT"
+          echo "deploy_changed=$deploy_changed" >> "$GITHUB_OUTPUT"
+          echo "has_build_changes=$has_build_changes" >> "$GITHUB_OUTPUT"
           echo "has_changes=$has_changes" >> "$GITHUB_OUTPUT"
           echo "rust_required=$rust_required" >> "$GITHUB_OUTPUT"
 
+  deploy-verify:
+    needs: plan
+    if: needs.plan.outputs.deploy_changed == 'true'
+    runs-on: [self-hosted, Linux, X64, devops]
+    concurrency:
+      group: knowledge-core-dev-deploy-verify
+      cancel-in-progress: true
+    env:
+      GO111MODULE: "on"
+      GOPROXY: "https://goproxy.cn,direct"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+      - name: Validate deployment overlays and dynamic configuration
+        run: |
+          set -euo pipefail
+          for overlay in deploy/*/overlay/dev; do
+            test -d "$overlay"
+            kubectl kustomize "$overlay" >/dev/null
+          done
+          for input in deploy/nacos/*.dynamic.yaml; do
+            service="${input##*/}"
+            service="${service%.dynamic.yaml}"
+            go run ./tools/configctl validate --service "$service" --input "$input"
+          done
+
   go-verify-build:
     needs: plan
-    if: needs.plan.outputs.has_changes == 'true'
+    if: needs.plan.outputs.has_build_changes == 'true'
     runs-on: [self-hosted, Linux, X64, devops]
     concurrency:
       group: knowledge-core-dev-go
@@ -106,7 +150,7 @@ jobs:
       - name: Run Go gates and build artifacts
         env:
           STATE_DIR: ${{ needs.plan.outputs.state_dir }}
-          SERVICES: ${{ needs.plan.outputs.services }}
+          SERVICES: ${{ needs.plan.outputs.build_services }}
         run: |
           set -euo pipefail
           go_services=$(printf '%s' "$SERVICES" | tr ',' '\n' | grep -Ev '^collaboration$' | tr '\n' ' ' || true)
@@ -117,7 +161,7 @@ jobs:
 
   rust-verify-build:
     needs: [plan, go-verify-build]
-    if: needs.plan.outputs.has_changes == 'true' && needs.go-verify-build.result == 'success' && needs.plan.outputs.rust_required == 'true'
+    if: needs.plan.outputs.has_build_changes == 'true' && needs.go-verify-build.result == 'success' && needs.plan.outputs.rust_required == 'true'
     runs-on: [self-hosted, Linux, X64, devops]
     concurrency:
       group: knowledge-core-dev-rust
@@ -185,7 +229,7 @@ jobs:
 
   package-candidates:
     needs: [plan, go-verify-build, rust-verify-build, release-notes]
-    if: always() && needs.plan.outputs.has_changes == 'true' && needs.go-verify-build.result == 'success' && (needs.rust-verify-build.result == 'success' || needs.rust-verify-build.result == 'skipped') && needs.release-notes.result == 'success'
+    if: always() && needs.plan.outputs.has_build_changes == 'true' && needs.go-verify-build.result == 'success' && (needs.rust-verify-build.result == 'success' || needs.rust-verify-build.result == 'skipped') && needs.release-notes.result == 'success'
     runs-on: [self-hosted, Linux, X64, devops]
     concurrency:
       group: knowledge-core-dev-package
@@ -213,7 +257,7 @@ jobs:
       - name: Assemble artifact manifest and build candidates
         env:
           STATE_DIR: ${{ needs.plan.outputs.state_dir }}
-          SERVICES: ${{ needs.plan.outputs.services }}
+          SERVICES: ${{ needs.plan.outputs.build_services }}
         run: |
           set -euo pipefail
           rm -rf .ci-artifacts
@@ -244,7 +288,7 @@ jobs:
               -v "$DOCKER_CONFIG:/root/.docker:ro" \
               -v "$HARBOR_CA_FILE:/etc/harbor-ca/ca.crt:ro" \
               -v "$KC_CACHE_ROOT/buildx:/buildx" \
-              -e CI_PROJECT_CONFIG_JSON -e DOCKER_HOST=unix:///var/run/docker.sock \
+              -e CI_PROJECT_CONFIG_JSON -e BUILD_CPU_PERCENT -e DOCKER_HOST=unix:///var/run/docker.sock \
               -e DOCKER_CONFIG=/root/.docker -e BUILDX_CONFIG=/buildx \
               -e CI_REGISTRY_CA_FILE=/etc/harbor-ca/ca.crt -e SSL_CERT_FILE=/etc/harbor-ca/ca.crt \
               -w /workspace "$CI_IMAGE" "$@"
@@ -280,7 +324,7 @@ jobs:
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           STATE_DIR: ${{ needs.plan.outputs.state_dir }}
-          SERVICES: ${{ needs.plan.outputs.services }}
+          SERVICES: ${{ needs.plan.outputs.release_services }}
         run: |
           set -euo pipefail
           test -n "${DEEPSEEK_API_KEY:-}" || {
@@ -295,8 +339,8 @@ jobs:
             --changes-file /state/changes.json --output /state/release.md
 
   deploy-release:
-    needs: [plan, package-candidates, release-notes]
-    if: needs.package-candidates.result == 'success' && needs.release-notes.result == 'success'
+    needs: [plan, deploy-verify, package-candidates, release-notes]
+    if: always() && needs.plan.outputs.has_changes == 'true' && (needs.deploy-verify.result == 'success' || needs.plan.outputs.deploy_changed == 'false') && needs.release-notes.result == 'success' && (needs.package-candidates.result == 'success' || needs.plan.outputs.has_build_changes == 'false')
     environment: release
     runs-on: [self-hosted, Linux, X64, devops]
     concurrency:
@@ -343,7 +387,11 @@ jobs:
           STATE_DIR: ${{ needs.plan.outputs.state_dir }}
         run: |
           set -euo pipefail
-          overrides=$(jq -c '[.services[] | {kustomize_name, image_repo:(.image|split(":")[0]), digest}] | map({key:.kustomize_name,value:{newName:.image_repo,digest:.digest}}) | from_entries' "$STATE_DIR/candidates.json")
+          if [[ "${{ needs.plan.outputs.has_build_changes }}" == true ]]; then
+            overrides=$(jq -c '[.services[] | {kustomize_name, image_repo:(.image|split(":")[0]), digest}] | map({key:.kustomize_name,value:{newName:.image_repo,digest:.digest}}) | from_entries' "$STATE_DIR/candidates.json")
+          else
+            overrides='{}'
+          fi
           result=$(docker run --rm --network host -v "$GITHUB_WORKSPACE:/workspace" \
             -e CI_PROJECT_CONFIG_JSON -e CI_GITOPS_IMAGE_OVERRIDES_JSON="$overrides" -e GITOPS_TOKEN \
             -w /workspace "$CI_IMAGE" promote-snapshot --source-sha "$GITHUB_SHA")
@@ -399,7 +447,7 @@ jobs:
           docker run --rm --network host -v "$GITHUB_WORKSPACE:/workspace" -v "$KUBECONFIG:/secrets/kubeconfig:ro" \
             -e CI_PROJECT_CONFIG_JSON -e CI_GITOPS_IMAGE_OVERRIDES_JSON -e KUBECONFIG=/secrets/kubeconfig \
             -w /workspace "$CI_IMAGE" argo-wait --revision "${{ steps.gitops.outputs.gitops_revision }}" \
-            --services "${{ needs.plan.outputs.services }}"
+            --services "${{ needs.plan.outputs.release_services }}"
       - name: Run post-deploy smoke test
         run: |
           docker run --rm --network host -v "$GITHUB_WORKSPACE:/workspace" -v "$KUBECONFIG:/secrets/kubeconfig:ro" \
@@ -420,21 +468,24 @@ jobs:
           set -euo pipefail
           docker_socket="${DOCKER_HOST:-unix:///var/run/docker.sock}"
           socket="${docker_socket#unix://}"
-          IFS=',' read -r -a selected <<< "${{ needs.plan.outputs.services }}"
-          for service in "${selected[@]}"; do
-            docker run --rm --network host \
-              -v "$GITHUB_WORKSPACE:/workspace" \
-              -v "$socket:/var/run/docker.sock" \
-              -v "$DOCKER_CONFIG:/root/.docker" \
-              -v "$HARBOR_CA_FILE:/etc/harbor-ca/ca.crt:ro" \
-              -e CI_PROJECT_CONFIG_JSON -e DOCKER_HOST=unix:///var/run/docker.sock \
-              -e DOCKER_CONFIG=/root/.docker -e CI_REGISTRY_CA_FILE=/etc/harbor-ca/ca.crt \
-              -e SSL_CERT_FILE=/etc/harbor-ca/ca.crt -w /workspace "$CI_IMAGE" \
-              promote-candidate --service "$service" --tag "sha-$GITHUB_SHA"
-          done
+          selected=()
+          if [[ "${{ needs.plan.outputs.has_build_changes }}" == true ]]; then
+            IFS=',' read -r -a selected <<< "${{ needs.plan.outputs.build_services }}"
+            for service in "${selected[@]}"; do
+              docker run --rm --network host \
+                -v "$GITHUB_WORKSPACE:/workspace" \
+                -v "$socket:/var/run/docker.sock" \
+                -v "$DOCKER_CONFIG:/root/.docker" \
+                -v "$HARBOR_CA_FILE:/etc/harbor-ca/ca.crt:ro" \
+                -e CI_PROJECT_CONFIG_JSON -e BUILD_CPU_PERCENT -e DOCKER_HOST=unix:///var/run/docker.sock \
+                -e DOCKER_CONFIG=/root/.docker -e CI_REGISTRY_CA_FILE=/etc/harbor-ca/ca.crt \
+                -e SSL_CERT_FILE=/etc/harbor-ca/ca.crt -w /workspace "$CI_IMAGE" \
+                promote-candidate --service "$service" --tag "sha-$GITHUB_SHA"
+            done
+          fi
           docker run --rm --network host -v "$GITHUB_WORKSPACE:/workspace" -v "$STATE_DIR:/state" \
             -e CI_PROJECT_CONFIG_JSON -e GITHUB_TOKEN -e CI_RELEASE_CHANGES_FILE=/state/changes.json \
-            -w /workspace "$CI_IMAGE" release --services "${{ needs.plan.outputs.services }}" \
+            -w /workspace "$CI_IMAGE" release --services "${{ needs.plan.outputs.release_services }}" \
             --changes-file /state/changes.json --summary-file /state/release.md
           for service in "${selected[@]}"; do
             if ! docker run --rm --network host -v "$GITHUB_WORKSPACE:/workspace" -v "$STATE_DIR:/state" \
@@ -466,7 +517,7 @@ jobs:
             --description "Knowledge Core dev deployment failed" --target-url "https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
 
   cleanup:
-    needs: [plan, go-verify-build, rust-verify-build, package-candidates, release-notes, deploy-release]
+    needs: [plan, deploy-verify, go-verify-build, rust-verify-build, package-candidates, release-notes, deploy-release]
     if: always()
     runs-on: [self-hosted, Linux, X64, devops]
     steps:
