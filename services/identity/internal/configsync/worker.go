@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	commonv1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/common"
 	platformv1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/platform"
 	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/platform/platformservice"
 	coreapp "github.com/HappyLadySauce/Knowledge-Core/pkg/app"
@@ -18,8 +19,18 @@ import (
 	natsresource "github.com/HappyLadySauce/Knowledge-Core/pkg/nats"
 	"github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/config"
 	identityemail "github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/email"
+	"github.com/cloudwego/kitex/client/callopt"
 	"github.com/google/uuid"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	oteltrace "go.opentelemetry.io/otel/trace"
 )
+
+type platformClient interface {
+	GetConsumerState(context.Context, *platformv1.GetConsumerStateRequest, ...callopt.Option) (*platformv1.ConsumerConfigurationState, error)
+	GetConsumerConfiguration(context.Context, *platformv1.GetConsumerConfigurationRequest, ...callopt.Option) (*platformv1.Configuration, error)
+	ReportConfigurationApply(context.Context, *platformv1.ReportConfigurationApplyRequest, ...callopt.Option) (*commonv1.EmptyResponse, error)
+}
 
 type event struct {
 	MessageID string `json:"message_id"`
@@ -29,7 +40,7 @@ type event struct {
 
 type Worker struct {
 	broker       *natsresource.DurableBroker
-	platform     platformservice.Client
+	platform     platformClient
 	email        *identityemail.Worker
 	serviceToken string
 	logger       *slog.Logger
@@ -198,6 +209,17 @@ func (w *Worker) handle(ctx context.Context, delivery *natsresource.Delivery) {
 }
 
 func (w *Worker) reconcile(ctx context.Context) error {
+	// Parent span groups the periodic email-config probe so Tempo does not
+	// show a bare PlatformService/GetConsumerState root.
+	// 父 span 把周期性 email 配置对账收成一条链路，避免 Tempo 只剩裸 RPC root。
+	ctx, span := otel.Tracer("knowledge-core/identity").Start(ctx, "identity.config.reconcile",
+		oteltrace.WithSpanKind(oteltrace.SpanKindInternal),
+		oteltrace.WithAttributes(
+			attribute.String("config.namespace", "email"),
+			attribute.String("config.consumer", "identity.email"),
+		),
+	)
+	defer span.End()
 	state, err := w.platform.GetConsumerState(coreauth.WithServiceToken(ctx, w.serviceToken), &platformv1.GetConsumerStateRequest{Namespace: "email", Consumer: "identity.email"})
 	if err != nil {
 		return fmt.Errorf("read identity configuration consumer state: %w", err)

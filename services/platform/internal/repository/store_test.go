@@ -1,10 +1,13 @@
 package repository
 
 import (
+	"errors"
 	"testing"
 	"time"
 
+	"github.com/HappyLadySauce/Knowledge-Core/services/platform/internal/domain"
 	"github.com/HappyLadySauce/Knowledge-Core/services/platform/internal/model"
+	"gorm.io/gorm"
 )
 
 func TestSnapshotFromIdempotencyRestoresOriginalRedactedResponse(t *testing.T) {
@@ -47,5 +50,51 @@ func TestAcceptDeliveryUpdateDoesNotRegressTerminalState(t *testing.T) {
 	}
 	if !acceptDeliveryUpdate("validating", "applied") {
 		t.Fatal("validating state rejected an applied transition")
+	}
+}
+
+func TestConsumerStateTreatsMissingConfigurationAsIdle(t *testing.T) {
+	t.Parallel()
+
+	state, err := consumerStateAfterConfigurationLookup("development", "email", "identity.email", model.Configuration{}, gorm.ErrRecordNotFound)
+	if err != nil {
+		t.Fatalf("consumerStateAfterConfigurationLookup() error = %v", err)
+	}
+	if state.Environment != "development" || state.Namespace != "email" || state.Consumer != "identity.email" {
+		t.Fatalf("idle state identity = %#v", state)
+	}
+	if state.DesiredRevision != 0 || state.AppliedRevision != 0 || state.Status != "pending" {
+		t.Fatalf("idle state = %#v, want DesiredRevision 0 and pending", state)
+	}
+}
+
+func TestConsumerStateKeepsConfiguredRevision(t *testing.T) {
+	t.Parallel()
+
+	state, err := consumerStateAfterConfigurationLookup("development", "email", "identity.email", model.Configuration{Revision: 4}, nil)
+	if err != nil {
+		t.Fatalf("consumerStateAfterConfigurationLookup() error = %v", err)
+	}
+	if state.DesiredRevision != 4 || state.Status != "pending" {
+		t.Fatalf("configured state = %#v", state)
+	}
+}
+
+func TestConsumerStateWrapsUnexpectedLookupErrors(t *testing.T) {
+	t.Parallel()
+
+	lookupErr := errors.New("connection refused")
+	_, err := consumerStateAfterConfigurationLookup("development", "email", "identity.email", model.Configuration{}, lookupErr)
+	if !errors.Is(err, lookupErr) {
+		t.Fatalf("consumerStateAfterConfigurationLookup() error = %v, want wrapped %v", err, lookupErr)
+	}
+}
+
+func TestIdleConsumerStateIsZeroRevision(t *testing.T) {
+	t.Parallel()
+
+	state := idleConsumerState("development", "email", "identity.email")
+	if state != (domain.ConsumerState{Environment: "development", Namespace: "email", Consumer: "identity.email", Status: "pending"}) {
+		t.Fatalf("idleConsumerState() = %#v", state)
 	}
 }

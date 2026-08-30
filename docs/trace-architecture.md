@@ -80,6 +80,9 @@ span attribute 只使用低基数字段，例如 route template、RPC method、s
   `ListPurgeCandidates`、`PurgeMaintenanceData` 使用 `trace.Suppress`。空 claim 不会导出
   单 span root（例如 `select outbox`）。claim 到真实工作后改为未抑制的 work context：outbox
   从消息 headers 恢复 W3C parent 再发布；attachment/purge 文档使用短操作 span。
+- Attachment worker 空转探测：`Claim` 使用 `trace.Suppress`。空队列不会导出单 span root
+  （例如 `select scan_jobs`）。领取到扫描任务后改为未抑制的 `attachment.worker.scan_job`
+  短操作 span，只带 `attachment.status`。
 - Redis 连接池拨号：`pkg/redis` 启用 redisotel `WithDialFilter`，不导出 `redis.dial`
   span（连接池补连常用无父级 context，易形成噪音 root）。业务请求下的 Redis 命令 span
   仍会导出；连接问题继续通过 Redis pool metrics / 日志观察。
@@ -161,6 +164,8 @@ Go 服务通过 `<SERVICE>_TRACE_ENABLED`、`<SERVICE>_TRACE_ENDPOINT`、`<SERVI
 | Hertz/Kitex 传播 | `pkg/trace/hertz.go`、`pkg/trace/kitex.go` |
 | Go NATS producer/consumer | `pkg/nats/propagation.go`、`pkg/nats/durable.go`、`pkg/nats/delivery.go` |
 | Knowledge outbox / worker wake | `services/knowledge/internal/repository/outbox.go`、`attachments.go`、`notify.go`、`services/knowledge/internal/worker/worker.go`、`wake.go` |
+| Attachment scan worker | `services/attachment/internal/service/service.go`、`internal/worker/worker.go` |
+| Identity configuration reconcile | `services/identity/internal/configsync/worker.go` |
 | Rust RPC/WebSocket context | `services/collaboration/src/rpc/context.rs`、`websocket.rs`、`actor.rs` |
 | Rust NATS/outbox | `services/collaboration/src/worker.rs`、`storage/postgres.rs` |
 | 本地 Collector/Tempo | `docker/infrastructure/otel-collector-config.yaml`、`tempo.yaml`、`docker-compose.yml` |

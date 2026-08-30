@@ -255,15 +255,16 @@ func (s *Store) GetRevision(ctx context.Context, namespace string, revision int6
 
 func (s *Store) ConsumerState(ctx context.Context, namespace, consumer string) (domain.ConsumerState, error) {
 	var configuration model.Configuration
-	if err := s.db.WithContext(ctx).Where("environment = ? AND namespace = ?", s.environment, namespace).Take(&configuration).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return domain.ConsumerState{}, domain.ErrNotFound
-		}
-		return domain.ConsumerState{}, fmt.Errorf("get consumer desired configuration: %w", err)
+	lookupErr := s.db.WithContext(ctx).Where("environment = ? AND namespace = ?", s.environment, namespace).Take(&configuration).Error
+	state, err := consumerStateAfterConfigurationLookup(s.environment, namespace, consumer, configuration, lookupErr)
+	if err != nil {
+		return domain.ConsumerState{}, err
 	}
-	state := domain.ConsumerState{Environment: s.environment, Namespace: namespace, Consumer: consumer, DesiredRevision: configuration.Revision, Status: "pending"}
+	if state.DesiredRevision <= 0 {
+		return state, nil
+	}
 	var latest model.ConfigDelivery
-	err := s.db.WithContext(ctx).Where("environment = ? AND namespace = ? AND consumer = ?", s.environment, namespace, consumer).Order("revision DESC").First(&latest).Error
+	err = s.db.WithContext(ctx).Where("environment = ? AND namespace = ? AND consumer = ?", s.environment, namespace, consumer).Order("revision DESC").First(&latest).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return state, nil
 	}
@@ -478,6 +479,22 @@ func changedKeys(oldPublic, oldSecrets, nextPublic, nextSecrets map[string]strin
 	}
 	sort.Strings(result)
 	return result
+}
+
+func idleConsumerState(environment, namespace, consumer string) domain.ConsumerState {
+	return domain.ConsumerState{Environment: environment, Namespace: namespace, Consumer: consumer, DesiredRevision: 0, Status: "pending"}
+}
+
+func consumerStateAfterConfigurationLookup(environment, namespace, consumer string, configuration model.Configuration, err error) (domain.ConsumerState, error) {
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// Missing namespace is an idle consumer, not a lookup failure.
+			// 未写入的 namespace 对消费者是空闲状态，不是查询失败。
+			return idleConsumerState(environment, namespace, consumer), nil
+		}
+		return domain.ConsumerState{}, fmt.Errorf("get consumer desired configuration: %w", err)
+	}
+	return domain.ConsumerState{Environment: environment, Namespace: namespace, Consumer: consumer, DesiredRevision: configuration.Revision, Status: "pending"}, nil
 }
 
 func decodeHeaders(encoded []byte) map[string]string {

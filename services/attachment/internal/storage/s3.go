@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/url"
 	"strconv"
 	"time"
@@ -99,7 +100,7 @@ func (s *S3) CompleteMultipart(ctx context.Context, key, uploadID string, parts 
 func (s *S3) AbortMultipart(ctx context.Context, key, uploadID string) error {
 	return s.core.AbortMultipartUpload(ctx, s.bucket, key, uploadID)
 }
-func (s *S3) OpenObject(ctx context.Context, key string) (*minio.Object, error) {
+func (s *S3) OpenObject(ctx context.Context, key string) (io.ReadCloser, error) {
 	obj, err := s.internal.GetObject(ctx, s.bucket, key, minio.GetObjectOptions{})
 	if err != nil {
 		return nil, err

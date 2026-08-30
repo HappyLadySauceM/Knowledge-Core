@@ -8,7 +8,7 @@ Go constructors validate required dependencies and return `(T, error)`. Errors a
 
 ## Logging and telemetry
 
-Propagate `context.Context`, deadlines, request IDs, and W3C trace end to end. Metric labels and span attributes stay on route templates, RPC methods, status codes, stable business codes, and dependency names.
+Propagate `context.Context`, deadlines, request IDs, and W3C trace end to end. Metric labels and span attributes stay on route templates, RPC methods, status codes, stable business codes, and dependency names. Knowledge and Attachment worker empty-claim probes use `trace.Suppress` so idle SQL does not export orphan roots; claimed work uses a short unsuppressed span. GetConsumerState treats a missing namespace as DesiredRevision=0 idle state, not NotFound.
 
 ## Tests
 
@@ -18,7 +18,7 @@ Tests stay close to implementation and cover success, edges, dependency failure,
 
 Repository text uses LF except `.bat` / `.cmd`. Module and directory ownership lives in `conventions.code-layout`, not architecture.
 
-<!-- fact:conventions.code-style status:verified sources:user-confirmed, user-confirmed-schema-v2-rerecord -->
+<!-- fact:conventions.code-style status:verified sources:docs/trace-architecture.md#4-噪音过滤, user-confirmed, user-confirmed-schema-v2-rerecord -->
 
 ## 4. Repository modules
 

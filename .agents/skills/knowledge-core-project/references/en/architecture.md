@@ -115,7 +115,7 @@ flowchart LR
 
 ### Configuration change
 
-- **description**: Platform commits revision, audit, idempotency, and outbox atomically, then publishes coordinate-only events.
+- **description**: Platform commits revision, audit, idempotency, and outbox atomically, then publishes coordinate-only events. GetConsumerState returns DesiredRevision=0 idle state when a namespace has not been written, rather than NotFound.
 
 
 ## Quality attributes
@@ -187,4 +187,4 @@ flowchart LR
 - **mitigation**: Pin IDL generation, enforce compatibility checks, and fail readiness on critical stream/subject mismatches.
 
 
-<!-- fact:architecture.design status:verified sources:README.md#knowledge-core, docs/framework-design.md, docs/framework-design.md#9, docs/framework-design.md#knowledge-core, docs/rust-collaboration-design.md#rust-collaboration, Knowledge-Core/.tmp/architecture-design.md, user-confirmed-en-locale-source -->
+<!-- fact:architecture.design status:verified sources:README.md#knowledge-core, docs/framework-design.md, docs/framework-design.md#9, docs/framework-design.md#knowledge-core, docs/platform-configuration.md#配置同步, docs/rust-collaboration-design.md#rust-collaboration, Knowledge-Core/.tmp/architecture-design.md, user-confirmed-en-locale-source -->

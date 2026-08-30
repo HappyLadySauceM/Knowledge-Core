@@ -8,7 +8,7 @@ Go 构造函数校验必需依赖并返回 `(T, error)`。错误补充操作上�
 
 ## 日志与遥测
 
-端到端传播 `context.Context`、deadline、request ID 和 W3C trace。指标标签和 span 属性只使用路由模板、RPC 方法、状态码、稳定业务码和依赖名。
+端到端传播 `context.Context`、deadline、request ID 和 W3C trace。指标标签和 span 属性只使用路由模板、RPC 方法、状态码、稳定业务码和依赖名。Knowledge 与 Attachment worker 的空转 claim 使用 `trace.Suppress`，避免空闲 SQL 导出无父 root；领取到工作后使用未抑制的短操作 span。`GetConsumerState` 把尚未写入的 namespace 视为 `DesiredRevision=0` 的空闲状态，而不是 NotFound。
 
 ## 测试
 
@@ -18,7 +18,7 @@ Go 构造函数校验必需依赖并返回 `(T, error)`。错误补充操作上�
 
 仓库文本使用 LF，`.bat` / `.cmd` 除外。模块与目录所有权写在 `conventions.code-layout`，不写在架构里。
 
-<!-- fact:conventions.code-style status:verified sources:user-confirmed, user-confirmed-schema-v2-rerecord -->
+<!-- fact:conventions.code-style status:verified sources:docs/trace-architecture.md#4-噪音过滤, user-confirmed, user-confirmed-schema-v2-rerecord -->
 
 ## 4. 仓库模块
 

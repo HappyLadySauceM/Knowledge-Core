@@ -3,11 +3,11 @@
   "facts": [
     {
       "id": "architecture.design",
-      "revision": 142,
+      "revision": 148,
       "section": "architecture",
       "sources": [
         {
-          "detail": "evidence-sha256:985e23ae9cc132e1d4d5198ff02d5c54098c6a76e90567ee31b195224764f268",
+          "detail": "evidence-sha256:9491e6d241375d5b08bcd504c2024e44af2a282c231e16762e563e928af5d734",
           "kind": "documented",
           "reference": "README.md#knowledge-core"
         },
@@ -16,17 +16,21 @@
           "reference": "docs/framework-design.md"
         },
         {
-          "detail": "evidence-sha256:985e23ae9cc132e1d4d5198ff02d5c54098c6a76e90567ee31b195224764f268",
+          "detail": "evidence-sha256:9491e6d241375d5b08bcd504c2024e44af2a282c231e16762e563e928af5d734",
           "kind": "documented",
           "reference": "docs/framework-design.md#9"
         },
         {
-          "detail": "evidence-sha256:985e23ae9cc132e1d4d5198ff02d5c54098c6a76e90567ee31b195224764f268",
+          "detail": "evidence-sha256:9491e6d241375d5b08bcd504c2024e44af2a282c231e16762e563e928af5d734",
           "kind": "documented",
           "reference": "docs/framework-design.md#knowledge-core"
         },
         {
-          "detail": "evidence-sha256:985e23ae9cc132e1d4d5198ff02d5c54098c6a76e90567ee31b195224764f268",
+          "kind": "documented",
+          "reference": "docs/platform-configuration.md#\u914d\u7f6e\u540c\u6b65"
+        },
+        {
+          "detail": "evidence-sha256:9491e6d241375d5b08bcd504c2024e44af2a282c231e16762e563e928af5d734",
           "kind": "documented",
           "reference": "docs/rust-collaboration-design.md#rust-collaboration"
         },
@@ -40,7 +44,7 @@
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-08-28T04:16:24Z",
+      "updatedAt": "2026-08-30T14:12:35Z",
       "value": {
         "containers": [
           {
@@ -181,7 +185,7 @@
             "name": "Attachment lifecycle"
           },
           {
-            "description": "Platform commits revision, audit, idempotency, and outbox atomically, then publishes coordinate-only events.",
+            "description": "Platform commits revision, audit, idempotency, and outbox atomically, then publishes coordinate-only events. GetConsumerState returns DesiredRevision=0 idle state when a namespace has not been written, rather than NotFound.",
             "name": "Configuration change"
           }
         ],
@@ -395,9 +399,13 @@
     },
     {
       "id": "conventions.code-style",
-      "revision": 136,
+      "revision": 147,
       "section": "conventions",
       "sources": [
+        {
+          "kind": "documented",
+          "reference": "docs/trace-architecture.md#4-\u566a\u97f3\u8fc7\u6ee4"
+        },
         {
           "kind": "user",
           "reference": "user-confirmed"
@@ -408,8 +416,8 @@
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-08-27T06:01:01Z",
-      "value": "## Errors\n\nGo constructors validate required dependencies and return `(T, error)`. Errors add operation context, keep the cause with `%w`, and use `errors.Is` / `errors.As`. Cross-boundary errors use `pkg/error` code/key/kind. Do not use `Must*`, panic for business failure, or `os.Exit` outside the process entrypoint.\n\n## Logging and telemetry\n\nPropagate `context.Context`, deadlines, request IDs, and W3C trace end to end. Metric labels and span attributes stay on route templates, RPC methods, status codes, stable business codes, and dependency names.\n\n## Tests\n\nTests stay close to implementation and cover success, edges, dependency failure, error mapping, cleanup/rollback, and deterministic concurrent behavior. Rust requires rustfmt, clippy `-D warnings`, and cargo deny.\n\n## Secrets and layout\n\nRepository text uses LF except `.bat` / `.cmd`. Module and directory ownership lives in `conventions.code-layout`, not architecture.\n"
+      "updatedAt": "2026-08-30T14:11:34Z",
+      "value": "## Errors\n\nGo constructors validate required dependencies and return `(T, error)`. Errors add operation context, keep the cause with `%w`, and use `errors.Is` / `errors.As`. Cross-boundary errors use `pkg/error` code/key/kind. Do not use `Must*`, panic for business failure, or `os.Exit` outside the process entrypoint.\n\n## Logging and telemetry\n\nPropagate `context.Context`, deadlines, request IDs, and W3C trace end to end. Metric labels and span attributes stay on route templates, RPC methods, status codes, stable business codes, and dependency names. Knowledge and Attachment worker empty-claim probes use `trace.Suppress` so idle SQL does not export orphan roots; claimed work uses a short unsuppressed span. GetConsumerState treats a missing namespace as DesiredRevision=0 idle state, not NotFound.\n\n## Tests\n\nTests stay close to implementation and cover success, edges, dependency failure, error mapping, cleanup/rollback, and deterministic concurrent behavior. Rust requires rustfmt, clippy `-D warnings`, and cargo deny.\n\n## Secrets and layout\n\nRepository text uses LF except `.bat` / `.cmd`. Module and directory ownership lives in `conventions.code-layout`, not architecture.\n"
     },
     {
       "id": "documents.managed",
@@ -1014,11 +1022,11 @@
     "profile": "generic",
     "slug": "knowledge-core"
   },
-  "revision": 146,
+  "revision": 148,
   "scan": {
-    "fingerprint": "7ba945fe520c125d3c7c5e3ef190cdca8ab134bd318dbd6d6fffca983ccd054e",
-    "inventoryCount": 435
+    "fingerprint": "ca25d183c34d0d868be299e03515b1d9f2b729b1db2a37eab92f365eda3fda3e",
+    "inventoryCount": 436
   },
   "schemaVersion": 3,
-  "updatedAt": "2026-08-30T08:48:41Z"
+  "updatedAt": "2026-08-30T14:12:35Z"
 }

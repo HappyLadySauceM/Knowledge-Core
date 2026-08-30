@@ -1,10 +1,10 @@
 {
   "documents": {
     "architecture": {
-      "enDigest": "2385c44de645d48b02bb80b56b29d9f62860f4c119cbb7638ceee94de20330e4",
-      "syncedEnDigest": "2385c44de645d48b02bb80b56b29d9f62860f4c119cbb7638ceee94de20330e4",
-      "syncedZhDigest": "0054aa0833f4006d2acb6791e82ea5d44e2d12a8e653cec5697577b786013078",
-      "zhDigest": "0054aa0833f4006d2acb6791e82ea5d44e2d12a8e653cec5697577b786013078"
+      "enDigest": "7f9ba282d7093808bd51e638780405d23bfa445dd156c8f3e6477da0f5a1c317",
+      "syncedEnDigest": "7f9ba282d7093808bd51e638780405d23bfa445dd156c8f3e6477da0f5a1c317",
+      "syncedZhDigest": "b2119cac21abc40c0b9adfb0525a87d228bfa973693565bbdd349bcd43883e2c",
+      "zhDigest": "b2119cac21abc40c0b9adfb0525a87d228bfa973693565bbdd349bcd43883e2c"
     },
     "constraints": {
       "enDigest": "210470fb3a92187b5947185f9931d5be257822405656253359a45b508c265673",
@@ -13,10 +13,10 @@
       "zhDigest": "0a9e33aa9c6f1c5a07b57e8a0365158275251e66364b3e5f4d628a12ef4e378d"
     },
     "conventions": {
-      "enDigest": "32e720b9ea75f64fdee6219a33eb3c879c6979ea6a2ac88f4053d572302d7e97",
-      "syncedEnDigest": "32e720b9ea75f64fdee6219a33eb3c879c6979ea6a2ac88f4053d572302d7e97",
-      "syncedZhDigest": "fad468a403c445178f5a3c11ba57a37a5f1951bb246e3151f3a2c7403481d630",
-      "zhDigest": "fad468a403c445178f5a3c11ba57a37a5f1951bb246e3151f3a2c7403481d630"
+      "enDigest": "6e96ef785431517b1343e987fefd68263014cadb8dea9e76053f1efdb69d29d3",
+      "syncedEnDigest": "6e96ef785431517b1343e987fefd68263014cadb8dea9e76053f1efdb69d29d3",
+      "syncedZhDigest": "9aed6e0c9f7d2a431ece8d89ff212e75c631ef729dd043bee3832c2612fe22f7",
+      "zhDigest": "9aed6e0c9f7d2a431ece8d89ff212e75c631ef729dd043bee3832c2612fe22f7"
     },
     "environment": {
       "enDigest": "9b9cb2dcd111fe0dc6cf018bd1a244ade2e7de0eef38d0774338ec50373fb5f1",

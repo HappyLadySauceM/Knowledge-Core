@@ -6,19 +6,38 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"io"
 	"math"
 	"strings"
 	"time"
 
 	attachmentv1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/attachment"
+	coretrace "github.com/HappyLadySauce/Knowledge-Core/pkg/trace"
 	"github.com/HappyLadySauce/Knowledge-Core/services/attachment/internal/domain"
 	attachmenterrors "github.com/HappyLadySauce/Knowledge-Core/services/attachment/internal/errors"
 	"github.com/HappyLadySauce/Knowledge-Core/services/attachment/internal/repository"
 	"github.com/HappyLadySauce/Knowledge-Core/services/attachment/internal/scanner"
 	"github.com/HappyLadySauce/Knowledge-Core/services/attachment/internal/storage"
 	"github.com/minio/minio-go/v7"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	oteltrace "go.opentelemetry.io/otel/trace"
 	"gorm.io/gorm"
 )
+
+type scanStore interface {
+	Claim(context.Context) (*domain.Attachment, error)
+	RetryScan(context.Context, string, error) error
+	CompleteScan(context.Context, string, domain.ScanResult, bool) error
+}
+
+type objectOpener interface {
+	OpenObject(context.Context, string) (io.ReadCloser, error)
+}
+
+type contentScanner interface {
+	Scan(context.Context, io.Reader) (scanner.Result, error)
+}
 
 type Service struct {
 	repo      *repository.Store
@@ -202,30 +221,50 @@ func (s *Service) Restore(ctx context.Context, owner int64, id string) error {
 	return mapRepositoryError(s.repo.Restore(ctx, id, owner))
 }
 func (s *Service) ScanOnce(ctx context.Context) error {
-	row, err := s.repo.Claim(ctx)
+	return scanOnce(ctx, s.repo, s.objects, s.scanner)
+}
+
+func scanOnce(ctx context.Context, store scanStore, objects objectOpener, content contentScanner) error {
+	// Empty claims are continuous worker probes. Suppress them so GORM does
+	// not export orphan select scan_jobs roots.
+	// 空领取是持续探测，抑制后 GORM 不会导出无父级的 select scan_jobs。
+	probeCtx := coretrace.Suppress(ctx)
+	row, err := store.Claim(probeCtx)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil
 	}
 	if err != nil {
 		return err
 	}
-	obj, err := s.objects.OpenObject(ctx, row.ObjectKey)
+	workCtx, span := otel.Tracer("knowledge-core/attachment").Start(ctx, "attachment.worker.scan_job",
+		oteltrace.WithSpanKind(oteltrace.SpanKindInternal),
+		oteltrace.WithAttributes(attribute.String("attachment.status", row.Status)),
+	)
+	defer span.End()
+	obj, err := objects.OpenObject(workCtx, row.ObjectKey)
 	if err != nil {
-		if retryErr := s.repo.RetryScan(ctx, row.ID, err); retryErr != nil {
+		if retryErr := store.RetryScan(workCtx, row.ID, err); retryErr != nil {
 			return retryErr
 		}
 		return err
 	}
 	defer func() { _ = obj.Close() }()
-	result, err := s.scanner.Scan(ctx, obj)
+	result, err := content.Scan(workCtx, obj)
 	if err != nil {
-		if retryErr := s.repo.RetryScan(ctx, row.ID, err); retryErr != nil {
+		if retryErr := store.RetryScan(workCtx, row.ID, err); retryErr != nil {
 			return retryErr
 		}
 		return err
 	}
-	return s.repo.CompleteScan(ctx, row.ID, domain.ScanResult{Clean: result.Clean, SHA256: result.SHA256, Size: result.Size, DetectedType: result.DetectedType}, result.Clean)
+	return store.CompleteScan(workCtx, row.ID, domain.ScanResult{Clean: result.Clean, SHA256: result.SHA256, Size: result.Size, DetectedType: result.DetectedType}, result.Clean)
 }
+
+var (
+	_ scanStore      = (*repository.Store)(nil)
+	_ objectOpener   = (*storage.S3)(nil)
+	_ contentScanner = (*scanner.ClamAV)(nil)
+)
+
 func toTransport(a *domain.Attachment) *attachmentv1.Attachment {
 	if a == nil {
 		return nil

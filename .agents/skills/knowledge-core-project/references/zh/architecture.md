@@ -297,7 +297,7 @@ Knowledge 清理 worker 通过 Collaboration `PurgeDocument` 删除协作数据�
 
 管理员经 Gateway façade 读写 `site` / `email` / `ai`。`PUT` 必须带强 `If-Match` 与幂等键。一次写入在同一 PostgreSQL 事务内完成快照、审计、幂等记录与 outbox。敏感字段（SMTP 密码、AI API key）用 AES-256-GCM 信封加密，KEK 仅从 `PLATFORM_ENCRYPTION_KEK` 注入；AAD 绑定 environment、namespace、revision。
 
-事件：stream `KNOWLEDGE_CORE_CONFIG`，subject `platform.config.changed.v1`。payload 只含坐标、修订与摘要，不含配置值。Gateway 在 Platform 暂不可用时保留旧静态站点配置作降级。Identity 邮件消费者 durable 名为 `identity-email-config-v1`。
+事件：stream `KNOWLEDGE_CORE_CONFIG`，subject `platform.config.changed.v1`。payload 只含坐标、修订与摘要，不含配置值。Gateway 在 Platform 暂不可用时保留旧静态站点配置作降级。Identity 邮件消费者 durable 名为 `identity-email-config-v1`。`GetConsumerState` 在 namespace 尚未写入时返回 `DesiredRevision=0` 的空闲状态，而不是 NotFound。
 
 ## 9. 持久化与一致性
 
@@ -363,7 +363,7 @@ Nacos `3.2.3`：bootstrap 要求 HTTPS endpoint、namespace/group/data ID、每�
 
 一条用户请求的 trace 从 Higress 收到公开 HTTP 开始，经 Gateway、内部 RPC、数据库/缓存、消息生产消费，到 Higress 发送完响应结束。异步路径通过消息 headers 与 outbox 持久化传播，不依赖进程内存。
 
-抑制 trace（仍走日志与 metrics）：`/metrics`、`/livez`、`/readyz`、`/health/live`、`/health/ready`、RPC `Ping`/`Live`、WebSocket ping/pong。JetStream 重投递不为每次 attempt 建新 span。Collector 对错误、parking/DLQ、超过 1 秒的 trace 100% 保留，其余成功 trace 保留 10%。
+抑制 trace（仍走日志与 metrics）：`/metrics`、`/livez`、`/readyz`、`/health/live`、`/health/ready`、RPC `Ping`/`Live`、WebSocket ping/pong。Knowledge 与 Attachment worker 的空转 claim 使用 `trace.Suppress`，避免空闲 SQL 导出无父 root；领取到真实工作后再开短操作 span。JetStream 重投递不为每次 attempt 建新 span。Collector 对错误、parking/DLQ、超过 1 秒的 trace 100% 保留，其余成功 trace 保留 10%。
 
 六个服务各自独立 Prometheus registry，在 admin `/metrics` 暴露。标签只使用路由模板、RPC 方法、状态码、稳定业务码、依赖名。禁止用户 ID、request/trace ID、原始 URL、错误文本、SQL 参数、Redis key、payload。Go 出站熔断暴露 `knowledge_core_rpc_client_circuit_state{dependency,state}`，`state` 仅为 `closed`/`open`/`half_open`。
 
@@ -441,7 +441,7 @@ Kubernetes 三层所有权：
 
 因此：本文件描述的是可构建、可测试的当前代码架构，不能据此宣称已完成生产切换或完整生产级验收。
 
-<!-- fact:architecture.design status:verified sources:README.md#knowledge-core, docs/framework-design.md, docs/framework-design.md#9, docs/framework-design.md#knowledge-core, docs/rust-collaboration-design.md#rust-collaboration, Knowledge-Core/.tmp/architecture-design.md, user-confirmed-en-locale-source -->
+<!-- fact:architecture.design status:verified sources:README.md#knowledge-core, docs/framework-design.md, docs/framework-design.md#9, docs/framework-design.md#knowledge-core, docs/platform-configuration.md#配置同步, docs/rust-collaboration-design.md#rust-collaboration, Knowledge-Core/.tmp/architecture-design.md, user-confirmed-en-locale-source -->
 
 Knowledge Core 是知识协作后端，包含六个显式组装的服务：Go Gateway、Identity、Knowledge、Attachment、Platform，以及 Rust Collaboration。每个服务拥有自己的 PostgreSQL schema，通过 typed Thrift RPC 访问；Gateway 只做 HTTP 边缘。kubectl context `default` 中的现场证据显示命名空间 `knowledge-core-dev`。当前 context 看不到 production 与 canary。
 

@@ -26,8 +26,8 @@ func (f *fakeStore) Put(_ context.Context, request repository.PutRequest) (domai
 func (f *fakeStore) GetDelivery(context.Context, string, int64) (repository.Delivery, error) {
 	return repository.Delivery{}, nil
 }
-func (f *fakeStore) ConsumerState(context.Context, string, string) (domain.ConsumerState, error) {
-	return domain.ConsumerState{Environment: f.snapshot.Environment, Namespace: f.snapshot.Namespace, Status: "pending"}, nil
+func (f *fakeStore) ConsumerState(_ context.Context, namespace, consumer string) (domain.ConsumerState, error) {
+	return domain.ConsumerState{Environment: f.snapshot.Environment, Namespace: namespace, Consumer: consumer, Status: "pending"}, nil
 }
 func (f *fakeStore) ReportDelivery(context.Context, domain.DeliveryUpdate) error { return nil }
 
@@ -56,6 +56,23 @@ func TestGetRedactsSecrets(t *testing.T) {
 		}
 	}
 	t.Fatal("redacted api_key entry was not returned")
+}
+
+func TestConsumerStateReturnsIdleDesiredRevision(t *testing.T) {
+	t.Parallel()
+
+	store := &fakeStore{snapshot: domain.Snapshot{Environment: "development", Namespace: "email"}}
+	svc, err := New(store)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	state, err := svc.ConsumerState(context.Background(), "email", "identity.email")
+	if err != nil {
+		t.Fatalf("ConsumerState() error = %v", err)
+	}
+	if state.DesiredRevision != 0 || state.Namespace != "email" || state.Consumer != "identity.email" || state.Status != "pending" {
+		t.Fatalf("ConsumerState() = %#v, want idle email consumer", state)
+	}
 }
 
 func TestPutBuildsStableRequestHash(t *testing.T) {
