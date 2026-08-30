@@ -13,7 +13,6 @@ permissions:
 env:
   CI_IMAGE: harbor.happyladysauce.local/knowledge-core/ci-templates:v1.1.11@sha256:26af40ffdc6efdef4d8e7a6135d8e76f2326639cda9fa21c46af7477f6ebc0bc
   BUILD_CPU_PERCENT: "75"
-  KC_CACHE_ROOT: /opt/actions-runner/_cache/knowledge-core
   CI_PROJECT_CONFIG_JSON: >-
     {"project":"Knowledge-Core","source_repo":"HappyLadySauceM/Knowledge-Core","gitops_repo":"https://github.com/HappyLadySauceM/deploy.git","gitops_path":"Knowledge-Core","gitops_kustomization":"dev/common/kustomization.yaml","gitops_branch":"main","shared_paths":[".github","pkg","idl","kitex_gen","scripts","services/collaboration/interop","Makefile","go.mod","go.sum"],"harbor_registry":"harbor.happyladysauce.local","harbor_project":"knowledge-core","argocd_server":"argocd.happyladysauce.local","argocd_application":"knowledge-core-gateway-dev","smoke_command":["make","smoke-ci"],"release_model":"git-independent-service-aggregate","aggregate_release_prefix":"knowledge-core","aggregate_version_file":"VERSION","release_language":"zh-CN","deepseek_model":"deepseek-v4-flash","base_images":[{"source":"gcr.io/distroless/static-debian12:nonroot@sha256:f5b485ea962d9bd1186b2f6b3a061191539b905b82ec395de78cbfae51f20e35","destination":"harbor.happyladysauce.local/knowledge-core/base/distroless-static-debian12:nonroot"},{"source":"docker.m.daocloud.io/library/debian:bookworm-slim@sha256:7b140f374b289a7c2befc338f42ebe6441b7ea838a042bbd5acbfca6ec875818","destination":"harbor.happyladysauce.local/knowledge-core/base/debian:bookworm-slim"}],"services":[{"name":"gateway","source_path":"services/gateway","version_file":"services/gateway/VERSION","dockerfile":"docker/gateway/Dockerfile","context":".","image_repository":"harbor.happyladysauce.local/knowledge-core/gateway","deploy_snapshot":"deploy/gateway"},{"name":"identity","source_path":"services/identity","version_file":"services/identity/VERSION","dockerfile":"docker/identity/Dockerfile","context":".","image_repository":"harbor.happyladysauce.local/knowledge-core/identity","deploy_snapshot":"deploy/identity"},{"name":"knowledge","source_path":"services/knowledge","version_file":"services/knowledge/VERSION","dockerfile":"docker/knowledge/Dockerfile","context":".","image_repository":"harbor.happyladysauce.local/knowledge-core/knowledge","deploy_snapshot":"deploy/knowledge"},{"name":"attachment","source_path":"services/attachment","version_file":"services/attachment/VERSION","dockerfile":"docker/attachment/Dockerfile","context":".","image_repository":"harbor.happyladysauce.local/knowledge-core/attachment","deploy_snapshot":"deploy/attachment"},{"name":"platform","source_path":"services/platform","version_file":"services/platform/VERSION","dockerfile":"docker/platform/Dockerfile","context":".","image_repository":"harbor.happyladysauce.local/knowledge-core/platform","deploy_snapshot":"deploy/platform"},{"name":"collaboration","source_path":"services/collaboration","version_file":"services/collaboration/VERSION","dockerfile":"docker/collaboration/Dockerfile","context":".","image_repository":"harbor.happyladysauce.local/knowledge-core/collaboration","deploy_snapshot":"deploy/collaboration"}]}
 
@@ -55,14 +54,26 @@ jobs:
         id: plan
         run: |
           set -euo pipefail
+          # Align container UID with the runner user so bind mounts stay writable.
+          # 容器 UID 与 runner 用户对齐，避免挂载目录被写成 root。
+          socket="${DOCKER_HOST:-unix:///var/run/docker.sock}"
+          socket="${socket#unix://}"
+          KC_CACHE_ROOT="$(cd "$GITHUB_WORKSPACE/../.." && pwd)/_cache/knowledge-core"
+          ci_run() {
+            docker run --rm --network host \
+              --user "$(id -u):$(id -g)" \
+              --group-add "$(stat -c '%g' "$socket")" \
+              -e HOME="${RUNNER_TEMP:-/tmp}" \
+              "$@"
+          }
           state_dir="$KC_CACHE_ROOT/runs/${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           install -d -m 0700 "$state_dir"
           base="$(git rev-parse origin/main)"
-          docker run --rm --network host \
+          ci_run \
             -v "$GITHUB_WORKSPACE:/workspace" \
             -v "$state_dir:/state" \
             -e CI_PROJECT_CONFIG_JSON -w /workspace "$CI_IMAGE" validate
-          changes=$(docker run --rm --network host \
+          changes=$(ci_run \
             -v "$GITHUB_WORKSPACE:/workspace" \
             -v "$state_dir:/state" \
             -e CI_PROJECT_CONFIG_JSON -w /workspace "$CI_IMAGE" changes \
@@ -141,7 +152,7 @@ jobs:
       - name: Install pinned IDL generators
         run: |
           set -euo pipefail
-          bin_dir="/opt/actions-runner/_tool/knowledge-core-go-tools"
+          bin_dir="${RUNNER_TOOL_CACHE}/knowledge-core-go-tools"
           install -d -m 0755 "$bin_dir"
           [[ -x "$bin_dir/kitex" ]] || GOBIN="$bin_dir" go install github.com/cloudwego/kitex/tool/cmd/kitex@v0.16.2
           [[ -x "$bin_dir/hz" ]] || GOBIN="$bin_dir" go install github.com/cloudwego/hertz/cmd/hz@v0.9.7
@@ -177,6 +188,7 @@ jobs:
       - name: Select bounded Rust target cache
         run: |
           set -euo pipefail
+          KC_CACHE_ROOT="$(cd "$GITHUB_WORKSPACE/../.." && pwd)/_cache/knowledge-core"
           lock_key=$(sha256sum services/collaboration/Cargo.lock services/collaboration/rust-toolchain.toml | sha256sum | cut -c1-16)
           target_root="$KC_CACHE_ROOT/cargo-target"
           target_dir="$target_root/$lock_key"
@@ -278,18 +290,27 @@ jobs:
           candidate="sha-$GITHUB_SHA"
           candidate_manifest="$STATE_DIR/candidates.json"
           jq -n --arg sha "$GITHUB_SHA" --arg tag "$candidate" '{source_sha:$sha,candidate_tag:$tag,services:{}}' > "$candidate_manifest"
-          docker_socket="${DOCKER_HOST:-unix:///var/run/docker.sock}"
-          socket="${docker_socket#unix://}"
-          ci() {
+          socket="${DOCKER_HOST:-unix:///var/run/docker.sock}"
+          socket="${socket#unix://}"
+          KC_CACHE_ROOT="$(cd "$GITHUB_WORKSPACE/../.." && pwd)/_cache/knowledge-core"
+          install -d -m 0700 "$KC_CACHE_ROOT/buildx"
+          ci_run() {
             docker run --rm --network host \
+              --user "$(id -u):$(id -g)" \
+              --group-add "$(stat -c '%g' "$socket")" \
+              -e HOME="${RUNNER_TEMP:-/tmp}" \
+              "$@"
+          }
+          ci() {
+            ci_run \
               -v "$GITHUB_WORKSPACE:/workspace" \
               -v "$STATE_DIR:/state" \
               -v "$socket:/var/run/docker.sock" \
-              -v "$DOCKER_CONFIG:/root/.docker:ro" \
+              -v "$DOCKER_CONFIG:/ci/docker:ro" \
               -v "$HARBOR_CA_FILE:/etc/harbor-ca/ca.crt:ro" \
               -v "$KC_CACHE_ROOT/buildx:/buildx" \
               -e CI_PROJECT_CONFIG_JSON -e BUILD_CPU_PERCENT -e DOCKER_HOST=unix:///var/run/docker.sock \
-              -e DOCKER_CONFIG=/root/.docker -e BUILDX_CONFIG=/buildx \
+              -e DOCKER_CONFIG=/ci/docker -e BUILDX_CONFIG=/buildx \
               -e CI_REGISTRY_CA_FILE=/etc/harbor-ca/ca.crt -e SSL_CERT_FILE=/etc/harbor-ca/ca.crt \
               -w /workspace "$CI_IMAGE" "$@"
           }
@@ -331,7 +352,16 @@ jobs:
             echo "::error::DEEPSEEK_API_KEY is required for the remote release summary"
             exit 1
           }
-          docker run --rm --network host \
+          socket="${DOCKER_HOST:-unix:///var/run/docker.sock}"
+          socket="${socket#unix://}"
+          ci_run() {
+            docker run --rm --network host \
+              --user "$(id -u):$(id -g)" \
+              --group-add "$(stat -c '%g' "$socket")" \
+              -e HOME="${RUNNER_TEMP:-/tmp}" \
+              "$@"
+          }
+          ci_run \
             -v "$GITHUB_WORKSPACE:/workspace" \
             -v "$STATE_DIR:/state" \
             -e CI_PROJECT_CONFIG_JSON -e DEEPSEEK_API_KEY \
@@ -387,12 +417,21 @@ jobs:
           STATE_DIR: ${{ needs.plan.outputs.state_dir }}
         run: |
           set -euo pipefail
+          socket="${DOCKER_HOST:-unix:///var/run/docker.sock}"
+          socket="${socket#unix://}"
+          ci_run() {
+            docker run --rm --network host \
+              --user "$(id -u):$(id -g)" \
+              --group-add "$(stat -c '%g' "$socket")" \
+              -e HOME="${RUNNER_TEMP:-/tmp}" \
+              "$@"
+          }
           if [[ "${{ needs.plan.outputs.has_build_changes }}" == true ]]; then
             overrides=$(jq -c '[.services[] | {kustomize_name, image_repo:(.image|split(":")[0]), digest}] | map({key:.kustomize_name,value:{newName:.image_repo,digest:.digest}}) | from_entries' "$STATE_DIR/candidates.json")
           else
             overrides='{}'
           fi
-          result=$(docker run --rm --network host -v "$GITHUB_WORKSPACE:/workspace" \
+          result=$(ci_run -v "$GITHUB_WORKSPACE:/workspace" \
             -e CI_PROJECT_CONFIG_JSON -e CI_GITOPS_IMAGE_OVERRIDES_JSON="$overrides" -e GITOPS_TOKEN \
             -w /workspace "$CI_IMAGE" promote-snapshot --source-sha "$GITHUB_SHA")
           echo "$result"
@@ -435,7 +474,17 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
-          docker run --rm --network host -v "$GITHUB_WORKSPACE:/workspace" \
+          set -euo pipefail
+          socket="${DOCKER_HOST:-unix:///var/run/docker.sock}"
+          socket="${socket#unix://}"
+          ci_run() {
+            docker run --rm --network host \
+              --user "$(id -u):$(id -g)" \
+              --group-add "$(stat -c '%g' "$socket")" \
+              -e HOME="${RUNNER_TEMP:-/tmp}" \
+              "$@"
+          }
+          ci_run -v "$GITHUB_WORKSPACE:/workspace" \
             -e CI_PROJECT_CONFIG_JSON -e GITHUB_TOKEN -w /workspace "$CI_IMAGE" status --sha "$GITHUB_SHA" --state pending \
             --description "Knowledge Core dev deployment started" --target-url "https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
       - name: Wait for Argo
@@ -444,20 +493,49 @@ jobs:
           STATE_DIR: ${{ needs.plan.outputs.state_dir }}
         run: |
           set -euo pipefail
-          docker run --rm --network host -v "$GITHUB_WORKSPACE:/workspace" -v "$KUBECONFIG:/secrets/kubeconfig:ro" \
+          socket="${DOCKER_HOST:-unix:///var/run/docker.sock}"
+          socket="${socket#unix://}"
+          ci_run() {
+            docker run --rm --network host \
+              --user "$(id -u):$(id -g)" \
+              --group-add "$(stat -c '%g' "$socket")" \
+              -e HOME="${RUNNER_TEMP:-/tmp}" \
+              "$@"
+          }
+          ci_run -v "$GITHUB_WORKSPACE:/workspace" -v "$KUBECONFIG:/secrets/kubeconfig:ro" \
             -e CI_PROJECT_CONFIG_JSON -e CI_GITOPS_IMAGE_OVERRIDES_JSON -e KUBECONFIG=/secrets/kubeconfig \
             -w /workspace "$CI_IMAGE" argo-wait --revision "${{ steps.gitops.outputs.gitops_revision }}" \
             --services "${{ needs.plan.outputs.release_services }}"
       - name: Run post-deploy smoke test
         run: |
-          docker run --rm --network host -v "$GITHUB_WORKSPACE:/workspace" -v "$KUBECONFIG:/secrets/kubeconfig:ro" \
+          set -euo pipefail
+          socket="${DOCKER_HOST:-unix:///var/run/docker.sock}"
+          socket="${socket#unix://}"
+          ci_run() {
+            docker run --rm --network host \
+              --user "$(id -u):$(id -g)" \
+              --group-add "$(stat -c '%g' "$socket")" \
+              -e HOME="${RUNNER_TEMP:-/tmp}" \
+              "$@"
+          }
+          ci_run -v "$GITHUB_WORKSPACE:/workspace" -v "$KUBECONFIG:/secrets/kubeconfig:ro" \
             -e CI_PROJECT_CONFIG_JSON -e KUBECONFIG=/secrets/kubeconfig -w /workspace "$CI_IMAGE" smoke
           touch "${{ needs.plan.outputs.state_dir }}/smoke.ok"
       - name: Mark dev smoke successful
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
-          docker run --rm --network host -v "$GITHUB_WORKSPACE:/workspace" \
+          set -euo pipefail
+          socket="${DOCKER_HOST:-unix:///var/run/docker.sock}"
+          socket="${socket#unix://}"
+          ci_run() {
+            docker run --rm --network host \
+              --user "$(id -u):$(id -g)" \
+              --group-add "$(stat -c '%g' "$socket")" \
+              -e HOME="${RUNNER_TEMP:-/tmp}" \
+              "$@"
+          }
+          ci_run -v "$GITHUB_WORKSPACE:/workspace" \
             -e CI_PROJECT_CONFIG_JSON -e GITHUB_TOKEN -w /workspace "$CI_IMAGE" status --sha "$GITHUB_SHA" --state success \
             --description "Knowledge Core dev smoke passed" --target-url "https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
       - name: Promote candidate tags and create release
@@ -466,31 +544,38 @@ jobs:
           STATE_DIR: ${{ needs.plan.outputs.state_dir }}
         run: |
           set -euo pipefail
-          docker_socket="${DOCKER_HOST:-unix:///var/run/docker.sock}"
-          socket="${docker_socket#unix://}"
+          socket="${DOCKER_HOST:-unix:///var/run/docker.sock}"
+          socket="${socket#unix://}"
+          ci_run() {
+            docker run --rm --network host \
+              --user "$(id -u):$(id -g)" \
+              --group-add "$(stat -c '%g' "$socket")" \
+              -e HOME="${RUNNER_TEMP:-/tmp}" \
+              "$@"
+          }
           selected=()
           if [[ "${{ needs.plan.outputs.has_build_changes }}" == true ]]; then
             IFS=',' read -r -a selected <<< "${{ needs.plan.outputs.build_services }}"
             for service in "${selected[@]}"; do
-              docker run --rm --network host \
+              ci_run \
                 -v "$GITHUB_WORKSPACE:/workspace" \
                 -v "$socket:/var/run/docker.sock" \
-                -v "$DOCKER_CONFIG:/root/.docker" \
+                -v "$DOCKER_CONFIG:/ci/docker" \
                 -v "$HARBOR_CA_FILE:/etc/harbor-ca/ca.crt:ro" \
                 -e CI_PROJECT_CONFIG_JSON -e BUILD_CPU_PERCENT -e DOCKER_HOST=unix:///var/run/docker.sock \
-                -e DOCKER_CONFIG=/root/.docker -e CI_REGISTRY_CA_FILE=/etc/harbor-ca/ca.crt \
+                -e DOCKER_CONFIG=/ci/docker -e CI_REGISTRY_CA_FILE=/etc/harbor-ca/ca.crt \
                 -e SSL_CERT_FILE=/etc/harbor-ca/ca.crt -w /workspace "$CI_IMAGE" \
                 promote-candidate --service "$service" --tag "sha-$GITHUB_SHA"
             done
           fi
-          docker run --rm --network host -v "$GITHUB_WORKSPACE:/workspace" -v "$STATE_DIR:/state" \
+          ci_run -v "$GITHUB_WORKSPACE:/workspace" -v "$STATE_DIR:/state" \
             -e CI_PROJECT_CONFIG_JSON -e GITHUB_TOKEN -e CI_RELEASE_CHANGES_FILE=/state/changes.json \
             -w /workspace "$CI_IMAGE" release --services "${{ needs.plan.outputs.release_services }}" \
             --changes-file /state/changes.json --summary-file /state/release.md
           for service in "${selected[@]}"; do
-            if ! docker run --rm --network host -v "$GITHUB_WORKSPACE:/workspace" -v "$STATE_DIR:/state" \
-              -v "$DOCKER_CONFIG:/root/.docker:ro" -v "$HARBOR_CA_FILE:/etc/harbor-ca/ca.crt:ro" \
-              -e CI_PROJECT_CONFIG_JSON -e DOCKER_CONFIG=/root/.docker -e SSL_CERT_FILE=/etc/harbor-ca/ca.crt -w /workspace "$CI_IMAGE" \
+            if ! ci_run -v "$GITHUB_WORKSPACE:/workspace" -v "$STATE_DIR:/state" \
+              -v "$DOCKER_CONFIG:/ci/docker:ro" -v "$HARBOR_CA_FILE:/etc/harbor-ca/ca.crt:ro" \
+              -e CI_PROJECT_CONFIG_JSON -e DOCKER_CONFIG=/ci/docker -e SSL_CERT_FILE=/etc/harbor-ca/ca.crt -w /workspace "$CI_IMAGE" \
               cleanup-candidate --service "$service" --tag "sha-$GITHUB_SHA"; then
               echo "::warning::candidate cleanup failed for $service; the verified deployment remains active"
             fi
@@ -500,11 +585,21 @@ jobs:
         env:
           GITOPS_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
+          set -euo pipefail
           if [ -f "${{ needs.plan.outputs.state_dir }}/smoke.ok" ]; then
             echo "Smoke already passed; keep the verified deployment for an idempotent release retry."
             exit 0
           fi
-          docker run --rm --network host -v "$GITHUB_WORKSPACE:/workspace" \
+          socket="${DOCKER_HOST:-unix:///var/run/docker.sock}"
+          socket="${socket#unix://}"
+          ci_run() {
+            docker run --rm --network host \
+              --user "$(id -u):$(id -g)" \
+              --group-add "$(stat -c '%g' "$socket")" \
+              -e HOME="${RUNNER_TEMP:-/tmp}" \
+              "$@"
+          }
+          ci_run -v "$GITHUB_WORKSPACE:/workspace" \
             -e CI_PROJECT_CONFIG_JSON -e GITOPS_TOKEN -w /workspace "$CI_IMAGE" rollback-snapshot \
             --revision "${{ steps.gitops.outputs.gitops_revision }}"
       - name: Mark dev deployment failed
@@ -512,7 +607,17 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
-          docker run --rm --network host -v "$GITHUB_WORKSPACE:/workspace" \
+          set -euo pipefail
+          socket="${DOCKER_HOST:-unix:///var/run/docker.sock}"
+          socket="${socket#unix://}"
+          ci_run() {
+            docker run --rm --network host \
+              --user "$(id -u):$(id -g)" \
+              --group-add "$(stat -c '%g' "$socket")" \
+              -e HOME="${RUNNER_TEMP:-/tmp}" \
+              "$@"
+          }
+          ci_run -v "$GITHUB_WORKSPACE:/workspace" \
             -e CI_PROJECT_CONFIG_JSON -e GITHUB_TOKEN -w /workspace "$CI_IMAGE" status --sha "$GITHUB_SHA" --state failure \
             --description "Knowledge Core dev deployment failed" --target-url "https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
 
@@ -524,8 +629,18 @@ jobs:
       - name: Prune only stale runner state and dedicated Buildx cache
         run: |
           set -euo pipefail
+          socket="${DOCKER_HOST:-unix:///var/run/docker.sock}"
+          socket="${socket#unix://}"
+          KC_CACHE_ROOT="$(cd "$GITHUB_WORKSPACE/../.." && pwd)/_cache/knowledge-core"
+          ci_run() {
+            docker run --rm --network host \
+              --user "$(id -u):$(id -g)" \
+              --group-add "$(stat -c '%g' "$socket")" \
+              -e HOME="${RUNNER_TEMP:-/tmp}" \
+              "$@"
+          }
           install -d -m 0700 "$KC_CACHE_ROOT/runs"
-          docker run --rm \
+          ci_run \
             -v "$KC_CACHE_ROOT/runs:/runs" \
             --entrypoint /bin/sh "$CI_IMAGE" \
             -ec 'find /runs -mindepth 1 -maxdepth 1 -type d -mmin +1440 -exec rm -rf -- {} +'
