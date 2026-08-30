@@ -25,10 +25,10 @@
       "zhDigest": "f113ff85a7cde3cac7bed9811f5ccc99bc7d2033801f19c9fd218caea4f9fa97"
     },
     "services": {
-      "enDigest": "221251b843fd474d2abea028515646bb19106fb3d4afe9274b413d2ed113c528",
-      "syncedEnDigest": "221251b843fd474d2abea028515646bb19106fb3d4afe9274b413d2ed113c528",
-      "syncedZhDigest": "c40103c11af58c321e55496b0400d8852ba05b6abcdf4cce5df19ec21926fece",
-      "zhDigest": "c40103c11af58c321e55496b0400d8852ba05b6abcdf4cce5df19ec21926fece"
+      "enDigest": "5cd5cb2b06bdf286530ed7ead27ad359bf5a9361d1bc919cf55d24ef641a6f61",
+      "syncedEnDigest": "5cd5cb2b06bdf286530ed7ead27ad359bf5a9361d1bc919cf55d24ef641a6f61",
+      "syncedZhDigest": "57618a86406262a037f9832993f53879e65c899fce3ac2b1bd320b088bfcda7c",
+      "zhDigest": "57618a86406262a037f9832993f53879e65c899fce3ac2b1bd320b088bfcda7c"
     },
     "workflows": {
       "enDigest": "e2475a099b7077ba12d82062c0ce2cb7e4e74834742320001d998907e8baf3ae",

@@ -412,12 +412,56 @@
       "value": "## Errors\n\nGo constructors validate required dependencies and return `(T, error)`. Errors add operation context, keep the cause with `%w`, and use `errors.Is` / `errors.As`. Cross-boundary errors use `pkg/error` code/key/kind. Do not use `Must*`, panic for business failure, or `os.Exit` outside the process entrypoint.\n\n## Logging and telemetry\n\nPropagate `context.Context`, deadlines, request IDs, and W3C trace end to end. Metric labels and span attributes stay on route templates, RPC methods, status codes, stable business codes, and dependency names.\n\n## Tests\n\nTests stay close to implementation and cover success, edges, dependency failure, error mapping, cleanup/rollback, and deterministic concurrent behavior. Rust requires rustfmt, clippy `-D warnings`, and cargo deny.\n\n## Secrets and layout\n\nRepository text uses LF except `.bat` / `.cmd`. Module and directory ownership lives in `conventions.code-layout`, not architecture.\n"
     },
     {
+      "id": "documents.managed",
+      "revision": 144,
+      "section": "documents",
+      "sources": [
+        {
+          "kind": "user",
+          "reference": "user-confirmed-managed-documents"
+        }
+      ],
+      "status": "verified",
+      "updatedAt": "2026-08-30T08:48:07Z",
+      "value": [
+        {
+          "domains": [
+            "architecture",
+            "constraints",
+            "conventions",
+            "environment",
+            "services",
+            "workflows"
+          ],
+          "path": "AGENTS.md",
+          "purpose": "Agent coding constraints, ownership boundaries, and repository workflows; preserve the Skill Constructor managed block."
+        },
+        {
+          "domains": [
+            "constraints",
+            "conventions"
+          ],
+          "path": "CLAUDE.md",
+          "purpose": "Claude Code entrypoint that delegates project rules to AGENTS.md; keep it as @AGENTS.md."
+        },
+        {
+          "domains": [
+            "architecture",
+            "environment",
+            "services",
+            "workflows"
+          ],
+          "path": "README.md",
+          "purpose": "Public implemented capabilities, API behavior, architecture, setup, and operational workflows."
+        }
+      ]
+    },
+    {
       "id": "entrypoints.catalog",
-      "revision": 138,
+      "revision": 144,
       "section": "services",
       "sources": [
         {
-          "detail": "evidence-sha256:0f227a4dc8cecdf021566a02b5ca6fbbf05b21bec287a80f8b951c3f74d51096",
           "kind": "detected",
           "reference": "filesystem:entrypoint-candidates"
         },
@@ -431,8 +475,8 @@
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-08-27T07:36:59Z",
-      "value": "Service process entrypoints are services/gateway/main.go, services/identity/main.go, services/knowledge/main.go, services/attachment/main.go, and services/collaboration/src/main.rs. Service main files only create and execute the application command; Go spec files only declare the application spec. Auxiliary executable entrypoints include scripts/idlguard, Collaboration Rust codegen, and tools/authkeys, tools/configctl, and tools/interop. Deployment definitions live under deploy and docker."
+      "updatedAt": "2026-08-30T08:48:07Z",
+      "value": "Service process entrypoints are services/gateway/main.go, services/identity/main.go, services/knowledge/main.go, services/attachment/main.go, services/platform/main.go, and services/collaboration/src/main.rs. Service main files only create and execute the application command; Go spec files only declare the application spec. Auxiliary executable entrypoints include scripts/idlguard, Collaboration Rust codegen, and tools/authkeys, tools/configctl, and tools/interop. Deployment definitions live under deploy and docker."
     },
     {
       "id": "environment.definitions",
@@ -543,21 +587,21 @@
     },
     {
       "id": "security.secrets-and-config",
-      "revision": 138,
+      "revision": 145,
       "section": "conventions",
       "sources": [
         {
-          "detail": "evidence-sha256:0a464b721fda7e17b58ce251824668e7825c1fd2a782ba503077d128dce3c0f4",
+          "detail": "evidence-sha256:e8f167795223e0edf2b7118560608a89586aacac3c2c6082bee0132c3d07be0d",
           "kind": "documented",
           "reference": "README.md#compose"
         },
         {
-          "detail": "evidence-sha256:0a464b721fda7e17b58ce251824668e7825c1fd2a782ba503077d128dce3c0f4",
+          "detail": "evidence-sha256:e8f167795223e0edf2b7118560608a89586aacac3c2c6082bee0132c3d07be0d",
           "kind": "documented",
           "reference": "README.md#k3s-gitops"
         },
         {
-          "detail": "evidence-sha256:0a464b721fda7e17b58ce251824668e7825c1fd2a782ba503077d128dce3c0f4",
+          "detail": "evidence-sha256:e8f167795223e0edf2b7118560608a89586aacac3c2c6082bee0132c3d07be0d",
           "kind": "documented",
           "reference": "README.md#section"
         },
@@ -567,7 +611,7 @@
           "reference": "deploy/base/README.md#application-deployment-base"
         },
         {
-          "detail": "evidence-sha256:0a464b721fda7e17b58ce251824668e7825c1fd2a782ba503077d128dce3c0f4",
+          "detail": "evidence-sha256:e8f167795223e0edf2b7118560608a89586aacac3c2c6082bee0132c3d07be0d",
           "kind": "documented",
           "reference": "deploy/nacos/README.md#nacos-application-configuration"
         },
@@ -577,47 +621,47 @@
           "reference": "deploy/overlay/dev/README.md#development-overlay"
         },
         {
-          "detail": "evidence-sha256:0a464b721fda7e17b58ce251824668e7825c1fd2a782ba503077d128dce3c0f4",
+          "detail": "evidence-sha256:e8f167795223e0edf2b7118560608a89586aacac3c2c6082bee0132c3d07be0d",
           "kind": "documented",
           "reference": "docs/framework-design.md#11"
         },
         {
-          "detail": "evidence-sha256:0a464b721fda7e17b58ce251824668e7825c1fd2a782ba503077d128dce3c0f4",
+          "detail": "evidence-sha256:e8f167795223e0edf2b7118560608a89586aacac3c2c6082bee0132c3d07be0d",
           "kind": "documented",
           "reference": "docs/framework-design.md#12"
         },
         {
-          "detail": "evidence-sha256:0a464b721fda7e17b58ce251824668e7825c1fd2a782ba503077d128dce3c0f4",
+          "detail": "evidence-sha256:e8f167795223e0edf2b7118560608a89586aacac3c2c6082bee0132c3d07be0d",
           "kind": "documented",
           "reference": "docs/framework-design.md#8-secret-tls"
         },
         {
-          "detail": "evidence-sha256:0a464b721fda7e17b58ce251824668e7825c1fd2a782ba503077d128dce3c0f4",
+          "detail": "evidence-sha256:e8f167795223e0edf2b7118560608a89586aacac3c2c6082bee0132c3d07be0d",
           "kind": "documented",
           "reference": "docs/migrations/2026-08-auth-productionization.md#section"
         },
         {
-          "detail": "evidence-sha256:0a464b721fda7e17b58ce251824668e7825c1fd2a782ba503077d128dce3c0f4",
+          "detail": "evidence-sha256:e8f167795223e0edf2b7118560608a89586aacac3c2c6082bee0132c3d07be0d",
           "kind": "documented",
           "reference": "docs/migrations/2026-08-platform-configuration.md#platform-configuration-migration"
         },
         {
-          "detail": "evidence-sha256:0a464b721fda7e17b58ce251824668e7825c1fd2a782ba503077d128dce3c0f4",
+          "detail": "evidence-sha256:e8f167795223e0edf2b7118560608a89586aacac3c2c6082bee0132c3d07be0d",
           "kind": "documented",
           "reference": "docs/platform-configuration.md#section"
         },
         {
-          "detail": "evidence-sha256:0a464b721fda7e17b58ce251824668e7825c1fd2a782ba503077d128dce3c0f4",
+          "detail": "evidence-sha256:e8f167795223e0edf2b7118560608a89586aacac3c2c6082bee0132c3d07be0d",
           "kind": "documented",
           "reference": "docs/rust-collaboration-design.md#2-1"
         },
         {
-          "detail": "evidence-sha256:0a464b721fda7e17b58ce251824668e7825c1fd2a782ba503077d128dce3c0f4",
+          "detail": "evidence-sha256:e8f167795223e0edf2b7118560608a89586aacac3c2c6082bee0132c3d07be0d",
           "kind": "documented",
           "reference": "docs/rust-collaboration-design.md#7"
         },
         {
-          "detail": "evidence-sha256:0a464b721fda7e17b58ce251824668e7825c1fd2a782ba503077d128dce3c0f4",
+          "detail": "evidence-sha256:e8f167795223e0edf2b7118560608a89586aacac3c2c6082bee0132c3d07be0d",
           "kind": "documented",
           "reference": "docs/trace-architecture.md#7-collector-tempo"
         },
@@ -635,7 +679,7 @@
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-08-27T07:36:59Z",
+      "updatedAt": "2026-08-30T08:48:41Z",
       "value": "Secrets may be injected only from environment variables, Kubernetes Secrets, or SOPS-encrypted GitOps manifests. Sensitive values must not be stored in plaintext in source, configuration, logs, metrics, trace spans, or release metadata."
     },
     {
@@ -962,7 +1006,7 @@
   ],
   "generator": {
     "name": "skill-constructor",
-    "version": "0.7.0"
+    "version": "0.8.0"
   },
   "project": {
     "language": "en",
@@ -970,11 +1014,11 @@
     "profile": "generic",
     "slug": "knowledge-core"
   },
-  "revision": 143,
+  "revision": 146,
   "scan": {
-    "fingerprint": "3531e3a7b5cf4d005d455c4b83cf75be3b6b9c81ddeea2ea7980001946115702",
-    "inventoryCount": 433
+    "fingerprint": "7ba945fe520c125d3c7c5e3ef190cdca8ab134bd318dbd6d6fffca983ccd054e",
+    "inventoryCount": 435
   },
   "schemaVersion": 3,
-  "updatedAt": "2026-08-29T05:02:59Z"
+  "updatedAt": "2026-08-30T08:48:41Z"
 }

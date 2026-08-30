@@ -7,7 +7,7 @@ description: "Project-specific engineering guidance for Knowledge-Core. Use for 
 
 # Knowledge-Core Project Guide
 
-Manifest revision: `143`. Manifest digest: `ddf4c61c3fb606cb`.
+Manifest revision: `146`. Manifest digest: `a20e19a26295b2cd`.
 
 ## Required Workflow
 
@@ -25,6 +25,15 @@ Manifest revision: `143`. Manifest digest: `ddf4c61c3fb606cb`.
 - Keep `.skill-constructor/manifest.json` and this generated Skill directory under version control, and
   include synchronized updates with the related engineering commit unless the manifest records a
   verified exception.
+
+## Managed Project Documents
+
+After a domain change, review and synchronize each document whose configured domains
+intersect the task. These files remain human-editable and are not generated projections.
+
+- `AGENTS.md` (architecture, constraints, conventions, environment, services, workflows): Agent coding constraints, ownership boundaries, and repository workflows; preserve the Skill Constructor managed block.
+- `CLAUDE.md` (constraints, conventions): Claude Code entrypoint that delegates project rules to AGENTS.md; keep it as @AGENTS.md.
+- `README.md` (architecture, environment, services, workflows): Public implemented capabilities, API behavior, architecture, setup, and operational workflows.
 
 ## References
 

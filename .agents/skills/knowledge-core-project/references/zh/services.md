@@ -118,6 +118,6 @@ flowchart LR
 
 状态：`verified`
 
-服务进程入口点为 services/gateway/main.go、services/identity/main.go、services/knowledge/main.go、services/attachment/main.go 和 services/collaboration/src/main.rs。服务 main 文件只创建并执行应用命令；Go spec 文件只声明应用规格。辅助可执行入口点包括 scripts/idlguard、Collaboration 的 Rust 代码生成，以及 tools/authkeys、tools/configctl 和 tools/interop。部署定义位于 deploy 和 docker 下。
+服务进程入口点为 services/gateway/main.go、services/identity/main.go、services/knowledge/main.go、services/attachment/main.go、services/platform/main.go 和 services/collaboration/src/main.rs。服务 main 文件只创建并执行应用命令；Go spec 文件只声明应用规格。辅助可执行入口点包括 scripts/idlguard、Collaboration 的 Rust 代码生成，以及 tools/authkeys、tools/configctl 和 tools/interop。部署定义位于 deploy 和 docker 下。
 
 来源： `filesystem:entrypoint-candidates`, `user-confirmed`, `user-confirmed-en-locale-source`

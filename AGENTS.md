@@ -1,6 +1,6 @@
 # Knowledge Core Agent 协作规范
 
-本文适用于整个仓库（Go module + Rust workspace，四个服务：Gateway、Identity、Knowledge、Collaboration）。详细架构、运行时契约和当前能力以 [`docs/framework-design.md`](docs/framework-design.md) 为准，Rust Collaboration 的设计基线见 [`docs/rust-collaboration-design.md`](docs/rust-collaboration-design.md)；本文只记录编码 Agent 必须遵守的强约束。不要把规划中或 IDL 中尚未落地的能力描述为已经实现。
+本文适用于整个仓库（Go module + Rust workspace，六个服务：Gateway、Identity、Knowledge、Attachment、Collaboration、Platform）。详细架构、运行时契约和当前能力以 [`docs/framework-design.md`](docs/framework-design.md) 为准，Rust Collaboration 的设计基线见 [`docs/rust-collaboration-design.md`](docs/rust-collaboration-design.md)；本文只记录编码 Agent 必须遵守的强约束。不要把规划中或 IDL 中尚未落地的能力描述为已经实现。
 
 ## Git 与分支
 
@@ -27,15 +27,20 @@
 
 ### Gateway
 
-- Gateway 是 HTTP edge：负责严格请求校验、鉴权、安全中间件、限流、公开错误映射和对上游 typed client 的调用编排；不得直连 Identity 数据库或复制 Identity 领域规则。
-- `internal/client` 封装 Identity、Knowledge、Collaboration RPC，`internal/middleware` 承载跨路由安全策略，`internal/context` 显式装配 Redis、三个上游 client 与 HTTP components。
+- Gateway 是 HTTP edge：负责严格请求校验、鉴权、安全中间件、限流、公开错误映射和对上游 typed client 的调用编排；不得直连任何业务服务数据库或复制其领域规则。
+- `internal/client` 封装 Identity、Knowledge、Collaboration、Attachment、Platform RPC，`internal/middleware` 承载跨路由安全策略，`internal/context` 显式装配 Redis、上游 client 与 HTTP components。
 - Gateway handler 与 route middleware 的所有权以生成清单为准；文件头中的 generated 注释不能覆盖 `scripts/generated-files.txt` 的判定。
 
 ### Knowledge
 
-- Knowledge 拥有文档元数据、成员权限、发布/公开投影、附件（S3 预签名 + ClamAV 扫描）、回收站、配额和 outbox，不保存 Yjs 二进制状态；数据在 PostgreSQL `knowledge` schema，SQL 迁移放 `internal/migration/migrations/`。
+- Knowledge 拥有文档元数据、文件夹、成员权限、发布/公开投影、回收站、配额和 outbox，并在迁移窗口内保留旧文档附件兼容能力；不拥有通用附件对象，也不保存 Yjs 二进制状态。数据在 PostgreSQL `knowledge` schema，SQL 迁移放 `internal/migration/migrations/`。
 - `internal/domain`（document、richtext）与 `internal/model`（GORM）边界同 Identity；`internal/logic` 依赖小型 repository 接口，`internal/repository` 负责持久化、幂等与存储错误映射，`internal/storage`（S3）、`internal/scanner`（ClamAV）、`internal/worker` 承载附件与后台任务。
 - 通过 `internal/client` 调用 Identity 与 Collaboration RPC；`internal/transport/rpc` 只做传输适配，不在 handler 中复制业务规则。
+
+### Attachment
+
+- Attachment 拥有通用文件元数据、multipart 上传、扫描状态、引用与回收生命周期，数据在 PostgreSQL `attachment` schema，对象字节位于 S3/MinIO，并使用 ClamAV 扫描。
+- 不复制文档权限或 Collaboration 领域规则；Gateway 通过 typed RPC 调用 Attachment，业务服务只通过稳定契约引用附件。
 
 ### Collaboration
 
@@ -43,6 +48,11 @@
 - 拥有 PostgreSQL `collaboration` schema（Yjs update、snapshot、version、projection job、outbox）；依赖 Redis、NATS 与 Knowledge RPC。不复制文档权限规则：创建 session 时经 Knowledge RPC 复核访问级别，ticket 短期、单次使用。
 - Rust 门禁：rustfmt、clippy 必须 `-D warnings`、`cargo deny`（advisories/bans/licenses/sources）；工具链固定在 `rust-toolchain.toml`（1.97.1）。
 - Node 互操作 fixture 在 `services/collaboration/interop/`（yjs ↔ yrs，`npm run ci` = format:check + `node --test` + audit），不属于 Go 包发现范围（GO_PACKAGES）。
+
+### Platform
+
+- Platform 拥有带修订控制的站点、邮件和 AI 业务配置、敏感值加密、审计、幂等与 outbox，数据在 PostgreSQL `platform` schema，并通过 NATS 发布只含坐标的可靠变更事件。
+- 不拥有进程监听地址、证书或连接池等静态运行时配置；这些仍由各服务配置和部署平台管理。
 
 ## Go、依赖与调用链
 
@@ -127,6 +137,8 @@
 - Keep `.skill-constructor/manifest.json` and the generated project Skill directory under version
   control, and include their synchronized updates with the related engineering commit unless this
   repository records a verified manifest exception.
+- When the generated project Skill lists managed project documents, review and synchronize those
+  whose configured domains intersect the completed task; they remain human-editable files.
 - Never edit generated English project-skill files or stage, commit, or push harness updates without
   an explicit user request.
 <!-- skill-constructor:end -->

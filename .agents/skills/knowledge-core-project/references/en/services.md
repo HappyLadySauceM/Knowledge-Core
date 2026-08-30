@@ -75,6 +75,6 @@ Clients enter through Gateway HTTP or Collaboration WebSocket. Gateway calls Ide
 
 Status: `verified`
 
-Service process entrypoints are services/gateway/main.go, services/identity/main.go, services/knowledge/main.go, services/attachment/main.go, and services/collaboration/src/main.rs. Service main files only create and execute the application command; Go spec files only declare the application spec. Auxiliary executable entrypoints include scripts/idlguard, Collaboration Rust codegen, and tools/authkeys, tools/configctl, and tools/interop. Deployment definitions live under deploy and docker.
+Service process entrypoints are services/gateway/main.go, services/identity/main.go, services/knowledge/main.go, services/attachment/main.go, services/platform/main.go, and services/collaboration/src/main.rs. Service main files only create and execute the application command; Go spec files only declare the application spec. Auxiliary executable entrypoints include scripts/idlguard, Collaboration Rust codegen, and tools/authkeys, tools/configctl, and tools/interop. Deployment definitions live under deploy and docker.
 
 Sources: `filesystem:entrypoint-candidates`, `user-confirmed`, `user-confirmed-en-locale-source`
