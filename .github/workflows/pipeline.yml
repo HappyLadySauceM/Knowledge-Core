@@ -64,6 +64,8 @@ jobs:
               --user "$(id -u):$(id -g)" \
               --group-add "$(stat -c '%g' "$socket")" \
               -e HOME="${RUNNER_TEMP:-/tmp}" \
+              -e HTTP_PROXY -e HTTPS_PROXY -e NO_PROXY \
+              -e http_proxy -e https_proxy -e no_proxy \
               "$@"
           }
           state_dir="$KC_CACHE_ROOT/runs/${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
@@ -227,15 +229,20 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24.18.1
-          cache: npm
-          cache-dependency-path: services/collaboration/interop/package-lock.json
+          # Self-hosted GitHub Actions cache restore hangs; Node binaries use npmmirror.
+          # 自托管 GitHub Actions 缓存恢复会挂起；Node 二进制走 npmmirror。
+          mirror: https://cdn.npmmirror.com/binaries/node
       - name: Run Rust and interoperability gates
         env:
           STATE_DIR: ${{ needs.plan.outputs.state_dir }}
+          npm_config_registry: https://registry.npmmirror.com
         run: |
           set -euo pipefail
           make rust-ci generate-rust-check
           make rust-release RUST_ARTIFACT_DIR="$STATE_DIR/artifacts"
+          # npm ci honors lockfile resolved URLs; rewrite npmjs.org to npmmirror.
+          # npm ci 会使用 lockfile 里的 resolved URL；把 npmjs.org 改写为 npmmirror。
+          python3 -c 'from pathlib import Path; p=Path("services/collaboration/interop/package-lock.json"); p.write_text(p.read_text().replace("https://registry.npmjs.org/", "https://registry.npmmirror.com/"))'
           npm --prefix services/collaboration/interop ci
           npm --prefix services/collaboration/interop run ci
 
@@ -299,6 +306,8 @@ jobs:
               --user "$(id -u):$(id -g)" \
               --group-add "$(stat -c '%g' "$socket")" \
               -e HOME="${RUNNER_TEMP:-/tmp}" \
+              -e HTTP_PROXY -e HTTPS_PROXY -e NO_PROXY \
+              -e http_proxy -e https_proxy -e no_proxy \
               "$@"
           }
           ci() {
@@ -359,6 +368,8 @@ jobs:
               --user "$(id -u):$(id -g)" \
               --group-add "$(stat -c '%g' "$socket")" \
               -e HOME="${RUNNER_TEMP:-/tmp}" \
+              -e HTTP_PROXY -e HTTPS_PROXY -e NO_PROXY \
+              -e http_proxy -e https_proxy -e no_proxy \
               "$@"
           }
           ci_run \
@@ -424,6 +435,8 @@ jobs:
               --user "$(id -u):$(id -g)" \
               --group-add "$(stat -c '%g' "$socket")" \
               -e HOME="${RUNNER_TEMP:-/tmp}" \
+              -e HTTP_PROXY -e HTTPS_PROXY -e NO_PROXY \
+              -e http_proxy -e https_proxy -e no_proxy \
               "$@"
           }
           if [[ "${{ needs.plan.outputs.has_build_changes }}" == true ]]; then
@@ -482,6 +495,8 @@ jobs:
               --user "$(id -u):$(id -g)" \
               --group-add "$(stat -c '%g' "$socket")" \
               -e HOME="${RUNNER_TEMP:-/tmp}" \
+              -e HTTP_PROXY -e HTTPS_PROXY -e NO_PROXY \
+              -e http_proxy -e https_proxy -e no_proxy \
               "$@"
           }
           ci_run -v "$GITHUB_WORKSPACE:/workspace" \
@@ -500,6 +515,8 @@ jobs:
               --user "$(id -u):$(id -g)" \
               --group-add "$(stat -c '%g' "$socket")" \
               -e HOME="${RUNNER_TEMP:-/tmp}" \
+              -e HTTP_PROXY -e HTTPS_PROXY -e NO_PROXY \
+              -e http_proxy -e https_proxy -e no_proxy \
               "$@"
           }
           ci_run -v "$GITHUB_WORKSPACE:/workspace" -v "$KUBECONFIG:/secrets/kubeconfig:ro" \
@@ -516,6 +533,8 @@ jobs:
               --user "$(id -u):$(id -g)" \
               --group-add "$(stat -c '%g' "$socket")" \
               -e HOME="${RUNNER_TEMP:-/tmp}" \
+              -e HTTP_PROXY -e HTTPS_PROXY -e NO_PROXY \
+              -e http_proxy -e https_proxy -e no_proxy \
               "$@"
           }
           ci_run -v "$GITHUB_WORKSPACE:/workspace" -v "$KUBECONFIG:/secrets/kubeconfig:ro" \
@@ -533,6 +552,8 @@ jobs:
               --user "$(id -u):$(id -g)" \
               --group-add "$(stat -c '%g' "$socket")" \
               -e HOME="${RUNNER_TEMP:-/tmp}" \
+              -e HTTP_PROXY -e HTTPS_PROXY -e NO_PROXY \
+              -e http_proxy -e https_proxy -e no_proxy \
               "$@"
           }
           ci_run -v "$GITHUB_WORKSPACE:/workspace" \
@@ -551,6 +572,8 @@ jobs:
               --user "$(id -u):$(id -g)" \
               --group-add "$(stat -c '%g' "$socket")" \
               -e HOME="${RUNNER_TEMP:-/tmp}" \
+              -e HTTP_PROXY -e HTTPS_PROXY -e NO_PROXY \
+              -e http_proxy -e https_proxy -e no_proxy \
               "$@"
           }
           selected=()
@@ -597,6 +620,8 @@ jobs:
               --user "$(id -u):$(id -g)" \
               --group-add "$(stat -c '%g' "$socket")" \
               -e HOME="${RUNNER_TEMP:-/tmp}" \
+              -e HTTP_PROXY -e HTTPS_PROXY -e NO_PROXY \
+              -e http_proxy -e https_proxy -e no_proxy \
               "$@"
           }
           ci_run -v "$GITHUB_WORKSPACE:/workspace" \
@@ -615,6 +640,8 @@ jobs:
               --user "$(id -u):$(id -g)" \
               --group-add "$(stat -c '%g' "$socket")" \
               -e HOME="${RUNNER_TEMP:-/tmp}" \
+              -e HTTP_PROXY -e HTTPS_PROXY -e NO_PROXY \
+              -e http_proxy -e https_proxy -e no_proxy \
               "$@"
           }
           ci_run -v "$GITHUB_WORKSPACE:/workspace" \
@@ -637,6 +664,8 @@ jobs:
               --user "$(id -u):$(id -g)" \
               --group-add "$(stat -c '%g' "$socket")" \
               -e HOME="${RUNNER_TEMP:-/tmp}" \
+              -e HTTP_PROXY -e HTTPS_PROXY -e NO_PROXY \
+              -e http_proxy -e https_proxy -e no_proxy \
               "$@"
           }
           install -d -m 0700 "$KC_CACHE_ROOT/runs"

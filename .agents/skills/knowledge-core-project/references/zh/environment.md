@@ -85,7 +85,7 @@
 
 <!-- fact:environment.runtimes status:verified sources:kubectl-context-default -->
 
-项目包含一个 Go 模块，以及 services/collaboration 下的一个 Rust workspace。使用仓库固定版本的生成器（Kitex 0.16.2、仅通过 hz update 使用的 hz 0.9.7、thriftgo 0.4.5），并使用 rust-toolchain.toml 指定的 rustc 1.97.1。Collaboration 互操作夹具要求 Node.js >= 24.18.1 并执行 npm ci。所有非公开配置都通过环境变量或部署平台的密钥管理注入；绝不要在仓库配置中存储密钥值。
+项目包含一个 Go 模块，以及 services/collaboration 下的一个 Rust workspace。使用仓库固定版本的生成器（Kitex 0.16.2、仅通过 hz update 使用的 hz 0.9.7、thriftgo 0.4.5），并使用 rust-toolchain.toml 指定的 rustc 1.97.1。Collaboration 互操作夹具要求 Node.js >= 24.18.1 并执行 `npm ci`；包 tarball 通过 `services/collaboration/interop/.npmrc` 走 npmmirror。所有非公开配置都通过环境变量或部署平台的密钥管理注入；绝不要在仓库配置中存储密钥值。
 
 <!-- fact:environment.setup status:verified sources:user-confirmed, user-confirmed-en-locale-source -->
 
