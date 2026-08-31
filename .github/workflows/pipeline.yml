@@ -13,6 +13,9 @@ permissions:
 env:
   CI_IMAGE: harbor.happyladysauce.local/knowledge-core/ci-templates:v1.1.11@sha256:26af40ffdc6efdef4d8e7a6135d8e76f2326639cda9fa21c46af7477f6ebc0bc
   BUILD_CPU_PERCENT: "75"
+  # Node 24 actions need this when the runner exports HTTP_PROXY (create-github-app-token post included).
+  # runner 导出 HTTP_PROXY 时，Node 24 的 action（含 create-github-app-token 的 post）需要此开关。
+  NODE_USE_ENV_PROXY: "1"
   CI_PROJECT_CONFIG_JSON: >-
     {"project":"Knowledge-Core","source_repo":"HappyLadySauceM/Knowledge-Core","gitops_repo":"https://github.com/HappyLadySauceM/deploy.git","gitops_path":"Knowledge-Core","gitops_kustomization":"dev/common/kustomization.yaml","gitops_branch":"main","shared_paths":[".github","pkg","idl","kitex_gen","scripts","services/collaboration/interop","Makefile","go.mod","go.sum"],"harbor_registry":"harbor.happyladysauce.local","harbor_project":"knowledge-core","argocd_server":"argocd.happyladysauce.local","argocd_application":"knowledge-core-gateway-dev","smoke_command":["make","smoke-ci"],"release_model":"git-independent-service-aggregate","aggregate_release_prefix":"knowledge-core","aggregate_version_file":"VERSION","release_language":"zh-CN","deepseek_model":"deepseek-v4-flash","base_images":[{"source":"gcr.io/distroless/static-debian12:nonroot@sha256:f5b485ea962d9bd1186b2f6b3a061191539b905b82ec395de78cbfae51f20e35","destination":"harbor.happyladysauce.local/knowledge-core/base/distroless-static-debian12:nonroot"},{"source":"docker.m.daocloud.io/library/debian:bookworm-slim@sha256:7b140f374b289a7c2befc338f42ebe6441b7ea838a042bbd5acbfca6ec875818","destination":"harbor.happyladysauce.local/knowledge-core/base/debian:bookworm-slim"}],"services":[{"name":"gateway","source_path":"services/gateway","version_file":"services/gateway/VERSION","dockerfile":"docker/gateway/Dockerfile","context":".","image_repository":"harbor.happyladysauce.local/knowledge-core/gateway","deploy_snapshot":"deploy/gateway"},{"name":"identity","source_path":"services/identity","version_file":"services/identity/VERSION","dockerfile":"docker/identity/Dockerfile","context":".","image_repository":"harbor.happyladysauce.local/knowledge-core/identity","deploy_snapshot":"deploy/identity"},{"name":"knowledge","source_path":"services/knowledge","version_file":"services/knowledge/VERSION","dockerfile":"docker/knowledge/Dockerfile","context":".","image_repository":"harbor.happyladysauce.local/knowledge-core/knowledge","deploy_snapshot":"deploy/knowledge"},{"name":"attachment","source_path":"services/attachment","version_file":"services/attachment/VERSION","dockerfile":"docker/attachment/Dockerfile","context":".","image_repository":"harbor.happyladysauce.local/knowledge-core/attachment","deploy_snapshot":"deploy/attachment"},{"name":"platform","source_path":"services/platform","version_file":"services/platform/VERSION","dockerfile":"docker/platform/Dockerfile","context":".","image_repository":"harbor.happyladysauce.local/knowledge-core/platform","deploy_snapshot":"deploy/platform"},{"name":"collaboration","source_path":"services/collaboration","version_file":"services/collaboration/VERSION","dockerfile":"docker/collaboration/Dockerfile","context":".","image_repository":"harbor.happyladysauce.local/knowledge-core/collaboration","deploy_snapshot":"deploy/collaboration"}]}
 
@@ -391,6 +394,8 @@ jobs:
       - name: Mint GitHub App token
         id: app-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        env:
+          NODE_USE_ENV_PROXY: "1"
         with:
           client-id: ${{ secrets.GH_APP_ID }}
           private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}

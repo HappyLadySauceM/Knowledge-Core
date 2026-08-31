@@ -19,10 +19,10 @@
       "zhDigest": "9aed6e0c9f7d2a431ece8d89ff212e75c631ef729dd043bee3832c2612fe22f7"
     },
     "environment": {
-      "enDigest": "c4bf8df84cb3910ed7d4c73cc9734a7f870a06e79da570106b3299515e75aba3",
-      "syncedEnDigest": "c4bf8df84cb3910ed7d4c73cc9734a7f870a06e79da570106b3299515e75aba3",
-      "syncedZhDigest": "d00761a9e6ab4e8053f233f4409c535d2533af316ed689a088c7541acbd722fb",
-      "zhDigest": "d00761a9e6ab4e8053f233f4409c535d2533af316ed689a088c7541acbd722fb"
+      "enDigest": "52603e364a323d53e2756d0b84b4f4920bc97470b176922c48e044ec4a38cc10",
+      "syncedEnDigest": "52603e364a323d53e2756d0b84b4f4920bc97470b176922c48e044ec4a38cc10",
+      "syncedZhDigest": "b77a93b64e9162f7c8b0d88c9b2211bef6be1268f165c47c76e61dddcebf229e",
+      "zhDigest": "b77a93b64e9162f7c8b0d88c9b2211bef6be1268f165c47c76e61dddcebf229e"
     },
     "services": {
       "enDigest": "5cd5cb2b06bdf286530ed7ead27ad359bf5a9361d1bc919cf55d24ef641a6f61",
@@ -31,10 +31,10 @@
       "zhDigest": "57618a86406262a037f9832993f53879e65c899fce3ac2b1bd320b088bfcda7c"
     },
     "workflows": {
-      "enDigest": "7612f88524e7c68468668c743c3817091ed2d295f59db375fe632c84921e2239",
-      "syncedEnDigest": "7612f88524e7c68468668c743c3817091ed2d295f59db375fe632c84921e2239",
-      "syncedZhDigest": "837fac412db05d987da51030eb9327c001f1c104eeba4e3900568820ecc02cd3",
-      "zhDigest": "837fac412db05d987da51030eb9327c001f1c104eeba4e3900568820ecc02cd3"
+      "enDigest": "ca35dcc6bd4216c36827e23075c3f183f5ec32fff4f1020369ea467c91e9ad50",
+      "syncedEnDigest": "ca35dcc6bd4216c36827e23075c3f183f5ec32fff4f1020369ea467c91e9ad50",
+      "syncedZhDigest": "55db3699cb200feb35cc189c29cd929bf6731b976614270fa887b836a482ff9c",
+      "zhDigest": "55db3699cb200feb35cc189c29cd929bf6731b976614270fa887b836a482ff9c"
     }
   },
   "schemaVersion": 1,

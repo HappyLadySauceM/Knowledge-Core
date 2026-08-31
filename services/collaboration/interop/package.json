@@ -11,7 +11,7 @@
     "format:check": "prettier --check .",
     "generate:fixtures": "node ./generate-fixtures.mjs",
     "test": "node --test",
-    "audit": "npm audit --audit-level=high",
+    "audit": "npm audit --audit-level=high --registry=https://registry.npmjs.org",
     "ci": "npm run format:check && npm test && npm run audit"
   },
   "dependencies": {

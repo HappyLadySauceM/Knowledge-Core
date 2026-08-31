@@ -324,7 +324,7 @@
     },
     {
       "id": "cicd.pipeline",
-      "revision": 153,
+      "revision": 154,
       "section": "workflows",
       "sources": [
         {
@@ -353,8 +353,8 @@
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-08-30T15:26:04Z",
-      "value": "Pushes to `dev` trigger the reusable Python CI control image from ci-templates. All trusted release jobs use the organization self-hosted runner labels `self-hosted`, `Linux`, `X64`, and `devops`; system Docker cleanup is limited to the dedicated Buildx cache and runner state. Control-image containers run as the current runner UID and GID (`docker run --user $(id -u):$(id -g)` with a writable HOME); Docker config is mounted at `/ci/docker` rather than `/root/.docker`; runner cache is `$GITHUB_WORKSPACE/../../_cache/knowledge-core` and Go tools use `RUNNER_TOOL_CACHE`. The host runner uses systemd `HTTP_PROXY=http://127.0.0.1:10991` (sing-box HTTP inbound) with `NO_PROXY` for Harbor, cluster, and npmmirror; `ci_run` forwards those variables into the control image. Build and compile parallelism defaults to 75% of effective runner CPUs (affinity and cgroup quota), configurable with `BUILD_CPU_PERCENT`; `BUILD_JOBS` is only a bounded emergency override. The pipeline runs `make ci` and Collaboration Node interop checks on Node 24.18.1 from npmmirror, without GitHub Actions npm cache restore; detects affected services; warms pinned base images into Harbor; builds affected images using only the Harbor registry cache; and publishes the `dev` tag without image scanning or signing. The current `dev` image is kept as `previous` before replacement. Knowledge-Core/deploy is the editable deploy source; CI copies it to the Knowledge-Core/deploy snapshot in HappyLadySauceM/deploy, updates root image digests, and pushes with a fast-forward compare-and-swap check and bounded retry. Deploy-only changes skip image builds but run deployment validation, GitOps synchronization, Argo health, and dev smoke before promoting `dev` to `main`; code changes run the complete image chain. If Argo or smoke fails, CI restores the exact GitOps snapshot commit with an ordinary fast-forward and moves each affected Harbor `previous` tag back to `dev`; rollback refuses to overwrite if the remote branch moved. After success, `previous` tags must be deleted for Harbor GC; cleanup failure blocks release. DeepSeek release summary failure blocks promotion to `main`. On success, `dev` fast-forwards to `main` and creates one aggregate `vMAJOR.MINOR.PATCH` Git tag and GitHub Release, both pointing at the exact promotion commit SHA; the Release title matches the version tag. Existing knowledge-core-v* tags still count when choosing the next patch or retrying a prefixed tagged commit. Retrying the same commit reuses the matching aggregate tag and existing Release, but rejects a tag that points at another commit. Shared history is never force-pushed or rebased."
+      "updatedAt": "2026-08-31T06:03:25Z",
+      "value": "Pushes to `dev` trigger the reusable Python CI control image from ci-templates. All trusted release jobs use the organization self-hosted runner labels `self-hosted`, `Linux`, `X64`, and `devops`; system Docker cleanup is limited to the dedicated Buildx cache and runner state. Control-image containers run as the current runner UID and GID (`docker run --user $(id -u):$(id -g)` with a writable HOME); Docker config is mounted at `/ci/docker` rather than `/root/.docker`; runner cache is `$GITHUB_WORKSPACE/../../_cache/knowledge-core` and Go tools use `RUNNER_TOOL_CACHE`. The host runner uses systemd `HTTP_PROXY=http://127.0.0.1:10991` (sing-box HTTP inbound) with `NO_PROXY` for Harbor, cluster, and npmmirror, and `NODE_USE_ENV_PROXY=1` so Node 24 actions including `create-github-app-token` post honor that proxy; `ci_run` forwards those variables into the control image. Build and compile parallelism defaults to 75% of effective runner CPUs (affinity and cgroup quota), configurable with `BUILD_CPU_PERCENT`; `BUILD_JOBS` is only a bounded emergency override. The pipeline runs `make ci` and Collaboration Node interop checks on Node 24.18.1 from npmmirror, without GitHub Actions npm cache restore; `npm audit` uses `https://registry.npmjs.org` because npmmirror does not implement the security advisories API; detects affected services; warms pinned base images into Harbor; builds affected images using only the Harbor registry cache; and publishes the `dev` tag without image scanning or signing. The current `dev` image is kept as `previous` before replacement. Knowledge-Core/deploy is the editable deploy source; CI copies it to the Knowledge-Core/deploy snapshot in HappyLadySauceM/deploy, updates root image digests, and pushes with a fast-forward compare-and-swap check and bounded retry. Deploy-only changes skip image builds but run deployment validation, GitOps synchronization, Argo health, and dev smoke before promoting `dev` to `main`; code changes run the complete image chain. If Argo or smoke fails, CI restores the exact GitOps snapshot commit with an ordinary fast-forward and moves each affected Harbor `previous` tag back to `dev`; rollback refuses to overwrite if the remote branch moved. After success, `previous` tags must be deleted for Harbor GC; cleanup failure blocks release. DeepSeek release summary failure blocks promotion to `main`. On success, `dev` fast-forwards to `main` and creates one aggregate `vMAJOR.MINOR.PATCH` Git tag and GitHub Release, both pointing at the exact promotion commit SHA; the Release title matches the version tag. Existing knowledge-core-v* tags still count when choosing the next patch or retrying a prefixed tagged commit. Retrying the same commit reuses the matching aggregate tag and existing Release, but rejects a tag that points at another commit. Shared history is never force-pushed or rebased."
     },
     {
       "id": "constraints.project",
@@ -536,12 +536,16 @@
     },
     {
       "id": "environment.setup",
-      "revision": 151,
+      "revision": 154,
       "section": "environment",
       "sources": [
         {
           "kind": "detected",
           "reference": "services/collaboration/interop/.npmrc"
+        },
+        {
+          "kind": "detected",
+          "reference": "services/collaboration/interop/package.json"
         },
         {
           "kind": "user",
@@ -553,8 +557,8 @@
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-08-30T15:21:01Z",
-      "value": "The project contains one Go module and a Rust workspace under services/collaboration. Use the repository-pinned generators (Kitex 0.16.2, hz 0.9.7 via `hz update` only, thriftgo 0.4.5) and rustc 1.97.1 from rust-toolchain.toml. Collaboration interop fixtures require Node.js >= 24.18.1 and `npm ci`; package tarballs use npmmirror via `services/collaboration/interop/.npmrc`. Inject all non-public configuration through environment variables or the deploy platform's secret store; never store secret values in repository configuration."
+      "updatedAt": "2026-08-31T06:03:25Z",
+      "value": "The project contains one Go module and a Rust workspace under services/collaboration. Use the repository-pinned generators (Kitex 0.16.2, hz 0.9.7 via `hz update` only, thriftgo 0.4.5) and rustc 1.97.1 from rust-toolchain.toml. Collaboration interop fixtures require Node.js >= 24.18.1 and `npm ci`; package tarballs use npmmirror via `services/collaboration/interop/.npmrc`, while `npm audit` uses `https://registry.npmjs.org` because npmmirror does not implement the security advisories API. Inject all non-public configuration through environment variables or the deploy platform's secret store; never store secret values in repository configuration."
     },
     {
       "id": "environment.toolchains",
@@ -1030,11 +1034,11 @@
     "profile": "generic",
     "slug": "knowledge-core"
   },
-  "revision": 153,
+  "revision": 154,
   "scan": {
     "fingerprint": "7de6c67794c77428fad6ecabcc75839b1bbbef9bca271b64241658ac701f1282",
     "inventoryCount": 436
   },
   "schemaVersion": 3,
-  "updatedAt": "2026-08-30T15:26:04Z"
+  "updatedAt": "2026-08-31T06:03:25Z"
 }
