@@ -226,12 +226,12 @@ npm ci
 npm run ci
 ```
 
-`.github/workflows/pipeline.yml` 是唯一项目 workflow；它调用 `/opt/HappyLadySauceM/ci-templates`
-发布的 Python 控制镜像。`dev` push 先运行 `make ci` 与 Collaboration Node 互操作门禁，再按
-变更服务从 Harbor 缓存构建并覆盖 `dev` 镜像 tag。控制镜像复用稳定 Buildx builder，并向
-Dockerfile 传入按 runner 有效 CPU 75% 计算的 `BUILD_JOBS`；Go/Rust 构建层通过固定 cache mount id
-跨服务复用 module/cargo 缓存。镜像不扫描、不签名；当前 `dev` tag 构建前会
-保留为 `previous`，Argo CD 同步和冒烟成功后删除 `previous`，由 Harbor 垃圾回收回收旧层。
+`.github/workflows/pipeline.yml` 是唯一项目 workflow，配置集中在 `.ci/pipeline.yaml`，不再依赖
+宿主机路径或内联 JSON。质量/部署任务使用 ARC 的 `hls-standard` runner，镜像构建使用带特权
+Docker-in-Docker 的 `hls-builder` runner；builder 以服务 matrix 并行（最多 4 个），standard
+池最多 8 个。Go/Rust 编译产物、变更计划和候选 digest 通过 GitHub Artifacts 在 job 间传递，
+候选镜像使用提交 SHA 标签，Smoke 通过后才由 Harbor API 提升为 `dev`；失败时执行 GitOps
+CAS 重试并回滚未通过 Smoke 的修订。runner 不挂载宿主机 Docker socket，也不依赖共享工作目录。
 
 仓库 Actions Secret 只提供 `HARBOR_DOCKER_CONFIG_JSON` 与 `HARBOR_CA_PEM`。`release` environment
 只允许 `dev`，并提供 `GH_APP_ID`、`GH_APP_PRIVATE_KEY`、`K3S_RELEASE_KUBECONFIG` 与

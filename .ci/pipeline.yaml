@@ -1,0 +1,116 @@
+schema_version: 2
+project: Knowledge-Core
+source_repo: HappyLadySauceM/Knowledge-Core
+gitops_repo: https://github.com/HappyLadySauceM/deploy.git
+gitops_path: Knowledge-Core
+gitops_kustomization: dev/common/kustomization.yaml
+gitops_branch: main
+release_branch: main
+development_branch: dev
+git_identity_name: happyladysauce-ci
+git_identity_email: happyladysauce-ci@noreply.local
+shared_paths:
+  - .ci
+  - .github
+  - pkg
+  - idl
+  - kitex_gen
+  - scripts
+  - services/collaboration/interop
+  - Makefile
+  - go.mod
+  - go.sum
+harbor_registry: harbor.happyladysauce.local
+harbor_project: knowledge-core
+argocd_server: argocd.happyladysauce.local
+argocd_namespace: argocd
+argocd_application: knowledge-core-gateway-dev
+application_suffix: -dev
+smoke_namespace: knowledge-core-dev
+smoke_command:
+  - make
+  - smoke-ci
+smoke_endpoints:
+  - service: knowledge-core-gateway
+    port: "8082"
+    path: /readyz
+  - service: knowledge-core-identity
+    port: "8081"
+    path: /readyz
+  - service: knowledge-core-knowledge
+    port: "8083"
+    path: /readyz
+  - service: knowledge-core-collaboration
+    port: "8084"
+    path: /health/ready
+  - service: knowledge-core-gateway
+    port: "8080"
+    path: /health/ready
+  - service: knowledge-core-gateway
+    port: "8080"
+    path: /api/v1/documents?limit=1
+release_model: git-independent-service-aggregate
+aggregate_release_prefix: knowledge-core
+aggregate_version_file: VERSION
+release_language: zh-CN
+deepseek_model: deepseek-v4-flash
+base_images:
+  - source: gcr.io/distroless/static-debian12:nonroot@sha256:f5b485ea962d9bd1186b2f6b3a061191539b905b82ec395de78cbfae51f20e35
+    destination: harbor.happyladysauce.local/knowledge-core/base/distroless-static-debian12:nonroot
+  - source: docker.m.daocloud.io/library/debian:bookworm-slim@sha256:7b140f374b289a7c2befc338f42ebe6441b7ea838a042bbd5acbfca6ec875818
+    destination: harbor.happyladysauce.local/knowledge-core/base/debian:bookworm-slim
+services:
+  - name: gateway
+    source_path: services/gateway
+    version_file: services/gateway/VERSION
+    dockerfile: docker/gateway/Dockerfile
+    context: .
+    image_repository: harbor.happyladysauce.local/knowledge-core/gateway
+    deploy_snapshot: deploy/gateway
+    kustomize_name: knowledge-core-gateway
+    artifact_group: go
+  - name: identity
+    source_path: services/identity
+    version_file: services/identity/VERSION
+    dockerfile: docker/identity/Dockerfile
+    context: .
+    image_repository: harbor.happyladysauce.local/knowledge-core/identity
+    deploy_snapshot: deploy/identity
+    kustomize_name: knowledge-core-identity
+    artifact_group: go
+  - name: knowledge
+    source_path: services/knowledge
+    version_file: services/knowledge/VERSION
+    dockerfile: docker/knowledge/Dockerfile
+    context: .
+    image_repository: harbor.happyladysauce.local/knowledge-core/knowledge
+    deploy_snapshot: deploy/knowledge
+    kustomize_name: knowledge-core-knowledge
+    artifact_group: go
+  - name: attachment
+    source_path: services/attachment
+    version_file: services/attachment/VERSION
+    dockerfile: docker/attachment/Dockerfile
+    context: .
+    image_repository: harbor.happyladysauce.local/knowledge-core/attachment
+    deploy_snapshot: deploy/attachment
+    kustomize_name: knowledge-core-attachment
+    artifact_group: go
+  - name: platform
+    source_path: services/platform
+    version_file: services/platform/VERSION
+    dockerfile: docker/platform/Dockerfile
+    context: .
+    image_repository: harbor.happyladysauce.local/knowledge-core/platform
+    deploy_snapshot: deploy/platform
+    kustomize_name: knowledge-core-platform
+    artifact_group: go
+  - name: collaboration
+    source_path: services/collaboration
+    version_file: services/collaboration/VERSION
+    dockerfile: docker/collaboration/Dockerfile
+    context: .
+    image_repository: harbor.happyladysauce.local/knowledge-core/collaboration
+    deploy_snapshot: deploy/collaboration
+    kustomize_name: knowledge-core-collaboration
+    artifact_group: rust
