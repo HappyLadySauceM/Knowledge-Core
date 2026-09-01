@@ -73,8 +73,13 @@ func (c Config) Validate() error {
 		shutdownErr = fmt.Errorf("app.shutdown_timeout must be at least public_http.shutdown_timeout + admin_http.shutdown_timeout (%s)", drainBudget)
 	}
 	var endpointErr error
-	if c.PublicHTTP.TLS.Enabled != strings.HasPrefix(c.Endpoints.PublicBaseURL, "https://") {
-		endpointErr = errors.Join(endpointErr, errors.New("endpoints.public_base_url scheme must match public_http TLS"))
+	// PublicBaseURL is the externally advertised origin.  In Kubernetes the
+	// ingress (Higress) terminates public TLS while the Gateway Pod listens on
+	// plain HTTP, so an HTTPS public URL is valid even when the local listener
+	// has TLS disabled.  When Gateway terminates TLS itself, still require the
+	// advertised URL to use HTTPS.
+	if c.PublicHTTP.TLS.Enabled && !strings.HasPrefix(c.Endpoints.PublicBaseURL, "https://") {
+		endpointErr = errors.Join(endpointErr, errors.New("endpoints.public_base_url must use https when public_http TLS is enabled"))
 	}
 	if c.App.Environment != "development" && !strings.HasPrefix(c.Endpoints.CollaborationWebSocketBaseURL, "wss://") {
 		endpointErr = errors.Join(endpointErr, errors.New("production collaboration WebSocket URL must use wss"))

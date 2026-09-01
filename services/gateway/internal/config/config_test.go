@@ -29,6 +29,36 @@ func TestConfigValidate(t *testing.T) {
 	}
 }
 
+func TestConfigAllowsIngressTerminatedHTTPS(t *testing.T) {
+	keys, err := coreauth.GenerateKeyPair()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := New()
+	cfg.Auth.PublicKey = keys.PublicKey
+	cfg.Endpoints.PublicBaseURL = "https://gateway.example.com"
+	cfg.Endpoints.CollaborationWebSocketBaseURL = "wss://gateway.example.com"
+
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("Validate() rejected ingress-terminated HTTPS: %v", err)
+	}
+}
+
+func TestConfigRejectsHTTPPublicURLWhenGatewayTerminatesTLS(t *testing.T) {
+	keys, err := coreauth.GenerateKeyPair()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := New()
+	cfg.Auth.PublicKey = keys.PublicKey
+	cfg.PublicHTTP.TLS.Enabled = true
+	cfg.Endpoints.PublicBaseURL = "http://gateway.example.com"
+
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "must use https when public_http TLS is enabled") {
+		t.Fatalf("Validate() error = %v", err)
+	}
+}
+
 func TestRateLimitRequiresMillisecondWindow(t *testing.T) {
 	options := NewRateLimitOptions()
 	options.Window = time.Nanosecond

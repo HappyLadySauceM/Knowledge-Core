@@ -239,7 +239,7 @@ k3s 的项目 PostgreSQL database 为 `knowledge_core_dev`。Identity、Knowledg
 
 代码当前强制的生产约束包括：
 
-- Gateway 的公开 base URL 必须与 public listener TLS 一致；production 的 Collaboration RPC client 必须使用验证开启的双向 mTLS，公开协作地址必须为 `wss`。
+- Gateway 的公开 base URL 是外部访问地址；当 Higress 等可信 ingress 终止 TLS 时，允许使用 `https`/`wss` 的公开地址而由 Pod 内部以 HTTP 监听。若由 Gateway 自身终止 public listener TLS，则公开 base URL 必须使用 `https`。production 的 Collaboration RPC client 必须使用验证开启的双向 mTLS，公开协作地址必须为 `wss`。
 - Knowledge 的非 development 环境要求 Collaboration RPC 双向 mTLS，并禁止自动创建对象存储 bucket。
 - Collaboration production 要求非空精确 Origin、RPC 双向 mTLS、PostgreSQL 验证 TLS、`rediss`、Knowledge RPC 双向 mTLS，以及 NATS TLS。公开 WebSocket TLS 可由服务或明确信任的 ingress 终止。
 
