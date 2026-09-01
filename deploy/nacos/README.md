@@ -1,10 +1,13 @@
 # Nacos Application Configuration
 
-These plaintext files are complete non-sensitive `v1beta1/ApplicationConfig` development-baseline
-templates for the existing `<service>.dynamic.yaml` Data IDs. They are operational inputs, not
-Kubernetes resources. Values such as loopback endpoints are local-development defaults; replace
-startup-only addresses and service endpoints with the target environment's reviewed non-sensitive
-values before publishing. Secret-backed environment variables remain the highest-priority source.
+These plaintext files are complete non-sensitive `v1beta1/ApplicationConfig` templates for the
+development k3s environment and the existing `<service>.dynamic.yaml` Data IDs. They are
+operational inputs, not Kubernetes resources. Service-to-service dependencies use the target
+cluster's `*.svc.cluster.local` names; public HTTP/WebSocket URLs and CORS origins use the
+external application domain. For another namespace or cluster, copy the files and replace only
+the reviewed environment-specific Service FQDNs and public domain before publishing. Local
+Compose does not enable Nacos and continues to use `services/*/etc/config.yaml` plus environment
+overrides. Secret-backed environment variables remain the highest-priority source.
 
 Validate and encrypt a revision before publishing:
 

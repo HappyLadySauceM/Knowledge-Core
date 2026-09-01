@@ -9,5 +9,5 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
 data:
   PLATFORM_APP_ENVIRONMENT: development
-  PLATFORM_POSTGRES_HOST: postgresql.postgresql.svc.cluster.local
-  PLATFORM_NATS_SERVERS: nats://nats.nats.svc.cluster.local:4222
+  PLATFORM_POSTGRES_HOST: postgresql.infrastructure-dev.svc.cluster.local
+  PLATFORM_NATS_SERVERS: nats://nats.infrastructure-dev.svc.cluster.local:4222
