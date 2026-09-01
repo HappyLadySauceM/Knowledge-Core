@@ -89,7 +89,7 @@ func (w *Worker) Serve() (serveErr error) {
 	// Reconcile once on startup so a restart or a lost event cannot leave the
 	// process on an old last-good configuration indefinitely.
 	if err := w.reconcile(w.ctx); err != nil {
-		w.logger.WarnContext(w.ctx, "identity configuration startup reconciliation deferred", slog.String("error.type", fmt.Sprintf("%T", err)))
+		w.warnReconcile(w.ctx, "identity configuration startup reconciliation deferred", err)
 	}
 	ticker := time.NewTicker(60 * time.Second)
 	defer ticker.Stop()
@@ -100,10 +100,16 @@ func (w *Worker) Serve() (serveErr error) {
 			return nil
 		case <-ticker.C:
 			if err := w.reconcile(w.ctx); err != nil {
-				w.logger.WarnContext(w.ctx, "identity configuration reconciliation failed", slog.String("error.type", fmt.Sprintf("%T", err)))
+				w.warnReconcile(w.ctx, "identity configuration reconciliation failed", err)
 			}
 		}
 	}
+}
+
+func (w *Worker) warnReconcile(ctx context.Context, msg string, err error) {
+	// Log the cause so operators can tell SMTP, RPC, and parse failures apart.
+	// 把 cause 打出来，才能区分 SMTP、RPC 和解析失败。
+	w.logger.WarnContext(ctx, msg, slog.Any("error", err))
 }
 
 func (w *Worker) Ready(ctx context.Context) error {

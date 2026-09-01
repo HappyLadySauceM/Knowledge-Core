@@ -92,6 +92,137 @@ func TestEffectiveRequestTimeoutUsesCallerDeadlineAndConfiguration(t *testing.T)
 	}
 }
 
+func TestDurableSubscribeRetriesExclusiveBindUntilSuccess(t *testing.T) {
+	restoreExclusiveBindWait(t)
+	waitExclusiveBind = func(context.Context, time.Duration) error { return nil }
+
+	boundErr := errors.New("consumer is already bound to a subscription")
+	attempts := 0
+	js := &fakeJetStream{
+		subscribe: func(string, natsclient.MsgHandler, ...natsclient.SubOpt) (*natsclient.Subscription, error) {
+			attempts++
+			if attempts < 3 {
+				return nil, boundErr
+			}
+			return nil, nil
+		},
+	}
+	broker := newTestDurableBroker(js)
+	sub, err := broker.Subscribe(context.Background(), ConsumerConfig{
+		Stream:  "KNOWLEDGE_CORE_CONFIG",
+		Durable: "identity-email-config-v1",
+		Subject: "platform.config.changed.v1",
+	}, func(context.Context, *Delivery) {})
+	if err != nil {
+		t.Fatalf("Subscribe() error = %v", err)
+	}
+	if sub == nil {
+		t.Fatal("Subscribe() subscription = nil")
+	}
+	if attempts != 3 {
+		t.Fatalf("Subscribe() attempts = %d, want 3", attempts)
+	}
+}
+
+func TestDurableSubscribeDoesNotRetryOtherSubscribeErrors(t *testing.T) {
+	restoreExclusiveBindWait(t)
+	waitExclusiveBind = func(context.Context, time.Duration) error {
+		t.Fatal("waitExclusiveBind() called for a non-bind error")
+		return nil
+	}
+
+	wantErr := errors.New("stream not found")
+	attempts := 0
+	js := &fakeJetStream{
+		subscribe: func(string, natsclient.MsgHandler, ...natsclient.SubOpt) (*natsclient.Subscription, error) {
+			attempts++
+			return nil, wantErr
+		},
+	}
+	_, err := newTestDurableBroker(js).Subscribe(context.Background(), ConsumerConfig{
+		Stream:  "events",
+		Durable: "identity",
+		Subject: "identity.created",
+	}, func(context.Context, *Delivery) {})
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("Subscribe() error = %v, want %v", err, wantErr)
+	}
+	if attempts != 1 {
+		t.Fatalf("Subscribe() attempts = %d, want 1", attempts)
+	}
+}
+
+func TestDurableSubscribeDoesNotRetryQueueConsumerBindErrors(t *testing.T) {
+	restoreExclusiveBindWait(t)
+	waitExclusiveBind = func(context.Context, time.Duration) error {
+		t.Fatal("waitExclusiveBind() called for a queue subscription")
+		return nil
+	}
+
+	boundErr := errors.New("consumer is already bound to a subscription")
+	attempts := 0
+	js := &fakeJetStream{
+		queueSubscribe: func(string, string, natsclient.MsgHandler, ...natsclient.SubOpt) (*natsclient.Subscription, error) {
+			attempts++
+			return nil, boundErr
+		},
+	}
+	_, err := newTestDurableBroker(js).Subscribe(context.Background(), ConsumerConfig{
+		Stream:  "events",
+		Durable: "identity",
+		Queue:   "identity-workers",
+		Subject: "identity.created",
+	}, func(context.Context, *Delivery) {})
+	if !errors.Is(err, boundErr) {
+		t.Fatalf("Subscribe() error = %v, want %v", err, boundErr)
+	}
+	if attempts != 1 {
+		t.Fatalf("QueueSubscribe() attempts = %d, want 1", attempts)
+	}
+}
+
+func TestDurableSubscribeStopsExclusiveBindRetryWhenContextCanceled(t *testing.T) {
+	restoreExclusiveBindWait(t)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	waitExclusiveBind = func(context.Context, time.Duration) error {
+		cancel()
+		return context.Canceled
+	}
+	js := &fakeJetStream{
+		subscribe: func(string, natsclient.MsgHandler, ...natsclient.SubOpt) (*natsclient.Subscription, error) {
+			return nil, errors.New("consumer is already bound to a subscription")
+		},
+	}
+	_, err := newTestDurableBroker(js).Subscribe(ctx, ConsumerConfig{
+		Stream:  "events",
+		Durable: "identity",
+		Subject: "identity.created",
+	}, func(context.Context, *Delivery) {})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("Subscribe() error = %v, want context.Canceled", err)
+	}
+}
+
+func newTestDurableBroker(js *fakeJetStream) *DurableBroker {
+	return &DurableBroker{
+		conn: &natsclient.Conn{},
+		js:   js,
+		newJetStream: func(time.Duration) (jetStreamClient, error) {
+			return js, nil
+		},
+		logger:       slog.Default(),
+		timeout:      time.Second,
+		drainTimeout: time.Second,
+	}
+}
+
+func restoreExclusiveBindWait(t *testing.T) {
+	t.Helper()
+	original := waitExclusiveBind
+	t.Cleanup(func() { waitExclusiveBind = original })
+}
+
 func TestDurableSubscribePassesEffectiveMaxWait(t *testing.T) {
 	t.Parallel()
 	wantErr := errors.New("subscribe failed")
@@ -191,11 +322,13 @@ func TestEnsureStreamRejectsContractDrift(t *testing.T) {
 }
 
 type fakeJetStream struct {
-	accountInfo   func(...natsclient.JSOpt) (*natsclient.AccountInfo, error)
-	addStream     func(*natsclient.StreamConfig) (*natsclient.StreamInfo, error)
-	streamInfo    *natsclient.StreamInfo
-	streamInfoErr error
-	subscribeErr  error
+	accountInfo    func(...natsclient.JSOpt) (*natsclient.AccountInfo, error)
+	addStream      func(*natsclient.StreamConfig) (*natsclient.StreamInfo, error)
+	streamInfo     *natsclient.StreamInfo
+	streamInfoErr  error
+	subscribeErr   error
+	subscribe      func(string, natsclient.MsgHandler, ...natsclient.SubOpt) (*natsclient.Subscription, error)
+	queueSubscribe func(string, string, natsclient.MsgHandler, ...natsclient.SubOpt) (*natsclient.Subscription, error)
 }
 
 func (f *fakeJetStream) AccountInfo(opts ...natsclient.JSOpt) (*natsclient.AccountInfo, error) {
@@ -224,18 +357,24 @@ func (f *fakeJetStream) PublishMsg(*natsclient.Msg, ...natsclient.PubOpt) (*nats
 }
 
 func (f *fakeJetStream) Subscribe(
-	string,
-	natsclient.MsgHandler,
-	...natsclient.SubOpt,
+	subject string,
+	handler natsclient.MsgHandler,
+	opts ...natsclient.SubOpt,
 ) (*natsclient.Subscription, error) {
+	if f.subscribe != nil {
+		return f.subscribe(subject, handler, opts...)
+	}
 	return nil, f.subscribeErr
 }
 
 func (f *fakeJetStream) QueueSubscribe(
-	string,
-	string,
-	natsclient.MsgHandler,
-	...natsclient.SubOpt,
+	subject string,
+	queue string,
+	handler natsclient.MsgHandler,
+	opts ...natsclient.SubOpt,
 ) (*natsclient.Subscription, error) {
+	if f.queueSubscribe != nil {
+		return f.queueSubscribe(subject, queue, handler, opts...)
+	}
 	return nil, f.subscribeErr
 }

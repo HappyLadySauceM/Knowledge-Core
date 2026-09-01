@@ -189,6 +189,53 @@ func (b *DurableBroker) Publish(ctx context.Context, message Message, opts Publi
 	return nil
 }
 
+const exclusiveBindRetryTimeout = 45 * time.Second
+const exclusiveBindRetryCap = 8 * time.Second
+
+var waitExclusiveBind = waitExclusiveBindDefault
+
+func waitExclusiveBindDefault(ctx context.Context, delay time.Duration) error {
+	if ctx == nil {
+		return errors.New("wait exclusive nats consumer bind: context is required")
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if delay <= 0 {
+		return nil
+	}
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
+}
+
+func exclusiveBindRetryWait(attempt int) time.Duration {
+	if attempt < 1 {
+		attempt = 1
+	}
+	wait := time.Second << (attempt - 1)
+	if wait > exclusiveBindRetryCap {
+		return exclusiveBindRetryCap
+	}
+	return wait
+}
+
+func isExclusiveConsumerBoundError(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "already bound to a subscription")
+}
+
+func exclusiveBindRetryContext(ctx context.Context) (context.Context, context.CancelFunc) {
+	if _, hasDeadline := ctx.Deadline(); hasDeadline {
+		return ctx, func() {}
+	}
+	return context.WithTimeout(ctx, exclusiveBindRetryTimeout)
+}
+
 func (b *DurableBroker) Subscribe(ctx context.Context, cfg ConsumerConfig, handler Handler) (*Subscription, error) {
 	if b == nil || b.conn == nil || b.js == nil || b.newJetStream == nil {
 		return nil, errors.New("subscribe durable nats consumer: broker is closed")
@@ -239,7 +286,33 @@ func (b *DurableBroker) Subscribe(ctx context.Context, cfg ConsumerConfig, handl
 		subscribeErr error
 	)
 	if cfg.Queue == "" {
-		sub, subscribeErr = js.Subscribe(cfg.Subject, callback, opts...)
+		// Exclusive durables stay bound until the previous TCP session drops.
+		// Retry bind until the caller deadline, or 45s when the caller has none.
+		// 独占 durable 会一直占着旧 TCP 会话；在调用方 deadline 内重试绑定，
+		// 没有 deadline 时最多等 45 秒。
+		retryCtx, cancelRetry := exclusiveBindRetryContext(ctx)
+		defer cancelRetry()
+		for attempt := 0; ; attempt++ {
+			if err := retryCtx.Err(); err != nil {
+				cancelHandler()
+				return nil, fmt.Errorf("subscribe durable nats consumer %q: %w", cfg.Durable, err)
+			}
+			sub, subscribeErr = js.Subscribe(cfg.Subject, callback, opts...)
+			if subscribeErr == nil || !isExclusiveConsumerBoundError(subscribeErr) {
+				break
+			}
+			retry := attempt + 1
+			if b.logger != nil {
+				b.logger.WarnContext(retryCtx, "exclusive nats consumer is already bound; retrying subscribe",
+					slog.String("consumer", cfg.Durable),
+					slog.Int("retry", retry),
+				)
+			}
+			if waitErr := waitExclusiveBind(retryCtx, exclusiveBindRetryWait(retry)); waitErr != nil {
+				cancelHandler()
+				return nil, fmt.Errorf("subscribe durable nats consumer %q: %w", cfg.Durable, waitErr)
+			}
+		}
 	} else {
 		sub, subscribeErr = js.QueueSubscribe(cfg.Subject, cfg.Queue, callback, opts...)
 	}
@@ -260,6 +333,9 @@ func (b *DurableBroker) Subscribe(ctx context.Context, cfg ConsumerConfig, handl
 			fmt.Errorf("subscribe durable nats consumer %q: %w", cfg.Durable, ctxErr),
 			cleanupErr,
 		)
+	}
+	if sub == nil {
+		return newSubscription(nil, b.drainTimeout, cancelHandler), nil
 	}
 	return newSubscription(sub, b.drainTimeout, cancelHandler), nil
 }

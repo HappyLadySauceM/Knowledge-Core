@@ -37,7 +37,7 @@ Platform 是网页管理员可写业务配置的唯一数据所有者。当前 n
 - aggregate：`<environment>:<namespace>`，aggregate version 等于配置 revision
 - payload 仅含坐标、修订和快照摘要，不含配置值或敏感值
 
-发布失败按 1、2、4…秒指数退避，最多 8 次后进入 `parked`。管理员页面通过 `/deliveries/:revision` 展示 `pending`、`published` 或 `parked`；Platform 内部 RPC 还提供消费者精确 revision 快照、状态查询和应用回报。`GetConsumerState` 在 namespace 尚未写入时返回 `DesiredRevision=0` 的空闲状态，而不是 404。邮件消费者使用 durable 名称 `identity-email-config-v1`，启动和每 60 秒按 desired/applied 水位对账，SMTP 探测失败只保留 last-good 配置并按退避重试，达到上限后进入 dead-letter/parked。
+发布失败按 1、2、4…秒指数退避，最多 8 次后进入 `parked`。管理员页面通过 `/deliveries/:revision` 展示 `pending`、`published` 或 `parked`；Platform 内部 RPC 还提供消费者精确 revision 快照、状态查询和应用回报。`GetConsumerState` 在 namespace 尚未写入时返回 `DesiredRevision=0` 的空闲状态，而不是 404。邮件消费者使用 durable 名称 `identity-email-config-v1`。该 durable 是独占 push consumer：进程启动时若上一次 TCP 会话尚未从 JetStream 解绑，Subscribe 会在调用方 deadline（无 deadline 时最多 45 秒）内退避重试 `already bound`，而不是立刻让 Identity 退出。启动和每 60 秒按 desired/applied 水位对账，SMTP 探测失败只保留 last-good 配置并按退避重试，达到上限后进入 dead-letter/parked。对账失败的 WARN 必须带上 `error` cause，不能只打 `error.type`。
 
 ## 部署前置与验证边界
 

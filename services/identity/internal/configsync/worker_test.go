@@ -1,8 +1,11 @@
 package configsync
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"log/slog"
+	"strings"
 	"testing"
 	"time"
 
@@ -101,6 +104,26 @@ func spanNames(spans []sdktrace.ReadOnlySpan) []string {
 		names = append(names, span.Name())
 	}
 	return names
+}
+
+func TestWarnReconcileLogsErrorCause(t *testing.T) {
+	var output bytes.Buffer
+	worker := &Worker{
+		logger: slog.New(slog.NewJSONHandler(&output, nil)),
+		ctx:    context.Background(),
+	}
+	cause := errors.New("read identity configuration consumer state: rpc timeout")
+	worker.warnReconcile(context.Background(), "identity configuration reconciliation failed", cause)
+	logged := output.String()
+	if !strings.Contains(logged, "identity configuration reconciliation failed") {
+		t.Fatalf("log = %s, want reconcile message", logged)
+	}
+	if !strings.Contains(logged, "rpc timeout") {
+		t.Fatalf("log = %s, want error cause", logged)
+	}
+	if strings.Contains(logged, `"error.type"`) && !strings.Contains(logged, `"error"`) {
+		t.Fatalf("log = %s, still missing error cause field", logged)
+	}
 }
 
 func TestRetryDelayIsBounded(t *testing.T) {
