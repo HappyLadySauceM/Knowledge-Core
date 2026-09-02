@@ -178,6 +178,9 @@ jobs:
         with:
           name: knowledge-core-go-artifacts-${{ github.run_id }}-${{ github.run_attempt }}
           path: .ci-artifacts
+          # Dot-directories are hidden; v4 upload-artifact skips them by default.
+          # 以点号开头的目录会被视为隐藏文件，v4 upload-artifact 默认跳过。
+          include-hidden-files: true
           if-no-files-found: error
           retention-days: 7
 
@@ -229,6 +232,9 @@ jobs:
         with:
           name: knowledge-core-rust-artifacts-${{ github.run_id }}-${{ github.run_attempt }}
           path: .ci-artifacts
+          # Dot-directories are hidden; v4 upload-artifact skips them by default.
+          # 以点号开头的目录会被视为隐藏文件，v4 upload-artifact 默认跳过。
+          include-hidden-files: true
           if-no-files-found: error
           retention-days: 7
 
