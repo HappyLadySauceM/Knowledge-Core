@@ -227,11 +227,9 @@ npm run ci
 ```
 
 `.github/workflows/pipeline.yml` 负责构建与发布，配置集中在 `.ci/pipeline.yaml`，不再依赖
-宿主机路径或内联 JSON。`.github/workflows/feishu-notify.yml` 把流水线结论、PR、Issue 和
-Release 推到飞书自定义机器人，逻辑在组织 `ci-templates` 复合 Action；失败不会让
-`knowledge-core-pipeline` 变红。质量/部署任务使用 ARC 的 `hls-standard` runner，镜像构建使用带特权
-Docker-in-Docker 的 `hls-builder` runner；当前单节点 canary 的 builder 最多 1 个，standard
-池最多 4 个（各 8 CPU / 8Gi）。Go 依赖使用 goproxy.cn，Node 包使用 npmmirror，Runner 的外部 HTTP(S)
+宿主机路径或内联 JSON。pipeline 末尾 `notify` job 把流水线结论推到飞书；`.github/workflows/feishu-notify.yml`
+只覆盖 PR、Issue、Review 和 Release，逻辑在组织 `ci-templates` 复合 Action。质量/部署任务使用 ARC 的 `hls-standard` runner，镜像构建使用带特权
+Docker-in-Docker 的 `hls-builder` runner；当前最多 8 个 standard（request 2 CPU / 1Gi，limit 4 CPU / 4Gi）和 8 个 builder（DinD 4 CPU / 4Gi + runner 4 CPU / 1Gi）。Go 依赖使用 goproxy.cn，Node 包使用 npmmirror，Runner 的外部 HTTP(S)
 流量由集群环境注入的 sing-box 代理控制。Go/Rust 编译产物、变更计划和候选 digest 通过 GitHub Artifacts 在 job 间传递，
 候选镜像使用提交 SHA 标签，Smoke 通过后才由 Harbor API 提升为 `dev`；失败时执行 GitOps
 CAS 重试并回滚未通过 Smoke 的修订。runner 不挂载宿主机 Docker socket。Go/Cargo/npm/Playwright
