@@ -15,6 +15,10 @@ env:
   CI_PROJECT_CONFIG: .ci/pipeline.yaml
   BUILD_CPU_PERCENT: "75"
   NODE_USE_ENV_PROXY: "1"
+  GO111MODULE: "on"
+  GOPROXY: "https://goproxy.cn,direct"
+  NPM_CONFIG_REGISTRY: "https://registry.npmmirror.com"
+  COREPACK_NPM_REGISTRY: "https://registry.npmmirror.com"
 
 # Serialize releases for this project/branch while allowing the matrix jobs in
 # one run to consume all available ARC capacity.
@@ -134,8 +138,6 @@ jobs:
       cancel-in-progress: true
     env:
       KC_RUST_GATE: "0"
-      GO111MODULE: "on"
-      GOPROXY: "https://goproxy.cn,direct"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -221,7 +223,6 @@ jobs:
           mkdir -p .ci-artifacts
           make rust-release RUST_ARTIFACT_DIR=.ci-artifacts
           printf 'verified-rust\n' > .ci-artifacts/artifact-marker-rust.txt
-          python3 -c 'from pathlib import Path; p=Path("services/collaboration/interop/package-lock.json"); p.write_text(p.read_text().replace("https://registry.npmjs.org/", "https://registry.npmmirror.com/"))'
           npm --prefix services/collaboration/interop ci
           npm --prefix services/collaboration/interop run ci
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -305,7 +306,7 @@ jobs:
     environment: release
     strategy:
       fail-fast: false
-      max-parallel: 4
+      max-parallel: 1
       matrix:
         service: ${{ fromJSON(needs.plan.outputs.build_matrix) }}
     steps:
@@ -426,6 +427,15 @@ jobs:
           printf '%s' "$HARBOR_CA_PEM" > "$RUNNER_TEMP/release/ca.crt"
           printf '%s' "$K3S_RELEASE_KUBECONFIG" > "$RUNNER_TEMP/release/kubeconfig"
           test -s "$RUNNER_TEMP/release/config.json" && test -s "$RUNNER_TEMP/release/ca.crt" && test -s "$RUNNER_TEMP/release/kubeconfig"
+          api_server="$(kubectl config --kubeconfig "$RUNNER_TEMP/release/kubeconfig" view --minify -o jsonpath='{.clusters[0].cluster.server}')"
+          test "$api_server" = "https://kubernetes.default.svc:443" || {
+            echo "release kubeconfig must use the cluster-internal Kubernetes service, got: $api_server" >&2
+            exit 1
+          }
+          kubectl --kubeconfig "$RUNNER_TEMP/release/kubeconfig" version --request-timeout=10s
+          kubectl --kubeconfig "$RUNNER_TEMP/release/kubeconfig" auth can-i update applicationsets.argoproj.io/knowledge-core-services-dev -n argocd | grep -qx yes
+          kubectl --kubeconfig "$RUNNER_TEMP/release/kubeconfig" auth can-i update applications.argoproj.io/knowledge-core-gateway-dev -n argocd | grep -qx yes
+          kubectl --kubeconfig "$RUNNER_TEMP/release/kubeconfig" auth can-i get services/knowledge-core-gateway -n knowledge-core-dev | grep -qx yes
           if [[ -s /etc/ssl/certs/ca-certificates.crt ]]; then
             cat /etc/ssl/certs/ca-certificates.crt "$RUNNER_TEMP/release/ca.crt" > "$RUNNER_TEMP/release/ca-bundle.crt"
           else
