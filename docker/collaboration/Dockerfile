@@ -1,10 +1,12 @@
-ARG RUNTIME_BASE_IMAGE=harbor.happyladysauce.local/knowledge-core/base/debian:trixie-slim
+ARG RUNTIME_BASE_IMAGE=harbor.happyladysauce.local/knowledge-core/base/ubuntu:24.04
 FROM ${RUNTIME_BASE_IMAGE}
-# ARC runners are Ubuntu 24.04 (glibc 2.39). bookworm-slim only has glibc 2.36,
-# so a GNU-linked collaboration binary needs a newer runtime plus libssl3.
-# ARC runner 是 Ubuntu 24.04（glibc 2.39）。bookworm-slim 只有 glibc 2.36，
-# GNU 链接的 collaboration 二进制需要更新的运行时，并安装 libssl3。
-RUN apt-get update && apt-get install --yes --no-install-recommends ca-certificates libssl3 \
+# ARC runners and this runtime are Ubuntu 24.04 (glibc 2.39). nacos native-tls
+# still needs libssl3t64 at runtime.
+# ARC runner 与本运行时均为 Ubuntu 24.04（glibc 2.39）。nacos native-tls
+# 运行时仍需要 libssl3t64。
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends ca-certificates libssl3t64 \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --gid 10001 knowledge-core \
     && useradd --uid 10001 --gid knowledge-core --no-create-home --shell /usr/sbin/nologin knowledge-core

@@ -10,13 +10,14 @@
 
 <!-- fact:workflows.development status:verified sources:user-confirmed, user-confirmed-schema-v2-rerecord -->
 
-推送到 `dev` 会触发 ci-templates 提供的可复用 Python CI 控制镜像。所有受信任的发布任务均使用组织级 self-hosted runner 标签 `self-hosted`、`Linux`、`X64` 和 `devops`；系统 Docker 的清理仅限专用 Buildx 缓存和 runner 运行状态。控制镜像容器以当前 runner 的 UID/GID 运行（`docker run --user $(id -u):$(id -g)`，并提供可写 HOME）；Docker 配置挂载在 `/ci/docker` 而不是 `/root/.docker`；runner 缓存位于 `$GITHUB_WORKSPACE/../../_cache/knowledge-core`，Go 工具使用 `RUNNER_TOOL_CACHE`。宿主机 runner 通过 systemd 使用 sing-box HTTP 入站 `HTTP_PROXY=http://127.0.0.1:10991`，`NO_PROXY` 排除 Harbor、集群和 npmmirror，并设置 `NODE_USE_ENV_PROXY=1`，以便 Node 24 的 action（含 `create-github-app-token` 的 post）走该代理；`ci_run` 把这些变量传入控制镜像。构建和编译并行度默认使用 runner 有效 CPU（CPU 亲和性与 cgroup 配额）的 75%，可通过 `BUILD_CPU_PERCENT` 配置；`BUILD_JOBS` 仅作为有界的紧急覆盖。流水线运行 make ci，并在来自 npmmirror 的 Node 24.18.1 下运行 Collaboration 的 Node 互操作检查，且不恢复 GitHub Actions 的 npm 缓存；`npm audit` 使用 `https://registry.npmjs.org`，因为 npmmirror 尚未实现 security advisories API；检测受影响的服务；将固定版本的基础镜像预热到 Harbor；仅使用 Harbor 注册表缓存构建受影响的镜像；并在不执行镜像扫描或签名的情况下发布 dev 标签。替换前，当前 dev 镜像会保留为 previous。Knowledge-Core/deploy 是可编辑的部署源；CI 将其复制到 HappyLadySauceM/deploy 中的 Knowledge-Core/deploy 快照，更新根级镜像摘要，并通过带有有界重试的快进式比较并交换检查推送。仅修改部署的变更会跳过镜像构建，但仍执行部署校验、GitOps 同步、Argo 健康检查和 dev 冒烟测试，然后将 dev 提升到 main；代码变更执行完整镜像链路。若 Argo 或冒烟测试失败，CI 会以普通快进提交还原准确的 GitOps 快照提交，并将每个受影响镜像的 Harbor previous 标签恢复为 dev；若远程分支已移动，回滚会拒绝覆盖。成功后必须删除 previous 标签以供 Harbor 垃圾回收，清理失败会阻止发布。DeepSeek 发布摘要失败会阻止提升到 main。成功后，dev 会快进到 main，并创建一个聚合的 vMAJOR.MINOR.PATCH Git 标签和 GitHub Release，两者均指向准确的提升提交 SHA；Release 标题与版本标签相同。选择下一个补丁版本或重试已有带前缀标签的提交时，现有 knowledge-core-v* 标签仍计入。重试同一提交时会复用匹配的聚合标签和现有 Release，但拒绝指向其他提交的标签。共享历史绝不强制推送或变基。
+推送到 `dev` 会运行 `.github/workflows/pipeline.yml`，配置来自 `.ci/pipeline.yaml`，由 `ci-templates` 发布的 ARC runner 镜像执行；仓库内不内嵌 `ci_run` 控制镜像。质量/部署任务使用 `hls-standard`（非特权容器，8 CPU / 8Gi，min 1 max 4；namespace 配额 32 CPU / 32Gi）。standard namespace 的 Pod Security 为 privileged，只为让四个 runner 共用 hostPath `/var/lib/hls-ci-cache` 挂到 `/cache`（`CARGO_HOME`、`GOMODCACHE`、`GOCACHE`、`NPM_CONFIG_CACHE`、`PLAYWRIGHT_BROWSERS_PATH`、`RUNNER_TOOL_CACHE`）；不使用 GitHub Actions cache。镜像构建使用 `hls-builder`（特权 Docker-in-Docker 5Gi 加 runner 1Gi，min 0 max 1）。工作流 `max-parallel` 为 1。外部 HTTP(S) 经 `HTTP_PROXY`/`HTTPS_PROXY`=`http://10.42.0.1:10991`（standard、builder 与 `arc-system` 命名空间中的 `arc-proxy` Secret）；`NO_PROXY` 覆盖 localhost、回环、`.svc`、Kubernetes API、Harbor、Argo 与 `.happyladysauce.local`。仍设置 `NODE_USE_ENV_PROXY=1`，以便 Node 24 的 action（含 `create-github-app-token` 的 post）走该代理。Go 模块使用 `GOPROXY=https://goproxy.cn,direct`。Makefile 从 cgroup `cpu.max` / CFS quota 读取 `AVAILABLE_CPUS`（上限 8），并将 `BUILD_JOBS` 设为该值的 `BUILD_CPU_PERCENT`（默认 75%）；`BUILD_JOBS` 仍可作为显式紧急覆盖；golangci-lint 超时为 15m。Go/Rust 门禁的 artifact 上传需设置 `include-hidden-files`，因为 `.ci-artifacts` 是隐藏目录。六个服务镜像都使用 Harbor `ubuntu:24.04`（glibc 2.39，与 ARC runner 一致）。Go 镜像保持 `CGO_ENABLED=0` 并安装 `ca-certificates`（uid 65532）。Collaboration 复制预编译二进制，安装 `ca-certificates` 与 `libssl3t64`，若 `ldd` 报告缺库则镜像构建失败。流水线运行 `make ci`，并在来自 npmmirror 的 Node 24.18.1 下运行 Collaboration 的 Node 互操作检查，且不恢复 GitHub Actions 的 npm 缓存；`npm audit` 使用 `https://registry.npmjs.org`，因为 npmmirror 尚未实现 security advisories API；检测受影响的服务；由仅依赖 `plan` 的 `prewarm-base-images` 将钉死的 `ubuntu:24.04` 预热到 Harbor，从而与 Go/Rust 门禁并行；仅使用 Harbor 注册表缓存构建受影响的镜像；并在不执行镜像扫描或签名的情况下发布 `dev` 标签。替换前，当前 `dev` 镜像会保留为 `previous`。Knowledge-Core/deploy 是可编辑的部署源；CI 将其复制到 HappyLadySauceM/deploy 中的 Knowledge-Core/deploy 快照，更新根级镜像摘要，并使用 `knowledge-core-release` ServiceAccount 与集群内 `https://kubernetes.default.svc:443`，通过带有有界重试的快进式比较并交换检查推送。`deploy-release` 的 checkout 使用 `fetch-depth: 0`，以便 `origin/main` 祖先检查成功。仅修改部署的变更会跳过镜像构建，但仍执行部署校验、GitOps 同步、Argo 健康检查和 dev 冒烟测试，然后将 `dev` 提升到 `main`；代码变更执行完整镜像链路。若 Argo 或冒烟测试失败，CI 会以普通快进提交还原准确的 GitOps 快照提交，并将每个受影响镜像的 Harbor `previous` 标签恢复为 `dev`；若远程分支已移动，回滚会拒绝覆盖。成功后必须删除 `previous` 标签以供 Harbor 垃圾回收，清理失败会阻止发布。DeepSeek 发布摘要失败会阻止提升到 `main`。成功后，`dev` 会快进到 `main`，并创建一个聚合的 `vMAJOR.MINOR.PATCH` Git 标签和 GitHub Release，两者均指向准确的提升提交 SHA；Release 标题与版本标签相同。选择下一个补丁版本或重试已有带前缀标签的提交时，现有 knowledge-core-v* 标签仍计入。重试同一提交时会复用匹配的聚合标签和现有 Release，但拒绝指向其他提交的标签。共享历史绝不强制推送或变基。`release` environment 仅限 `dev`，并提供 `GH_APP_ID`、`GH_APP_PRIVATE_KEY`、kubeconfig 与 `DEEPSEEK_API_KEY`。
 
 <!-- fact:cicd.pipeline status:verified sources:.github/workflows/pipeline.yml, filesystem:ci-config, user-confirmed, user-confirmed-cicd-ratio-and-source-deploy-sync, user-confirmed-en-locale-source, user-confirmed-runner-migration -->
 
-每次变更后运行 make ci；它覆盖 check 和 generate-check，包括 Go 与 Rust 格式检查、vet/clippy、lint、非缓存测试、构建、漏洞/供应链检查以及生成文件漂移检查。涉及 Go 并发、goroutine、编排或生命周期的工作还需运行 make race。修改 Node 夹具时，在 services/collaboration/interop 下运行 npm ci && npm run ci。修改 IDL 时，还需重新生成、审查 wire/API 兼容性，并运行 go run ./scripts/idlguard compat-git <merge-base> idl。
+每次变更后运行 `make ci`；它覆盖 check 和 generate-check，包括 Go 与 Rust 格式检查、vet/clippy、lint、非缓存测试、构建、漏洞/供应链检查以及生成文件漂移检查。涉及 Go 并发、goroutine、编排或生命周期的工作还需运行 `make race`。修改 Node 夹具时，在 `services/collaboration/interop` 下运行 `npm ci && npm run ci`。修改 IDL 时，还需重新生成、审查 wire/API 兼容性，并运行 `go run ./scripts/idlguard compat-git <merge-base> idl`。
 
 <!-- fact:validation.definition-of-done status:verified sources:docs/migrations/2026-08-rust-collaboration.md#section, docs/rust-collaboration-design.md#7, AGENTS.md user-provided repository instructions, user-confirmed, user-confirmed-en-locale-source -->
+
 ## 附录
 
 ## `workflows.build`
@@ -51,42 +52,6 @@
 - **npm:format**: `{"command":"prettier --write .","source":"services/collaboration/interop/package.json"}`
 - **npm:format:check**: `{"command":"prettier --check .","source":"services/collaboration/interop/package.json"}`
 - **npm:generate:fixtures**: `{"command":"node ./generate-fixtures.mjs","source":"services/collaboration/interop/package.json"}`
-
-来源： `detected:project-scripts`
-
-## `workflows.scripts`
-
-状态：`verified`
-
-- **make:build**: `{"command":"make build","source":"Makefile"}`
-- **make:check**: `{"command":"make check","source":"Makefile"}`
-- **make:ci**: `{"command":"make ci","source":"Makefile"}`
-- **make:fmt**: `{"command":"make fmt","source":"Makefile"}`
-- **make:fmt-check**: `{"command":"make fmt-check","source":"Makefile"}`
-- **make:generate**: `{"command":"make generate","source":"Makefile"}`
-- **make:generate-check**: `{"command":"make generate-check","source":"Makefile"}`
-- **make:generate-go-check**: `{"command":"make generate-go-check","source":"Makefile"}`
-- **make:generate-rust-check**: `{"command":"make generate-rust-check","source":"Makefile"}`
-- **make:go-ci**: `{"command":"make go-ci","source":"Makefile"}`
-- **make:go-release**: `{"command":"make go-release","source":"Makefile"}`
-- **make:help**: `{"command":"make help","source":"Makefile"}`
-- **make:line**: `{"command":"make line","source":"Makefile"}`
-- **make:lint**: `{"command":"make lint","source":"Makefile"}`
-- **make:race**: `{"command":"make race","source":"Makefile"}`
-- **make:rust-ci**: `{"command":"make rust-ci","source":"Makefile"}`
-- **make:rust-release**: `{"command":"make rust-release","source":"Makefile"}`
-- **make:smoke-ci**: `{"command":"make smoke-ci","source":"Makefile"}`
-- **make:supply-chain**: `{"command":"make supply-chain","source":"Makefile"}`
-- **make:test**: `{"command":"make test","source":"Makefile"}`
-- **make:tidy**: `{"command":"make tidy","source":"Makefile"}`
-- **make:vet**: `{"command":"make vet","source":"Makefile"}`
-- **make:vuln**: `{"command":"make vuln","source":"Makefile"}`
-- **npm:audit**: `{"command":"npm audit --audit-level=high","source":"services/collaboration/interop/package.json"}`
-- **npm:ci**: `{"command":"npm run format:check && npm test && npm run audit","source":"services/collaboration/interop/package.json"}`
-- **npm:format**: `{"command":"prettier --write .","source":"services/collaboration/interop/package.json"}`
-- **npm:format:check**: `{"command":"prettier --check .","source":"services/collaboration/interop/package.json"}`
-- **npm:generate:fixtures**: `{"command":"node ./generate-fixtures.mjs","source":"services/collaboration/interop/package.json"}`
-- **npm:test**: `{"command":"node --test","source":"services/collaboration/interop/package.json"}`
 
 来源： `detected:project-scripts`
 

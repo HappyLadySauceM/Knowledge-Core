@@ -270,8 +270,8 @@ jobs:
           retention-days: 7
 
   prewarm-base-images:
-    needs: [plan, go-verify-build, rust-verify-build, release-notes]
-    if: always() && needs.plan.outputs.has_build_changes == 'true' && needs.go-verify-build.result == 'success' && (needs.rust-verify-build.result == 'success' || needs.rust-verify-build.result == 'skipped') && needs.release-notes.result == 'success'
+    needs: [plan]
+    if: needs.plan.outputs.has_build_changes == 'true'
     runs-on: hls-builder
     timeout-minutes: 20
     environment: release

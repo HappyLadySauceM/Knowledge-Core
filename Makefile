@@ -24,10 +24,10 @@ GOFLAGS ?= -mod=mod
 export GOFLAGS
 # Derive local/CI compile parallelism from effective CPUs (nproc capped by
 # cgroup quota), not the node's raw CPU count. ARC standard runners are
-# 1 CPU / 6Gi; nproc still sees the host and golangci-lint/cargo thrash.
+# 8 CPU / 8Gi; nproc still sees the host and golangci-lint/cargo thrash.
 # BUILD_JOBS remains an explicit emergency override.
 # 按有效 CPU（nproc 并被 cgroup 配额封顶）计算并行度，不用节点裸核心数。
-# ARC 标准池为 1 CPU / 6Gi；nproc 仍看到宿主机，golangci-lint/cargo 会过载。
+# ARC 标准池为 8 CPU / 8Gi；nproc 仍看到宿主机，golangci-lint/cargo 会过载。
 # BUILD_JOBS 仍可显式覆盖。
 BUILD_CPU_PERCENT ?= 75
 export BUILD_CPU_PERCENT

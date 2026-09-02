@@ -1,8 +1,8 @@
 version: "2"
 
 run:
-  # 1-CPU ARC runners need more than the default 5m even after GOMAXPROCS is capped.
-  # 限制 GOMAXPROCS 之后，1 CPU 的 ARC runner 仍可能超过默认 5 分钟。
+  # Keep a 15m budget after GOMAXPROCS follows the 8-CPU ARC cgroup.
+  # GOMAXPROCS 跟随 8 CPU ARC cgroup 后仍保留 15 分钟预算。
   timeout: 15m
   tests: true
 

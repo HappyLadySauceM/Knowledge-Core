@@ -280,9 +280,9 @@ Collaboration 收到信号后先 not-ready，再停止 RPC 与 WebSocket 接入�
 
 ## 11. 生成、验证与交付
 
-Collaboration production Dockerfile（`docker/collaboration/Dockerfile`）在镜像内执行
-`cargo build --locked --release`，再将二进制拷入无特权 runtime 层；不依赖宿主机预编译
-`.ci-artifacts`。
+Collaboration production Dockerfile（`docker/collaboration/Dockerfile`）把 standard runner
+上预编译的 `.ci-artifacts/collaboration` COPY 进 Ubuntu 24.04 运行时（`libssl3t64`），
+与 Go 服务同一 Harbor `ubuntu:24.04` 底；不在镜像内再跑 `cargo build`。
 
 IDL 源位于 `idl/http/v1` 和 `idl/rpc/v1`。生成工具固定为 Kitex `v0.16.2`、Hertz `v0.9.7`、thriftgo `0.4.5`；生成文件所有权以 `scripts/generated-files.txt` 为准。Gateway handler 和未列入清单的 route middleware 保持手写/混合所有权。
 
@@ -294,14 +294,16 @@ go run ./scripts/idlguard compat-git <merge-base> idl
 
 `make ci` 先执行 `go mod tidy` 并补齐缺失或过低的 CI 工具（本机更高版本直接接受），再执行 Go/Rust format、vet、golangci-lint、Clippy `-D warnings`、无缓存测试、release build、govulncheck、cargo-deny 和 Go/Rust 生成漂移检查。`make race`、`services/collaboration/interop` 的 `npm ci && npm run ci`、真实 PostgreSQL/Redis/NATS 测试以及 production image smoke 仍需按改动范围显式执行。真实依赖测试设置 `COLLABORATION_TEST_REQUIRE_REAL_DEPENDENCIES=1`；缺少任一连接变量时必须失败，不能静默 skip。
 
-开发交付只保留 `dev`，`main` 对开发者保持只读。`.github/workflows/pipeline.yml` 调用通用
-Python CI 控制镜像，依次执行质量门禁、变更服务镜像构建、GitOps deploy 快照提交、Argo CD
-健康检查和 dev 冒烟；镜像使用 Harbor registry cache，并在 runner 上复用稳定 Buildx builder
-`ci-templates`，使 Go（`kc-go-mod`/`kc-go-build`）与 Rust（`kc-cargo-*`）的 BuildKit cache
-mount 跨服务存活。编译并行度通过 `BUILD_JOBS` / BuildKit `max-parallelism` 限制为宿主机
-CPU 的四分之三。只维护 `dev`/`previous` 临时 tag，不执行镜像扫描或签名。Rust 门禁对 Rust、
-IDL、生成器、Makefile 和 workflow 变更启用，其他提交跳过 Rust 检查；`make ci` 不重复执行
-release 编译，最终镜像构建仍负责该编译。冒烟后由 DeepSeek 根据限长、脱敏的代码变更上下文
+开发交付只保留 `dev`，`main` 对开发者保持只读。`.github/workflows/pipeline.yml` 由
+`ci-templates` 发布的 ARC runner 镜像执行：质量/部署走 `hls-standard`，镜像构建走
+`hls-builder`（privileged DinD），依次做质量门禁、变更服务镜像构建、GitOps deploy
+快照提交、Argo CD 健康检查和 dev 冒烟；镜像使用 Harbor registry cache，并在 builder
+上复用稳定 Buildx builder `ci-templates`，使 Go（`kc-go-mod`/`kc-go-build`）与
+Rust（`kc-cargo-*`）的 BuildKit cache mount 跨服务存活。编译并行度通过 `BUILD_JOBS` / BuildKit `max-parallelism` 限制为
+cgroup 可见 CPU（`cpu.max` / CFS quota）的四分之三，ARC `hls-standard`（8 CPU）上约为 6。
+只维护 `dev`/`previous` 临时 tag，不执行镜像扫描或签名。Rust 门禁对 Rust、
+IDL、生成器、Makefile 和 workflow 变更启用，其他提交跳过 Rust 检查；`make rust-ci`
+不重复执行 release 编译，`make rust-release` 在 standard 上产出发运二进制，镜像构建只负责 COPY。冒烟后由 DeepSeek 根据限长、脱敏的代码变更上下文
 生成分层功能摘要：共享/CI/构建变更写入 Shared changes，服务业务路径变更才进入
 Service-specific changes；调用失败即停止。成功后仅 fast-forward `main`，并只创建一个
 `v*` 聚合 tag 与对应 GitHub Release（不再创建各服务独立 tag）。GitOps 与源码
@@ -318,7 +320,8 @@ digest。`deploy/` 是应用仓库部署模板的原样快照；`dev/<service>` 
 Nacos、NATS、MinIO、ClamAV 位于独立 namespace，PostgreSQL 和 Redis 复用现有服务；
 应用只使用项目级账号和前缀。
 
-k3s 不保存 CI cache/PVC 或构建镜像，只保留 Argo CD；其只读 repository Secret、AppProject 和
+k3s 不保存构建镜像；CI 依赖缓存在 CI 节点的 `/var/lib/hls-ci-cache`（hostPath），不使用
+GitHub Actions cache。集群只保留 Argo CD；其只读 repository Secret、AppProject 和
 ApplicationSet 由 GitOps 仓库声明。平台组件与六个应用服务各自拥有独立 Application，共享资源由
 两个 foundation Application 管理；Secret 使用独立 `ksops-v1.0` source。CI 更新统一镜像覆盖后，
 只等待受影响服务的 Application，再执行集群内冒烟。

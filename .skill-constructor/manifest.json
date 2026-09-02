@@ -324,7 +324,7 @@
     },
     {
       "id": "cicd.pipeline",
-      "revision": 154,
+      "revision": 157,
       "section": "workflows",
       "sources": [
         {
@@ -341,6 +341,10 @@
         },
         {
           "kind": "user",
+          "reference": "user-confirmed-4x8-hostpath-ubuntu-runtime"
+        },
+        {
+          "kind": "user",
           "reference": "user-confirmed-cicd-ratio-and-source-deploy-sync"
         },
         {
@@ -353,8 +357,8 @@
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-08-31T06:03:25Z",
-      "value": "Pushes to `dev` trigger the reusable Python CI control image from ci-templates. All trusted release jobs use the organization self-hosted runner labels `self-hosted`, `Linux`, `X64`, and `devops`; system Docker cleanup is limited to the dedicated Buildx cache and runner state. Control-image containers run as the current runner UID and GID (`docker run --user $(id -u):$(id -g)` with a writable HOME); Docker config is mounted at `/ci/docker` rather than `/root/.docker`; runner cache is `$GITHUB_WORKSPACE/../../_cache/knowledge-core` and Go tools use `RUNNER_TOOL_CACHE`. The host runner uses systemd `HTTP_PROXY=http://127.0.0.1:10991` (sing-box HTTP inbound) with `NO_PROXY` for Harbor, cluster, and npmmirror, and `NODE_USE_ENV_PROXY=1` so Node 24 actions including `create-github-app-token` post honor that proxy; `ci_run` forwards those variables into the control image. Build and compile parallelism defaults to 75% of effective runner CPUs (affinity and cgroup quota), configurable with `BUILD_CPU_PERCENT`; `BUILD_JOBS` is only a bounded emergency override. The pipeline runs `make ci` and Collaboration Node interop checks on Node 24.18.1 from npmmirror, without GitHub Actions npm cache restore; `npm audit` uses `https://registry.npmjs.org` because npmmirror does not implement the security advisories API; detects affected services; warms pinned base images into Harbor; builds affected images using only the Harbor registry cache; and publishes the `dev` tag without image scanning or signing. The current `dev` image is kept as `previous` before replacement. Knowledge-Core/deploy is the editable deploy source; CI copies it to the Knowledge-Core/deploy snapshot in HappyLadySauceM/deploy, updates root image digests, and pushes with a fast-forward compare-and-swap check and bounded retry. Deploy-only changes skip image builds but run deployment validation, GitOps synchronization, Argo health, and dev smoke before promoting `dev` to `main`; code changes run the complete image chain. If Argo or smoke fails, CI restores the exact GitOps snapshot commit with an ordinary fast-forward and moves each affected Harbor `previous` tag back to `dev`; rollback refuses to overwrite if the remote branch moved. After success, `previous` tags must be deleted for Harbor GC; cleanup failure blocks release. DeepSeek release summary failure blocks promotion to `main`. On success, `dev` fast-forwards to `main` and creates one aggregate `vMAJOR.MINOR.PATCH` Git tag and GitHub Release, both pointing at the exact promotion commit SHA; the Release title matches the version tag. Existing knowledge-core-v* tags still count when choosing the next patch or retrying a prefixed tagged commit. Retrying the same commit reuses the matching aggregate tag and existing Release, but rejects a tag that points at another commit. Shared history is never force-pushed or rebased."
+      "updatedAt": "2026-09-02T10:37:17Z",
+      "value": "Pushes to `dev` run `.github/workflows/pipeline.yml` from `.ci/pipeline.yaml` on the `ci-templates` ARC runner image; the repository does not ship an in-repo `ci_run` control image. Quality and deploy jobs use `hls-standard` (non-privileged containers, 8 CPU / 8Gi, min 1 max 4; namespace quota 32 CPU / 32Gi). The standard namespace is Pod Security privileged only so four runners can share hostPath `/var/lib/hls-ci-cache` at `/cache` (`CARGO_HOME`, `GOMODCACHE`, `GOCACHE`, `NPM_CONFIG_CACHE`, `PLAYWRIGHT_BROWSERS_PATH`, `RUNNER_TOOL_CACHE`); GitHub Actions cache is not used. Image builds use `hls-builder` (privileged Docker-in-Docker 5Gi plus runner 1Gi, min 0 max 1). Workflow `max-parallel` is 1. External HTTP(S) uses `HTTP_PROXY`/`HTTPS_PROXY`=`http://10.42.0.1:10991` from the `arc-proxy` Secret in the standard, builder, and `arc-system` namespaces; `NO_PROXY` covers localhost, loopbacks, `.svc`, the Kubernetes API, Harbor, Argo, and `.happyladysauce.local`. `NODE_USE_ENV_PROXY=1` remains so Node 24 actions including `create-github-app-token` post honor that proxy. Go modules use `GOPROXY=https://goproxy.cn,direct`. The Makefile sets `AVAILABLE_CPUS` from cgroup `cpu.max` / CFS quota (capped at 8) and `BUILD_JOBS` to `BUILD_CPU_PERCENT` (default 75%) of that value; `BUILD_JOBS` remains an explicit emergency override; golangci-lint timeout is 15m. Go/Rust gate artifact uploads set `include-hidden-files` because `.ci-artifacts` is a hidden directory. All six service images use Harbor `ubuntu:24.04` (glibc 2.39, matching ARC runners). Go images stay `CGO_ENABLED=0` and add `ca-certificates` (uid 65532). Collaboration copies the prebuilt binary, adds `ca-certificates` plus `libssl3t64`, and fails the image build if `ldd` reports missing libraries. The pipeline runs `make ci` and Collaboration Node interop checks on Node 24.18.1 from npmmirror, without GitHub Actions npm cache restore; `npm audit` uses `https://registry.npmjs.org` because npmmirror does not implement the security advisories API; detects affected services; warms pinned `ubuntu:24.04` into Harbor in `prewarm-base-images` which needs only `plan` so it runs beside the Go/Rust gates; builds affected images using only the Harbor registry cache; and publishes the `dev` tag without image scanning or signing. The current `dev` image is kept as `previous` before replacement. Knowledge-Core/deploy is the editable deploy source; CI copies it to the Knowledge-Core/deploy snapshot in HappyLadySauceM/deploy, updates root image digests, and pushes with a fast-forward compare-and-swap check and bounded retry using the `knowledge-core-release` ServiceAccount and in-cluster `https://kubernetes.default.svc:443`. `deploy-release` checkouts use `fetch-depth: 0` so `origin/main` ancestry checks succeed. Deploy-only changes skip image builds but run deployment validation, GitOps synchronization, Argo health, and dev smoke before promoting `dev` to `main`; code changes run the complete image chain. If Argo or smoke fails, CI restores the exact GitOps snapshot commit with an ordinary fast-forward and moves each affected Harbor `previous` tag back to `dev`; rollback refuses to overwrite if the remote branch moved. After success, `previous` tags must be deleted for Harbor GC; cleanup failure blocks release. DeepSeek release summary failure blocks promotion to `main`. On success, `dev` fast-forwards to `main` and creates one aggregate `vMAJOR.MINOR.PATCH` Git tag and GitHub Release, both pointing at the exact promotion commit SHA; the Release title matches the version tag. Existing knowledge-core-v* tags still count when choosing the next patch or retrying a prefixed tagged commit. Retrying the same commit reuses the matching aggregate tag and existing Release, but rejects a tag that points at another commit. Shared history is never force-pushed or rebased. The `release` environment is limited to `dev` and supplies `GH_APP_ID`, `GH_APP_PRIVATE_KEY`, kubeconfig, and `DEEPSEEK_API_KEY`."
     },
     {
       "id": "constraints.project",
@@ -536,7 +540,7 @@
     },
     {
       "id": "environment.setup",
-      "revision": 154,
+      "revision": 157,
       "section": "environment",
       "sources": [
         {
@@ -553,12 +557,16 @@
         },
         {
           "kind": "user",
+          "reference": "user-confirmed-4x8-hostpath-ubuntu-runtime"
+        },
+        {
+          "kind": "user",
           "reference": "user-confirmed-en-locale-source"
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-08-31T06:03:25Z",
-      "value": "The project contains one Go module and a Rust workspace under services/collaboration. Use the repository-pinned generators (Kitex 0.16.2, hz 0.9.7 via `hz update` only, thriftgo 0.4.5) and rustc 1.97.1 from rust-toolchain.toml. Collaboration interop fixtures require Node.js >= 24.18.1 and `npm ci`; package tarballs use npmmirror via `services/collaboration/interop/.npmrc`, while `npm audit` uses `https://registry.npmjs.org` because npmmirror does not implement the security advisories API. Inject all non-public configuration through environment variables or the deploy platform's secret store; never store secret values in repository configuration."
+      "updatedAt": "2026-09-02T10:37:17Z",
+      "value": "The project contains one Go module and a Rust workspace under services/collaboration. Use the repository-pinned generators (Kitex 0.16.2, hz 0.9.7 via `hz update` only, thriftgo 0.4.5) and rustc 1.97.1 from rust-toolchain.toml. Collaboration interop fixtures require Node.js >= 24.18.1 and `npm ci`; package tarballs use npmmirror via `services/collaboration/interop/.npmrc`, while `npm audit` uses `https://registry.npmjs.org` because npmmirror does not implement the security advisories API. ARC runners share node-local language caches at `/cache` (hostPath `/var/lib/hls-ci-cache`, uid 1001); do not enable GitHub Actions cache. Inject all non-public configuration through environment variables or the deploy platform's secret store; never store secret values in repository configuration."
     },
     {
       "id": "environment.toolchains",
@@ -607,21 +615,21 @@
     },
     {
       "id": "security.secrets-and-config",
-      "revision": 145,
+      "revision": 158,
       "section": "conventions",
       "sources": [
         {
-          "detail": "evidence-sha256:e8f167795223e0edf2b7118560608a89586aacac3c2c6082bee0132c3d07be0d",
+          "detail": "evidence-sha256:2712882d19ca5638edc21b255c0fdf1952b55447dc66d831ea9673d4358e169c",
           "kind": "documented",
           "reference": "README.md#compose"
         },
         {
-          "detail": "evidence-sha256:e8f167795223e0edf2b7118560608a89586aacac3c2c6082bee0132c3d07be0d",
+          "detail": "evidence-sha256:2712882d19ca5638edc21b255c0fdf1952b55447dc66d831ea9673d4358e169c",
           "kind": "documented",
           "reference": "README.md#k3s-gitops"
         },
         {
-          "detail": "evidence-sha256:e8f167795223e0edf2b7118560608a89586aacac3c2c6082bee0132c3d07be0d",
+          "detail": "evidence-sha256:2712882d19ca5638edc21b255c0fdf1952b55447dc66d831ea9673d4358e169c",
           "kind": "documented",
           "reference": "README.md#section"
         },
@@ -631,7 +639,7 @@
           "reference": "deploy/base/README.md#application-deployment-base"
         },
         {
-          "detail": "evidence-sha256:e8f167795223e0edf2b7118560608a89586aacac3c2c6082bee0132c3d07be0d",
+          "detail": "evidence-sha256:2712882d19ca5638edc21b255c0fdf1952b55447dc66d831ea9673d4358e169c",
           "kind": "documented",
           "reference": "deploy/nacos/README.md#nacos-application-configuration"
         },
@@ -641,47 +649,47 @@
           "reference": "deploy/overlay/dev/README.md#development-overlay"
         },
         {
-          "detail": "evidence-sha256:e8f167795223e0edf2b7118560608a89586aacac3c2c6082bee0132c3d07be0d",
+          "detail": "evidence-sha256:2712882d19ca5638edc21b255c0fdf1952b55447dc66d831ea9673d4358e169c",
           "kind": "documented",
           "reference": "docs/framework-design.md#11"
         },
         {
-          "detail": "evidence-sha256:e8f167795223e0edf2b7118560608a89586aacac3c2c6082bee0132c3d07be0d",
+          "detail": "evidence-sha256:2712882d19ca5638edc21b255c0fdf1952b55447dc66d831ea9673d4358e169c",
           "kind": "documented",
           "reference": "docs/framework-design.md#12"
         },
         {
-          "detail": "evidence-sha256:e8f167795223e0edf2b7118560608a89586aacac3c2c6082bee0132c3d07be0d",
+          "detail": "evidence-sha256:2712882d19ca5638edc21b255c0fdf1952b55447dc66d831ea9673d4358e169c",
           "kind": "documented",
           "reference": "docs/framework-design.md#8-secret-tls"
         },
         {
-          "detail": "evidence-sha256:e8f167795223e0edf2b7118560608a89586aacac3c2c6082bee0132c3d07be0d",
+          "detail": "evidence-sha256:2712882d19ca5638edc21b255c0fdf1952b55447dc66d831ea9673d4358e169c",
           "kind": "documented",
           "reference": "docs/migrations/2026-08-auth-productionization.md#section"
         },
         {
-          "detail": "evidence-sha256:e8f167795223e0edf2b7118560608a89586aacac3c2c6082bee0132c3d07be0d",
+          "detail": "evidence-sha256:2712882d19ca5638edc21b255c0fdf1952b55447dc66d831ea9673d4358e169c",
           "kind": "documented",
           "reference": "docs/migrations/2026-08-platform-configuration.md#platform-configuration-migration"
         },
         {
-          "detail": "evidence-sha256:e8f167795223e0edf2b7118560608a89586aacac3c2c6082bee0132c3d07be0d",
+          "detail": "evidence-sha256:2712882d19ca5638edc21b255c0fdf1952b55447dc66d831ea9673d4358e169c",
           "kind": "documented",
           "reference": "docs/platform-configuration.md#section"
         },
         {
-          "detail": "evidence-sha256:e8f167795223e0edf2b7118560608a89586aacac3c2c6082bee0132c3d07be0d",
+          "detail": "evidence-sha256:2712882d19ca5638edc21b255c0fdf1952b55447dc66d831ea9673d4358e169c",
           "kind": "documented",
           "reference": "docs/rust-collaboration-design.md#2-1"
         },
         {
-          "detail": "evidence-sha256:e8f167795223e0edf2b7118560608a89586aacac3c2c6082bee0132c3d07be0d",
+          "detail": "evidence-sha256:2712882d19ca5638edc21b255c0fdf1952b55447dc66d831ea9673d4358e169c",
           "kind": "documented",
           "reference": "docs/rust-collaboration-design.md#7"
         },
         {
-          "detail": "evidence-sha256:e8f167795223e0edf2b7118560608a89586aacac3c2c6082bee0132c3d07be0d",
+          "detail": "evidence-sha256:2712882d19ca5638edc21b255c0fdf1952b55447dc66d831ea9673d4358e169c",
           "kind": "documented",
           "reference": "docs/trace-architecture.md#7-collector-tempo"
         },
@@ -699,7 +707,7 @@
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-08-30T08:48:41Z",
+      "updatedAt": "2026-09-02T10:39:34Z",
       "value": "Secrets may be injected only from environment variables, Kubernetes Secrets, or SOPS-encrypted GitOps manifests. Sensitive values must not be stored in plaintext in source, configuration, logs, metrics, trace spans, or release metadata."
     },
     {
@@ -1034,11 +1042,11 @@
     "profile": "generic",
     "slug": "knowledge-core"
   },
-  "revision": 154,
+  "revision": 158,
   "scan": {
-    "fingerprint": "7de6c67794c77428fad6ecabcc75839b1bbbef9bca271b64241658ac701f1282",
-    "inventoryCount": 436
+    "fingerprint": "b369f5b995de84689f3d9fd39c1f4e1ada1d19715d5ae412c971f621f2e89506",
+    "inventoryCount": 437
   },
   "schemaVersion": 3,
-  "updatedAt": "2026-08-31T06:03:25Z"
+  "updatedAt": "2026-09-02T10:39:34Z"
 }
