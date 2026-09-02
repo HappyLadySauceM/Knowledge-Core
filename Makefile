@@ -22,16 +22,39 @@ KC_RUST_GATE ?= 1
 # CI 中以 go.mod/go.sum 为准，避免旧 vendor/modules.txt 阻断验证流水线。
 GOFLAGS ?= -mod=mod
 export GOFLAGS
-# Derive local/CI compile parallelism from the effective CPU count instead of
-# pinning a machine-specific number. BUILD_JOBS remains an explicit emergency
-# override for callers that need one bounded worker count.
-# 按可用 CPU 比例计算本地/CI 编译并行度，不绑定机器核心数；BUILD_JOBS
-# 仅作为需要固定并行 worker 数时的显式覆盖。
+# Derive local/CI compile parallelism from effective CPUs (nproc capped by
+# cgroup quota), not the node's raw CPU count. ARC standard runners are
+# 1 CPU / 6Gi; nproc still sees the host and golangci-lint/cargo thrash.
+# BUILD_JOBS remains an explicit emergency override.
+# 按有效 CPU（nproc 并被 cgroup 配额封顶）计算并行度，不用节点裸核心数。
+# ARC 标准池为 1 CPU / 6Gi；nproc 仍看到宿主机，golangci-lint/cargo 会过载。
+# BUILD_JOBS 仍可显式覆盖。
 BUILD_CPU_PERCENT ?= 75
+export BUILD_CPU_PERCENT
 ifeq ($(shell test "$(BUILD_CPU_PERCENT)" -ge 1 2>/dev/null && test "$(BUILD_CPU_PERCENT)" -le 100 2>/dev/null && echo valid),)
 $(error BUILD_CPU_PERCENT must be an integer from 1 to 100)
 endif
-BUILD_JOBS ?= $(shell nproc 2>/dev/null | awk -v p="$(BUILD_CPU_PERCENT)" '{v=int(($$1*p)/100); if (v<1) v=1; print v}')
+AVAILABLE_CPUS ?= $(shell \
+	n=$$(nproc 2>/dev/null || echo 1); \
+	quota_cpus=""; \
+	if [ -r /sys/fs/cgroup/cpu.max ]; then \
+		quota=$$(awk '{print $$1}' /sys/fs/cgroup/cpu.max); \
+		period=$$(awk '{print $$2}' /sys/fs/cgroup/cpu.max); \
+		if [ "$$quota" != "max" ] && [ -n "$$period" ] && [ "$$period" -gt 0 ] 2>/dev/null; then \
+			quota_cpus=$$((quota / period)); \
+			if [ "$$quota_cpus" -lt 1 ]; then quota_cpus=1; fi; \
+		fi; \
+	elif [ -r /sys/fs/cgroup/cpu/cpu.cfs_quota_us ] && [ -r /sys/fs/cgroup/cpu/cpu.cfs_period_us ]; then \
+		quota=$$(cat /sys/fs/cgroup/cpu/cpu.cfs_quota_us); \
+		period=$$(cat /sys/fs/cgroup/cpu/cpu.cfs_period_us); \
+		if [ "$$quota" -gt 0 ] && [ "$$period" -gt 0 ]; then \
+			quota_cpus=$$((quota / period)); \
+			if [ "$$quota_cpus" -lt 1 ]; then quota_cpus=1; fi; \
+		fi; \
+	fi; \
+	if [ -n "$$quota_cpus" ] && [ "$$quota_cpus" -lt "$$n" ]; then n=$$quota_cpus; fi; \
+	echo $$n)
+BUILD_JOBS ?= $(shell echo $(AVAILABLE_CPUS) | awk -v p="$(BUILD_CPU_PERCENT)" '{v=int(($$1*p)/100); if (v<1) v=1; print v}')
 GO_RELEASE_SERVICES ?= gateway identity knowledge attachment platform
 GO_ARTIFACT_DIR ?= .ci-artifacts
 RUST_ARTIFACT_DIR ?= .ci-artifacts

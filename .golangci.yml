@@ -1,7 +1,9 @@
 version: "2"
 
 run:
-  timeout: 5m
+  # 1-CPU ARC runners need more than the default 5m even after GOMAXPROCS is capped.
+  # 限制 GOMAXPROCS 之后，1 CPU 的 ARC runner 仍可能超过默认 5 分钟。
+  timeout: 15m
   tests: true
 
 linters:

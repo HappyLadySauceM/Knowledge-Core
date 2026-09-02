@@ -132,7 +132,7 @@ jobs:
     needs: plan
     if: needs.plan.outputs.has_build_changes == 'true'
     runs-on: hls-standard
-    timeout-minutes: 30
+    timeout-minutes: 45
     concurrency:
       group: ${{ github.repository }}-${{ github.workflow }}-go-${{ github.ref }}
       cancel-in-progress: true
@@ -187,7 +187,7 @@ jobs:
     needs: plan
     if: needs.plan.outputs.has_build_changes == 'true' && needs.plan.outputs.rust_required == 'true'
     runs-on: hls-standard
-    timeout-minutes: 35
+    timeout-minutes: 50
     concurrency:
       group: ${{ github.repository }}-${{ github.workflow }}-rust-${{ github.ref }}
       cancel-in-progress: true
