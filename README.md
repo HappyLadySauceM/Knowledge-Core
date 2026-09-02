@@ -226,8 +226,10 @@ npm ci
 npm run ci
 ```
 
-`.github/workflows/pipeline.yml` 是唯一项目 workflow，配置集中在 `.ci/pipeline.yaml`，不再依赖
-宿主机路径或内联 JSON。质量/部署任务使用 ARC 的 `hls-standard` runner，镜像构建使用带特权
+`.github/workflows/pipeline.yml` 负责构建与发布，配置集中在 `.ci/pipeline.yaml`，不再依赖
+宿主机路径或内联 JSON。`.github/workflows/feishu-notify.yml` 把流水线结论、PR、Issue 和
+Release 推到飞书自定义机器人，逻辑在组织 `ci-templates` 复合 Action；失败不会让
+`knowledge-core-pipeline` 变红。质量/部署任务使用 ARC 的 `hls-standard` runner，镜像构建使用带特权
 Docker-in-Docker 的 `hls-builder` runner；当前单节点 canary 的 builder 最多 1 个，standard
 池最多 4 个（各 8 CPU / 8Gi）。Go 依赖使用 goproxy.cn，Node 包使用 npmmirror，Runner 的外部 HTTP(S)
 流量由集群环境注入的 sing-box 代理控制。Go/Rust 编译产物、变更计划和候选 digest 通过 GitHub Artifacts 在 job 间传递，
@@ -239,7 +241,9 @@ CAS 重试并回滚未通过 Smoke 的修订。runner 不挂载宿主机 Docker 
 仓库 Actions Secret 只提供 `HARBOR_DOCKER_CONFIG_JSON` 与 `HARBOR_CA_PEM`。`release` environment
 只允许 `dev`，并提供 `GH_APP_ID`、`GH_APP_PRIVATE_KEY`、使用
 `https://kubernetes.default.svc:443` 的 `K3S_RELEASE_KUBECONFIG` 与
-`DEEPSEEK_API_KEY`；Secret 不得写入 workflow、项目配置或日志。
+`DEEPSEEK_API_KEY`。飞书 webhook 与签名密钥是组织 Actions secrets
+`FEISHU_WEBHOOK_URL` / `FEISHU_WEBHOOK_SECRET`，不放进 `release` environment。
+Secret 不得写入 workflow、项目配置或日志。
 
 ## k3s 与 GitOps
 
