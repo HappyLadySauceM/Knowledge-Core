@@ -98,6 +98,8 @@ jobs:
     if: needs.plan.outputs.deploy_changed == 'true'
     runs-on: hls-standard
     timeout-minutes: 15
+    env:
+      GOFLAGS: -mod=mod
     concurrency:
       group: ${{ github.repository }}-${{ github.workflow }}-deploy-verify-${{ github.ref }}
       cancel-in-progress: true
