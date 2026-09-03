@@ -38,7 +38,7 @@ jobs:
       contents: read
     steps:
       - name: Mark Feishu pipeline task in progress
-        uses: HappyLadySauceM/ci-templates/.github/actions/feishu-pipeline-task@dba16f4200c0276b3685dfa889a62fa77d64df9a
+        uses: HappyLadySauceM/ci-templates/.github/actions/feishu-pipeline-task@0afa6fd5c6a58c2ad4529d02920afeefe2ec039e
         with:
           operation: sync
           phase: in_progress
@@ -762,7 +762,7 @@ jobs:
       - name: Mark Feishu pipeline task complete
         if: vars.FEISHU_TASK_TRACKER_ENABLED == 'true'
         continue-on-error: true
-        uses: HappyLadySauceM/ci-templates/.github/actions/feishu-pipeline-task@dba16f4200c0276b3685dfa889a62fa77d64df9a
+        uses: HappyLadySauceM/ci-templates/.github/actions/feishu-pipeline-task@0afa6fd5c6a58c2ad4529d02920afeefe2ec039e
         with:
           operation: sync
           phase: completed
