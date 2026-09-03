@@ -92,8 +92,12 @@ jobs:
           } >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: knowledge-core-plan-${{ github.run_id }}-${{ github.run_attempt }}
+          # Keep names stable within one run so rerun-failed can reuse artifacts
+          # produced by jobs that were already successful in an earlier attempt.
+          # 在同一 run 内保持名称稳定，让 rerun-failed 可以复用前一次成功作业的产物。
+          name: knowledge-core-plan-${{ github.run_id }}
           path: changes.json
+          overwrite: true
           if-no-files-found: error
           retention-days: 7
 
@@ -176,8 +180,9 @@ jobs:
           printf 'verified-go\n' > .ci-artifacts/artifact-marker-go.txt
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: knowledge-core-go-artifacts-${{ github.run_id }}-${{ github.run_attempt }}
+          name: knowledge-core-go-artifacts-${{ github.run_id }}
           path: .ci-artifacts
+          overwrite: true
           # Dot-directories are hidden; v4 upload-artifact skips them by default.
           # 以点号开头的目录会被视为隐藏文件，v4 upload-artifact 默认跳过。
           include-hidden-files: true
@@ -230,8 +235,9 @@ jobs:
           npm --prefix services/collaboration/interop run ci
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: knowledge-core-rust-artifacts-${{ github.run_id }}-${{ github.run_attempt }}
+          name: knowledge-core-rust-artifacts-${{ github.run_id }}
           path: .ci-artifacts
+          overwrite: true
           # Dot-directories are hidden; v4 upload-artifact skips them by default.
           # 以点号开头的目录会被视为隐藏文件，v4 upload-artifact 默认跳过。
           include-hidden-files: true
@@ -254,7 +260,7 @@ jobs:
           fetch-tags: true
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          name: knowledge-core-plan-${{ github.run_id }}-${{ github.run_attempt }}
+          name: knowledge-core-plan-${{ github.run_id }}
       - name: Generate one release summary
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
@@ -265,8 +271,9 @@ jobs:
           ci-templates summarize --config "$CI_PROJECT_CONFIG" --services "$SERVICES" --changes-file changes.json --output release.md
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: knowledge-core-release-notes-${{ github.run_id }}-${{ github.run_attempt }}
+          name: knowledge-core-release-notes-${{ github.run_id }}
           path: release.md
+          overwrite: true
           if-no-files-found: error
           retention-days: 7
 
@@ -322,12 +329,12 @@ jobs:
           fetch-depth: 1
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          name: knowledge-core-go-artifacts-${{ github.run_id }}-${{ github.run_attempt }}
+          name: knowledge-core-go-artifacts-${{ github.run_id }}
           path: .ci-artifacts
       - if: needs.plan.outputs.rust_required == 'true'
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          name: knowledge-core-rust-artifacts-${{ github.run_id }}-${{ github.run_attempt }}
+          name: knowledge-core-rust-artifacts-${{ github.run_id }}
           path: .ci-artifacts
       - name: Prepare Harbor credentials
         env:
@@ -373,8 +380,9 @@ jobs:
           jq -e '.kustomize_name and .image and .digest' "candidate-$SERVICE.json" >/dev/null
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: knowledge-core-candidate-${{ matrix.service }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: knowledge-core-candidate-${{ matrix.service }}-${{ github.run_id }}
           path: candidate-${{ matrix.service }}.json
+          overwrite: true
           if-no-files-found: error
           retention-days: 7
 
@@ -414,14 +422,14 @@ jobs:
           token: ${{ steps.app-token.outputs.token }}
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          name: knowledge-core-plan-${{ github.run_id }}-${{ github.run_attempt }}
+          name: knowledge-core-plan-${{ github.run_id }}
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          name: knowledge-core-release-notes-${{ github.run_id }}-${{ github.run_attempt }}
+          name: knowledge-core-release-notes-${{ github.run_id }}
       - if: needs.plan.outputs.has_build_changes == 'true'
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          pattern: knowledge-core-candidate-*-${{ github.run_id }}-${{ github.run_attempt }}
+          pattern: knowledge-core-candidate-*-${{ github.run_id }}
           path: .candidates
           merge-multiple: true
       - name: Prepare deployment credentials
