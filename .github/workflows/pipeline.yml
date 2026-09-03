@@ -313,7 +313,30 @@ jobs:
           make rust-release RUST_ARTIFACT_DIR=.ci-artifacts
           printf 'verified-rust\n' > .ci-artifacts/artifact-marker-rust.txt
           npm --prefix services/collaboration/interop ci
-          npm --prefix services/collaboration/interop run ci
+          npm --prefix services/collaboration/interop run format:check
+          npm --prefix services/collaboration/interop test
+          # npm audit has no local fallback: retry only transport failures so a
+          # real high-severity finding continues to fail the gate immediately.
+          for attempt in 1 2 3; do
+            audit_log="$(mktemp)"
+            if npm --prefix services/collaboration/interop run audit >"$audit_log" 2>&1; then
+              cat "$audit_log"
+              rm -f "$audit_log"
+              break
+            fi
+            cat "$audit_log" >&2
+            if ! grep -Eiq 'socket hang up|audit endpoint returned an error|ECONNRESET|ETIMEDOUT|EAI_AGAIN|ENOTFOUND' "$audit_log"; then
+              rm -f "$audit_log"
+              exit 1
+            fi
+            rm -f "$audit_log"
+            if [[ "$attempt" == 3 ]]; then
+              echo "npm audit failed after transient-network retries" >&2
+              exit 1
+            fi
+            echo "::warning::npm audit transport failure; retrying (attempt $attempt/3)"
+            sleep "$attempt"
+          done
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: knowledge-core-binary-collaboration-${{ github.run_id }}
