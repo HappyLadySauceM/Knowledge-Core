@@ -1,17 +1,13 @@
-.git
-.github
-.vscode
-.zed
-.cursor
-.codex
-.env
-.env.*
-**/node_modules
-**/dist
-**/coverage
-target
-data
-logs
-bin
-coverage.out
-*.exe
+# Candidate Dockerfiles only need the selected verified binary, their runtime
+# configuration, and the Dockerfile itself. Keep source and vendored Rust
+# crates out of every BuildKit context.
+*
+!.dockerignore
+!.ci-artifacts/
+!.ci-artifacts/**
+!docker/
+!docker/**
+!services/
+!services/*/
+!services/*/etc/
+!services/*/etc/config.yaml

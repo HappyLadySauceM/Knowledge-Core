@@ -55,6 +55,8 @@ AVAILABLE_CPUS ?= $(shell \
 	if [ -n "$$quota_cpus" ] && [ "$$quota_cpus" -lt "$$n" ]; then n=$$quota_cpus; fi; \
 	echo $$n)
 BUILD_JOBS ?= $(shell echo $(AVAILABLE_CPUS) | awk -v p="$(BUILD_CPU_PERCENT)" '{v=int(($$1*p)/100); if (v<1) v=1; print v}')
+CARGO_BUILD_JOBS ?= $(BUILD_JOBS)
+export CARGO_BUILD_JOBS
 GO_RELEASE_SERVICES ?= gateway identity knowledge attachment platform
 GO_ARTIFACT_DIR ?= .ci-artifacts
 RUST_ARTIFACT_DIR ?= .ci-artifacts

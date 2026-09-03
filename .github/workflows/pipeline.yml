@@ -13,7 +13,7 @@ env:
   # The runner image contains the versioned ci-templates CLI. Project-specific
   # values live in source control instead of being duplicated in workflow JSON.
   CI_PROJECT_CONFIG: .ci/pipeline.yaml
-  BUILD_CPU_PERCENT: "75"
+  BUILD_CPU_PERCENT: "100"
   NODE_USE_ENV_PROXY: "1"
   GO111MODULE: "on"
   GOPROXY: "https://goproxy.cn,direct"
@@ -27,6 +27,29 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  track-start:
+    if: vars.FEISHU_TASK_TRACKER_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: release
+    continue-on-error: true
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Mark Feishu pipeline task in progress
+        uses: HappyLadySauceM/ci-templates/.github/actions/feishu-pipeline-task@dba16f4200c0276b3685dfa889a62fa77d64df9a
+        with:
+          operation: sync
+          phase: in_progress
+          app-id: ${{ vars.FEISHU_APP_ID }}
+          app-secret: ${{ secrets.FEISHU_APP_SECRET }}
+          chat-id: ${{ vars.FEISHU_CHAT_ID }}
+          github-custom-attr-id: ${{ vars.FEISHU_GITHUB_ATTR_ID }}
+          workflow-name: knowledge-core-pipeline
+          github-token: ${{ github.token }}
+          deepseek-api-key: ${{ secrets.DEEPSEEK_API_KEY }}
+
   plan:
     runs-on: hls-standard
     timeout-minutes: 10
@@ -37,10 +60,14 @@ jobs:
       services: ${{ steps.plan.outputs.services }}
       build_services: ${{ steps.plan.outputs.build_services }}
       build_matrix: ${{ steps.plan.outputs.build_matrix }}
+      go_build_matrix: ${{ steps.plan.outputs.go_build_matrix }}
+      rust_build_matrix: ${{ steps.plan.outputs.rust_build_matrix }}
       deploy_services: ${{ steps.plan.outputs.deploy_services }}
       release_services: ${{ steps.plan.outputs.release_services }}
       deploy_changed: ${{ steps.plan.outputs.deploy_changed }}
       has_build_changes: ${{ steps.plan.outputs.has_build_changes }}
+      has_go_build_changes: ${{ steps.plan.outputs.has_go_build_changes }}
+      has_rust_build_changes: ${{ steps.plan.outputs.has_rust_build_changes }}
       has_changes: ${{ steps.plan.outputs.has_changes }}
       rust_required: ${{ steps.plan.outputs.rust_required }}
     steps:
@@ -75,17 +102,41 @@ jobs:
           print(str(any(s.name in selected and s.artifact_group == "rust" for s in load_config(os.environ["CI_PROJECT_CONFIG"]).services)).lower())
           PY
           )"
+          go_build_services="$(BUILD_SERVICES="$build_services" python3 - <<'PY'
+          import os
+          from ci_templates.config import load_config
+          selected = set(filter(None, os.environ["BUILD_SERVICES"].split(",")))
+          print(",".join(s.name for s in load_config(os.environ["CI_PROJECT_CONFIG"]).services if s.name in selected and s.artifact_group == "go"))
+          PY
+          )"
+          rust_build_services="$(BUILD_SERVICES="$build_services" python3 - <<'PY'
+          import os
+          from ci_templates.config import load_config
+          selected = set(filter(None, os.environ["BUILD_SERVICES"].split(",")))
+          print(",".join(s.name for s in load_config(os.environ["CI_PROJECT_CONFIG"]).services if s.name in selected and s.artifact_group == "rust"))
+          PY
+          )"
+          go_build_matrix="$(jq -cn --arg value "$go_build_services" '$value | split(",") | map(select(length > 0)) | if length == 0 then ["__skip__"] else . end')"
+          rust_build_matrix="$(jq -cn --arg value "$rust_build_services" '$value | split(",") | map(select(length > 0)) | if length == 0 then ["__skip__"] else . end')"
           has_changes=false
           has_build_changes=false
+          has_go_build_changes=false
+          has_rust_build_changes=false
           [[ -n "$services" || "$deploy_changed" == true ]] && has_changes=true
           [[ -n "$build_services" ]] && has_build_changes=true
+          [[ -n "$go_build_services" ]] && has_go_build_changes=true
+          [[ -n "$rust_build_services" ]] && has_rust_build_changes=true
           {
             echo "services=$services"
             echo "build_services=$build_services"
             echo "build_matrix=$build_matrix"
+            echo "go_build_matrix=$go_build_matrix"
+            echo "rust_build_matrix=$rust_build_matrix"
             echo "deploy_services=$deploy_services"
             echo "release_services=$release_services"
             echo "has_build_changes=$has_build_changes"
+            echo "has_go_build_changes=$has_go_build_changes"
+            echo "has_rust_build_changes=$has_rust_build_changes"
             echo "has_changes=$has_changes"
             echo "deploy_changed=$deploy_changed"
             echo "rust_required=$rust_required"
@@ -178,20 +229,50 @@ jobs:
             make go-release GO_RELEASE_SERVICES="$go_services" GO_ARTIFACT_DIR=.ci-artifacts KC_RUST_GATE=0
           fi
           printf 'verified-go\n' > .ci-artifacts/artifact-marker-go.txt
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - if: contains(fromJSON(needs.plan.outputs.go_build_matrix), 'gateway')
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: knowledge-core-go-artifacts-${{ github.run_id }}
-          path: .ci-artifacts
+          name: knowledge-core-binary-gateway-${{ github.run_id }}
+          path: .ci-artifacts/gateway
           overwrite: true
-          # Dot-directories are hidden; v4 upload-artifact skips them by default.
-          # 以点号开头的目录会被视为隐藏文件，v4 upload-artifact 默认跳过。
-          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
+      - if: contains(fromJSON(needs.plan.outputs.go_build_matrix), 'identity')
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: knowledge-core-binary-identity-${{ github.run_id }}
+          path: .ci-artifacts/identity
+          overwrite: true
+          if-no-files-found: error
+          retention-days: 7
+      - if: contains(fromJSON(needs.plan.outputs.go_build_matrix), 'knowledge')
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: knowledge-core-binary-knowledge-${{ github.run_id }}
+          path: .ci-artifacts/knowledge
+          overwrite: true
+          if-no-files-found: error
+          retention-days: 7
+      - if: contains(fromJSON(needs.plan.outputs.go_build_matrix), 'attachment')
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: knowledge-core-binary-attachment-${{ github.run_id }}
+          path: .ci-artifacts/attachment
+          overwrite: true
+          if-no-files-found: error
+          retention-days: 7
+      - if: contains(fromJSON(needs.plan.outputs.go_build_matrix), 'platform')
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: knowledge-core-binary-platform-${{ github.run_id }}
+          path: .ci-artifacts/platform
+          overwrite: true
           if-no-files-found: error
           retention-days: 7
 
   rust-verify-build:
-    # Go and Rust quality gates are independent and can consume separate
-    # standard runners concurrently; package-candidates joins them below.
+    # Go and Rust quality gates are independent. Their package jobs fan out
+    # independently too, so Go image packaging does not wait for Rust release.
     needs: plan
     if: needs.plan.outputs.has_build_changes == 'true' && needs.plan.outputs.rust_required == 'true'
     runs-on: hls-standard
@@ -235,12 +316,9 @@ jobs:
           npm --prefix services/collaboration/interop run ci
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: knowledge-core-rust-artifacts-${{ github.run_id }}
-          path: .ci-artifacts
+          name: knowledge-core-binary-collaboration-${{ github.run_id }}
+          path: .ci-artifacts/collaboration
           overwrite: true
-          # Dot-directories are hidden; v4 upload-artifact skips them by default.
-          # 以点号开头的目录会被视为隐藏文件，v4 upload-artifact 默认跳过。
-          include-hidden-files: true
           if-no-files-found: error
           retention-days: 7
 
@@ -312,29 +390,93 @@ jobs:
           docker info >/dev/null
           ci-templates prewarm --config "$CI_PROJECT_CONFIG" --repo .
 
-  package-candidates:
-    needs: [plan, go-verify-build, rust-verify-build, prewarm-base-images]
-    if: always() && needs.plan.outputs.has_build_changes == 'true' && needs.go-verify-build.result == 'success' && (needs.rust-verify-build.result == 'success' || needs.rust-verify-build.result == 'skipped') && needs.prewarm-base-images.result == 'success'
+  package-go-candidates:
+    needs: [plan, go-verify-build, prewarm-base-images]
+    if: always() && needs.plan.outputs.has_go_build_changes == 'true' && needs.go-verify-build.result == 'success' && needs.prewarm-base-images.result == 'success'
     runs-on: hls-builder
     timeout-minutes: 30
     environment: release
     strategy:
       fail-fast: false
-      max-parallel: 8
+      max-parallel: 5
       matrix:
-        service: ${{ fromJSON(needs.plan.outputs.build_matrix) }}
+        service: ${{ fromJSON(needs.plan.outputs.go_build_matrix) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 1
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          name: knowledge-core-go-artifacts-${{ github.run_id }}
+          name: knowledge-core-binary-${{ matrix.service }}-${{ github.run_id }}
           path: .ci-artifacts
-      - if: needs.plan.outputs.rust_required == 'true'
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+      - name: Prepare Harbor credentials
+        env:
+          HARBOR_DOCKER_CONFIG_JSON: ${{ secrets.HARBOR_DOCKER_CONFIG_JSON }}
+          HARBOR_CA_PEM: ${{ secrets.HARBOR_CA_PEM }}
+        run: |
+          set -euo pipefail
+          umask 077
+          install -d "$RUNNER_TEMP/harbor"
+          printf '%s' "$HARBOR_DOCKER_CONFIG_JSON" > "$RUNNER_TEMP/harbor/config.json"
+          printf '%s' "$HARBOR_CA_PEM" > "$RUNNER_TEMP/harbor/ca.crt"
+          test -s "$RUNNER_TEMP/harbor/config.json" && test -s "$RUNNER_TEMP/harbor/ca.crt"
+          if [[ -s /etc/ssl/certs/ca-certificates.crt ]]; then
+            cat /etc/ssl/certs/ca-certificates.crt "$RUNNER_TEMP/harbor/ca.crt" > "$RUNNER_TEMP/harbor/ca-bundle.crt"
+          else
+            cp "$RUNNER_TEMP/harbor/ca.crt" "$RUNNER_TEMP/harbor/ca-bundle.crt"
+          fi
+          echo "DOCKER_CONFIG=$RUNNER_TEMP/harbor" >> "$GITHUB_ENV"
+          echo "SSL_CERT_FILE=$RUNNER_TEMP/harbor/ca-bundle.crt" >> "$GITHUB_ENV"
+          echo "CI_REGISTRY_CA_FILE=$RUNNER_TEMP/harbor/ca.crt" >> "$GITHUB_ENV"
+      - name: Build immutable candidate
+        env:
+          SERVICE: ${{ matrix.service }}
+        run: |
+          set -euo pipefail
+          test "$SERVICE" != __skip__
+          test -f ".ci-artifacts/$SERVICE"
+          chmod 0755 ".ci-artifacts/$SERVICE"
+          digest="$(sha256sum ".ci-artifacts/$SERVICE" | awk '{print $1}')"
+          jq -n --arg service "$SERVICE" --arg path ".ci-artifacts/$SERVICE" --arg digest "$digest" \
+            '{source_sha:env.GITHUB_SHA,services:{($service):{path:$path,sha256:$digest}}}' > .ci-artifact-manifest.json
+          candidate_tag="$(python3 - <<'PY'
+          import os
+          from ci_templates.config import load_config
+          print(load_config(os.environ["CI_PROJECT_CONFIG"]).candidate_tag_template.format(sha=os.environ["GITHUB_SHA"]))
+          PY
+          )"
+          result="$(ci-templates build --config "$CI_PROJECT_CONFIG" --service "$SERVICE" --tag "$candidate_tag" --preserve-previous --reuse-existing --artifact-manifest .ci-artifact-manifest.json)"
+          echo "$result"
+          jq -e '.digest | strings | test("^sha256:[0-9a-f]{64}$")' <<<"$result" >/dev/null
+          jq --arg source_sha "$GITHUB_SHA" --arg candidate_tag "$candidate_tag" \
+            '. + {source_sha:$source_sha,candidate_tag:$candidate_tag}' <<<"$result" > "candidate-$SERVICE.json"
+          jq -e '.kustomize_name and .image and .digest' "candidate-$SERVICE.json" >/dev/null
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: knowledge-core-rust-artifacts-${{ github.run_id }}
+          name: knowledge-core-candidate-${{ matrix.service }}-${{ github.run_id }}
+          path: candidate-${{ matrix.service }}.json
+          overwrite: true
+          if-no-files-found: error
+          retention-days: 7
+
+  package-rust-candidates:
+    needs: [plan, rust-verify-build, prewarm-base-images]
+    if: always() && needs.plan.outputs.has_rust_build_changes == 'true' && needs.rust-verify-build.result == 'success' && needs.prewarm-base-images.result == 'success'
+    runs-on: hls-builder
+    timeout-minutes: 30
+    environment: release
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        service: ${{ fromJSON(needs.plan.outputs.rust_build_matrix) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: knowledge-core-binary-${{ matrix.service }}-${{ github.run_id }}
           path: .ci-artifacts
       - name: Prepare Harbor credentials
         env:
@@ -387,8 +529,8 @@ jobs:
           retention-days: 7
 
   deploy-release:
-    needs: [plan, deploy-verify, package-candidates, release-notes]
-    if: always() && needs.plan.outputs.has_changes == 'true' && (needs.deploy-verify.result == 'success' || needs.plan.outputs.deploy_changed == 'false') && needs.release-notes.result == 'success' && (needs.package-candidates.result == 'success' || needs.plan.outputs.has_build_changes == 'false')
+    needs: [plan, deploy-verify, package-go-candidates, package-rust-candidates, release-notes]
+    if: always() && needs.plan.outputs.has_changes == 'true' && (needs.deploy-verify.result == 'success' || needs.plan.outputs.deploy_changed == 'false') && needs.release-notes.result == 'success' && (needs.plan.outputs.has_go_build_changes != 'true' || needs.package-go-candidates.result == 'success') && (needs.plan.outputs.has_rust_build_changes != 'true' || needs.package-rust-candidates.result == 'success')
     runs-on: hls-standard
     timeout-minutes: 45
     environment: release
@@ -609,14 +751,29 @@ jobs:
 
   notify:
     if: always()
-    needs: [plan, deploy-verify, go-verify-build, rust-verify-build, release-notes, prewarm-base-images, package-candidates, deploy-release, cleanup-candidates]
-    runs-on: hls-standard
+    needs: [plan, deploy-verify, go-verify-build, rust-verify-build, release-notes, prewarm-base-images, package-go-candidates, package-rust-candidates, deploy-release, cleanup-candidates]
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     environment: release
     permissions:
       actions: read
       contents: read
     steps:
+      - name: Mark Feishu pipeline task complete
+        if: vars.FEISHU_TASK_TRACKER_ENABLED == 'true'
+        continue-on-error: true
+        uses: HappyLadySauceM/ci-templates/.github/actions/feishu-pipeline-task@dba16f4200c0276b3685dfa889a62fa77d64df9a
+        with:
+          operation: sync
+          phase: completed
+          conclusion: ${{ contains(needs.*.result, 'failure') && 'failure' || contains(needs.*.result, 'cancelled') && 'cancelled' || 'success' }}
+          app-id: ${{ vars.FEISHU_APP_ID }}
+          app-secret: ${{ secrets.FEISHU_APP_SECRET }}
+          chat-id: ${{ vars.FEISHU_CHAT_ID }}
+          github-custom-attr-id: ${{ vars.FEISHU_GITHUB_ATTR_ID }}
+          workflow-name: knowledge-core-pipeline
+          github-token: ${{ github.token }}
+          deepseek-api-key: ${{ secrets.DEEPSEEK_API_KEY }}
       - name: Notify Feishu CI
         if: vars.FEISHU_TASK_TRACKER_ENABLED != 'true'
         # Pin to the ci-templates commit that added CI-card notify.py.
