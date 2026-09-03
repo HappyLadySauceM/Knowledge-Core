@@ -269,7 +269,23 @@ go-ci:
 	GOMAXPROCS=$(BUILD_JOBS) go vet $(GO_PACKAGES)
 	GOMAXPROCS=$(BUILD_JOBS) $(GOLANGCI_LINT) run $(GO_PACKAGES)
 	GOMAXPROCS=$(BUILD_JOBS) go test -count=1 $(GO_PACKAGES)
-	GOMAXPROCS=$(BUILD_JOBS) $(GOVULNCHECK) $(GO_PACKAGES)
+	@set -eu; \
+	for attempt in 1 2 3; do \
+	  audit_log="$$(mktemp)"; \
+	  if GOMAXPROCS=$(BUILD_JOBS) $(GOVULNCHECK) $(GO_PACKAGES) >"$$audit_log" 2>&1; then \
+	    cat "$$audit_log"; rm -f "$$audit_log"; break; \
+	  fi; \
+	  cat "$$audit_log" >&2; \
+	  if ! grep -Eiq 'TLS handshake timeout|i/o timeout|connection reset|connection refused|temporary failure|no such host|server misbehaving|context deadline exceeded' "$$audit_log"; then \
+	    rm -f "$$audit_log"; exit 1; \
+	  fi; \
+	  rm -f "$$audit_log"; \
+	  if [ "$$attempt" = 3 ]; then \
+	    echo "govulncheck failed after transient-network retries" >&2; exit 1; \
+	  fi; \
+	  echo "::warning::govulncheck transport failure; retrying (attempt $$attempt/3)"; \
+	  sleep "$$attempt"; \
+	done
 
 rust-ci:
 	cd $(RUST_ROOT) && $(CARGO) fmt --all --check
