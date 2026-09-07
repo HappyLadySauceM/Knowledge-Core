@@ -35,6 +35,8 @@ use yrs::{
 type TestResult<T = ()> = std::result::Result<T, Box<dyn Error + Send + Sync>>;
 
 const REQUIRE_REAL_DEPENDENCIES: &str = "COLLABORATION_TEST_REQUIRE_REAL_DEPENDENCIES";
+const TEST_NATS_USERNAME: &str = "COLLABORATION_TEST_NATS_USERNAME";
+const TEST_NATS_PASSWORD: &str = "COLLABORATION_TEST_NATS_PASSWORD";
 const CONTRACT_STREAM: &str = "KC_COLLAB_CONTRACT_TEST";
 const CONTRACT_PERMISSION_STREAM: &str = "KC_COLLAB_CONTRACT_PERMISSION_TEST";
 static NATS_FIXTURE_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
@@ -227,8 +229,8 @@ impl NatsFixture {
             connect_timeout: Duration::from_secs(5),
             operation_timeout: Duration::from_secs(5),
             token: None,
-            username: None,
-            password: None,
+            username: optional_env(TEST_NATS_USERNAME),
+            password: optional_env(TEST_NATS_PASSWORD),
             tls: TlsConfig::default(),
         };
         Ok(Self { client, config })
@@ -560,6 +562,10 @@ fn real_dependencies_required() -> TestResult<bool> {
             "COLLABORATION_TEST_REQUIRE_REAL_DEPENDENCIES must contain valid Unicode",
         )),
     }
+}
+
+fn optional_env(name: &str) -> Option<String> {
+    env::var(name).ok().filter(|value| !value.trim().is_empty())
 }
 
 fn test_error(message: impl Into<String>) -> Box<dyn Error + Send + Sync> {

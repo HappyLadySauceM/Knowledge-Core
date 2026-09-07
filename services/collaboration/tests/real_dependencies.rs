@@ -39,6 +39,8 @@ use yrs::{ReadTxn, Transact, XmlElementPrelim, XmlFragment};
 type TestResult<T = ()> = Result<T, Box<dyn Error + Send + Sync>>;
 
 const REQUIRE_REAL_DEPENDENCIES: &str = "COLLABORATION_TEST_REQUIRE_REAL_DEPENDENCIES";
+const TEST_NATS_USERNAME: &str = "COLLABORATION_TEST_NATS_USERNAME";
+const TEST_NATS_PASSWORD: &str = "COLLABORATION_TEST_NATS_PASSWORD";
 const CONTRACT_STREAM: &str = "KC_COLLAB_CONTRACT_TEST";
 const CONTRACT_PERMISSION_STREAM: &str = "KC_COLLAB_CONTRACT_PERMISSION_TEST";
 const REQUIRED_ENVIRONMENT: [&str; 3] = [
@@ -513,7 +515,14 @@ async fn redis_contract(url: &str) -> TestResult {
 }
 
 async fn nats_contract(url: &str) -> TestResult {
-    let client = async_nats::connect(url).await?;
+    let mut options = async_nats::ConnectOptions::new();
+    if let (Some(username), Some(password)) = (
+        optional_env(TEST_NATS_USERNAME),
+        optional_env(TEST_NATS_PASSWORD),
+    ) {
+        options = options.user_and_password(username, password);
+    }
+    let client = options.connect(url).await?;
     let context = jetstream::new(client.clone());
     let suffix = Uuid::now_v7().simple().to_string();
     let stream_name = CONTRACT_STREAM.to_owned();
@@ -531,8 +540,8 @@ async fn nats_contract(url: &str) -> TestResult {
         connect_timeout: Duration::from_secs(5),
         operation_timeout: Duration::from_secs(5),
         token: None,
-        username: None,
-        password: None,
+        username: optional_env(TEST_NATS_USERNAME),
+        password: optional_env(TEST_NATS_PASSWORD),
         tls: TlsConfig::default(),
     };
     let primary_instance = format!("real-test-primary-{suffix}");
@@ -676,6 +685,10 @@ fn real_environment() -> TestResult<Option<RealEnvironment>> {
         postgres_url: postgres_url_with_password(&postgres_url, &postgres_password)?,
         redis_url,
     }))
+}
+
+fn optional_env(name: &str) -> Option<String> {
+    env::var(name).ok().filter(|value| !value.trim().is_empty())
 }
 
 fn postgres_url_with_password(base_url: &str, password: &str) -> TestResult<String> {
