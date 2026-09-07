@@ -628,21 +628,21 @@
     },
     {
       "id": "security.secrets-and-config",
-      "revision": 164,
+      "revision": 165,
       "section": "conventions",
       "sources": [
         {
-          "detail": "evidence-sha256:2b480940ed9b0273e090564221a28150974ceb039117bd686ca2eade0c2bdd6c",
+          "detail": "evidence-sha256:0b0c26ec2dbdd31eed4343a73b343af0c4fb337742a849b9d75a647c52e9bdcb",
           "kind": "documented",
           "reference": "README.md#compose"
         },
         {
-          "detail": "evidence-sha256:2b480940ed9b0273e090564221a28150974ceb039117bd686ca2eade0c2bdd6c",
+          "detail": "evidence-sha256:0b0c26ec2dbdd31eed4343a73b343af0c4fb337742a849b9d75a647c52e9bdcb",
           "kind": "documented",
           "reference": "README.md#k3s-gitops"
         },
         {
-          "detail": "evidence-sha256:2b480940ed9b0273e090564221a28150974ceb039117bd686ca2eade0c2bdd6c",
+          "detail": "evidence-sha256:0b0c26ec2dbdd31eed4343a73b343af0c4fb337742a849b9d75a647c52e9bdcb",
           "kind": "documented",
           "reference": "README.md#section"
         },
@@ -652,7 +652,7 @@
           "reference": "deploy/base/README.md#application-deployment-base"
         },
         {
-          "detail": "evidence-sha256:2b480940ed9b0273e090564221a28150974ceb039117bd686ca2eade0c2bdd6c",
+          "detail": "evidence-sha256:0b0c26ec2dbdd31eed4343a73b343af0c4fb337742a849b9d75a647c52e9bdcb",
           "kind": "documented",
           "reference": "deploy/nacos/README.md#nacos-application-configuration"
         },
@@ -662,47 +662,47 @@
           "reference": "deploy/overlay/dev/README.md#development-overlay"
         },
         {
-          "detail": "evidence-sha256:2b480940ed9b0273e090564221a28150974ceb039117bd686ca2eade0c2bdd6c",
+          "detail": "evidence-sha256:0b0c26ec2dbdd31eed4343a73b343af0c4fb337742a849b9d75a647c52e9bdcb",
           "kind": "documented",
           "reference": "docs/framework-design.md#11"
         },
         {
-          "detail": "evidence-sha256:2b480940ed9b0273e090564221a28150974ceb039117bd686ca2eade0c2bdd6c",
+          "detail": "evidence-sha256:0b0c26ec2dbdd31eed4343a73b343af0c4fb337742a849b9d75a647c52e9bdcb",
           "kind": "documented",
           "reference": "docs/framework-design.md#12"
         },
         {
-          "detail": "evidence-sha256:2b480940ed9b0273e090564221a28150974ceb039117bd686ca2eade0c2bdd6c",
+          "detail": "evidence-sha256:0b0c26ec2dbdd31eed4343a73b343af0c4fb337742a849b9d75a647c52e9bdcb",
           "kind": "documented",
           "reference": "docs/framework-design.md#8-secret-tls"
         },
         {
-          "detail": "evidence-sha256:2b480940ed9b0273e090564221a28150974ceb039117bd686ca2eade0c2bdd6c",
+          "detail": "evidence-sha256:0b0c26ec2dbdd31eed4343a73b343af0c4fb337742a849b9d75a647c52e9bdcb",
           "kind": "documented",
           "reference": "docs/migrations/2026-08-auth-productionization.md#section"
         },
         {
-          "detail": "evidence-sha256:2b480940ed9b0273e090564221a28150974ceb039117bd686ca2eade0c2bdd6c",
+          "detail": "evidence-sha256:0b0c26ec2dbdd31eed4343a73b343af0c4fb337742a849b9d75a647c52e9bdcb",
           "kind": "documented",
           "reference": "docs/migrations/2026-08-platform-configuration.md#platform-configuration-migration"
         },
         {
-          "detail": "evidence-sha256:2b480940ed9b0273e090564221a28150974ceb039117bd686ca2eade0c2bdd6c",
+          "detail": "evidence-sha256:0b0c26ec2dbdd31eed4343a73b343af0c4fb337742a849b9d75a647c52e9bdcb",
           "kind": "documented",
           "reference": "docs/platform-configuration.md#section"
         },
         {
-          "detail": "evidence-sha256:2b480940ed9b0273e090564221a28150974ceb039117bd686ca2eade0c2bdd6c",
+          "detail": "evidence-sha256:0b0c26ec2dbdd31eed4343a73b343af0c4fb337742a849b9d75a647c52e9bdcb",
           "kind": "documented",
           "reference": "docs/rust-collaboration-design.md#2-1"
         },
         {
-          "detail": "evidence-sha256:2b480940ed9b0273e090564221a28150974ceb039117bd686ca2eade0c2bdd6c",
+          "detail": "evidence-sha256:0b0c26ec2dbdd31eed4343a73b343af0c4fb337742a849b9d75a647c52e9bdcb",
           "kind": "documented",
           "reference": "docs/rust-collaboration-design.md#7"
         },
         {
-          "detail": "evidence-sha256:2b480940ed9b0273e090564221a28150974ceb039117bd686ca2eade0c2bdd6c",
+          "detail": "evidence-sha256:0b0c26ec2dbdd31eed4343a73b343af0c4fb337742a849b9d75a647c52e9bdcb",
           "kind": "documented",
           "reference": "docs/trace-architecture.md#7-collector-tempo"
         },
@@ -720,7 +720,7 @@
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-09-07T03:59:23Z",
+      "updatedAt": "2026-09-07T09:13:42Z",
       "value": "Secrets may be injected only from environment variables, Kubernetes Secrets, or SOPS-encrypted GitOps manifests. Sensitive values must not be stored in plaintext in source, configuration, logs, metrics, trace spans, or release metadata."
     },
     {
@@ -1055,11 +1055,11 @@
     "profile": "generic",
     "slug": "knowledge-core"
   },
-  "revision": 164,
+  "revision": 165,
   "scan": {
-    "fingerprint": "c9bbe6675563a2c0731f34bd9529889192d32deb9b4e7872202fa326c75ff8e2",
+    "fingerprint": "061433a2e44a2516137da44343affb5cd15d419fe6d3e56d26d58f41d298ad2b",
     "inventoryCount": 435
   },
   "schemaVersion": 3,
-  "updatedAt": "2026-09-07T03:59:23Z"
+  "updatedAt": "2026-09-07T09:13:42Z"
 }

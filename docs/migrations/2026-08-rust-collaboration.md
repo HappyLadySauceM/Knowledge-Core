@@ -6,7 +6,7 @@
 
 - `DocumentDetailData` 删除 field 5 `websocket_url` 和 field 6 `fragment`，field ID 不复用。
 - Gateway 新增 `POST /api/v1/studio/documents/:document_id/collaboration-sessions`。客户端必须先创建短期 session，再把固定协议和一次性 ticket 放入 `Sec-WebSocket-Protocol`。
-- WebSocket 路径改为 `/v1/instances/{ordinal}/documents/{document_id}`；`COLLABORATION_INSTANCE_COUNT=1` 时进程额外接受 `/v1/documents/{document_id}`。不再支持 Hocuspocus token refresh 扩展、匿名公开协作或旧 `/collaboration` 行为。Gateway 必须使用 Collaboration RPC 的 `instance_ordinal` 构造可信 `websocket_url`。
+- WebSocket 路径统一为 `/v1/documents/{document_id}`，由 Higress 对完整 URI 做 upstream hash；不再支持实例 ordinal 路径、Hocuspocus token refresh 扩展、匿名公开协作或旧 `/collaboration` 行为。Gateway 不再依赖 Collaboration RPC 的实例分配结果。
 - Gateway、Knowledge 和 Collaboration 的版本、清理、授权与投影调用统一切换到生成的 Thrift client/server。旧 internal HTTP listener 不保留兼容层。
 - Knowledge RPC 新增独立 `Live`：`Ping` 保持 readiness 语义，Collaboration 启动探测使用 `Live`，避免 Knowledge 与 Collaboration 的 readiness 冷启动环。
 - `go run ./scripts/idlguard compat-git d0b96df70be36e1db602d68ca2c26c8f09f36a1a idl` 已执行；唯一不兼容项是上述两个 `DocumentDetailData` 字段删除。`Live` 与 Collaboration RPC 新增项没有产生额外兼容告警。
@@ -61,3 +61,14 @@
 - 本地 actor 继续串行处理本实例连接；提交后的内容通过 PostgreSQL outbox、JetStream fanout 和 sequence gap recovery 收敛。awareness/cursor 不持久化，跨实例期间允许暂时不完整。前端断线会重新申请 ticket，但复用同一 Y.Doc/IndexedDB。
 
 发布要求在维护窗口内同时提升 Gateway、Collaboration、Web 和 deploy snapshot，先确认 Higress 渲染结果只有一个 `/v1/documents/` WebSocket path，再滚动 Collaboration。旧 URL 客户端会收到 404/升级失败，不能与新路由混合发布；回滚同样必须整体回滚客户端、Gateway、Collaboration 和 Higress snapshot。
+
+## 2026-09-07 发布顺序修复
+
+路由收敛发布曾因新 Rust 二进制先于 Nacos 文档更新而启动失败：旧 Nacos revision 4 仍包含
+`config.routing.instance_count`，而新二进制已经删除该字段。修复分两步：
+
+- 兼容版本暂时保留 deprecated `routing` 反序列化字段并忽略其值，使旧 Nacos 文档不会阻断启动；
+- 通过受控 `configctl publish` 发布不含该字段的新 Nacos revision，确认所有副本加载后，再删除兼容字段。
+
+Argo 等待器在明确的 Failed/Degraded/CrashLoop 等状态下 fail-fast，并输出 operation、资源、Pod reason
+与最近日志。GitOps 回滚前先终止进行中的 Application operation，回滚提交后再次等待目标 revision 收敛。

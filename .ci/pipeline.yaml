@@ -25,6 +25,7 @@ harbor_project: knowledge-core
 argocd_server: argocd.happyladysauce.local
 argocd_namespace: argocd
 argocd_application: knowledge-core-gateway-dev
+argocd_wait_timeout_seconds: 600
 application_suffix: -dev
 smoke_namespace: knowledge-core-dev
 smoke_command:

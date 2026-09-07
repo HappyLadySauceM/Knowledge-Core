@@ -22,3 +22,8 @@ uses a dedicated writer identity scoped to `dev/KNOWLEDGE_CORE/<service>.dynamic
 reader identities and the Nacos administrator are not publishing identities. Increase `revision`
 for every content change. Before rolling back to a binary that only understands `v1alpha1`, publish
 a compatible `v1alpha1/DynamicConfig` document with a higher revision.
+
+When removing or renaming an `ApplicationConfig` field, release a binary that tolerates the old field
+first. Publish the new Nacos revision from a controlled environment and verify every replica has loaded
+it before removing the compatibility field from the binary. The GitOps snapshot and Nacos document are
+separate release inputs; promoting one does not publish the other.

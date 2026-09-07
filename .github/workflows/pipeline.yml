@@ -716,11 +716,25 @@ jobs:
                       pass
           print("release_tag=%s" % (tag or ""))
           PY
-      - name: Roll back unverified GitOps snapshot
+      - name: Terminate failed Argo operations
+        id: terminate
         if: failure() && steps.gitops.outputs.gitops_revision != '' && steps.gitops.outputs.gitops_revision != steps.gitops.outputs.gitops_base_revision && env.SMOKE_OK != 'true'
+        run: ci-templates argo-terminate --config "$CI_PROJECT_CONFIG" --services "${{ needs.plan.outputs.release_services }}"
+      - name: Roll back unverified GitOps snapshot
+        id: rollback
+        if: failure() && steps.terminate.outcome == 'success' && steps.gitops.outputs.gitops_revision != '' && steps.gitops.outputs.gitops_revision != steps.gitops.outputs.gitops_base_revision && env.SMOKE_OK != 'true'
         env:
           GITOPS_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: ci-templates rollback-snapshot --config "$CI_PROJECT_CONFIG" --revision "${{ steps.gitops.outputs.gitops_revision }}"
+        run: |
+          set -euo pipefail
+          result="$(ci-templates rollback-snapshot --config "$CI_PROJECT_CONFIG" --revision "${{ steps.gitops.outputs.gitops_revision }}")"
+          echo "$result"
+          rollback_revision="$(jq -r '.gitops_revision' <<<"$result")"
+          test "$rollback_revision" != "null" && test -n "$rollback_revision"
+          echo "gitops_revision=$rollback_revision" >> "$GITHUB_OUTPUT"
+      - name: Wait for rollback convergence
+        if: always() && steps.rollback.outcome == 'success'
+        run: ci-templates argo-wait --config "$CI_PROJECT_CONFIG" --revision "${{ steps.rollback.outputs.gitops_revision }}" --services "${{ needs.plan.outputs.release_services }}"
       - name: Mark dev deployment failed
         if: failure() && steps.gitops.outputs.gitops_revision != ''
         env:
