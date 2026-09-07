@@ -8,7 +8,8 @@ use opentelemetry_sdk::{
     trace::SdkTracerProvider,
 };
 use prometheus::{
-    Encoder, HistogramOpts, HistogramVec, IntCounterVec, IntGauge, Opts, Registry, TextEncoder,
+    Encoder, Gauge, HistogramOpts, HistogramVec, IntCounterVec, IntGauge, Opts, Registry,
+    TextEncoder,
 };
 use tracing_subscriber::{
     EnvFilter, Registry as SubscriberRegistry, layer::SubscriberExt as _, reload,
@@ -37,6 +38,12 @@ struct MetricSet {
     websocket_closes: IntCounterVec,
     update_duration: HistogramVec,
     worker_operations: IntCounterVec,
+    application_ready: IntGauge,
+    outbox_pending: IntGauge,
+    outbox_parked: IntGauge,
+    projection_pending: IntGauge,
+    outbox_oldest_age_seconds: Gauge,
+    projection_oldest_age_seconds: Gauge,
     config_connected: IntGauge,
     config_last_success: IntGauge,
     config_reloads: IntCounterVec,
@@ -49,6 +56,7 @@ impl Metrics {
     /// # Errors
     ///
     /// Returns an error when a metric descriptor or collector cannot be registered.
+    #[allow(clippy::too_many_lines)]
     pub fn new() -> Result<Self> {
         let registry = Registry::new_custom(Some("knowledge_core_collaboration".to_owned()), None)
             .map_err(metric_error)?;
@@ -97,6 +105,36 @@ impl Metrics {
             &["operation", "outcome"],
         )
         .map_err(metric_error)?;
+        let application_ready = IntGauge::with_opts(Opts::new(
+            "app_ready",
+            "Whether the Collaboration application is accepting traffic.",
+        ))
+        .map_err(metric_error)?;
+        let outbox_pending = IntGauge::with_opts(Opts::new(
+            "outbox_pending",
+            "Number of Collaboration outbox events awaiting publication.",
+        ))
+        .map_err(metric_error)?;
+        let outbox_parked = IntGauge::with_opts(Opts::new(
+            "outbox_parked",
+            "Number of Collaboration outbox events parked after bounded retries.",
+        ))
+        .map_err(metric_error)?;
+        let projection_pending = IntGauge::with_opts(Opts::new(
+            "projection_pending",
+            "Number of Collaboration projection jobs awaiting convergence.",
+        ))
+        .map_err(metric_error)?;
+        let outbox_oldest_age_seconds = Gauge::with_opts(Opts::new(
+            "outbox_oldest_age_seconds",
+            "Age in seconds of the oldest pending Collaboration outbox event.",
+        ))
+        .map_err(metric_error)?;
+        let projection_oldest_age_seconds = Gauge::with_opts(Opts::new(
+            "projection_oldest_age_seconds",
+            "Age in seconds of the oldest pending Collaboration projection job.",
+        ))
+        .map_err(metric_error)?;
         let config_connected = IntGauge::with_opts(Opts::new(
             "nacos_config_connected",
             "Whether the latest Nacos configuration operation succeeded.",
@@ -128,6 +166,12 @@ impl Metrics {
             Box::new(websocket_closes.clone()),
             Box::new(update_duration.clone()),
             Box::new(worker_operations.clone()),
+            Box::new(application_ready.clone()),
+            Box::new(outbox_pending.clone()),
+            Box::new(outbox_parked.clone()),
+            Box::new(projection_pending.clone()),
+            Box::new(outbox_oldest_age_seconds.clone()),
+            Box::new(projection_oldest_age_seconds.clone()),
             Box::new(config_connected.clone()),
             Box::new(config_last_success.clone()),
             Box::new(config_reloads.clone()),
@@ -145,6 +189,12 @@ impl Metrics {
                 websocket_closes,
                 update_duration,
                 worker_operations,
+                application_ready,
+                outbox_pending,
+                outbox_parked,
+                projection_pending,
+                outbox_oldest_age_seconds,
+                projection_oldest_age_seconds,
                 config_connected,
                 config_last_success,
                 config_reloads,
@@ -199,6 +249,24 @@ impl Metrics {
             .worker_operations
             .with_label_values(&[operation, if succeeded { "ok" } else { "error" }])
             .inc();
+    }
+
+    pub(crate) fn application_ready_gauge(&self) -> IntGauge {
+        self.inner.application_ready.clone()
+    }
+
+    pub(crate) fn set_worker_backlog(&self, backlog: &crate::storage::WorkerBacklog) {
+        self.inner.outbox_pending.set(backlog.outbox_pending);
+        self.inner.outbox_parked.set(backlog.outbox_parked);
+        self.inner
+            .projection_pending
+            .set(backlog.projection_pending);
+        self.inner
+            .outbox_oldest_age_seconds
+            .set(backlog.outbox_oldest_age_seconds.max(0.0));
+        self.inner
+            .projection_oldest_age_seconds
+            .set(backlog.projection_oldest_age_seconds.max(0.0));
     }
 
     pub(crate) fn config_success(&self) {

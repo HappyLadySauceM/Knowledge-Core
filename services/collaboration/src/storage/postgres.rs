@@ -20,7 +20,7 @@ use uuid::Uuid;
 use super::{
     CommittedUpdate, DocumentEvent, DocumentStore, EventSubjects, LoadedDocument, OutboxEvent,
     ProjectionJob, RestorationCandidate, RestoreVersion, StoredUpdate, UpdateLimits, VersionCursor,
-    VersionPage, VersionStore, WorkerStore,
+    VersionPage, VersionStore, WorkerBacklog, WorkerStore,
 };
 use crate::{
     config::PostgresConfig,
@@ -41,7 +41,7 @@ struct Migration {
     sql: &'static str,
 }
 
-const MIGRATIONS: [Migration; 3] = [
+const MIGRATIONS: [Migration; 4] = [
     Migration {
         version: 1,
         name: "001_initial",
@@ -56,6 +56,11 @@ const MIGRATIONS: [Migration; 3] = [
         version: 3,
         name: "003_outbox_trace",
         sql: include_str!("../../migrations/003_outbox_trace.sql"),
+    },
+    Migration {
+        version: 4,
+        name: "004_maintenance_audit",
+        sql: include_str!("../../migrations/004_maintenance_audit.sql"),
     },
 ];
 
@@ -157,6 +162,115 @@ impl PostgresStore {
 
     pub async fn close(&self) {
         self.pool.close().await;
+    }
+
+    /// Requeues a bounded set of parked outbox events and writes one audit row per event.
+    ///
+    /// The event id and payload remain unchanged, while the retry budget is reset so the normal
+    /// publisher can make a fresh bounded attempt. Callers must provide an explicit operator
+    /// identity; this method never redrives an already published event.
+    ///
+    /// # Errors
+    ///
+    /// Returns an invalid-input error for an unsafe limit/operator and a storage error when the
+    /// transaction cannot lock, update, or audit the selected events.
+    pub async fn redrive_outbox(
+        &self,
+        context: &RequestContext,
+        limit: i64,
+        operator: &str,
+        event_id: Option<Uuid>,
+    ) -> Result<Vec<Uuid>> {
+        if !(1..=1_000).contains(&limit) {
+            return Err(ServiceError::invalid_input(
+                "outbox redrive limit must be between 1 and 1000",
+            ));
+        }
+        if operator.trim().is_empty() || operator.trim() != operator || operator.len() > 128 {
+            return Err(ServiceError::invalid_input(
+                "outbox redrive operator is invalid",
+            ));
+        }
+        self.timed_request(context, "redrive Collaboration outbox", async {
+            let mut transaction = self
+                .pool
+                .begin()
+                .await
+                .map_err(|error| storage_error(error, "begin outbox redrive transaction"))?;
+            let rows = if let Some(event_id) = event_id {
+                sqlx::query(
+                    "SELECT id, event_key, attempts, last_error_key
+                     FROM collaboration.outbox
+                     WHERE id = $1 AND published_at IS NULL AND parked_at IS NOT NULL
+                     FOR UPDATE SKIP LOCKED",
+                )
+                .bind(event_id)
+                .fetch_all(&mut *transaction)
+                .await
+                .map_err(|error| storage_error(error, "select outbox event for redrive"))?
+            } else {
+                sqlx::query(
+                    "SELECT id, event_key, attempts, last_error_key
+                     FROM collaboration.outbox
+                     WHERE published_at IS NULL AND parked_at IS NOT NULL
+                     ORDER BY parked_at, created_at, id
+                     FOR UPDATE SKIP LOCKED LIMIT $1",
+                )
+                .bind(limit)
+                .fetch_all(&mut *transaction)
+                .await
+                .map_err(|error| storage_error(error, "select parked outbox events"))?
+            };
+            let mut redriven = Vec::with_capacity(rows.len());
+            for row in rows {
+                let id: Uuid = row
+                    .try_get("id")
+                    .map_err(|error| storage_error(error, "decode outbox redrive id"))?;
+                let event_key: String = row
+                    .try_get("event_key")
+                    .map_err(|error| storage_error(error, "decode outbox redrive event key"))?;
+                let attempts: i32 = row
+                    .try_get("attempts")
+                    .map_err(|error| storage_error(error, "decode outbox redrive attempts"))?;
+                let last_error_key: String = row
+                    .try_get("last_error_key")
+                    .map_err(|error| storage_error(error, "decode outbox redrive error key"))?;
+                sqlx::query(
+                    "UPDATE collaboration.outbox
+                     SET parked_at = NULL, attempts = 0, next_attempt_at = now(),
+                         lease_until = NULL, last_error_key = 'maintenance.redrive',
+                         redrive_count = redrive_count + 1, last_redrive_at = now()
+                     WHERE id = $1 AND published_at IS NULL AND parked_at IS NOT NULL",
+                )
+                .bind(id)
+                .execute(&mut *transaction)
+                .await
+                .map_err(|error| storage_error(error, "requeue parked outbox event"))?;
+                sqlx::query(
+                    "INSERT INTO collaboration.maintenance_actions(
+                       id, action, target_kind, target_id, operator, detail
+                     ) VALUES ($1, 'outbox.redrive', 'outbox', $2, $3, $4)",
+                )
+                .bind(Uuid::now_v7())
+                .bind(id)
+                .bind(operator)
+                .bind(json!({
+                    "event_key": event_key,
+                    "previous_attempts": attempts,
+                    "previous_error_key": last_error_key,
+                }))
+                .execute(&mut *transaction)
+                .await
+                .map_err(|error| storage_error(error, "audit outbox redrive"))?;
+                redriven.push(id);
+            }
+            transaction
+                .commit()
+                .await
+                .map_err(|error| storage_error(error, "commit outbox redrive transaction"))?;
+            Ok(redriven)
+        })
+        .await
     }
 
     /// Checks that `PostgreSQL` accepts a bounded operation.
@@ -1029,6 +1143,47 @@ impl VersionStore for PostgresStore {
 
 #[async_trait]
 impl WorkerStore for PostgresStore {
+    async fn worker_backlog(&self, context: &RequestContext) -> Result<Option<WorkerBacklog>> {
+        self.timed_request(context, "read Collaboration worker backlog", async {
+            let row = sqlx::query(
+                "SELECT
+                   (SELECT count(*) FROM collaboration.outbox
+                    WHERE published_at IS NULL AND parked_at IS NULL)::bigint AS outbox_pending,
+                   (SELECT count(*) FROM collaboration.outbox
+                    WHERE published_at IS NULL AND parked_at IS NOT NULL)::bigint AS outbox_parked,
+                   COALESCE((SELECT EXTRACT(EPOCH FROM (now() - min(created_at)))
+                    FROM collaboration.outbox
+                    WHERE published_at IS NULL AND parked_at IS NULL), 0)::double precision
+                    AS outbox_oldest_age_seconds,
+                   (SELECT count(*) FROM collaboration.projection_jobs)::bigint AS projection_pending,
+                   COALESCE((SELECT EXTRACT(EPOCH FROM (now() - min(updated_at)))
+                    FROM collaboration.projection_jobs), 0)::double precision
+                    AS projection_oldest_age_seconds",
+            )
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|error| storage_error(error, "read Collaboration worker backlog"))?;
+            Ok(Some(WorkerBacklog {
+                outbox_pending: row
+                    .try_get("outbox_pending")
+                    .map_err(|error| storage_error(error, "decode outbox pending count"))?,
+                outbox_parked: row
+                    .try_get("outbox_parked")
+                    .map_err(|error| storage_error(error, "decode outbox parked count"))?,
+                outbox_oldest_age_seconds: row
+                    .try_get("outbox_oldest_age_seconds")
+                    .map_err(|error| storage_error(error, "decode outbox oldest age"))?,
+                projection_pending: row
+                    .try_get("projection_pending")
+                    .map_err(|error| storage_error(error, "decode projection pending count"))?,
+                projection_oldest_age_seconds: row
+                    .try_get("projection_oldest_age_seconds")
+                    .map_err(|error| storage_error(error, "decode projection oldest age"))?,
+            }))
+        })
+        .await
+    }
+
     async fn claim_projection_job(
         &self,
         context: &RequestContext,

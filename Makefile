@@ -87,7 +87,7 @@ endif
 
 .DEFAULT_GOAL := help
 
-.PHONY: help fmt fmt-check vet lint line test race build go-release rust-release vuln supply-chain tidy ensure-ci-tools ensure-kitex ensure-hz ensure-thriftgo ensure-cargo-deny ensure-rust-toolchain generate generate-check generate-go-check generate-rust-check check go-ci rust-ci ci smoke-ci
+.PHONY: help fmt fmt-check vet lint line test race build go-release rust-release vuln supply-chain tidy ensure-ci-tools ensure-kitex ensure-hz ensure-thriftgo ensure-cargo-deny ensure-rust-toolchain generate generate-check generate-go-check generate-rust-check check go-ci rust-ci rust-real-dependencies collaboration-maintenance ci smoke-ci
 
 help:
 	@echo Knowledge Core development targets:
@@ -106,6 +106,8 @@ help:
 	@echo   make generate        Regenerate Hertz and Kitex code
 	@echo   make generate-check  Regenerate and fail on generated-code drift
 	@echo   make check           Run Go gates and the Rust gate when enabled
+	@echo   make rust-real-dependencies Run Collaboration contracts against required live dependencies
+	@echo   make collaboration-maintenance Run an explicitly confirmed Collaboration redrive command
 	@echo   make ci              Tidy modules, ensure CI tools, then check, generate-check, and build
 
 fmt:
@@ -292,6 +294,19 @@ rust-ci:
 	cd $(RUST_ROOT) && CARGO_BUILD_JOBS=$(BUILD_JOBS) $(CARGO) clippy --workspace --all-features --locked -j $(BUILD_JOBS) -- -D warnings
 	cd $(RUST_ROOT) && CARGO_BUILD_JOBS=$(BUILD_JOBS) $(CARGO) test --workspace --all-targets --all-features --locked -j $(BUILD_JOBS)
 	cd $(RUST_ROOT) && $(CARGO_DENY) check advisories bans licenses sources
+
+rust-real-dependencies:
+	cd $(RUST_ROOT) && env \
+	COLLABORATION_TEST_REQUIRE_REAL_DEPENDENCIES=1 \
+	COLLABORATION_TEST_POSTGRES_URL="$${COLLABORATION_TEST_POSTGRES_URL:?COLLABORATION_TEST_POSTGRES_URL is required}" \
+	COLLABORATION_TEST_POSTGRES_PASSWORD="$${COLLABORATION_TEST_POSTGRES_PASSWORD:?COLLABORATION_TEST_POSTGRES_PASSWORD is required}" \
+	COLLABORATION_TEST_REDIS_URL="$${COLLABORATION_TEST_REDIS_URL:?COLLABORATION_TEST_REDIS_URL is required}" \
+	COLLABORATION_TEST_NATS_URL="$${COLLABORATION_TEST_NATS_URL:?COLLABORATION_TEST_NATS_URL is required}" \
+	CARGO_BUILD_JOBS=$(BUILD_JOBS) $(CARGO) test --locked --test real_dependencies --test distributed_contracts
+
+collaboration-maintenance:
+	@test -n "$(COLLABORATION_MAINTENANCE_COMMAND)" || (echo "COLLABORATION_MAINTENANCE_COMMAND is required" >&2; exit 1)
+	cd $(RUST_ROOT) && $(CARGO) run --release --locked -- maintenance $(COLLABORATION_MAINTENANCE_COMMAND)
 
 ifeq ($(KC_RUST_GATE),0)
 check: go-ci

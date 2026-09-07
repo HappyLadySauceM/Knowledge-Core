@@ -205,7 +205,7 @@ impl Application {
                 return Err(error);
             }
         };
-        let mut startup = Startup::new(telemetry);
+        let mut startup = Startup::new(telemetry, &metrics);
         match Self::assemble(config, metrics, &mut startup).await {
             Ok(application) => Ok(application),
             Err(error) => {
@@ -636,7 +636,7 @@ struct Startup {
 }
 
 impl Startup {
-    fn new(telemetry: Telemetry) -> Self {
+    fn new(telemetry: Telemetry, metrics: &Metrics) -> Self {
         Self {
             telemetry: Some(telemetry),
             remote: None,
@@ -645,7 +645,7 @@ impl Startup {
             rpc_exit_expected: CancellationToken::new(),
             rpc_startup_gate: Arc::new(RpcStartupGate::default()),
             failure: CancellationToken::new(),
-            health: HealthState::default(),
+            health: HealthState::with_ready_metric(metrics.application_ready_gauge()),
             postgres: None,
             tickets: None,
             nats: None,

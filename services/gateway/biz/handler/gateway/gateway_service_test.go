@@ -327,6 +327,23 @@ func TestCollaborationSessionAllowsTicketAndSessionToExpireTogether(t *testing.T
 
 func TestCreateCollaborationSessionRejectsAmbiguousOrInvalidUpstreamInput(t *testing.T) {
 	documentID := "0198f0e0-7b6d-7a11-8e21-1123456789ab"
+	t.Run("non-empty body", func(t *testing.T) {
+		request := handlerRequest(&identityStub{}, `{}`)
+		request.Params = param.Params{{Key: "document_id", Value: documentID}}
+		request.Set("gateway.principal", coreauth.Principal{UserID: 7, ExpiresAt: time.Now().Add(time.Minute)})
+		request.Set("gateway.access_token", "signed-token")
+		dependencies, _ := gatewaymiddleware.FromRequest(request)
+		dependencies.Collaboration = &collaborationStub{createSession: func(context.Context, *collaborationv1.CreateSessionRequest) (*collaborationv1.CollaborationSession, error) {
+			t.Fatal("CreateSession must not run for a non-empty request body")
+			return nil, nil
+		}}
+
+		CreateCollaborationSession(context.Background(), request)
+		if request.Response.StatusCode() != consts.StatusBadRequest {
+			t.Fatalf("status = %d, body = %s", request.Response.StatusCode(), request.Response.Body())
+		}
+	})
+
 	request := app.NewContext(1)
 	request.Params = param.Params{{Key: "document_id", Value: documentID}}
 	request.Request.URI().SetQueryString("unknown=true")

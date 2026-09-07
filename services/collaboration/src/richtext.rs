@@ -875,9 +875,7 @@ fn valid_link(value: &str) -> bool {
     if value.len() > 2048 || value.contains(['\r', '\n']) {
         return false;
     }
-    url::Url::parse(value)
-        .ok()
-        .is_some_and(|value| ["http", "https", "mailto"].contains(&value.scheme()))
+    url::Url::parse(value).is_ok_and(|value| ["http", "https", "mailto"].contains(&value.scheme()))
 }
 
 fn extract_plain_text(root: &Value) -> String {

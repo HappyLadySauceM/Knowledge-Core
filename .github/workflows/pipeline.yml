@@ -345,6 +345,61 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  collaboration-real-dependencies:
+    needs: plan
+    if: needs.plan.outputs.has_rust_build_changes == 'true'
+    # GitHub service containers need the DinD sidecar provided by hls-builder;
+    # hls-standard intentionally has no Docker socket.
+    runs-on: hls-builder
+    timeout-minutes: 20
+    concurrency:
+      group: ${{ github.repository }}-${{ github.workflow }}-collaboration-real-dependencies-${{ github.ref }}
+      cancel-in-progress: true
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: collaboration-test-password
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+      nats:
+        image: nats:2.11-alpine
+        command: -js
+        ports:
+          - 4222:4222
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 1
+      - name: Check pinned Rust toolchain
+        run: |
+          set -euo pipefail
+          rustup toolchain list | grep -Eq '^1.97.1-'
+          echo "RUSTUP_TOOLCHAIN=1.97.1" >> "$GITHUB_ENV"
+          echo "CARGO_TARGET_DIR=$RUNNER_TEMP/knowledge-core-real-dependency-target" >> "$GITHUB_ENV"
+      - name: Run required real dependency contracts
+        env:
+          COLLABORATION_TEST_POSTGRES_URL: postgres://postgres@127.0.0.1:5432/postgres
+          COLLABORATION_TEST_POSTGRES_PASSWORD: collaboration-test-password
+          COLLABORATION_TEST_REDIS_URL: redis://127.0.0.1:6379/1
+          COLLABORATION_TEST_NATS_URL: nats://127.0.0.1:4222
+        run: make rust-real-dependencies BUILD_CPU_PERCENT=50
+
   release-notes:
     needs: plan
     if: needs.plan.outputs.has_changes == 'true'
@@ -483,8 +538,8 @@ jobs:
           retention-days: 7
 
   package-rust-candidates:
-    needs: [plan, rust-verify-build, prewarm-base-images]
-    if: always() && needs.plan.outputs.has_rust_build_changes == 'true' && needs.rust-verify-build.result == 'success' && needs.prewarm-base-images.result == 'success'
+    needs: [plan, rust-verify-build, collaboration-real-dependencies, prewarm-base-images]
+    if: always() && needs.plan.outputs.has_rust_build_changes == 'true' && needs.rust-verify-build.result == 'success' && needs.collaboration-real-dependencies.result == 'success' && needs.prewarm-base-images.result == 'success'
     runs-on: hls-builder
     timeout-minutes: 30
     environment: release
@@ -552,8 +607,8 @@ jobs:
           retention-days: 7
 
   deploy-release:
-    needs: [plan, deploy-verify, package-go-candidates, package-rust-candidates, release-notes]
-    if: always() && needs.plan.outputs.has_changes == 'true' && (needs.deploy-verify.result == 'success' || needs.plan.outputs.deploy_changed == 'false') && needs.release-notes.result == 'success' && (needs.plan.outputs.has_go_build_changes != 'true' || needs.package-go-candidates.result == 'success') && (needs.plan.outputs.has_rust_build_changes != 'true' || needs.package-rust-candidates.result == 'success')
+    needs: [plan, deploy-verify, package-go-candidates, package-rust-candidates, collaboration-real-dependencies, release-notes]
+    if: always() && needs.plan.outputs.has_changes == 'true' && (needs.deploy-verify.result == 'success' || needs.plan.outputs.deploy_changed == 'false') && needs.release-notes.result == 'success' && (needs.plan.outputs.has_go_build_changes != 'true' || needs.package-go-candidates.result == 'success') && (needs.plan.outputs.has_rust_build_changes != 'true' || (needs.package-rust-candidates.result == 'success' && needs.collaboration-real-dependencies.result == 'success'))
     runs-on: hls-standard
     timeout-minutes: 45
     environment: release

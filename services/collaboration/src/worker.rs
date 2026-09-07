@@ -27,7 +27,7 @@ use tracing_opentelemetry::OpenTelemetrySpanExt as _;
 use crate::{
     actor::{ActorRegistry, CLOSE_DOCUMENT_INVALIDATED},
     admin::HealthState,
-    config::{MAX_TICKET_TTL_MS, NatsConfig, WorkerConfig},
+    config::{MAX_TICKET_TTL_MS, NATS_PARKING_SUBJECT, NatsConfig, WorkerConfig},
     domain::{DocumentId, RequestContext},
     error::{Result, ServiceError},
     ports::KnowledgePort,
@@ -43,6 +43,8 @@ const STREAM_DUPLICATE_WINDOW: Duration = STREAM_MAX_AGE;
 const DOCUMENT_STREAM_MAX_BYTES: i64 = 1_073_741_824;
 const PERMISSION_STREAM_MAX_BYTES: i64 = -1;
 const STREAM_MAX_MESSAGE_SIZE: i32 = 1_048_576;
+const PARKING_STREAM_MAX_AGE: Duration = Duration::from_hours(7 * 24);
+const PARKING_STREAM_MAX_BYTES: i64 = 1_073_741_824;
 const PERMISSION_REPLAY_MINIMUM: Duration = Duration::from_millis(MAX_TICKET_TTL_MS);
 const PERMISSION_REPLAY_POLL_INTERVAL: Duration = Duration::from_millis(10);
 const _: () = assert!(STREAM_MAX_AGE.as_millis() >= PERMISSION_REPLAY_MINIMUM.as_millis());
@@ -72,6 +74,8 @@ pub struct NatsClient {
     document_stream_contract: Arc<StreamContract>,
     permission_stream: Arc<str>,
     permission_stream_contract: Arc<StreamContract>,
+    parking_stream: Arc<str>,
+    parking_stream_contract: Arc<StreamContract>,
     consumer_prefix: Arc<str>,
     operation_timeout: Duration,
 }
@@ -80,6 +84,7 @@ pub struct NatsClient {
 struct StreamContract {
     subjects: Vec<String>,
     max_bytes: i64,
+    max_age: Duration,
     description: &'static str,
 }
 
@@ -87,12 +92,14 @@ struct StreamContract {
 struct StreamContracts {
     documents: StreamContract,
     permissions: StreamContract,
+    parking: StreamContract,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum StreamKind {
     Documents,
     Permissions,
+    Parking,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -132,6 +139,12 @@ impl StreamContracts {
             PERMISSION_STREAM_MAX_BYTES,
             "Knowledge Core Collaboration permission events",
         )?;
+        let parking = StreamContract::new(
+            vec![NATS_PARKING_SUBJECT.to_owned()],
+            PARKING_STREAM_MAX_BYTES,
+            "Knowledge Core Collaboration parked events",
+        )?
+        .with_max_age(PARKING_STREAM_MAX_AGE);
         if documents
             .subjects
             .iter()
@@ -144,6 +157,7 @@ impl StreamContracts {
         Ok(Self {
             documents,
             permissions,
+            parking,
         })
     }
 }
@@ -163,6 +177,7 @@ impl StreamContract {
         Ok(Self {
             subjects,
             max_bytes,
+            max_age: STREAM_MAX_AGE,
             description,
         })
     }
@@ -175,7 +190,7 @@ impl StreamContract {
             retention: RetentionPolicy::Limits,
             discard: DiscardPolicy::Old,
             storage: StorageType::File,
-            max_age: STREAM_MAX_AGE,
+            max_age: self.max_age,
             duplicate_window: STREAM_DUPLICATE_WINDOW,
             max_bytes: self.max_bytes,
             max_message_size: STREAM_MAX_MESSAGE_SIZE,
@@ -192,7 +207,7 @@ impl StreamContract {
             || actual.retention != RetentionPolicy::Limits
             || actual.discard != DiscardPolicy::Old
             || actual.storage != StorageType::File
-            || actual.max_age != STREAM_MAX_AGE
+            || actual.max_age != self.max_age
             || actual.duplicate_window != STREAM_DUPLICATE_WINDOW
             || actual.max_bytes != self.max_bytes
             || actual.max_message_size != STREAM_MAX_MESSAGE_SIZE
@@ -202,6 +217,11 @@ impl StreamContract {
             ));
         }
         Ok(())
+    }
+
+    fn with_max_age(mut self, max_age: Duration) -> Self {
+        self.max_age = max_age;
+        self
     }
 }
 
@@ -215,6 +235,7 @@ impl NatsClient {
         let StreamContracts {
             documents,
             permissions,
+            parking,
         } = StreamContracts::from_config(config)?;
         let mut options = async_nats::ConnectOptions::new()
             .name(&config.name)
@@ -258,11 +279,14 @@ impl NatsClient {
             document_stream_contract: Arc::new(documents),
             permission_stream: Arc::from(config.permission_stream.as_str()),
             permission_stream_contract: Arc::new(permissions),
+            parking_stream: Arc::from(format!("{}_PARKING", config.stream).as_str()),
+            parking_stream_contract: Arc::new(parking),
             consumer_prefix: Arc::from(consumer_prefix(instance_id)?.as_str()),
             operation_timeout: config.operation_timeout,
         };
         result.ensure_stream(StreamKind::Documents).await?;
         result.ensure_stream(StreamKind::Permissions).await?;
+        result.ensure_stream(StreamKind::Parking).await?;
         result.ping().await?;
         Ok(result)
     }
@@ -276,6 +300,10 @@ impl NatsClient {
             StreamKind::Permissions => (
                 self.permission_stream.as_ref(),
                 self.permission_stream_contract.as_ref(),
+            ),
+            StreamKind::Parking => (
+                self.parking_stream.as_ref(),
+                self.parking_stream_contract.as_ref(),
             ),
         }
     }
@@ -376,13 +404,18 @@ impl NatsClient {
             .checked_mul(2)
             .unwrap_or(Duration::from_mins(5))
             .max(Duration::from_secs(5));
-        let expected = consumer_config(
+        let mut expected = consumer_config(
             &durable_name,
             consumer_role,
             subject,
             ack_wait,
             start_policy,
         );
+        if stream_kind == StreamKind::Parking {
+            // NATS normalizes zero to its wire-level unlimited value (-1). Keep the
+            // expected contract at -1 so validation agrees with the server response.
+            expected.max_deliver = -1;
+        }
         let stream = self
             .verified_stream(stream_kind, "open NATS JetStream stream")
             .await?;
@@ -500,6 +533,7 @@ impl EventPublisher for NatsClient {
                 .map_err(|error| dependency_error(error, "acknowledge NATS JetStream publish"))?;
             if acknowledgement.stream != self.document_stream.as_ref()
                 && acknowledgement.stream != self.permission_stream.as_ref()
+                && acknowledgement.stream != self.parking_stream.as_ref()
             {
                 return Err(ServiceError::unavailable(anyhow::anyhow!(
                     "NATS acknowledged the event from an unexpected stream"
@@ -516,11 +550,169 @@ impl EventPublisher for NatsClient {
             .await?;
         self.verified_stream(StreamKind::Permissions, "ping NATS permission JetStream")
             .await?;
+        self.verified_stream(StreamKind::Parking, "ping NATS parking JetStream")
+            .await?;
         tokio::time::timeout(self.operation_timeout, self.client.flush())
             .await
             .map_err(|_| dependency_timeout("flush NATS connection"))?
             .map_err(|error| dependency_error(error, "flush NATS connection"))
     }
+}
+
+impl NatsClient {
+    /// Persists a failed delivery in the restricted parking stream before the source delivery is
+    /// terminated. The original payload is kept byte-for-byte; operational metadata is carried in
+    /// headers so parking cannot inflate a message beyond the normal event payload limit.
+    async fn park_message(&self, message: &jetstream::Message, failure_key: &str) -> Result<()> {
+        let info = message.info().map_err(|error| {
+            ServiceError::unavailable(anyhow::anyhow!(
+                "inspect NATS delivery for parking: {error}"
+            ))
+        })?;
+        let stream_sequence = info.stream_sequence;
+        let delivery_attempt = info.delivered;
+        let stream = info.stream.to_owned();
+        let consumer = info.consumer.to_owned();
+        let subject = message.message.subject.to_string();
+        let mut headers = std::collections::BTreeMap::new();
+        headers.insert(
+            "Nats-Msg-Id".to_owned(),
+            format!("parking:{stream}:{stream_sequence}"),
+        );
+        headers.insert("X-Parking-Reason".to_owned(), failure_key.to_owned());
+        headers.insert("X-Parking-Original-Stream".to_owned(), stream);
+        headers.insert("X-Parking-Original-Consumer".to_owned(), consumer);
+        headers.insert(
+            "X-Parking-Original-Stream-Sequence".to_owned(),
+            stream_sequence.to_string(),
+        );
+        headers.insert("X-Parking-Original-Subject".to_owned(), subject);
+        headers.insert(
+            "X-Parking-Delivery-Attempt".to_owned(),
+            delivery_attempt.to_string(),
+        );
+        if let Some(original) = &message.message.headers {
+            for (key, values) in original.iter() {
+                if let Some(value) = values.first() {
+                    headers.insert(
+                        format!("X-Parking-Original-{key}"),
+                        value.as_str().to_owned(),
+                    );
+                }
+            }
+        }
+        self.publish_with_headers(NATS_PARKING_SUBJECT, message.payload.to_vec(), &headers)
+            .await
+    }
+
+    /// Redrives a bounded number of parked deliveries back to their original protocol subject.
+    /// The parking message is acknowledged only after the republish receives a `JetStream` `PubAck`;
+    /// the original `Nats-Msg-Id` is restored so a retry after an operator/network failure is
+    /// deduplicated by `JetStream`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the bounded inputs are invalid, parking metadata is malformed, or
+    /// the republish/acknowledgement cannot be confirmed.
+    pub async fn redrive_parked(&self, limit: usize, operator: &str) -> Result<usize> {
+        if !(1..=1_000).contains(&limit)
+            || operator.trim().is_empty()
+            || operator.trim() != operator
+            || operator.len() > 128
+        {
+            return Err(ServiceError::invalid_input(
+                "parking redrive limit or operator is invalid",
+            ));
+        }
+        let mut subscription = self
+            .open_subscription(
+                "parking-redrive",
+                NATS_PARKING_SUBJECT,
+                self.operation_timeout,
+                ConsumerStartPolicy::AllRetained,
+                StreamKind::Parking,
+            )
+            .await?
+            .messages;
+        let mut redriven = 0;
+        while redriven < limit {
+            let Some(message) =
+                (match tokio::time::timeout(self.operation_timeout, subscription.next()).await {
+                    Ok(message) => message,
+                    Err(_) => break,
+                })
+            else {
+                break;
+            };
+            let message =
+                message.map_err(|error| dependency_error(error, "read NATS parking message"))?;
+            let original_headers = message.message.headers.as_ref().ok_or_else(|| {
+                ServiceError::conflict("parked NATS message has no original metadata")
+            })?;
+            let original_subject = header_value(original_headers, "X-Parking-Original-Subject")
+                .ok_or_else(|| {
+                    ServiceError::conflict("parked NATS message has no original subject")
+                })?;
+            if original_subject == NATS_PARKING_SUBJECT
+                || !self.is_protocol_subject(&original_subject)
+            {
+                return Err(ServiceError::conflict(
+                    "parked NATS message has an unsupported original subject",
+                ));
+            }
+            let mut headers = std::collections::BTreeMap::new();
+            for (key, values) in original_headers.iter() {
+                let key = key.to_string();
+                let Some(original_key) = key.strip_prefix("X-Parking-Original-") else {
+                    continue;
+                };
+                if let Some(value) = values.first() {
+                    headers.insert(original_key.to_owned(), value.as_str().to_owned());
+                }
+            }
+            headers.insert("X-Redrive-Operator".to_owned(), operator.to_owned());
+            headers.insert(
+                "X-Redrive-Parking-Sequence".to_owned(),
+                message
+                    .info()
+                    .map_err(|error| {
+                        ServiceError::unavailable(anyhow::anyhow!(
+                            "inspect NATS parking message: {error}"
+                        ))
+                    })?
+                    .stream_sequence
+                    .to_string(),
+            );
+            self.publish_with_headers(&original_subject, message.payload.to_vec(), &headers)
+                .await?;
+            message
+                .double_ack_with(AckKind::Ack)
+                .await
+                .map_err(|error| {
+                    ServiceError::unavailable(anyhow::anyhow!(
+                        "acknowledge NATS parking message: {error}"
+                    ))
+                })?;
+            redriven += 1;
+        }
+        Ok(redriven)
+    }
+
+    fn is_protocol_subject(&self, subject: &str) -> bool {
+        self.document_stream_contract
+            .subjects
+            .iter()
+            .any(|candidate| candidate == subject)
+            || self
+                .permission_stream_contract
+                .subjects
+                .iter()
+                .any(|candidate| candidate == subject)
+    }
+}
+
+fn header_value(headers: &async_nats::HeaderMap, name: &str) -> Option<String> {
+    headers.get(name).map(|value| value.as_str().to_owned())
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -655,9 +847,19 @@ impl WorkerRuntime {
         );
         let cancellation = parent_cancellation.child_token();
         let tracker = TaskTracker::new();
-        let mut abort_handles = Vec::with_capacity(7);
+        let mut abort_handles = Vec::with_capacity(8);
         let healthy = Arc::new(AtomicBool::new(true));
 
+        spawn_worker(
+            &tracker,
+            &mut abort_handles,
+            backlog_metrics_loop(
+                Arc::clone(&store),
+                config.clone(),
+                metrics.clone(),
+                cancellation.child_token(),
+            ),
+        );
         spawn_worker(
             &tracker,
             &mut abort_handles,
@@ -706,6 +908,7 @@ impl WorkerRuntime {
             subscription_loop(
                 SubscriptionKind::Update,
                 update_subscription,
+                Arc::clone(&nats),
                 actors.clone(),
                 Arc::clone(&healthy),
                 health.clone(),
@@ -721,6 +924,7 @@ impl WorkerRuntime {
             subscription_loop(
                 SubscriptionKind::Invalidation,
                 invalidation_subscription,
+                Arc::clone(&nats),
                 actors.clone(),
                 Arc::clone(&healthy),
                 health.clone(),
@@ -736,6 +940,7 @@ impl WorkerRuntime {
             subscription_loop(
                 SubscriptionKind::Permission,
                 permission_subscription.messages,
+                Arc::clone(&nats),
                 actors,
                 Arc::clone(&healthy),
                 health,
@@ -838,6 +1043,37 @@ async fn projection_loop(
                     project_one(store.as_ref(), knowledge.as_ref(), &config),
                 ).await;
                 metrics.worker_operation("projection", matches!(result, Ok(Ok(()))));
+            }
+        }
+    }
+}
+
+async fn backlog_metrics_loop(
+    store: Arc<dyn WorkerStore>,
+    config: WorkerConfig,
+    metrics: Metrics,
+    cancellation: CancellationToken,
+) {
+    let mut interval = tokio::time::interval(config.poll_interval);
+    interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+    loop {
+        tokio::select! {
+            biased;
+            () = cancellation.cancelled() => break,
+            _ = interval.tick() => {
+                let context = operation_context(config.operation_timeout);
+                let result = tokio::time::timeout(
+                    config.operation_timeout,
+                    store.worker_backlog(&context),
+                ).await;
+                match result {
+                    Ok(Ok(Some(backlog))) => {
+                        metrics.set_worker_backlog(&backlog);
+                        metrics.worker_operation("backlog", true);
+                    }
+                    Ok(Ok(None)) => metrics.worker_operation("backlog", true),
+                    Ok(Err(_)) | Err(_) => metrics.worker_operation("backlog", false),
+                }
             }
         }
     }
@@ -1020,6 +1256,7 @@ enum SubscriptionKind {
 async fn subscription_loop(
     kind: SubscriptionKind,
     mut subscription: pull::Stream,
+    nats: Arc<NatsClient>,
     actors: ActorRegistry,
     healthy: Arc<AtomicBool>,
     health: HealthState,
@@ -1085,8 +1322,17 @@ async fn subscription_loop(
                     }
                     metrics.worker_operation("nats_event", false);
                     let acknowledgement = if delivery_attempt >= 8 {
-                        metrics.worker_operation("nats_event_parked", true);
-                        message.double_ack_with(AckKind::Term)
+                        if let Ok(()) = nats
+                            .park_message(&message, "collaboration.event_processing_failed")
+                            .await
+                        {
+                            metrics.worker_operation("nats_event_parked", true);
+                            message.double_ack_with(AckKind::Term)
+                        } else {
+                            metrics.worker_operation("nats_event_parking_failed", false);
+                            let delay = Duration::from_secs(1_u64 << delivery_attempt.min(7));
+                            message.double_ack_with(AckKind::Nak(Some(delay)))
+                        }
                     } else {
                         let delay = Duration::from_secs(1_u64 << delivery_attempt.min(7));
                         message.double_ack_with(AckKind::Nak(Some(delay)))
@@ -1196,7 +1442,6 @@ struct DocumentReference {
 }
 
 #[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
 struct PermissionEvent {
     document_id: DocumentId,
     permission_revision: i64,
@@ -1773,6 +2018,8 @@ mod tests {
         let contracts = StreamContracts::from_config(&config).expect("stream contracts");
         let documents = contracts.documents.config(&config.stream);
         let permissions = contracts.permissions.config(&config.permission_stream);
+        let parking_name = format!("{}_PARKING", config.stream);
+        let parking = contracts.parking.config(&parking_name);
 
         assert_eq!(
             documents.subjects,
@@ -1787,6 +2034,9 @@ mod tests {
             vec![NATS_PERMISSION_SUBJECT.to_owned()]
         );
         assert_eq!(permissions.max_bytes, PERMISSION_STREAM_MAX_BYTES);
+        assert_eq!(parking.subjects, vec![NATS_PARKING_SUBJECT.to_owned()]);
+        assert_eq!(parking.max_bytes, PARKING_STREAM_MAX_BYTES);
+        assert_eq!(parking.max_age, PARKING_STREAM_MAX_AGE);
         assert!(
             documents
                 .subjects
@@ -1802,6 +2052,7 @@ mod tests {
             &config.permission_stream,
             permissions,
         );
+        assert_stream_contract_rejects_drift(&contracts.parking, &parking_name, parking);
 
         for (index, mut drifted) in [config.clone(), config.clone(), config]
             .into_iter()
@@ -1861,6 +2112,15 @@ mod tests {
         assert!(validate_consumer_config(&expected, &actual).is_err());
         actual.deliver_policy = DeliverPolicy::ByStartSequence { start_sequence: 1 };
         assert!(validate_consumer_config(&expected, &actual).is_err());
+    }
+
+    #[test]
+    fn permission_events_accept_additive_fields() {
+        let event: PermissionEvent = serde_json::from_str(
+            r#"{"document_id":"0198f0e0-7b6d-7a11-8e21-1123456789ab","permission_revision":2,"deleted":false,"actor_id":7}"#,
+        )
+        .expect("additive permission field must be ignored");
+        assert_eq!(event.permission_revision, 2);
     }
 
     #[test]

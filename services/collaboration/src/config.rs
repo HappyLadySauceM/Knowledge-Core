@@ -13,6 +13,7 @@ pub(crate) const MAX_TICKET_TTL_MS: u64 = 60_000;
 pub const NATS_UPDATE_SUBJECT: &str = "collaboration.documents.updated";
 pub const NATS_INVALIDATION_SUBJECT: &str = "collaboration.documents.invalidated";
 pub const NATS_PERMISSION_SUBJECT: &str = "knowledge.permissions.changed";
+pub const NATS_PARKING_SUBJECT: &str = "collaboration.events.parked";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Environment {

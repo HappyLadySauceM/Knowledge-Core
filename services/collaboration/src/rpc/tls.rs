@@ -86,6 +86,7 @@ impl fmt::Debug for RpcIncoming {
 impl MakeIncoming for RpcIncoming {
     type Incoming = Self;
 
+    #[allow(clippy::unused_async)]
     async fn make_incoming(self) -> io::Result<Self::Incoming> {
         Ok(self)
     }

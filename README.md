@@ -278,7 +278,7 @@ Argo CD repository Secret、AppProject 和 ApplicationSet 由私有 GitOps 仓�
 普通 Kustomize source，foundation Application 使用独立 `ksops-v1.0` source 解密 Secret；
 同步策略为 Automated/Prune/Self Heal，镜像始终引用不可变 Harbor digest。
 
-当前测试覆盖领域、逻辑、transport、严格输入、错误映射、Collaboration commit-before-broadcast、恢复、投影、outbox、生命周期、双向 Kitex/Volo、Yjs 和多实例 JetStream 行为。按照当前范围，Identity 与 Knowledge repository 尚未包含真实 PostgreSQL 集成测试；不要把现有 mock/单元测试等同于数据库兼容性验证。Rust Collaboration 的性能对比、完整 Compose WebSocket E2E、依赖 stop/start、备份及切换/回滚演练仍需在发布前完成。
+当前测试覆盖领域、逻辑、transport、严格输入、错误映射、Collaboration commit-before-broadcast、恢复、投影、outbox、生命周期、双向 Kitex/Volo、Yjs 和多实例 JetStream 行为；Rust Collaboration 的真实 PostgreSQL/Redis/NATS 合同测试由 CI 的 `collaboration-real-dependencies` 门禁强制执行。按照当前范围，Identity 与 Knowledge repository 尚未包含真实 PostgreSQL 集成测试；不要把现有 mock/单元测试等同于数据库兼容性验证。Rust Collaboration 的性能对比、完整 Compose WebSocket E2E、依赖 stop/start、备份及切换/回滚演练仍需在发布前完成。
 
 ## 代码生成
 

@@ -215,7 +215,7 @@ Collaboration 使用按版本有序执行并逐项校验 checksum 的显式 SQLx
 - 投影 worker 把当前 Yjs 文档转换为受限 rich-text JSON 和 plain text，再调用 Knowledge；失败按有界重试处理。
 - Collaboration outbox 与事件 headers 同事务保存 trace context，发布时透传 W3C headers；JetStream delivery 超过 8 次会停车并保持幂等 event key，避免循环/重试放大 span 数量。
 - `knowledge.permissions.changed` 和 `collaboration.documents.invalidated` 只用于失效通知，不替代 PostgreSQL 持久化。
-- Collaboration 是两套 JetStream stream contract 的 owner。默认 `KNOWLEDGE_CORE_EVENTS` 只包含 `collaboration.documents.updated` 与 `collaboration.documents.invalidated`，使用 24 小时 max age、1 GiB max bytes；默认 `KNOWLEDGE_CORE_PERMISSIONS` 只包含 `knowledge.permissions.changed`，使用 24 小时 max age 且 `max_bytes=-1`，避免容量驱逐破坏 ticket TTL 覆盖。两者名称必须不同，并共同要求 Limits retention、File storage、DiscardOld、24 小时 duplicate window 与 1 MiB max message；subject 或已有 stream 配置漂移时拒绝 ready。每个副本使用由唯一且重启稳定的 `COLLABORATION_INSTANCE_ID` 派生的 durable consumer，确保 fanout 与未 ACK redelivery。
+- Collaboration 是 JetStream stream contract 的 owner。默认 `KNOWLEDGE_CORE_EVENTS` 只包含 `collaboration.documents.updated` 与 `collaboration.documents.invalidated`，使用 24 小时 max age、1 GiB max bytes；默认 `KNOWLEDGE_CORE_PERMISSIONS` 只包含 `knowledge.permissions.changed`，使用 24 小时 max age 且 `max_bytes=-1`，避免容量驱逐破坏 ticket TTL 覆盖；失败投递进入派生的 `KNOWLEDGE_CORE_EVENTS_PARKING`，使用 7 天 max age、1 GiB max bytes，仅用于人工审计和 redrive。文档/权限/parking stream 名称必须不同，并共同要求 Limits retention、File storage、DiscardOld、24 小时 duplicate window 与 1 MiB max message；subject 或已有 stream 配置漂移时拒绝 ready。源消费只有在 parking PubAck 成功后才 TERM，parking redrive 只有原 subject PubAck 成功后才 ACK，并恢复原 `Nats-Msg-Id`。每个副本使用由唯一且重启稳定的 `COLLABORATION_INSTANCE_ID` 派生的 durable consumer，确保 fanout 与未 ACK redelivery。
 
 ## 8. 配置、Secret 与 TLS
 

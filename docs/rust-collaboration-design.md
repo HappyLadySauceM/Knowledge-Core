@@ -232,8 +232,8 @@ snapshot worker 用单个 lateral aggregate 同时计算每个 document 自水�
 - NATS permission/invalidation subscription 异常时停止接收新 session、关闭受保护连接并标记 not-ready，不为可用性静默放行；当前恢复策略是由外部编排重启进程，不在进程内无界重连。
 - Knowledge 出站 RPC 使用连续失败熔断；打开时 `authorize`/`project` 返回 `40007 / collaboration.unavailable`，不得降级为匿名可写。启动与 supervisor 不以 Knowledge `Live` 作为 Ready 门闩。
 - 每个副本的 `COLLABORATION_INSTANCE_ID` 必须唯一且重启后稳定；它用于派生各角色的 JetStream durable consumer identity，使副本间 fanout 与同一副本的未 ACK redelivery 同时成立。
-- update、document invalidation 与 permission subject 分别固定为 `collaboration.documents.updated`、`collaboration.documents.invalidated` 和 `knowledge.permissions.changed`；相关环境变量只能等于协议值，不能用于部署级改名。document 与 permission stream 名称可配置但必须不同；两者的 max age 与 duplicate window 都固定为 24 小时并做严格漂移校验。
-- document stream 只拥有 update/invalidation subject，并以 1 GiB `max_bytes` 限制历史；permission stream 只拥有 permission subject，`max_bytes=-1`，只按 24 小时 max age 驱逐。permission event 必须包含正 revision；新 durable 使用 `DeliverPolicy::All` 回放全部时间保留历史，以 consumer 创建后读取的 permission stream `last_sequence` 为启动目标，并等待服务端连续 ACK floor 的 stream sequence 越过目标。若 retention 在投递前收缩，只有 consumer 同时没有 pending 和 ack-pending 消息时才视为空集合追平。actor 只关闭 revision 更旧的 session，并用保留时间不短于最大 ticket TTL 的 registry watermark 拒绝事件到达前签发、到达后才消费的旧 ticket。重复或延迟事件不得关闭同 revision/更新授权连接。
+- update、document invalidation 与 permission subject 分别固定为 `collaboration.documents.updated`、`collaboration.documents.invalidated` 和 `knowledge.permissions.changed`；相关环境变量只能等于协议值，不能用于部署级改名。document 与 permission stream 名称可配置但必须不同；两者的 max age 与 duplicate window 都固定为 24 小时并做严格漂移校验，parking stream 由 document stream 名派生且单独校验 7 天保留。
+- document stream 只拥有 update/invalidation subject，并以 1 GiB `max_bytes` 限制历史；permission stream 只拥有 permission subject，`max_bytes=-1`，只按 24 小时 max age 驱逐；parking stream 只拥有 `collaboration.events.parked`，以 7 天 max age 和 1 GiB `max_bytes` 受限保存失败投递。permission event 必须包含正 revision；新 durable 使用 `DeliverPolicy::All` 回放全部时间保留历史，以 consumer 创建后读取的 permission stream `last_sequence` 为启动目标，并等待服务端连续 ACK floor 的 stream sequence 越过目标。若 retention 在投递前收缩，只有 consumer 同时没有 pending 和 ack-pending 消息时才视为空集合追平。actor 只关闭 revision 更旧的 session，并用保留时间不短于最大 ticket TTL 的 registry watermark 拒绝事件到达前签发、到达后才消费的旧 ticket。重复或延迟事件不得关闭同 revision/更新授权连接。
 
 所有 background task 必须由 `CancellationToken`、`JoinSet`/task tracker 和 Runtime 统一拥有。启动顺序为配置校验、telemetry、数据库 migration、Redis/NATS、Knowledge client、actor/workers、listener；每个成功资源立即注册逆序 cleanup。RPC serve task 的返回、错误、panic 与 abort 都必须撤销 listener readiness；只有显式 shutdown/rollback 才标记为计划内退出。RPC task exit 与最终 readiness commit 通过同一同步 gate 串行化，最终 commit 前再次验证 RPC listener，不能在 task 已退出后重新置 ready。
 
@@ -261,7 +261,7 @@ idl/rpc/v1/collaboration.thrift
 
 `docker/collaboration/Dockerfile` 使用锁定 Rust 基础镜像构建 release artifact，最终以固定无特权 UID/GID `10001:10001` 运行且不包含 Rust toolchain、Node/npm。Compose 使用 RPC `:8883`、admin `:8084` 和 Docker 服务名 `knowledge:8882`，并已移除 `:8092`。
 
-当前没有远端自动 CI；提交前至少显式执行：
+远端 workflow 已配置 `collaboration-real-dependencies` 门禁；提交前至少显式执行：
 
 ```text
 cd services/collaboration
@@ -271,6 +271,9 @@ cargo test --workspace --all-targets --all-features --locked
 cargo build --workspace --release --locked
 cargo deny check advisories bans licenses sources
 ```
+
+CI 会在带 PostgreSQL、Redis 和 NATS 的 runner 上执行
+`make rust-real-dependencies BUILD_CPU_PERCENT=50`；本地若要复现同一门禁，需先提供对应的真实依赖连接变量。
 
 Node 24 只运行 `services/collaboration/interop` 的 `npm ci && npm run ci`。生成脚本、`make generate`、`make ci` 和 generated drift check 同时覆盖 Go 与 Rust Thrift 输出。真实依赖测试设置 `COLLABORATION_TEST_REQUIRE_REAL_DEPENDENCIES=1`；PostgreSQL、Redis 或 NATS 的对应连接变量缺失时测试直接失败，不允许把 skip 当成通过。
 

@@ -13,6 +13,7 @@ use axum::{
     http::{HeaderValue, Response, StatusCode, header},
     routing::get,
 };
+use prometheus::IntGauge;
 use tokio::{net::TcpListener, sync::Mutex, task::JoinHandle};
 use tokio_util::sync::CancellationToken;
 
@@ -36,20 +37,37 @@ pub struct HealthState {
 struct HealthInner {
     live: AtomicBool,
     ready: AtomicBool,
+    ready_metric: Option<IntGauge>,
 }
 
 impl HealthState {
+    pub fn with_ready_metric(ready_metric: IntGauge) -> Self {
+        Self {
+            inner: Arc::new(HealthInner {
+                live: AtomicBool::new(false),
+                ready: AtomicBool::new(false),
+                ready_metric: Some(ready_metric),
+            }),
+        }
+    }
+
     pub fn start(&self) {
         self.inner.live.store(true, Ordering::Release);
     }
 
     pub fn set_ready(&self, ready: bool) {
         self.inner.ready.store(ready, Ordering::Release);
+        if let Some(metric) = &self.inner.ready_metric {
+            metric.set(i64::from(ready));
+        }
     }
 
     pub fn stop(&self) {
         self.inner.ready.store(false, Ordering::Release);
         self.inner.live.store(false, Ordering::Release);
+        if let Some(metric) = &self.inner.ready_metric {
+            metric.set(0);
+        }
     }
 
     pub fn is_live(&self) -> bool {

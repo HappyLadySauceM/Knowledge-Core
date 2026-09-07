@@ -14,8 +14,8 @@ use bytes::Bytes;
 use futures_util::StreamExt as _;
 use knowledge_core_collaboration::{
     config::{
-        NATS_INVALIDATION_SUBJECT, NATS_PERMISSION_SUBJECT, NATS_UPDATE_SUBJECT, NatsConfig,
-        PostgresConfig, TlsConfig,
+        NATS_INVALIDATION_SUBJECT, NATS_PARKING_SUBJECT, NATS_PERMISSION_SUBJECT,
+        NATS_UPDATE_SUBJECT, NatsConfig, PostgresConfig, TlsConfig,
     },
     domain::{DocumentId, PublicUser, RequestContext, VersionId},
     error::ErrorCode,
@@ -128,7 +128,7 @@ async fn postgres_contract(url: &str) -> TestResult {
             .fetch_all(&migration_inspection)
             .await?;
     migration_inspection.close().await;
-    assert_eq!(migration_versions, vec![1_i64, 2_i64]);
+    assert_eq!(migration_versions, vec![1_i64, 2_i64, 3_i64, 4_i64]);
     let context = postgres_request_context("real-postgres-contract");
     store.initialize_document(&context, document_id).await?;
     let initial = store.load_document(&context, document_id).await?;
@@ -282,6 +282,31 @@ async fn worker_restore_and_purge_contract(
         .claim_outbox(context, 20, Duration::from_secs(5))
         .await?;
     assert!(events.len() >= 3);
+    let parked_event = events
+        .first()
+        .ok_or_else(|| test_error("outbox contract did not return an event"))?;
+    let inspection = PgPoolOptions::new().max_connections(1).connect(url).await?;
+    sqlx::query(
+        "UPDATE collaboration.outbox
+         SET parked_at = now(), lease_until = NULL
+         WHERE id = $1 AND published_at IS NULL",
+    )
+    .bind(parked_event.id)
+    .execute(&inspection)
+    .await?;
+    let redriven = store
+        .redrive_outbox(context, 1, "real-dependency-test", Some(parked_event.id))
+        .await?;
+    assert_eq!(redriven, vec![parked_event.id]);
+    let audit_count: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM collaboration.maintenance_actions
+         WHERE target_id = $1 AND action = 'outbox.redrive'",
+    )
+    .bind(parked_event.id)
+    .fetch_one(&inspection)
+    .await?;
+    assert!(audit_count >= 1);
+    inspection.close().await;
     for event in events {
         store.complete_outbox(context, event.id).await?;
     }
@@ -491,6 +516,7 @@ async fn nats_contract(url: &str) -> TestResult {
     let suffix = Uuid::now_v7().simple().to_string();
     let stream_name = format!("KC_COLLAB_TEST_{suffix}").to_uppercase();
     let permission_stream_name = format!("KC_COLLAB_PERMISSIONS_TEST_{suffix}").to_uppercase();
+    let parking_stream_name = format!("{stream_name}_PARKING");
 
     let config = NatsConfig {
         servers: vec![url.to_owned()],
@@ -513,7 +539,14 @@ async fn nats_contract(url: &str) -> TestResult {
         NatsClient::connect(&config, &primary_instance),
         NatsClient::connect(&config, &peer_instance),
     )?;
-    verify_stream_contracts(&context, &stream_name, &permission_stream_name, &suffix).await?;
+    verify_stream_contracts(
+        &context,
+        &stream_name,
+        &permission_stream_name,
+        &parking_stream_name,
+        &suffix,
+    )
+    .await?;
     let mut subscription = production
         .subscribe("contract", NATS_UPDATE_SUBJECT, Duration::from_secs(5))
         .await?;
@@ -535,6 +568,7 @@ async fn nats_contract(url: &str) -> TestResult {
     production.shutdown(Duration::from_secs(5)).await?;
     context.delete_stream(stream_name).await?;
     context.delete_stream(permission_stream_name).await?;
+    context.delete_stream(parking_stream_name).await?;
     client.flush().await?;
     Ok(())
 }
@@ -543,12 +577,15 @@ async fn verify_stream_contracts(
     context: &jetstream::Context,
     document_stream_name: &str,
     permission_stream_name: &str,
+    parking_stream_name: &str,
     suffix: &str,
 ) -> TestResult {
     let document_stream = context.get_stream(document_stream_name).await?;
     let document_info = document_stream.get_info().await?;
     let permission_stream = context.get_stream(permission_stream_name).await?;
     let permission_info = permission_stream.get_info().await?;
+    let parking_stream = context.get_stream(parking_stream_name).await?;
+    let parking_info = parking_stream.get_info().await?;
     assert_eq!(
         document_info.config.subjects,
         vec![
@@ -562,6 +599,12 @@ async fn verify_stream_contracts(
         vec![NATS_PERMISSION_SUBJECT.to_owned()]
     );
     assert_eq!(permission_info.config.max_bytes, -1);
+    assert_eq!(
+        parking_info.config.subjects,
+        vec![NATS_PARKING_SUBJECT.to_owned()]
+    );
+    assert_eq!(parking_info.config.max_bytes, 1_073_741_824);
+    assert_eq!(parking_info.config.max_age, Duration::from_hours(7 * 24));
     assert!(
         document_info
             .config

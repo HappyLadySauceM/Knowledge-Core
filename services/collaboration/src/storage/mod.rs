@@ -115,6 +115,15 @@ pub struct OutboxEvent {
     pub attempts: i32,
 }
 
+#[derive(Clone, Copy, Debug, Default)]
+pub struct WorkerBacklog {
+    pub outbox_pending: i64,
+    pub outbox_parked: i64,
+    pub outbox_oldest_age_seconds: f64,
+    pub projection_pending: i64,
+    pub projection_oldest_age_seconds: f64,
+}
+
 #[async_trait]
 pub trait DocumentStore: Send + Sync {
     async fn initialize_document(
@@ -192,6 +201,10 @@ pub trait VersionStore: Send + Sync {
 
 #[async_trait]
 pub trait WorkerStore: Send + Sync {
+    async fn worker_backlog(&self, _context: &RequestContext) -> Result<Option<WorkerBacklog>> {
+        Ok(None)
+    }
+
     async fn claim_projection_job(
         &self,
         context: &RequestContext,

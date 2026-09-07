@@ -640,7 +640,7 @@ fn valid_origin(headers: &HeaderMap, allowed_origins: &[String]) -> bool {
     if origins.next().is_some() {
         return false;
     }
-    origin.to_str().ok().is_some_and(|origin| {
+    origin.to_str().is_ok_and(|origin| {
         !origin.is_empty() && allowed_origins.iter().any(|allowed| allowed == origin)
     })
 }
