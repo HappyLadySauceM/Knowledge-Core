@@ -295,7 +295,11 @@ jobs:
           rustup component list --toolchain 1.97.1 | grep -Eq '^clippy-.* \(installed\)$'
           rustup component list --toolchain 1.97.1 | grep -Eq '^rustfmt-.* \(installed\)$'
           echo "RUSTUP_TOOLCHAIN=1.97.1" >> "$GITHUB_ENV"
-          echo "CARGO_TARGET_DIR=$RUNNER_TEMP/knowledge-core-cargo-target" >> "$GITHUB_ENV"
+          # hls-standard and hls-builder share the hostPath mounted at /cache.
+          # Keep the Rust target there so the real-dependency gate can reuse
+          # the artifacts produced by this quality gate instead of compiling
+          # the workspace a second time on a separate runner.
+          echo "CARGO_TARGET_DIR=/cache/knowledge-core-cargo-target" >> "$GITHUB_ENV"
       - uses: taiki-e/install-action@583939ec0c8ee9c523cc60342d3d979ce6730f38
         with:
           tool: cargo-deny@0.20.2
@@ -394,7 +398,10 @@ jobs:
           set -euo pipefail
           rustup toolchain list | grep -Eq '^1.97.1-'
           echo "RUSTUP_TOOLCHAIN=1.97.1" >> "$GITHUB_ENV"
-          echo "CARGO_TARGET_DIR=$RUNNER_TEMP/knowledge-core-real-dependency-target" >> "$GITHUB_ENV"
+          # Reuse the target populated by rust-verify-build. The jobs are
+          # serialized by the workflow's branch concurrency group, and the
+          # shared /cache mount is provided to both runner classes.
+          echo "CARGO_TARGET_DIR=/cache/knowledge-core-cargo-target" >> "$GITHUB_ENV"
       - name: Run required real dependency contracts
         env:
           COLLABORATION_TEST_POSTGRES_URL: postgres://postgres@127.0.0.1:5432/postgres
