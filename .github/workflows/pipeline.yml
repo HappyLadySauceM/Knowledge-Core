@@ -314,6 +314,12 @@ jobs:
           make rust-ci generate-rust-check
           rm -rf .ci-artifacts
           mkdir -p .ci-artifacts
+          mkdir -p .ci-artifacts/real-dependency-tests
+          for test_name in real_dependencies distributed_contracts; do
+            test_binary="$(find "${CARGO_TARGET_DIR:?}/debug/deps" -maxdepth 1 -type f -name "${test_name}-*" -perm -u+x -printf '%T@ %p\n' | sort -nr | head -n1 | cut -d' ' -f2-)"
+            test -n "$test_binary"
+            install -m 0755 "$test_binary" ".ci-artifacts/real-dependency-tests/$test_name"
+          done
           make rust-release RUST_ARTIFACT_DIR=.ci-artifacts
           printf 'verified-rust\n' > .ci-artifacts/artifact-marker-rust.txt
           npm --prefix services/collaboration/interop ci
@@ -348,6 +354,13 @@ jobs:
           overwrite: true
           if-no-files-found: error
           retention-days: 7
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: knowledge-core-collaboration-real-dependency-tests-${{ github.run_id }}
+          path: .ci-artifacts/real-dependency-tests
+          overwrite: true
+          if-no-files-found: error
+          retention-days: 7
 
   collaboration-real-dependencies:
     needs: [plan, rust-verify-build]
@@ -359,9 +372,6 @@ jobs:
     concurrency:
       group: ${{ github.repository }}-${{ github.workflow }}-collaboration-real-dependencies-${{ github.ref }}
       cancel-in-progress: true
-    env:
-      CARGO_INCREMENTAL: "0"
-      CARGO_PROFILE_TEST_DEBUG: "0"
     services:
       postgres:
         image: postgres:16-alpine
@@ -390,25 +400,24 @@ jobs:
         ports:
           - 4222:4222
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          fetch-depth: 1
-      - name: Check pinned Rust toolchain
-        run: |
-          set -euo pipefail
-          rustup toolchain list | grep -Eq '^1.97.1-'
-          echo "RUSTUP_TOOLCHAIN=1.97.1" >> "$GITHUB_ENV"
-          # Reuse the target populated by rust-verify-build. The jobs are
-          # serialized by the workflow's branch concurrency group, and the
-          # shared /cache mount is provided to both runner classes.
-          echo "CARGO_TARGET_DIR=/cache/knowledge-core-cargo-target" >> "$GITHUB_ENV"
+          name: knowledge-core-collaboration-real-dependency-tests-${{ github.run_id }}
+          path: .ci-artifacts/real-dependency-tests
       - name: Run required real dependency contracts
         env:
+          COLLABORATION_TEST_REQUIRE_REAL_DEPENDENCIES: "1"
           COLLABORATION_TEST_POSTGRES_URL: postgres://postgres@127.0.0.1:5432/postgres
           COLLABORATION_TEST_POSTGRES_PASSWORD: collaboration-test-password
           COLLABORATION_TEST_REDIS_URL: redis://127.0.0.1:6379/1
           COLLABORATION_TEST_NATS_URL: nats://127.0.0.1:4222
-        run: make rust-real-dependencies BUILD_CPU_PERCENT=75
+        run: |
+          set -euo pipefail
+          for test_name in real_dependencies distributed_contracts; do
+            test -x ".ci-artifacts/real-dependency-tests/$test_name"
+          done
+          ./.ci-artifacts/real-dependency-tests/real_dependencies
+          ./.ci-artifacts/real-dependency-tests/distributed_contracts
 
   release-notes:
     needs: plan
