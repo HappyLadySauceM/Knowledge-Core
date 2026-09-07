@@ -517,15 +517,18 @@ async fn nats_contract(url: &str) -> TestResult {
     let stream_name = format!("KC_COLLAB_TEST_{suffix}").to_uppercase();
     let permission_stream_name = format!("KC_COLLAB_PERMISSIONS_TEST_{suffix}").to_uppercase();
     let parking_stream_name = format!("{stream_name}_PARKING");
+    let update_subject = format!("{NATS_UPDATE_SUBJECT}.{suffix}");
+    let invalidation_subject = format!("{NATS_INVALIDATION_SUBJECT}.{suffix}");
+    let permission_subject = format!("{NATS_PERMISSION_SUBJECT}.{suffix}");
 
     let config = NatsConfig {
         servers: vec![url.to_owned()],
         name: "knowledge-core.collaboration.real-test".to_owned(),
         stream: stream_name.clone(),
         permission_stream: permission_stream_name.clone(),
-        update_subject: NATS_UPDATE_SUBJECT.to_owned(),
-        invalidation_subject: NATS_INVALIDATION_SUBJECT.to_owned(),
-        permission_subject: NATS_PERMISSION_SUBJECT.to_owned(),
+        update_subject,
+        invalidation_subject,
+        permission_subject,
         connect_timeout: Duration::from_secs(5),
         operation_timeout: Duration::from_secs(5),
         token: None,
@@ -539,19 +542,12 @@ async fn nats_contract(url: &str) -> TestResult {
         NatsClient::connect(&config, &primary_instance),
         NatsClient::connect(&config, &peer_instance),
     )?;
-    verify_stream_contracts(
-        &context,
-        &stream_name,
-        &permission_stream_name,
-        &parking_stream_name,
-        &suffix,
-    )
-    .await?;
+    verify_stream_contracts(&context, &config, &parking_stream_name, &suffix).await?;
     let mut subscription = production
-        .subscribe("contract", NATS_UPDATE_SUBJECT, Duration::from_secs(5))
+        .subscribe("contract", &config.update_subject, Duration::from_secs(5))
         .await?;
     production
-        .publish(NATS_UPDATE_SUBJECT, b"committed".to_vec())
+        .publish(&config.update_subject, b"committed".to_vec())
         .await?;
     let message = timeout(Duration::from_secs(5), subscription.next())
         .await
@@ -575,28 +571,27 @@ async fn nats_contract(url: &str) -> TestResult {
 
 async fn verify_stream_contracts(
     context: &jetstream::Context,
-    document_stream_name: &str,
-    permission_stream_name: &str,
+    config: &NatsConfig,
     parking_stream_name: &str,
     suffix: &str,
 ) -> TestResult {
-    let document_stream = context.get_stream(document_stream_name).await?;
+    let document_stream = context.get_stream(&config.stream).await?;
     let document_info = document_stream.get_info().await?;
-    let permission_stream = context.get_stream(permission_stream_name).await?;
+    let permission_stream = context.get_stream(&config.permission_stream).await?;
     let permission_info = permission_stream.get_info().await?;
     let parking_stream = context.get_stream(parking_stream_name).await?;
     let parking_info = parking_stream.get_info().await?;
     assert_eq!(
         document_info.config.subjects,
         vec![
-            NATS_INVALIDATION_SUBJECT.to_owned(),
-            NATS_UPDATE_SUBJECT.to_owned(),
+            config.invalidation_subject.clone(),
+            config.update_subject.clone(),
         ]
     );
     assert_eq!(document_info.config.max_bytes, 1_073_741_824);
     assert_eq!(
         permission_info.config.subjects,
-        vec![NATS_PERMISSION_SUBJECT.to_owned()]
+        vec![config.permission_subject.clone()]
     );
     assert_eq!(permission_info.config.max_bytes, -1);
     assert_eq!(
@@ -617,7 +612,7 @@ async fn verify_stream_contracts(
     for revision in 1..=3 {
         let acknowledgement = context
             .publish(
-                NATS_PERMISSION_SUBJECT.to_owned(),
+                config.permission_subject.clone(),
                 Bytes::from(format!(
                     r#"{{"document_id":"{}","permission_revision":{revision},"deleted":false}}"#,
                     Uuid::now_v7()
@@ -625,7 +620,7 @@ async fn verify_stream_contracts(
             )
             .await?
             .await?;
-        assert_eq!(acknowledgement.stream, permission_stream_name);
+        assert_eq!(acknowledgement.stream, config.permission_stream);
         sequences.push(acknowledgement.sequence);
     }
     assert!(permission_stream.delete_message(sequences[1]).await?);
@@ -639,7 +634,7 @@ async fn verify_stream_contracts(
                 name: Some(durable.clone()),
                 deliver_policy: DeliverPolicy::All,
                 ack_policy: AckPolicy::Explicit,
-                filter_subject: NATS_PERMISSION_SUBJECT.to_owned(),
+                filter_subject: config.permission_subject.clone(),
                 ..Default::default()
             },
         )

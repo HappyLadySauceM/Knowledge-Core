@@ -220,14 +220,17 @@ impl NatsFixture {
         let stream = format!("KC_DISTRIBUTED_{purpose}_{suffix}").to_uppercase();
         let permission_stream =
             format!("KC_DISTRIBUTED_PERMISSIONS_{purpose}_{suffix}").to_uppercase();
+        let update_subject = format!("{NATS_UPDATE_SUBJECT}.{suffix}");
+        let invalidation_subject = format!("{NATS_INVALIDATION_SUBJECT}.{suffix}");
+        let permission_subject = format!("{NATS_PERMISSION_SUBJECT}.{suffix}");
         let config = NatsConfig {
             servers: vec![url.to_owned()],
             name: format!("knowledge-core.collaboration.{purpose}-test"),
             stream: stream.clone(),
             permission_stream: permission_stream.clone(),
-            update_subject: NATS_UPDATE_SUBJECT.to_owned(),
-            invalidation_subject: NATS_INVALIDATION_SUBJECT.to_owned(),
-            permission_subject: NATS_PERMISSION_SUBJECT.to_owned(),
+            update_subject,
+            invalidation_subject,
+            permission_subject,
             connect_timeout: Duration::from_secs(5),
             operation_timeout: Duration::from_secs(5),
             token: None,
