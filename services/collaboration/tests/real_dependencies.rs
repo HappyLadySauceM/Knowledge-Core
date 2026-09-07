@@ -517,18 +517,15 @@ async fn nats_contract(url: &str) -> TestResult {
     let stream_name = format!("KC_COLLAB_TEST_{suffix}").to_uppercase();
     let permission_stream_name = format!("KC_COLLAB_PERMISSIONS_TEST_{suffix}").to_uppercase();
     let parking_stream_name = format!("{stream_name}_PARKING");
-    let update_subject = format!("{NATS_UPDATE_SUBJECT}.{suffix}");
-    let invalidation_subject = format!("{NATS_INVALIDATION_SUBJECT}.{suffix}");
-    let permission_subject = format!("{NATS_PERMISSION_SUBJECT}.{suffix}");
 
     let config = NatsConfig {
         servers: vec![url.to_owned()],
         name: "knowledge-core.collaboration.real-test".to_owned(),
         stream: stream_name.clone(),
         permission_stream: permission_stream_name.clone(),
-        update_subject,
-        invalidation_subject,
-        permission_subject,
+        update_subject: NATS_UPDATE_SUBJECT.to_owned(),
+        invalidation_subject: NATS_INVALIDATION_SUBJECT.to_owned(),
+        permission_subject: NATS_PERMISSION_SUBJECT.to_owned(),
         connect_timeout: Duration::from_secs(5),
         operation_timeout: Duration::from_secs(5),
         token: None,
@@ -562,11 +559,24 @@ async fn nats_contract(url: &str) -> TestResult {
         .map_err(|_| test_error("production NATS acknowledgement timed out"))??;
     peer.shutdown(Duration::from_secs(5)).await?;
     production.shutdown(Duration::from_secs(5)).await?;
-    context.delete_stream(stream_name).await?;
-    context.delete_stream(permission_stream_name).await?;
-    context.delete_stream(parking_stream_name).await?;
+    delete_stream_and_wait(&context, stream_name).await?;
+    delete_stream_and_wait(&context, permission_stream_name).await?;
+    delete_stream_and_wait(&context, parking_stream_name).await?;
     client.flush().await?;
     Ok(())
+}
+
+async fn delete_stream_and_wait(context: &jetstream::Context, name: String) -> TestResult {
+    context.delete_stream(name.clone()).await?;
+    for _ in 0..50 {
+        if context.get_stream(&name).await.is_err() {
+            return Ok(());
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    Err(test_error(format!(
+        "NATS stream {name} remained visible after deletion"
+    )))
 }
 
 async fn verify_stream_contracts(
@@ -721,6 +731,6 @@ fn postgres_request_context(request_id: &'static str) -> RequestContext {
     context
 }
 
-fn test_error(message: &'static str) -> Box<dyn Error + Send + Sync> {
-    Box::new(io::Error::other(message))
+fn test_error(message: impl Into<String>) -> Box<dyn Error + Send + Sync> {
+    Box::new(io::Error::other(message.into()))
 }

@@ -220,17 +220,14 @@ impl NatsFixture {
         let stream = format!("KC_DISTRIBUTED_{purpose}_{suffix}").to_uppercase();
         let permission_stream =
             format!("KC_DISTRIBUTED_PERMISSIONS_{purpose}_{suffix}").to_uppercase();
-        let update_subject = format!("{NATS_UPDATE_SUBJECT}.{suffix}");
-        let invalidation_subject = format!("{NATS_INVALIDATION_SUBJECT}.{suffix}");
-        let permission_subject = format!("{NATS_PERMISSION_SUBJECT}.{suffix}");
         let config = NatsConfig {
             servers: vec![url.to_owned()],
             name: format!("knowledge-core.collaboration.{purpose}-test"),
             stream: stream.clone(),
             permission_stream: permission_stream.clone(),
-            update_subject,
-            invalidation_subject,
-            permission_subject,
+            update_subject: NATS_UPDATE_SUBJECT.to_owned(),
+            invalidation_subject: NATS_INVALIDATION_SUBJECT.to_owned(),
+            permission_subject: NATS_PERMISSION_SUBJECT.to_owned(),
             connect_timeout: Duration::from_secs(5),
             operation_timeout: Duration::from_secs(5),
             token: None,
@@ -248,8 +245,9 @@ impl NatsFixture {
     }
 
     async fn finish(self, contract: TestResult) -> TestResult {
-        let delete_documents = self.context.delete_stream(&self.stream).await;
-        let delete_permissions = self.context.delete_stream(&self.permission_stream).await;
+        let delete_documents = delete_stream_and_wait(&self.context, self.stream.clone()).await;
+        let delete_permissions =
+            delete_stream_and_wait(&self.context, self.permission_stream.clone()).await;
         let flush = self.client.flush().await;
         contract?;
         delete_documents?;
@@ -257,6 +255,19 @@ impl NatsFixture {
         flush?;
         Ok(())
     }
+}
+
+async fn delete_stream_and_wait(context: &jetstream::Context, name: String) -> TestResult {
+    context.delete_stream(name.clone()).await?;
+    for _ in 0..50 {
+        if context.get_stream(&name).await.is_err() {
+            return Ok(());
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    Err(test_error(format!(
+        "NATS stream {name} remained visible after deletion"
+    )))
 }
 
 #[tokio::test]
