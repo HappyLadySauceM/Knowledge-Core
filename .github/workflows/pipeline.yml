@@ -413,6 +413,8 @@ jobs:
           COLLABORATION_TEST_NATS_URL: nats://127.0.0.1:4222
         run: |
           set -euo pipefail
+          chmod 0755 .ci-artifacts/real-dependency-tests/real_dependencies \
+            .ci-artifacts/real-dependency-tests/distributed_contracts
           for test_name in real_dependencies distributed_contracts; do
             test -x ".ci-artifacts/real-dependency-tests/$test_name"
           done
