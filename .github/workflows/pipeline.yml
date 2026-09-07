@@ -346,15 +346,18 @@ jobs:
           retention-days: 7
 
   collaboration-real-dependencies:
-    needs: plan
-    if: needs.plan.outputs.has_rust_build_changes == 'true'
+    needs: [plan, rust-verify-build]
+    if: always() && needs.plan.outputs.has_rust_build_changes == 'true' && needs.rust-verify-build.result == 'success'
     # GitHub service containers need the DinD sidecar provided by hls-builder;
     # hls-standard intentionally has no Docker socket.
     runs-on: hls-builder
-    timeout-minutes: 20
+    timeout-minutes: 35
     concurrency:
       group: ${{ github.repository }}-${{ github.workflow }}-collaboration-real-dependencies-${{ github.ref }}
       cancel-in-progress: true
+    env:
+      CARGO_INCREMENTAL: "0"
+      CARGO_PROFILE_TEST_DEBUG: "0"
     services:
       postgres:
         image: postgres:16-alpine
@@ -398,7 +401,7 @@ jobs:
           COLLABORATION_TEST_POSTGRES_PASSWORD: collaboration-test-password
           COLLABORATION_TEST_REDIS_URL: redis://127.0.0.1:6379/1
           COLLABORATION_TEST_NATS_URL: nats://127.0.0.1:4222
-        run: make rust-real-dependencies BUILD_CPU_PERCENT=50
+        run: make rust-real-dependencies BUILD_CPU_PERCENT=75
 
   release-notes:
     needs: plan
