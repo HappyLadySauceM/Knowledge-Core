@@ -49,3 +49,15 @@
 - PostgreSQL/NATS stop/start、完整 Compose/跨服务 WebSocket E2E、备份恢复以及切换/回滚演练。
 - 发布构建产生的 production image 最终 digest。
 - Identity 与 Knowledge repository 的真实 PostgreSQL 测试不在本次 Rust Collaboration 范围内，缺口继续保留。
+
+## 2026-09-07 路由收敛复审
+
+本次变更按已批准的破坏性维护窗口切换，不保留旧实例路径兼容层：
+
+- Gateway 返回的 WebSocket URL 统一为 `/v1/documents/{document_id}`；删除 `/v1/instances/{ordinal}/documents/{document_id}` 路径和 per-pod Service 路由。
+- `CreateSession` 不再分配实例，ticket v3 不再携带 `instance_ordinal`。IDL field 7 保留为 deprecated compatibility field，当前 Rust 服务始终返回空值，避免旧生成客户端解码失败。
+- Higress 只保留一个 WebSocket Ingress，目标为共享 `knowledge-core-collaboration` Service，并以完整 `$request_uri` 做 upstream hash。它只提供通常同文档同实例的 locality，不提供严格 owner、租约或 fencing；扩缩容、滚动、故障和重试仍可能造成短暂跨实例连接。
+- 删除 Collaboration 的 Redis route/load placement、`COLLABORATION_INSTANCE_COUNT` 和 Nacos `routing.instance_count` 配置；Redis 仅继续承担一次性 ticket 的 `GETDEL`。
+- 本地 actor 继续串行处理本实例连接；提交后的内容通过 PostgreSQL outbox、JetStream fanout 和 sequence gap recovery 收敛。awareness/cursor 不持久化，跨实例期间允许暂时不完整。前端断线会重新申请 ticket，但复用同一 Y.Doc/IndexedDB。
+
+发布要求在维护窗口内同时提升 Gateway、Collaboration、Web 和 deploy snapshot，先确认 Higress 渲染结果只有一个 `/v1/documents/` WebSocket path，再滚动 Collaboration。旧 URL 客户端会收到 404/升级失败，不能与新路由混合发布；回滚同样必须整体回滚客户端、Gateway、Collaboration 和 Higress snapshot。

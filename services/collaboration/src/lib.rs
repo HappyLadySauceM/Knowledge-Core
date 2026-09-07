@@ -9,7 +9,6 @@ pub mod generated;
 pub mod ports;
 pub mod remote_config;
 pub mod richtext;
-pub mod routing;
 pub mod rpc;
 pub mod storage;
 pub mod telemetry;

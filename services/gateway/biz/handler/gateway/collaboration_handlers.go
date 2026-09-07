@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"net/url"
-	"strconv"
 	"time"
 
 	collaborationv1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/collaboration"
@@ -92,15 +91,11 @@ func toCollaborationSessionData(
 	}, nil
 }
 
-// collaborationWebSocketPath builds the trusted instance WebSocket path from the RPC session.
-// collaborationWebSocketPath 用 RPC 会话构造可信的实例 WebSocket 路径。
+// collaborationWebSocketPath builds the single trusted document WebSocket path.
+// collaborationWebSocketPath 构造统一的可信文档 WebSocket 路径。
 func collaborationWebSocketPath(value *collaborationv1.CollaborationSession, documentID string) (string, error) {
-	if value == nil || !value.IsSetInstanceOrdinal() {
-		return "", errors.New("collaboration instance ordinal is missing")
+	if value == nil {
+		return "", errors.New("collaboration session is missing")
 	}
-	ordinal := value.GetInstanceOrdinal()
-	if ordinal < 0 {
-		return "", errors.New("collaboration instance ordinal is invalid")
-	}
-	return "/v1/instances/" + strconv.FormatInt(int64(ordinal), 10) + "/documents/" + url.PathEscape(documentID), nil
+	return "/v1/documents/" + url.PathEscape(documentID), nil
 }

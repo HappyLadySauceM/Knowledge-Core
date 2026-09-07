@@ -23,7 +23,7 @@ use zeroize::Zeroizing;
 
 use crate::{
     actor::{ActorLimits, ActorRegistry},
-    config::{ActorConfig, PublicConfig, RoutingConfig, TicketConfig, WorkerConfig},
+    config::{ActorConfig, PublicConfig, TicketConfig, WorkerConfig},
     error::{Result, ServiceError},
     telemetry::{LogController, Metrics},
     ticket::TicketService,
@@ -66,7 +66,6 @@ pub(crate) struct ApplicationOverrides {
     pub(crate) ticket: Option<TicketOverrides>,
     pub(crate) actor: Option<ActorOverrides>,
     pub(crate) workers: Option<WorkerOverrides>,
-    pub(crate) routing: Option<RoutingOverrides>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
@@ -176,12 +175,6 @@ pub(crate) struct WorkerOverrides {
     pub(crate) outbox_batch_size: Option<i64>,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct RoutingOverrides {
-    pub(crate) instance_count: Option<u32>,
-}
-
 #[derive(Clone)]
 pub(crate) struct RuntimeTargets {
     pub(crate) log: LogController,
@@ -193,7 +186,6 @@ pub(crate) struct RuntimeTargets {
     pub(crate) startup_ticket: TicketConfig,
     pub(crate) startup_actor: ActorConfig,
     pub(crate) startup_workers: WorkerConfig,
-    pub(crate) startup_routing: RoutingConfig,
 }
 
 #[derive(Clone)]
@@ -711,11 +703,6 @@ fn restart_required(config: &ApplicationOverrides, targets: &RuntimeTargets) -> 
                     .outbox_batch_size
                     .is_some_and(|v| v != targets.startup_workers.outbox_batch_size)
         })
-        || config.routing.as_ref().is_some_and(|value| {
-            value
-                .instance_count
-                .is_some_and(|count| count != targets.startup_routing.instance_count)
-        })
 }
 
 fn decrypt(
@@ -916,13 +903,6 @@ fn validate_application_overrides(config: &ApplicationOverrides) -> Result<()> {
             || value.outbox_batch_size.is_some_and(|v| v <= 0))
     {
         return Err(invalid("worker limits must be positive"));
-    }
-    if let Some(value) = &config.routing
-        && value
-            .instance_count
-            .is_some_and(|count| count == 0 || count > crate::routing::MAXIMUM_INSTANCE_COUNT)
-    {
-        return Err(invalid("routing instance_count must be between 1 and 32"));
     }
     Ok(())
 }

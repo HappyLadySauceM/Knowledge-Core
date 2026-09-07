@@ -32,7 +32,7 @@ Knowledge Core 是一个支持文档元数据、权限、通用附件、实时�
 | 协作会话 | `POST /api/v1/studio/documents/:document_id/collaboration-sessions` | 创建短期、单次使用的 WebSocket ticket |
 | 附件 | `/api/v1/studio/documents/:document_id/attachments` | 预签名上传、完成扫描和删除 |
 | 回收站 | `/api/v1/studio/trash` | 删除文档列表与恢复 |
-| 实时协作 | `ws://localhost:8091/v1/instances/:ordinal/documents/:document_id` | y-sync、awareness、权限复核、只读控制和稳定关闭码；Compose 单实例时 Gateway 返回 ordinal `0`，进程仍接受 `/v1/documents/:document_id` |
+| 实时协作 | `ws://localhost:8091/v1/documents/:document_id` | y-sync、awareness、权限复核、只读控制和稳定关闭码；Higress 按完整 URI 做通常同文档同实例的 hash，实例变化时由 PostgreSQL/JetStream 收敛 |
 
 完整 HTTP 契约源为 [idl/http/v1/gateway.thrift](idl/http/v1/gateway.thrift)。
 

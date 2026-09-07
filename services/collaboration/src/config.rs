@@ -37,13 +37,7 @@ pub struct Config {
     pub ticket: TicketConfig,
     pub actor: ActorConfig,
     pub workers: WorkerConfig,
-    pub routing: RoutingConfig,
     pub(crate) remote: Option<RemoteConfig>,
-}
-
-#[derive(Clone)]
-pub struct RoutingConfig {
-    pub instance_count: u32,
 }
 
 #[derive(Clone)]
@@ -352,12 +346,6 @@ impl Config {
             {
                 self.workers.outbox_batch_size = v;
             }
-        }
-        if let Some(value) = &overrides.routing
-            && env::var_os("COLLABORATION_INSTANCE_COUNT").is_none()
-            && let Some(instance_count) = value.instance_count
-        {
-            self.routing.instance_count = instance_count;
         }
         if let Some(value) = &overrides.rpc {
             if env::var_os("COLLABORATION_RPC_ADDRESS").is_none()
@@ -818,14 +806,6 @@ impl Config {
                     50,
                     1,
                     1_000,
-                )?,
-            },
-            routing: RoutingConfig {
-                instance_count: integer_as::<u32>(
-                    "COLLABORATION_INSTANCE_COUNT",
-                    u64::from(crate::routing::DEFAULT_INSTANCE_COUNT),
-                    1,
-                    u64::from(crate::routing::MAXIMUM_INSTANCE_COUNT),
                 )?,
             },
         })

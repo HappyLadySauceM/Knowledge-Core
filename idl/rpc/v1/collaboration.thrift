@@ -24,6 +24,8 @@ struct CollaborationSession {
   4: required string access
   5: required string ticket_expires_at
   6: required string session_expires_at
+  // Deprecated compatibility field. WebSocket placement is handled by the
+  // single /v1/documents/{document_id} route and this field is never set.
   7: optional i32 instance_ordinal
 }
 
