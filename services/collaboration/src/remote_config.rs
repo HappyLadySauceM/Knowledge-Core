@@ -55,11 +55,6 @@ pub(crate) struct DynamicDocument {
 pub(crate) struct ApplicationOverrides {
     pub(crate) log: Option<ApplicationLog>,
     pub(crate) shutdown_timeout_ms: Option<u64>,
-    /// Deprecated compatibility field. Older Nacos documents may still carry
-    /// `routing.instance_count`; routing is now owned by Higress and this
-    /// value is intentionally ignored.
-    #[allow(dead_code)]
-    pub(crate) routing: Option<DeprecatedRoutingOverrides>,
     pub(crate) public: Option<PublicOverrides>,
     pub(crate) rpc: Option<RpcOverrides>,
     pub(crate) admin: Option<AdminOverrides>,
@@ -71,12 +66,6 @@ pub(crate) struct ApplicationOverrides {
     pub(crate) ticket: Option<TicketOverrides>,
     pub(crate) actor: Option<ActorOverrides>,
     pub(crate) workers: Option<WorkerOverrides>,
-}
-
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
-pub(crate) struct DeprecatedRoutingOverrides {
-    #[serde(default)]
-    pub(crate) instance_count: Option<u32>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
@@ -1264,20 +1253,11 @@ mod tests {
     }
 
     #[test]
-    fn application_document_accepts_deprecated_routing_from_old_nacos_revision() {
-        let document = decode_dynamic_document(
+    fn application_document_rejects_removed_routing_from_old_nacos_revision() {
+        assert!(decode_dynamic_document(
             b"api_version: knowledge-core.io/v1beta1\nkind: ApplicationConfig\nservice: collaboration\nrevision: 4\nconfig:\n  log:\n    level: info\n  routing:\n    instance_count: 1\n",
         )
-        .expect("old routing field is a compatible no-op");
-        assert_eq!(
-            document
-                .config
-                .expect("application config")
-                .routing
-                .expect("deprecated routing")
-                .instance_count,
-            Some(1)
-        );
+        .is_err());
     }
 
     #[test]

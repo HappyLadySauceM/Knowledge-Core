@@ -65,10 +65,11 @@
 ## 2026-09-07 发布顺序修复
 
 路由收敛发布曾因新 Rust 二进制先于 Nacos 文档更新而启动失败：旧 Nacos revision 4 仍包含
-`config.routing.instance_count`，而新二进制已经删除该字段。修复分两步：
+`config.routing.instance_count`。修复已按两步完成：
 
-- 兼容版本暂时保留 deprecated `routing` 反序列化字段并忽略其值，使旧 Nacos 文档不会阻断启动；
-- 通过受控 `configctl publish` 发布不含该字段的新 Nacos revision，确认所有副本加载后，再删除兼容字段。
+- 兼容版本先保留 deprecated `routing` 反序列化字段并忽略其值，使旧 Nacos 文档不会阻断启动；
+- 在所有副本运行兼容镜像后，通过受控 `configctl publish` 发布不含该字段的 Nacos revision 5，
+  两个副本均确认加载 revision 5 后，当前版本已删除兼容字段；旧 routing 文档会被严格拒绝。
 
 Argo 等待器在明确的 Failed/Degraded/CrashLoop 等状态下 fail-fast，并输出 operation、资源、Pod reason
 与最近日志。GitOps 回滚前先终止进行中的 Application operation，回滚提交后再次等待目标 revision 收敛。
