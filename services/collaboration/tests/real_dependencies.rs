@@ -39,6 +39,8 @@ use yrs::{ReadTxn, Transact, XmlElementPrelim, XmlFragment};
 type TestResult<T = ()> = Result<T, Box<dyn Error + Send + Sync>>;
 
 const REQUIRE_REAL_DEPENDENCIES: &str = "COLLABORATION_TEST_REQUIRE_REAL_DEPENDENCIES";
+const CONTRACT_STREAM: &str = "KC_COLLAB_CONTRACT_TEST";
+const CONTRACT_PERMISSION_STREAM: &str = "KC_COLLAB_CONTRACT_PERMISSION_TEST";
 const REQUIRED_ENVIRONMENT: [&str; 3] = [
     "COLLABORATION_TEST_POSTGRES_URL",
     "COLLABORATION_TEST_POSTGRES_PASSWORD",
@@ -514,8 +516,8 @@ async fn nats_contract(url: &str) -> TestResult {
     let client = async_nats::connect(url).await?;
     let context = jetstream::new(client.clone());
     let suffix = Uuid::now_v7().simple().to_string();
-    let stream_name = format!("KC_COLLAB_TEST_{suffix}").to_uppercase();
-    let permission_stream_name = format!("KC_COLLAB_PERMISSIONS_TEST_{suffix}").to_uppercase();
+    let stream_name = CONTRACT_STREAM.to_owned();
+    let permission_stream_name = CONTRACT_PERMISSION_STREAM.to_owned();
     let parking_stream_name = format!("{stream_name}_PARKING");
 
     let config = NatsConfig {
@@ -559,24 +561,8 @@ async fn nats_contract(url: &str) -> TestResult {
         .map_err(|_| test_error("production NATS acknowledgement timed out"))??;
     peer.shutdown(Duration::from_secs(5)).await?;
     production.shutdown(Duration::from_secs(5)).await?;
-    delete_stream_and_wait(&context, stream_name).await?;
-    delete_stream_and_wait(&context, permission_stream_name).await?;
-    delete_stream_and_wait(&context, parking_stream_name).await?;
     client.flush().await?;
     Ok(())
-}
-
-async fn delete_stream_and_wait(context: &jetstream::Context, name: String) -> TestResult {
-    context.delete_stream(name.clone()).await?;
-    for _ in 0..50 {
-        if context.get_stream(&name).await.is_err() {
-            return Ok(());
-        }
-        tokio::time::sleep(Duration::from_millis(100)).await;
-    }
-    Err(test_error(format!(
-        "NATS stream {name} remained visible after deletion"
-    )))
 }
 
 async fn verify_stream_contracts(

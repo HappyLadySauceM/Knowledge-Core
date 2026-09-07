@@ -35,6 +35,8 @@ use yrs::{
 type TestResult<T = ()> = std::result::Result<T, Box<dyn Error + Send + Sync>>;
 
 const REQUIRE_REAL_DEPENDENCIES: &str = "COLLABORATION_TEST_REQUIRE_REAL_DEPENDENCIES";
+const CONTRACT_STREAM: &str = "KC_COLLAB_CONTRACT_TEST";
+const CONTRACT_PERMISSION_STREAM: &str = "KC_COLLAB_CONTRACT_PERMISSION_TEST";
 static NATS_FIXTURE_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -206,20 +208,14 @@ async fn acknowledge(message: jetstream::Message, consumer: &'static str) -> Tes
 
 struct NatsFixture {
     client: async_nats::Client,
-    context: jetstream::Context,
-    stream: String,
-    permission_stream: String,
     config: NatsConfig,
 }
 
 impl NatsFixture {
     async fn new(url: &str, purpose: &str) -> TestResult<Self> {
         let client = async_nats::connect(url).await?;
-        let context = jetstream::new(client.clone());
-        let suffix = Uuid::now_v7().simple().to_string();
-        let stream = format!("KC_DISTRIBUTED_{purpose}_{suffix}").to_uppercase();
-        let permission_stream =
-            format!("KC_DISTRIBUTED_PERMISSIONS_{purpose}_{suffix}").to_uppercase();
+        let stream = CONTRACT_STREAM.to_owned();
+        let permission_stream = CONTRACT_PERMISSION_STREAM.to_owned();
         let config = NatsConfig {
             servers: vec![url.to_owned()],
             name: format!("knowledge-core.collaboration.{purpose}-test"),
@@ -235,39 +231,15 @@ impl NatsFixture {
             password: None,
             tls: TlsConfig::default(),
         };
-        Ok(Self {
-            client,
-            context,
-            stream,
-            permission_stream,
-            config,
-        })
+        Ok(Self { client, config })
     }
 
     async fn finish(self, contract: TestResult) -> TestResult {
-        let delete_documents = delete_stream_and_wait(&self.context, self.stream.clone()).await;
-        let delete_permissions =
-            delete_stream_and_wait(&self.context, self.permission_stream.clone()).await;
         let flush = self.client.flush().await;
         contract?;
-        delete_documents?;
-        delete_permissions?;
         flush?;
         Ok(())
     }
-}
-
-async fn delete_stream_and_wait(context: &jetstream::Context, name: String) -> TestResult {
-    context.delete_stream(name.clone()).await?;
-    for _ in 0..50 {
-        if context.get_stream(&name).await.is_err() {
-            return Ok(());
-        }
-        tokio::time::sleep(Duration::from_millis(100)).await;
-    }
-    Err(test_error(format!(
-        "NATS stream {name} remained visible after deletion"
-    )))
 }
 
 #[tokio::test]
