@@ -16,9 +16,15 @@ env:
   BUILD_CPU_PERCENT: "100"
   NODE_USE_ENV_PROXY: "1"
   GO111MODULE: "on"
-  GOPROXY: "https://goproxy.cn,direct"
+  # A pipe falls back after network errors as well as 404/410 responses.
+  GOPROXY: "https://goproxy.cn|https://proxy.golang.org|direct"
   NPM_CONFIG_REGISTRY: "https://registry.npmmirror.com"
   COREPACK_NPM_REGISTRY: "https://registry.npmmirror.com"
+  NPM_CONFIG_PREFER_OFFLINE: "true"
+  NPM_CONFIG_FETCH_RETRIES: "4"
+  NPM_CONFIG_FETCH_RETRY_FACTOR: "2"
+  NPM_CONFIG_FETCH_RETRY_MINTIMEOUT: "10000"
+  NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT: "120000"
 
 # Serialize releases for this project/branch while allowing the matrix jobs in
 # one run to consume all available ARC capacity.
@@ -70,6 +76,8 @@ jobs:
       has_rust_build_changes: ${{ steps.plan.outputs.has_rust_build_changes }}
       has_changes: ${{ steps.plan.outputs.has_changes }}
       rust_required: ${{ steps.plan.outputs.rust_required }}
+      docs_changed: ${{ steps.plan.outputs.docs_changed }}
+      base_sha: ${{ steps.plan.outputs.base_sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -94,6 +102,7 @@ jobs:
           deploy_services="$(jq -r '.deploy_services | join(",")' <<<"$changes")"
           release_services="$(jq -r '.release_services | join(",")' <<<"$changes")"
           deploy_changed="$(jq -r '.deploy_changed' <<<"$changes")"
+          docs_changed="$(jq -r '.documentation_changed // false' <<<"$changes")"
           build_matrix="$(jq -cn --arg value "$build_services" '$value | split(",") | map(select(length > 0)) | if length == 0 then ["__skip__"] else . end')"
           rust_required="$(BUILD_SERVICES="$build_services" python3 - <<'PY'
           import os
@@ -140,8 +149,10 @@ jobs:
             echo "has_changes=$has_changes"
             echo "deploy_changed=$deploy_changed"
             echo "rust_required=$rust_required"
+            echo "docs_changed=$docs_changed"
+            echo "base_sha=$base"
           } >> "$GITHUB_OUTPUT"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           # Keep names stable within one run so rerun-failed can reuse artifacts
           # produced by jobs that were already successful in an earlier attempt.
@@ -183,9 +194,21 @@ jobs:
             go run ./tools/configctl validate --service "$service" --input "$input"
           done
 
+  docs-verify:
+    needs: plan
+    if: needs.plan.outputs.docs_changed == 'true'
+    runs-on: hls-standard
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Validate documentation whitespace
+        run: git diff --check "${{ needs.plan.outputs.base_sha }}...HEAD"
+
   go-verify-build:
     needs: plan
-    if: needs.plan.outputs.has_build_changes == 'true'
+    if: needs.plan.outputs.has_go_build_changes == 'true'
     runs-on: hls-standard
     timeout-minutes: 45
     concurrency:
@@ -229,8 +252,18 @@ jobs:
             make go-release GO_RELEASE_SERVICES="$go_services" GO_ARTIFACT_DIR=.ci-artifacts KC_RUST_GATE=0
           fi
           printf 'verified-go\n' > .ci-artifacts/artifact-marker-go.txt
+      - name: Publish Go binaries to same-node cache
+        env:
+          BUILD_SERVICES: ${{ needs.plan.outputs.go_build_matrix }}
+        run: |
+          set -euo pipefail
+          for service in $(jq -r '.[] | select(. != "__skip__")' <<<"$BUILD_SERVICES"); do
+            if ! scripts/ci-artifact-cache.sh publish "knowledge-core-binary-$service" ".ci-artifacts/$service"; then
+              echo "::warning::local cache publish failed for $service; GitHub Artifacts remains available"
+            fi
+          done
       - if: contains(fromJSON(needs.plan.outputs.go_build_matrix), 'gateway')
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: knowledge-core-binary-gateway-${{ github.run_id }}
           path: .ci-artifacts/gateway
@@ -238,7 +271,7 @@ jobs:
           if-no-files-found: error
           retention-days: 7
       - if: contains(fromJSON(needs.plan.outputs.go_build_matrix), 'identity')
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: knowledge-core-binary-identity-${{ github.run_id }}
           path: .ci-artifacts/identity
@@ -246,7 +279,7 @@ jobs:
           if-no-files-found: error
           retention-days: 7
       - if: contains(fromJSON(needs.plan.outputs.go_build_matrix), 'knowledge')
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: knowledge-core-binary-knowledge-${{ github.run_id }}
           path: .ci-artifacts/knowledge
@@ -254,7 +287,7 @@ jobs:
           if-no-files-found: error
           retention-days: 7
       - if: contains(fromJSON(needs.plan.outputs.go_build_matrix), 'attachment')
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: knowledge-core-binary-attachment-${{ github.run_id }}
           path: .ci-artifacts/attachment
@@ -262,7 +295,7 @@ jobs:
           if-no-files-found: error
           retention-days: 7
       - if: contains(fromJSON(needs.plan.outputs.go_build_matrix), 'platform')
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: knowledge-core-binary-platform-${{ github.run_id }}
           path: .ci-artifacts/platform
@@ -274,7 +307,7 @@ jobs:
     # Go and Rust quality gates are independent. Their package jobs fan out
     # independently too, so Go image packaging does not wait for Rust release.
     needs: plan
-    if: needs.plan.outputs.has_build_changes == 'true' && needs.plan.outputs.rust_required == 'true'
+    if: needs.plan.outputs.has_rust_build_changes == 'true'
     runs-on: hls-standard
     timeout-minutes: 50
     concurrency:
@@ -284,6 +317,9 @@ jobs:
       CARGO_INCREMENTAL: "0"
       CARGO_PROFILE_DEV_DEBUG: "0"
       CARGO_PROFILE_TEST_DEBUG: "0"
+      CARGO_NET_RETRY: "4"
+      CARGO_HTTP_TIMEOUT: "120"
+      CARGO_HTTP_MULTIPLEXING: "false"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -300,10 +336,18 @@ jobs:
           # the artifacts produced by this quality gate instead of compiling
           # the workspace a second time on a separate runner.
           echo "CARGO_TARGET_DIR=/cache/knowledge-core-cargo-target" >> "$GITHUB_ENV"
-      - uses: taiki-e/install-action@583939ec0c8ee9c523cc60342d3d979ce6730f38
-        with:
-          tool: cargo-deny@0.20.2
-          fallback: none
+      - name: Restore pinned cargo-deny from runner cache
+        run: |
+          set -euo pipefail
+          bin_dir="$RUNNER_TOOL_CACHE/knowledge-core/cargo-deny-0.20.2/bin"
+          if [[ ! -x "$bin_dir/cargo-deny" ]]; then
+            for attempt in 1 2 3; do
+              if cargo install --locked cargo-deny --version 0.20.2 --root "${bin_dir%/bin}"; then break; fi
+              [[ "$attempt" == 3 ]] && exit 1
+              sleep "$attempt"
+            done
+          fi
+          echo "$bin_dir" >> "$GITHUB_PATH"
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24.18.1
@@ -347,14 +391,23 @@ jobs:
             echo "::warning::npm audit transport failure; retrying (attempt $attempt/3)"
             sleep "$attempt"
           done
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - name: Publish Rust artifacts to same-node cache
+        run: |
+          set -euo pipefail
+          for pair in 'knowledge-core-binary-collaboration:.ci-artifacts/collaboration' 'knowledge-core-collaboration-real-dependency-tests:.ci-artifacts/real-dependency-tests'; do
+            name="${pair%%:*}" path="${pair#*:}"
+            if ! scripts/ci-artifact-cache.sh publish "$name" "$path"; then
+              echo "::warning::local cache publish failed for $name; GitHub Artifacts remains available"
+            fi
+          done
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: knowledge-core-binary-collaboration-${{ github.run_id }}
           path: .ci-artifacts/collaboration
           overwrite: true
           if-no-files-found: error
           retention-days: 7
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: knowledge-core-collaboration-real-dependency-tests-${{ github.run_id }}
           path: .ci-artifacts/real-dependency-tests
@@ -400,7 +453,20 @@ jobs:
         ports:
           - 4222:4222
     steps:
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+      - name: Restore real-dependency contracts from same-node cache
+        id: local-real-dependencies
+        run: |
+          if scripts/ci-artifact-cache.sh restore knowledge-core-collaboration-real-dependency-tests .ci-artifacts/real-dependency-tests; then
+            echo 'hit=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'hit=false' >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        id: github-real-dependencies
+        if: steps.local-real-dependencies.outputs.hit != 'true'
         with:
           name: knowledge-core-collaboration-real-dependency-tests-${{ github.run_id }}
           path: .ci-artifacts/real-dependency-tests
@@ -435,7 +501,7 @@ jobs:
         with:
           fetch-depth: 1
           fetch-tags: true
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: knowledge-core-plan-${{ github.run_id }}
       - name: Generate one release summary
@@ -446,7 +512,7 @@ jobs:
           set -euo pipefail
           test -n "${DEEPSEEK_API_KEY:-}" || { echo 'DEEPSEEK_API_KEY is required' >&2; exit 1; }
           ci-templates summarize --config "$CI_PROJECT_CONFIG" --services "$SERVICES" --changes-file changes.json --output release.md
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: knowledge-core-release-notes-${{ github.run_id }}
           path: release.md
@@ -504,7 +570,18 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 1
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+      - name: Restore binary from same-node cache
+        id: local-binary
+        env:
+          ARTIFACT_NAME: knowledge-core-binary-${{ matrix.service }}
+        run: |
+          if scripts/ci-artifact-cache.sh restore "$ARTIFACT_NAME" ".ci-artifacts/${{ matrix.service }}"; then
+            echo 'hit=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'hit=false' >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        if: steps.local-binary.outputs.hit != 'true'
         with:
           name: knowledge-core-binary-${{ matrix.service }}-${{ github.run_id }}
           path: .ci-artifacts
@@ -550,7 +627,7 @@ jobs:
           jq --arg source_sha "$GITHUB_SHA" --arg candidate_tag "$candidate_tag" \
             '. + {source_sha:$source_sha,candidate_tag:$candidate_tag}' <<<"$result" > "candidate-$SERVICE.json"
           jq -e '.kustomize_name and .image and .digest' "candidate-$SERVICE.json" >/dev/null
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: knowledge-core-candidate-${{ matrix.service }}-${{ github.run_id }}
           path: candidate-${{ matrix.service }}.json
@@ -573,7 +650,18 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 1
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+      - name: Restore binary from same-node cache
+        id: local-binary
+        env:
+          ARTIFACT_NAME: knowledge-core-binary-${{ matrix.service }}
+        run: |
+          if scripts/ci-artifact-cache.sh restore "$ARTIFACT_NAME" ".ci-artifacts/${{ matrix.service }}"; then
+            echo 'hit=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'hit=false' >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        if: steps.local-binary.outputs.hit != 'true'
         with:
           name: knowledge-core-binary-${{ matrix.service }}-${{ github.run_id }}
           path: .ci-artifacts
@@ -619,7 +707,7 @@ jobs:
           jq --arg source_sha "$GITHUB_SHA" --arg candidate_tag "$candidate_tag" \
             '. + {source_sha:$source_sha,candidate_tag:$candidate_tag}' <<<"$result" > "candidate-$SERVICE.json"
           jq -e '.kustomize_name and .image and .digest' "candidate-$SERVICE.json" >/dev/null
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: knowledge-core-candidate-${{ matrix.service }}-${{ github.run_id }}
           path: candidate-${{ matrix.service }}.json
@@ -661,14 +749,14 @@ jobs:
           # 快进 main 需要 origin/main 是 HEAD 的祖先。
           fetch-depth: 0
           token: ${{ steps.app-token.outputs.token }}
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: knowledge-core-plan-${{ github.run_id }}
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: knowledge-core-release-notes-${{ github.run_id }}
       - if: needs.plan.outputs.has_build_changes == 'true'
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           pattern: knowledge-core-candidate-*-${{ github.run_id }}
           path: .candidates
@@ -864,7 +952,7 @@ jobs:
 
   notify:
     if: always()
-    needs: [plan, deploy-verify, go-verify-build, rust-verify-build, release-notes, prewarm-base-images, package-go-candidates, package-rust-candidates, deploy-release, cleanup-candidates]
+    needs: [plan, docs-verify, deploy-verify, go-verify-build, rust-verify-build, release-notes, prewarm-base-images, package-go-candidates, package-rust-candidates, deploy-release, cleanup-candidates]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     environment: release

@@ -13,7 +13,6 @@ shared_paths:
   - .ci
   - .github
   - pkg
-  - api
   - idl
   - kitex_gen
   - scripts
@@ -21,6 +20,8 @@ shared_paths:
   - Makefile
   - go.mod
   - go.sum
+documentation_paths:
+  - api/README.md
 harbor_registry: harbor.happyladysauce.local
 harbor_project: knowledge-core
 argocd_server: argocd.happyladysauce.local
@@ -62,6 +63,8 @@ base_images:
 services:
   - name: gateway
     source_path: services/gateway
+    additional_source_paths:
+      - api
     version_file: services/gateway/VERSION
     dockerfile: docker/gateway/Dockerfile
     context: .
