@@ -1,0 +1,133 @@
+{
+  "asyncapi": "3.0.0",
+  "channels": {
+    "document": {
+      "address": "/v1/documents/{document_id}",
+      "bindings": {
+        "ws": {
+          "method": "GET",
+          "query": {
+            "additionalProperties": false,
+            "type": "object"
+          }
+        }
+      },
+      "description": "单个文档的 y-sync 与 awareness 双向通道。连接前必须通过 Gateway 创建一次性协作 session。",
+      "messages": {
+        "clientFrame": {
+          "$ref": "#/components/messages/clientFrame"
+        },
+        "serverFrame": {
+          "$ref": "#/components/messages/serverFrame"
+        }
+      }
+    }
+  },
+  "components": {
+    "messages": {
+      "clientFrame": {
+        "contentType": "application/octet-stream",
+        "description": "客户端发送 y-sync 或 awareness 二进制帧。",
+        "name": "clientFrame",
+        "payload": {
+          "description": "原始 WebSocket 二进制帧；由 y-sync/awareness 协议解释。",
+          "format": "binary",
+          "type": "string"
+        },
+        "summary": "客户端协作帧",
+        "title": "客户端协作帧"
+      },
+      "serverFrame": {
+        "contentType": "application/octet-stream",
+        "description": "服务端发送初始同步、广播更新或 awareness 二进制帧。",
+        "name": "serverFrame",
+        "payload": {
+          "description": "原始 WebSocket 二进制帧；由 y-sync/awareness 协议解释。",
+          "format": "binary",
+          "type": "string"
+        },
+        "summary": "服务端协作帧",
+        "title": "服务端协作帧"
+      }
+    },
+    "schemas": {
+      "DocumentId": {
+        "description": "规范 UUIDv7 文档 ID。",
+        "format": "uuid",
+        "type": "string"
+      }
+    },
+    "securitySchemes": {
+      "sessionTicket": {
+        "description": "值为 knowledge-core-yjs-v1, ticket.\u003copaque\u003e；ticket 由 Gateway session API 返回且只能使用一次。",
+        "in": "header",
+        "name": "Sec-WebSocket-Protocol",
+        "type": "apiKey"
+      }
+    }
+  },
+  "info": {
+    "description": "Collaboration 为单个文档提供基于 Yjs 的二进制实时协作通道。连接前必须由 Gateway 创建短期、单次使用的 session ticket。",
+    "title": "Knowledge Core Collaboration WebSocket API",
+    "version": "1.0.0"
+  },
+  "operations": {
+    "receiveDocumentFrames": {
+      "action": "receive",
+      "channel": {
+        "$ref": "#/channels/document"
+      },
+      "summary": "客户端向 Collaboration 发送二进制帧。"
+    },
+    "sendDocumentFrames": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/document"
+      },
+      "summary": "Collaboration 向客户端广播已提交的二进制帧。"
+    }
+  },
+  "servers": {
+    "development": {
+      "description": "本地 Collaboration WebSocket；生产环境使用 wss。",
+      "host": "localhost:8091",
+      "pathname": "/v1/documents/{document_id}",
+      "protocol": "ws"
+    }
+  },
+  "x-close-codes": [
+    {
+      "code": 4400,
+      "description": "子协议、帧格式或协作更新不合法。",
+      "reason": "invalid-protocol"
+    },
+    {
+      "code": 4401,
+      "description": "session ticket 已过期、已使用或关联会话已失效。",
+      "reason": "session-expired"
+    },
+    {
+      "code": 4403,
+      "description": "用户没有文档访问权限，或权限在连接期间被撤销。",
+      "reason": "forbidden"
+    },
+    {
+      "code": 4409,
+      "description": "文档已删除、失效或不再允许协作。",
+      "reason": "document-invalidated"
+    }
+  ],
+  "x-handshake": {
+    "failure_statuses": [
+      400,
+      401,
+      403,
+      429,
+      503
+    ],
+    "origin": "必须匹配 Collaboration 的精确允许 Origin。",
+    "path_parameter": "document_id",
+    "subprotocol": "knowledge-core-yjs-v1",
+    "ticket": "短期、单次使用；过期或重复使用返回 401。"
+  }
+}

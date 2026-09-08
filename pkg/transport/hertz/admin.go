@@ -28,11 +28,16 @@ import (
 )
 
 type AdminServerConfig struct {
-	ComponentName string
-	LogComponent  string
-	Options       option.HertzServerOptions
-	TLSConfig     *tls.Config
+	ComponentName  string
+	LogComponent   string
+	Options        option.HertzServerOptions
+	TLSConfig      *tls.Config
+	RegisterRoutes AdminRouteRegistrar
 }
+
+// AdminRouteRegistrar registers component-specific routes on the shared admin
+// listener after the built-in health and metrics endpoints are installed.
+type AdminRouteRegistrar func(*server.Hertz) error
 
 type AdminServer struct {
 	name         string
@@ -94,6 +99,11 @@ func NewAdminServer(
 	h.GET("/livez", healthHandler(healthRegistry.Live))
 	h.GET("/readyz", healthHandler(healthRegistry.Ready))
 	h.GET("/metrics", adaptor.HertzHandler(metricsRegistry.Handler()))
+	if cfg.RegisterRoutes != nil {
+		if err := cfg.RegisterRoutes(h); err != nil {
+			return nil, errors.Join(fmt.Errorf("register admin routes: %w", err), closeListener(listener))
+		}
+	}
 	return result, nil
 }
 

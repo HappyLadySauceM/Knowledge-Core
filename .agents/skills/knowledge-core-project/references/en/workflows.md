@@ -53,7 +53,7 @@ Status: `verified`
 - **npm:format:check**: `{"command":"prettier --check .","source":"services/collaboration/interop/package.json"}`
 - **npm:generate:fixtures**: `{"command":"node ./generate-fixtures.mjs","source":"services/collaboration/interop/package.json"}`
 
-Sources: `detected:project-scripts`
+Sources: `Makefile`, `detected:project-scripts`
 
 ## `cicd.config-files`
 

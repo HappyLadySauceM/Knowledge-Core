@@ -18,11 +18,13 @@ import (
 	"github.com/HappyLadySauce/Knowledge-Core/pkg/health"
 	redisresource "github.com/HappyLadySauce/Knowledge-Core/pkg/redis"
 	hertztransport "github.com/HappyLadySauce/Knowledge-Core/pkg/transport/hertz"
+	gatewayapidocs "github.com/HappyLadySauce/Knowledge-Core/services/gateway/internal/apidocs"
 	gatewayclient "github.com/HappyLadySauce/Knowledge-Core/services/gateway/internal/client"
 	"github.com/HappyLadySauce/Knowledge-Core/services/gateway/internal/config"
 	gatewaymiddleware "github.com/HappyLadySauce/Knowledge-Core/services/gateway/internal/middleware"
 	"github.com/HappyLadySauce/Knowledge-Core/services/gateway/internal/ratelimit"
 	publichttp "github.com/HappyLadySauce/Knowledge-Core/services/gateway/internal/transport/http"
+	"github.com/cloudwego/hertz/pkg/app/server"
 )
 
 type ServiceContext struct {
@@ -108,6 +110,9 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 			LogComponent:  "gateway.admin",
 			Options:       *cfg.AdminHTTP,
 			TLSConfig:     adminTLS,
+			RegisterRoutes: func(h *server.Hertz) error {
+				return gatewayapidocs.Register(h, cfg.APIDocs.Enabled)
+			},
 		},
 		runtime.Health,
 		runtime.Metrics,

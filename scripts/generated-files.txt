@@ -1,4 +1,12 @@
-# Generator-owned Kitex RPC and Hertz model/router files.
+# Generator-owned Kitex RPC, Hertz transport, and API documentation files.
+api/asyncapi.json
+api/asyncapi.yaml
+api/http.html
+api/index.html
+api/openapi.json
+api/openapi.yaml
+api/style.css
+api/websocket.html
 kitex_gen/attachment/attachment.go
 kitex_gen/attachment/attachmentservice/attachmentservice.go
 kitex_gen/attachment/attachmentservice/client.go

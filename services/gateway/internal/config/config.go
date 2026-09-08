@@ -26,6 +26,7 @@ type Config struct {
 	Auth             *AuthOptions               `mapstructure:"auth" json:"auth" yaml:"auth"`
 	CORS             *CORSOptions               `mapstructure:"cors" json:"cors" yaml:"cors"`
 	RateLimit        *RateLimitOptions          `mapstructure:"rate_limit" json:"rate_limit" yaml:"rate_limit"`
+	APIDocs          *APIDocsOptions            `mapstructure:"api_docs" json:"api_docs" yaml:"api_docs"`
 }
 
 func New() Config {
@@ -55,7 +56,7 @@ func New() Config {
 		App: option.NewAppOptions("gateway"), Log: option.NewLogOptions(), Trace: option.NewTraceOptions(),
 		PublicHTTP: publicHTTP, AdminHTTP: adminHTTP, Redis: option.NewRedisOptions(),
 		IdentityRPC: identityRPC, KnowledgeRPC: knowledgeRPC, CollaborationRPC: collaborationRPC, AttachmentRPC: attachmentRPC, PlatformRPC: platformRPC,
-		Endpoints: NewEndpointOptions(), Auth: NewAuthOptions(), CORS: NewCORSOptions(), RateLimit: NewRateLimitOptions(),
+		Endpoints: NewEndpointOptions(), Auth: NewAuthOptions(), CORS: NewCORSOptions(), RateLimit: NewRateLimitOptions(), APIDocs: NewAPIDocsOptions(),
 	}
 }
 
@@ -104,7 +105,7 @@ func (c Config) Validate() error {
 		wrapValidation("platform_rpc", c.PlatformRPC.Validate()),
 		wrapValidation("endpoints", c.Endpoints.Validate()),
 		wrapValidation("auth", c.Auth.Validate()), wrapValidation("cors", c.CORS.Validate()),
-		wrapValidation("rate_limit", c.RateLimit.Validate()), addressErr, shutdownErr, endpointErr,
+		wrapValidation("rate_limit", c.RateLimit.Validate()), wrapValidation("api_docs", c.APIDocs.Validate()), addressErr, shutdownErr, endpointErr,
 	)
 }
 
@@ -113,7 +114,7 @@ func (c Config) requireSections() error {
 		"app": c.App, "log": c.Log, "trace": c.Trace, "public_http": c.PublicHTTP,
 		"admin_http": c.AdminHTTP, "redis": c.Redis,
 		"identity_rpc": c.IdentityRPC, "knowledge_rpc": c.KnowledgeRPC, "collaboration_rpc": c.CollaborationRPC, "attachment_rpc": c.AttachmentRPC, "platform_rpc": c.PlatformRPC,
-		"endpoints": c.Endpoints, "auth": c.Auth, "cors": c.CORS, "rate_limit": c.RateLimit,
+		"endpoints": c.Endpoints, "auth": c.Auth, "cors": c.CORS, "rate_limit": c.RateLimit, "api_docs": c.APIDocs,
 	}
 	var joined error
 	for name, section := range sections {

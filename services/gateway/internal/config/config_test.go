@@ -67,6 +67,41 @@ func TestRateLimitRequiresMillisecondWindow(t *testing.T) {
 	}
 }
 
+func TestAPIDocsToggleRequiresRestart(t *testing.T) {
+	keys, err := coreauth.GenerateKeyPair()
+	if err != nil {
+		t.Fatal(err)
+	}
+	startup := New()
+	startup.Auth.PublicKey = keys.PublicKey
+	document := configcenter.DynamicDocument{
+		APIVersion: configcenter.ApplicationAPIVersion,
+		Kind:       configcenter.ApplicationKind,
+		Service:    "gateway",
+		Revision:   2,
+		Config:     map[string]any{"api_docs": map[string]any{"enabled": true}},
+	}
+	candidate, result, err := applyDocument(startup, startup, startup, document)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !candidate.APIDocs.Enabled {
+		t.Fatal("dynamic API docs setting was not applied")
+	}
+	if !contains(result.RestartRequiredFields, "api_docs.enabled") {
+		t.Fatalf("restart fields = %#v", result.RestartRequiredFields)
+	}
+}
+
+func contains(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
+}
+
 func TestProviderLoadsPublicKeyFromEnvironment(t *testing.T) {
 	keys, err := coreauth.GenerateKeyPair()
 	if err != nil {

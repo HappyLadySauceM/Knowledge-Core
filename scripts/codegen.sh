@@ -67,6 +67,14 @@ owned_files() {
       (cd "$root" && find kitex_gen -type f -print)
     fi
     for relative in \
+      api/asyncapi.json \
+      api/asyncapi.yaml \
+      api/http.html \
+      api/index.html \
+      api/openapi.json \
+      api/openapi.yaml \
+      api/style.css \
+      api/websocket.html \
       services/gateway/biz/model/gateway/gateway.go \
       services/gateway/biz/router/gateway/gateway.go \
       services/gateway/biz/router/register.go \
@@ -181,10 +189,17 @@ generate_hertz() {
   gofmt -w services/gateway/biz
 }
 
+generate_api_docs() {
+  local root="$1"
+  cd "$root"
+  go run ./scripts/apidocgen --root "$root"
+}
+
 if ! $check; then
   if $generate_go; then
     generate_rpc "$repository_root"
     generate_hertz "$repository_root"
+    generate_api_docs "$repository_root"
   fi
   if $generate_rust_output; then
     generate_rust "$repository_root"
@@ -218,11 +233,16 @@ cp -a "$repository_root/services/collaboration/tools" "$temporary_root/services/
 cp -a "$repository_root/services/collaboration/src" "$temporary_root/services/collaboration/src"
 mkdir -p "$temporary_root/services/gateway"
 cp -a "$repository_root/services/gateway/biz" "$temporary_root/services/gateway/biz"
+cp -a "$repository_root/api" "$temporary_root/api"
+mkdir -p "$temporary_root/services/gateway/internal/apidocs"
+cp -a "$repository_root/services/gateway/internal/apidocs/metadata.yaml" "$temporary_root/services/gateway/internal/apidocs/metadata.yaml"
+cp -a "$repository_root/services/gateway/internal/apidocs/websocket.yaml" "$temporary_root/services/gateway/internal/apidocs/websocket.yaml"
 [[ ! -f "$repository_root/.hz" ]] || cp -a "$repository_root/.hz" "$temporary_root/.hz"
 
 if $generate_go; then
   generate_rpc "$temporary_root"
   generate_hertz "$temporary_root"
+  generate_api_docs "$temporary_root"
 fi
 if $generate_rust_output; then
   generate_rust "$temporary_root"

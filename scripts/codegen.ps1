@@ -94,6 +94,14 @@ function Get-OwnedFiles {
             ForEach-Object { $_.FullName.Substring($prefix.Length).Replace("\", "/") })
     }
     foreach ($relative in @(
+        "api/asyncapi.json",
+        "api/asyncapi.yaml",
+        "api/http.html",
+        "api/index.html",
+        "api/openapi.json",
+        "api/openapi.yaml",
+        "api/style.css",
+        "api/websocket.html",
         "services/gateway/biz/model/gateway/gateway.go",
         "services/gateway/biz/router/gateway/gateway.go",
         "services/gateway/biz/router/register.go",
@@ -258,10 +266,23 @@ function Invoke-HertzGeneration {
     }
 }
 
+function Invoke-APIDocumentationGeneration {
+    param([Parameter(Mandatory = $true)][string]$Root)
+
+    Push-Location $Root
+    try {
+        & go run ./scripts/apidocgen --root $Root
+        Assert-NativeSuccess -Operation "API documentation generation"
+    } finally {
+        Pop-Location
+    }
+}
+
 if (-not $Check) {
     if ($generateGo) {
         Invoke-RPCGeneration -Root $repositoryRoot
         Invoke-HertzGeneration -Root $repositoryRoot
+        Invoke-APIDocumentationGeneration -Root $repositoryRoot
     }
     if ($generateRust) {
         Invoke-RustGeneration -Root $repositoryRoot
@@ -293,6 +314,10 @@ try {
     Copy-Item -LiteralPath (Join-Path $repositoryRoot "services/collaboration/src") -Destination (Join-Path $temporaryRoot "services/collaboration/src") -Recurse
     [System.IO.Directory]::CreateDirectory((Join-Path $temporaryRoot "services/gateway")) | Out-Null
     Copy-Item -LiteralPath (Join-Path $repositoryRoot "services/gateway/biz") -Destination (Join-Path $temporaryRoot "services/gateway/biz") -Recurse
+    Copy-Item -LiteralPath (Join-Path $repositoryRoot "api") -Destination (Join-Path $temporaryRoot "api") -Recurse
+    [System.IO.Directory]::CreateDirectory((Join-Path $temporaryRoot "services/gateway/internal/apidocs")) | Out-Null
+    Copy-Item -LiteralPath (Join-Path $repositoryRoot "services/gateway/internal/apidocs/metadata.yaml") -Destination (Join-Path $temporaryRoot "services/gateway/internal/apidocs/metadata.yaml")
+    Copy-Item -LiteralPath (Join-Path $repositoryRoot "services/gateway/internal/apidocs/websocket.yaml") -Destination (Join-Path $temporaryRoot "services/gateway/internal/apidocs/websocket.yaml")
     if (Test-Path -LiteralPath (Join-Path $repositoryRoot ".hz")) {
         Copy-Item -LiteralPath (Join-Path $repositoryRoot ".hz") -Destination (Join-Path $temporaryRoot ".hz")
     }
@@ -300,6 +325,7 @@ try {
     if ($generateGo) {
         Invoke-RPCGeneration -Root $temporaryRoot
         Invoke-HertzGeneration -Root $temporaryRoot
+        Invoke-APIDocumentationGeneration -Root $temporaryRoot
     }
     if ($generateRust) {
         Invoke-RustGeneration -Root $temporaryRoot

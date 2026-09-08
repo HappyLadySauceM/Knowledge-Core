@@ -13,6 +13,7 @@ shared_paths:
   - .ci
   - .github
   - pkg
+  - api
   - idl
   - kitex_gen
   - scripts

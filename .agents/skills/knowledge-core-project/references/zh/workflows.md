@@ -42,6 +42,8 @@
 
 状态：`verified`
 
+- **make:api-docs**: `{"command":"make api-docs","source":"Makefile"}`
+- **make:api-docs-check**: `{"command":"make api-docs-check","source":"Makefile"}`
 - **make:fmt**: `{"command":"make fmt","source":"Makefile"}`
 - **make:fmt-check**: `{"command":"make fmt-check","source":"Makefile"}`
 - **make:generate**: `{"command":"make generate","source":"Makefile"}`
@@ -53,7 +55,7 @@
 - **npm:format:check**: `{"command":"prettier --check .","source":"services/collaboration/interop/package.json"}`
 - **npm:generate:fixtures**: `{"command":"node ./generate-fixtures.mjs","source":"services/collaboration/interop/package.json"}`
 
-来源： `detected:project-scripts`
+来源： `Makefile`、`detected:project-scripts`
 
 ## `cicd.config-files`
 

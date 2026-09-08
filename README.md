@@ -36,6 +36,16 @@ Knowledge Core 是一个支持文档元数据、权限、通用附件、实时�
 
 完整 HTTP 契约源为 [idl/http/v1/gateway.thrift](idl/http/v1/gateway.thrift)。
 
+## API 文档
+
+执行 `make api-docs`（或 `make generate`）会从 Thrift IDL 和 Gateway 元数据生成
+`api/` 下的 OpenAPI 3.1.0、AsyncAPI 3.0.0、JSON/YAML 规范和中文只读页面；
+`make api-docs-check` 用于检查生成漂移。运行 Gateway 时，将
+`GATEWAY_API_DOCS_ENABLED=true`（或 YAML 中 `api_docs.enabled: true`）后，文档只在
+Admin `:8082` 的以下路径提供：`/docs/`、`/docs/http`、`/docs/websocket`、
+`/docs/openapi.{yaml,json}` 和 `/docs/asyncapi.{yaml,json}`。默认关闭，公网 `:8080`
+不注册这些路由；页面自包含、只读且不提供 Try it out。
+
 ## API 契约
 
 - JSON 请求必须使用 `Content-Type: application/json`。未知字段、额外 JSON 值、重复关键 header/query、非法数字和未知 query 均被拒绝。
@@ -288,6 +298,9 @@ Argo CD repository Secret、AppProject 和 ApplicationSet 由私有 GitOps 仓�
 make generate
 make generate-check
 ```
+
+API 文档生成物也纳入 `scripts/generated-files.txt` 的漂移校验；修改
+`services/gateway/internal/apidocs/*.yaml` 后应重新运行 `make api-docs`。
 
 IDL 变更还必须与 merge base 执行兼容检查：
 

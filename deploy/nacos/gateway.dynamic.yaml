@@ -1,7 +1,7 @@
 api_version: knowledge-core.io/v1beta1
 kind: ApplicationConfig
 service: gateway
-revision: 4
+revision: 5
 config:
   app:
     name: gateway
@@ -36,6 +36,8 @@ config:
     shutdown_timeout: 15s
     max_request_body_size: 4194304
     tls: {enabled: false}
+  api_docs:
+    enabled: true
   redis:
     address: redis-master.infrastructure-dev.svc.cluster.local:6379
     db: 0

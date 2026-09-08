@@ -147,6 +147,15 @@ Gateway 的 HTTP 规则：
 - 附件下载返回 `303 See Other` 和短期预签名 `Location`，不代理对象正文。
 - 响应中的公开 HTTP/WebSocket URL 只来自已校验配置，不信任请求 `Host`。
 
+API 文档由 `scripts/apidocgen` 生成，输入为 `idl/http/v1/gateway.thrift`、
+`services/gateway/internal/apidocs/metadata.yaml` 和
+`services/gateway/internal/apidocs/websocket.yaml`。生成物位于 `api/`，同时包含
+OpenAPI 3.1.0、独立的 AsyncAPI 3.0.0 WebSocket 契约和无外部 CDN 的只读 HTML 页面。
+Gateway 只在 Admin listener（默认 `:8082`）注册 `/docs/` 及其规范下载路由；公网
+`:8080` 不暴露文档。`api_docs.enabled` 默认关闭，部署到任何环境都必须显式设置为
+`true` 才启用 UI，且该开关变更需要重启。文档页面不提供在线调用，访问应限制在受控
+网络或端口转发内。
+
 ## 5. 内部契约与实时协作
 
 Identity RPC 提供 `Register`、`Authenticate`、`GetCurrentUser` 和 `ResolveUser`。Gateway 只调用生成的 typed client，不复制领域规则。

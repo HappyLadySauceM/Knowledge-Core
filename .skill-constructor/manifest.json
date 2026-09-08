@@ -487,7 +487,7 @@
     },
     {
       "id": "entrypoints.catalog",
-      "revision": 144,
+      "revision": 166,
       "section": "services",
       "sources": [
         {
@@ -504,8 +504,8 @@
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-08-30T08:48:07Z",
-      "value": "Service process entrypoints are services/gateway/main.go, services/identity/main.go, services/knowledge/main.go, services/attachment/main.go, services/platform/main.go, and services/collaboration/src/main.rs. Service main files only create and execute the application command; Go spec files only declare the application spec. Auxiliary executable entrypoints include scripts/idlguard, Collaboration Rust codegen, and tools/authkeys, tools/configctl, and tools/interop. Deployment definitions live under deploy and docker."
+      "updatedAt": "2026-09-08T09:27:31Z",
+      "value": "Service process entrypoints are services/gateway/main.go, services/identity/main.go, services/knowledge/main.go, services/attachment/main.go, services/platform/main.go, and services/collaboration/src/main.rs. Service main files only create and execute the application command; Go spec files only declare the application spec. Auxiliary executable entrypoints include scripts/apidocgen, scripts/idlguard, Collaboration Rust codegen, and tools/authkeys, tools/configctl, and tools/interop. Deployment definitions live under deploy and docker."
     },
     {
       "id": "environment.definitions",
@@ -628,21 +628,21 @@
     },
     {
       "id": "security.secrets-and-config",
-      "revision": 165,
+      "revision": 167,
       "section": "conventions",
       "sources": [
         {
-          "detail": "evidence-sha256:0b0c26ec2dbdd31eed4343a73b343af0c4fb337742a849b9d75a647c52e9bdcb",
+          "detail": "evidence-sha256:ef0e0c67f71bad8ca9f182c3207b5d6054dc12d1d3f96ee7a7b39adbba18d3f3",
           "kind": "documented",
           "reference": "README.md#compose"
         },
         {
-          "detail": "evidence-sha256:0b0c26ec2dbdd31eed4343a73b343af0c4fb337742a849b9d75a647c52e9bdcb",
+          "detail": "evidence-sha256:ef0e0c67f71bad8ca9f182c3207b5d6054dc12d1d3f96ee7a7b39adbba18d3f3",
           "kind": "documented",
           "reference": "README.md#k3s-gitops"
         },
         {
-          "detail": "evidence-sha256:0b0c26ec2dbdd31eed4343a73b343af0c4fb337742a849b9d75a647c52e9bdcb",
+          "detail": "evidence-sha256:ef0e0c67f71bad8ca9f182c3207b5d6054dc12d1d3f96ee7a7b39adbba18d3f3",
           "kind": "documented",
           "reference": "README.md#section"
         },
@@ -652,7 +652,7 @@
           "reference": "deploy/base/README.md#application-deployment-base"
         },
         {
-          "detail": "evidence-sha256:0b0c26ec2dbdd31eed4343a73b343af0c4fb337742a849b9d75a647c52e9bdcb",
+          "detail": "evidence-sha256:ef0e0c67f71bad8ca9f182c3207b5d6054dc12d1d3f96ee7a7b39adbba18d3f3",
           "kind": "documented",
           "reference": "deploy/nacos/README.md#nacos-application-configuration"
         },
@@ -662,47 +662,47 @@
           "reference": "deploy/overlay/dev/README.md#development-overlay"
         },
         {
-          "detail": "evidence-sha256:0b0c26ec2dbdd31eed4343a73b343af0c4fb337742a849b9d75a647c52e9bdcb",
+          "detail": "evidence-sha256:ef0e0c67f71bad8ca9f182c3207b5d6054dc12d1d3f96ee7a7b39adbba18d3f3",
           "kind": "documented",
           "reference": "docs/framework-design.md#11"
         },
         {
-          "detail": "evidence-sha256:0b0c26ec2dbdd31eed4343a73b343af0c4fb337742a849b9d75a647c52e9bdcb",
+          "detail": "evidence-sha256:ef0e0c67f71bad8ca9f182c3207b5d6054dc12d1d3f96ee7a7b39adbba18d3f3",
           "kind": "documented",
           "reference": "docs/framework-design.md#12"
         },
         {
-          "detail": "evidence-sha256:0b0c26ec2dbdd31eed4343a73b343af0c4fb337742a849b9d75a647c52e9bdcb",
+          "detail": "evidence-sha256:ef0e0c67f71bad8ca9f182c3207b5d6054dc12d1d3f96ee7a7b39adbba18d3f3",
           "kind": "documented",
           "reference": "docs/framework-design.md#8-secret-tls"
         },
         {
-          "detail": "evidence-sha256:0b0c26ec2dbdd31eed4343a73b343af0c4fb337742a849b9d75a647c52e9bdcb",
+          "detail": "evidence-sha256:ef0e0c67f71bad8ca9f182c3207b5d6054dc12d1d3f96ee7a7b39adbba18d3f3",
           "kind": "documented",
           "reference": "docs/migrations/2026-08-auth-productionization.md#section"
         },
         {
-          "detail": "evidence-sha256:0b0c26ec2dbdd31eed4343a73b343af0c4fb337742a849b9d75a647c52e9bdcb",
+          "detail": "evidence-sha256:ef0e0c67f71bad8ca9f182c3207b5d6054dc12d1d3f96ee7a7b39adbba18d3f3",
           "kind": "documented",
           "reference": "docs/migrations/2026-08-platform-configuration.md#platform-configuration-migration"
         },
         {
-          "detail": "evidence-sha256:0b0c26ec2dbdd31eed4343a73b343af0c4fb337742a849b9d75a647c52e9bdcb",
+          "detail": "evidence-sha256:ef0e0c67f71bad8ca9f182c3207b5d6054dc12d1d3f96ee7a7b39adbba18d3f3",
           "kind": "documented",
           "reference": "docs/platform-configuration.md#section"
         },
         {
-          "detail": "evidence-sha256:0b0c26ec2dbdd31eed4343a73b343af0c4fb337742a849b9d75a647c52e9bdcb",
+          "detail": "evidence-sha256:ef0e0c67f71bad8ca9f182c3207b5d6054dc12d1d3f96ee7a7b39adbba18d3f3",
           "kind": "documented",
           "reference": "docs/rust-collaboration-design.md#2-1"
         },
         {
-          "detail": "evidence-sha256:0b0c26ec2dbdd31eed4343a73b343af0c4fb337742a849b9d75a647c52e9bdcb",
+          "detail": "evidence-sha256:ef0e0c67f71bad8ca9f182c3207b5d6054dc12d1d3f96ee7a7b39adbba18d3f3",
           "kind": "documented",
           "reference": "docs/rust-collaboration-design.md#7"
         },
         {
-          "detail": "evidence-sha256:0b0c26ec2dbdd31eed4343a73b343af0c4fb337742a849b9d75a647c52e9bdcb",
+          "detail": "evidence-sha256:ef0e0c67f71bad8ca9f182c3207b5d6054dc12d1d3f96ee7a7b39adbba18d3f3",
           "kind": "documented",
           "reference": "docs/trace-architecture.md#7-collector-tempo"
         },
@@ -720,7 +720,7 @@
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-09-07T09:13:42Z",
+      "updatedAt": "2026-09-08T09:31:02Z",
       "value": "Secrets may be injected only from environment variables, Kubernetes Secrets, or SOPS-encrypted GitOps manifests. Sensitive values must not be stored in plaintext in source, configuration, logs, metrics, trace spans, or release metadata."
     },
     {
@@ -895,16 +895,16 @@
     },
     {
       "id": "validation.definition-of-done",
-      "revision": 164,
+      "revision": 167,
       "section": "workflows",
       "sources": [
         {
-          "detail": "evidence-sha256:fcce2f95135b209a7789b828819d38169033a865125d064ce1dd0c0f74fdbe0f",
+          "detail": "evidence-sha256:12f968d843a9fa5cd5ffc0fecce0816ccc8a6cc0e6c513d8e4fd314e0cc81b1e",
           "kind": "documented",
           "reference": "docs/migrations/2026-08-rust-collaboration.md#section"
         },
         {
-          "detail": "evidence-sha256:fcce2f95135b209a7789b828819d38169033a865125d064ce1dd0c0f74fdbe0f",
+          "detail": "evidence-sha256:12f968d843a9fa5cd5ffc0fecce0816ccc8a6cc0e6c513d8e4fd314e0cc81b1e",
           "kind": "documented",
           "reference": "docs/rust-collaboration-design.md#7"
         },
@@ -922,7 +922,7 @@
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-09-07T03:59:23Z",
+      "updatedAt": "2026-09-08T09:31:02Z",
       "value": "Run `make ci` after every change; it covers check and generate-check, including Go and Rust format checks, vet/clippy, lint, non-cached tests, build, vulnerability/supply-chain checks, and generated-file drift. Go concurrency, goroutine, orchestration, or lifecycle work also runs `make race`. Node fixture changes run `npm ci && npm run ci` under `services/collaboration/interop`. IDL changes also regenerate, review wire/API compatibility, and run `go run ./scripts/idlguard compat-git <merge-base> idl`."
     },
     {
@@ -964,16 +964,20 @@
     },
     {
       "id": "workflows.quality",
-      "revision": 1,
+      "revision": 167,
       "section": "workflows",
       "sources": [
+        {
+          "kind": "detected",
+          "reference": "Makefile"
+        },
         {
           "kind": "detected",
           "reference": "detected:project-scripts"
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-08-08T01:12:53Z",
+      "updatedAt": "2026-09-08T09:31:02Z",
       "value": {
         "make:fmt": {
           "command": "make fmt",
@@ -1055,11 +1059,11 @@
     "profile": "generic",
     "slug": "knowledge-core"
   },
-  "revision": 165,
+  "revision": 168,
   "scan": {
-    "fingerprint": "061433a2e44a2516137da44343affb5cd15d419fe6d3e56d26d58f41d298ad2b",
-    "inventoryCount": 435
+    "fingerprint": "91a7807165afb13ccdd0fe6ffefb5e376a4d7ac9b2b0a8993a936d68f55770e3",
+    "inventoryCount": 452
   },
   "schemaVersion": 3,
-  "updatedAt": "2026-09-07T09:13:42Z"
+  "updatedAt": "2026-09-08T09:48:34Z"
 }

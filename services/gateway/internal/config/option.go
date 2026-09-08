@@ -72,6 +72,16 @@ type RateLimitOptions struct {
 	AuthLimit   int64         `mapstructure:"auth_limit" json:"auth_limit" yaml:"auth_limit"`
 }
 
+// APIDocsOptions controls the read-only documentation UI and generated
+// machine-readable contracts exposed from the admin listener.
+type APIDocsOptions struct {
+	Enabled bool `mapstructure:"enabled" json:"enabled" yaml:"enabled"`
+}
+
+func NewAPIDocsOptions() *APIDocsOptions { return &APIDocsOptions{} }
+
+func (o APIDocsOptions) Validate() error { return nil }
+
 type EndpointOptions struct {
 	PublicBaseURL                 string  `mapstructure:"public_base_url" json:"public_base_url" yaml:"public_base_url"`
 	CollaborationWebSocketBaseURL string  `mapstructure:"collaboration_websocket_base_url" json:"collaboration_websocket_base_url" yaml:"collaboration_websocket_base_url"`

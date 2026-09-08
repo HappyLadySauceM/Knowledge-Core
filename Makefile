@@ -64,6 +64,7 @@ RUST_TARGET_DIR ?= $(if $(CARGO_TARGET_DIR),$(CARGO_TARGET_DIR),$(RUST_ROOT)/tar
 
 # Keep the Node interoperability fixture and its dependency tree out of Go discovery.
 GO_PACKAGES ?= \
+	./api \
 	./pkg/... \
 	./services/gateway/... \
 	./services/identity/... \
@@ -87,7 +88,7 @@ endif
 
 .DEFAULT_GOAL := help
 
-.PHONY: help fmt fmt-check vet lint line test race build go-release rust-release vuln supply-chain tidy ensure-ci-tools ensure-kitex ensure-hz ensure-thriftgo ensure-cargo-deny ensure-rust-toolchain generate generate-check generate-go-check generate-rust-check check go-ci rust-ci rust-real-dependencies collaboration-maintenance ci smoke-ci
+.PHONY: help fmt fmt-check vet lint line test race build go-release rust-release vuln supply-chain tidy api-docs api-docs-check ensure-ci-tools ensure-kitex ensure-hz ensure-thriftgo ensure-cargo-deny ensure-rust-toolchain generate generate-check generate-go-check generate-rust-check check go-ci rust-ci rust-real-dependencies collaboration-maintenance ci smoke-ci
 
 help:
 	@echo Knowledge Core development targets:
@@ -102,6 +103,8 @@ help:
 	@echo   make vuln            Check reachable Go vulnerabilities
 	@echo   make supply-chain    Check Rust advisories, bans, licenses, and sources
 	@echo   make tidy            Normalize go.mod and go.sum
+	@echo   make api-docs        Regenerate OpenAPI, AsyncAPI, and read-only API pages
+	@echo   make api-docs-check  Check API documentation for generated drift
 	@echo   make ensure-ci-tools Install missing or older CI tools; keep newer local versions
 	@echo   make generate        Regenerate Hertz and Kitex code
 	@echo   make generate-check  Regenerate and fail on generated-code drift
@@ -164,6 +167,12 @@ supply-chain:
 
 tidy:
 	go mod tidy
+
+api-docs:
+	go run ./scripts/apidocgen --root .
+
+api-docs-check:
+	go run ./scripts/apidocgen --root . --check
 
 # Compare a parsed x.y.z against a pin after stripping an optional v prefix.
 # 去掉可选 v 前缀后，比较解析出的 x.y.z 与钉住版本。

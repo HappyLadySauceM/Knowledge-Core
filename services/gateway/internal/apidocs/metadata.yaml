@@ -1,0 +1,398 @@
+version: 1
+defaults:
+  errors: [400, 401, 403, 404, 409, 412, 429, 500, 502, 503, 504]
+operations:
+  Live:
+    tag: 健康检查
+    summary: 存活探针
+    description: 仅证明 Gateway 进程存活，不检查业务依赖。
+    security: none
+    success_status: 200
+    errors: []
+  Ready:
+    tag: 健康检查
+    summary: 就绪探针
+    description: 返回 Gateway 是否已经可以接收公网请求。
+    security: none
+    success_status: 200
+    errors: [503]
+  Register:
+    tag: 身份与会话
+    summary: 注册用户
+    description: 创建一个新的用户账户并返回初始 access token。
+    security: none
+    success_status: 201
+    errors: [400, 409, 429, 500, 502, 503]
+  Login:
+    tag: 身份与会话
+    summary: 用户登录
+    description: 使用用户名或邮箱和密码创建会话。
+    security: none
+    success_status: 200
+    errors: [400, 401, 423, 429, 500, 502, 503]
+  RefreshSession:
+    tag: 身份与会话
+    summary: 刷新会话
+    description: 轮换 refresh token 并返回新的会话 token。
+    security: none
+    success_status: 200
+    errors: [400, 401, 409, 429, 500, 502, 503]
+  Logout:
+    tag: 身份与会话
+    summary: 注销当前会话
+    description: 撤销当前 access token 对应的会话。
+    security: bearer
+    success_status: 200
+    errors: [401, 404, 500, 502, 503, 504]
+  ListSessions:
+    tag: 身份与会话
+    summary: 列出会话
+    description: 返回当前用户的活动会话列表。
+    security: bearer
+    success_status: 200
+    errors: [401, 500, 502, 503, 504]
+  RevokeSession:
+    tag: 身份与会话
+    summary: 撤销指定会话
+    description: 撤销当前用户指定的会话。
+    security: bearer
+    success_status: 200
+    errors: [400, 401, 404, 500, 502, 503, 504]
+  RevokeAllSessions:
+    tag: 身份与会话
+    summary: 撤销全部会话
+    description: 撤销当前用户除当前请求外的全部会话。
+    security: bearer
+    success_status: 200
+    errors: [401, 500, 502, 503, 504]
+  RequestEmailVerification:
+    tag: 身份与会话
+    summary: 请求邮箱验证
+    description: 向指定邮箱发送一次性验证邮件。
+    security: none
+    success_status: 200
+    errors: [400, 429, 500, 502, 503, 504]
+  VerifyEmail:
+    tag: 身份与会话
+    summary: 验证邮箱
+    description: 使用邮件中的一次性 token 验证邮箱地址。
+    security: none
+    success_status: 200
+    errors: [400, 404, 409, 429, 500, 502, 503, 504]
+  RequestPasswordReset:
+    tag: 身份与会话
+    summary: 请求密码重置
+    description: 为用户创建密码重置流程并发送邮件。
+    security: none
+    success_status: 200
+    errors: [400, 429, 500, 502, 503, 504]
+  ResetPassword:
+    tag: 身份与会话
+    summary: 重置密码
+    description: 使用一次性 token 设置新密码。
+    security: none
+    success_status: 200
+    errors: [400, 404, 409, 429, 500, 502, 503, 504]
+  DeactivateAccount:
+    tag: 身份与会话
+    summary: 停用账户
+    description: 使用当前密码停用当前用户账户并撤销其会话。
+    security: bearer
+    success_status: 200
+    errors: [400, 401, 403, 409, 429, 500, 502, 503, 504]
+  CurrentUser:
+    tag: 身份与会话
+    summary: 获取当前用户
+    description: 返回当前 access token 对应的最新用户状态。
+    security: bearer
+    success_status: 200
+    errors: [401, 500, 502, 503, 504]
+  ListPublishedDocuments:
+    tag: 公开内容
+    summary: 列出公开文档
+    description: 按游标分页列出当前可见的已发布文档；有效 token 可提供访问上下文。
+    security: optional
+    success_status: 200
+    errors: [400, 401, 403, 429, 500, 502, 503, 504]
+  GetPublishedDocument:
+    tag: 公开内容
+    summary: 获取公开文档
+    description: 根据 slug 获取已发布文档及其 rich-text 内容和附件。
+    security: optional
+    success_status: 200
+    response_headers: [ETag, X-Request-ID, X-Trace-ID]
+    errors: [400, 401, 403, 404, 429, 500, 502, 503, 504]
+  GetSiteProfile:
+    tag: 公开内容
+    summary: 获取站点资料
+    description: 返回站点标题、标语和首页展示配置。
+    security: none
+    success_status: 200
+    errors: [500, 502, 503, 504]
+  GetConfiguration:
+    tag: 管理配置
+    summary: 读取配置
+    description: 读取指定 namespace 的当前业务配置；敏感值只以脱敏形式返回。
+    security: admin
+    success_status: 200
+    response_headers: [ETag, X-Request-ID, X-Trace-ID]
+    errors: [400, 401, 403, 404, 409, 412, 500, 502, 503, 504]
+  PutConfiguration:
+    tag: 管理配置
+    summary: 写入配置
+    description: 使用 If-Match 和 Idempotency-Key 以乐观并发方式写入 namespace 配置。
+    security: admin
+    success_status: 200
+    response_headers: [ETag, X-Request-ID, X-Trace-ID]
+    errors: [400, 401, 403, 409, 412, 429, 500, 502, 503, 504]
+  GetConfigurationDelivery:
+    tag: 管理配置
+    summary: 查询配置投递
+    description: 查询指定配置修订的可靠投递状态。
+    security: admin
+    success_status: 200
+    errors: [400, 401, 403, 404, 500, 502, 503, 504]
+  GetAttachmentContent:
+    tag: 附件
+    summary: 获取附件下载地址
+    description: 校验附件可下载状态后返回短期预签名 URL 的 303 重定向；不代理对象正文。
+    security: optional
+    success_status: 303
+    response_headers: [Cache-Control, Location, X-Request-ID, X-Trace-ID]
+    errors: [400, 401, 403, 404, 410, 429, 500, 502, 503, 504]
+  ListMediaAttachments:
+    tag: 附件
+    summary: 列出媒体附件
+    description: 列出当前用户拥有的通用附件并按游标分页。
+    security: bearer
+    success_status: 200
+    errors: [400, 401, 403, 429, 500, 502, 503, 504]
+  CreateMediaAttachment:
+    tag: 附件
+    summary: 创建媒体附件上传
+    description: 创建通用附件 multipart 上传并返回各分片预签名地址。
+    security: bearer
+    success_status: 201
+    response_headers: [Location, X-Request-ID, X-Trace-ID]
+    errors: [400, 401, 403, 409, 429, 500, 502, 503, 504]
+  GetMediaAttachment:
+    tag: 附件
+    summary: 获取媒体附件
+    description: 获取当前用户可见的通用附件元数据。
+    security: bearer
+    success_status: 200
+    errors: [400, 401, 403, 404, 429, 500, 502, 503, 504]
+  CompleteMediaAttachment:
+    tag: 附件
+    summary: 完成媒体附件上传
+    description: 提交所有分片的 ETag 并完成 multipart 上传。
+    security: bearer
+    success_status: 200
+    errors: [400, 401, 403, 404, 409, 429, 500, 502, 503, 504]
+  DeleteMediaAttachment:
+    tag: 附件
+    summary: 删除媒体附件
+    description: 将通用附件移入回收状态。
+    security: bearer
+    success_status: 204
+    errors: [400, 401, 403, 404, 409, 429, 500, 502, 503, 504]
+  RestoreMediaAttachment:
+    tag: 附件
+    summary: 恢复媒体附件
+    description: 从回收状态恢复通用附件。
+    security: bearer
+    success_status: 200
+    errors: [400, 401, 403, 404, 409, 429, 500, 502, 503, 504]
+  ListDocuments:
+    tag: Studio 文档
+    summary: 列出工作区文档
+    description: 按访问级别、发布状态和游标分页列出当前用户可管理的文档。
+    security: bearer
+    success_status: 200
+    errors: [400, 401, 403, 429, 500, 502, 503, 504]
+  ListFolders:
+    tag: Studio 文件夹
+    summary: 列出文件夹
+    description: 列出指定父文件夹下的工作区文件夹。
+    security: bearer
+    success_status: 200
+    errors: [400, 401, 403, 429, 500, 502, 503, 504]
+  CreateFolder:
+    tag: Studio 文件夹
+    summary: 创建文件夹
+    description: 在工作区中创建文件夹，可使用 Idempotency-Key 保证重试安全。
+    security: bearer
+    success_status: 201
+    response_headers: [Location, X-Request-ID, X-Trace-ID]
+    errors: [400, 401, 403, 409, 429, 500, 502, 503, 504]
+  UpdateFolder:
+    tag: Studio 文件夹
+    summary: 更新文件夹
+    description: 使用强 If-Match 更新文件夹名称或父级。
+    security: bearer
+    success_status: 200
+    errors: [400, 401, 403, 404, 409, 412, 429, 500, 502, 503, 504]
+  DeleteFolder:
+    tag: Studio 文件夹
+    summary: 删除文件夹
+    description: 使用强 If-Match 删除空文件夹。
+    security: bearer
+    success_status: 204
+    errors: [400, 401, 403, 404, 409, 412, 429, 500, 502, 503, 504]
+  CreateDocument:
+    tag: Studio 文档
+    summary: 创建文档
+    description: 创建文档元数据并返回工作区文档。
+    security: bearer
+    success_status: 201
+    response_headers: [ETag, Location, X-Request-ID, X-Trace-ID]
+    errors: [400, 401, 403, 409, 429, 500, 502, 503, 504]
+  GetDocument:
+    tag: Studio 文档
+    summary: 获取工作区文档
+    description: 获取文档当前元数据和访问级别。
+    security: bearer
+    success_status: 200
+    response_headers: [ETag, X-Request-ID, X-Trace-ID]
+    errors: [400, 401, 403, 404, 429, 500, 502, 503, 504]
+  CreateCollaborationSession:
+    tag: 实时协作
+    summary: 创建协作会话
+    description: 通过 Knowledge 权限复核后创建短期、单次使用的 WebSocket ticket。
+    security: bearer
+    success_status: 201
+    errors: [400, 401, 403, 404, 429, 500, 502, 503, 504]
+  UpdateDocument:
+    tag: Studio 文档
+    summary: 更新文档元数据
+    description: 使用强 If-Match 更新文档标题、摘要、slug、语言、标签或文件夹。
+    security: bearer
+    success_status: 200
+    response_headers: [ETag, X-Request-ID, X-Trace-ID]
+    errors: [400, 401, 403, 404, 409, 412, 429, 500, 502, 503, 504]
+  DeleteDocument:
+    tag: Studio 文档
+    summary: 删除文档
+    description: 使用强 If-Match 将文档移入回收站。
+    security: bearer
+    success_status: 204
+    errors: [400, 401, 403, 404, 409, 412, 429, 500, 502, 503, 504]
+  PublishDocument:
+    tag: 发布
+    summary: 发布文档
+    description: 使用当前 rich-text state vector 创建版本并发布文档公开投影。
+    security: bearer
+    success_status: 200
+    required_body: [state_vector]
+    response_headers: [ETag, X-Request-ID, X-Trace-ID]
+    errors: [400, 401, 403, 404, 409, 412, 429, 500, 502, 503, 504]
+  UnpublishDocument:
+    tag: 发布
+    summary: 取消发布文档
+    description: 使用强 If-Match 移除文档的公开发布状态。
+    security: bearer
+    success_status: 204
+    errors: [400, 401, 403, 404, 409, 412, 429, 500, 502, 503, 504]
+  ListMembers:
+    tag: 成员权限
+    summary: 列出文档成员
+    description: 返回文档成员及其当前角色和权限修订。
+    security: bearer
+    success_status: 200
+    errors: [400, 401, 403, 404, 429, 500, 502, 503, 504]
+  AddMember:
+    tag: 成员权限
+    summary: 添加文档成员
+    description: 按用户名添加 viewer 或 editor 成员。
+    security: bearer
+    success_status: 201
+    response_headers: [ETag, Location, X-Request-ID, X-Trace-ID]
+    errors: [400, 401, 403, 404, 409, 429, 500, 502, 503, 504]
+  UpdateMember:
+    tag: 成员权限
+    summary: 更新成员角色
+    description: 使用成员权限修订更新成员角色。
+    security: bearer
+    success_status: 200
+    response_headers: [ETag, X-Request-ID, X-Trace-ID]
+    errors: [400, 401, 403, 404, 409, 412, 429, 500, 502, 503, 504]
+  DeleteMember:
+    tag: 成员权限
+    summary: 移除文档成员
+    description: 使用成员权限修订移除指定成员。
+    security: bearer
+    success_status: 204
+    errors: [400, 401, 403, 404, 409, 412, 429, 500, 502, 503, 504]
+  ListVersions:
+    tag: 版本
+    summary: 列出文档版本
+    description: 按 sequence 游标分页列出文档不可变版本。
+    security: bearer
+    success_status: 200
+    errors: [400, 401, 403, 404, 429, 500, 502, 503, 504]
+  CreateVersion:
+    tag: 版本
+    summary: 创建文档版本
+    description: 保存当前协作状态的不可变版本。
+    security: bearer
+    success_status: 201
+    response_headers: [Location, X-Request-ID, X-Trace-ID]
+    errors: [400, 401, 403, 404, 409, 429, 500, 502, 503, 504]
+  GetVersion:
+    tag: 版本
+    summary: 获取版本详情
+    description: 获取指定版本的 rich-text 内容和纯文本投影。
+    security: bearer
+    success_status: 200
+    errors: [400, 401, 403, 404, 429, 500, 502, 503, 504]
+  RestoreVersion:
+    tag: 版本
+    summary: 恢复文档版本
+    description: 在 expected_sequence 匹配时生成恢复更新并创建新版本。
+    security: bearer
+    success_status: 201
+    errors: [400, 401, 403, 404, 409, 412, 429, 500, 502, 503, 504]
+  ListAttachments:
+    tag: 文档附件
+    summary: 列出文档附件
+    description: 列出迁移窗口内文档范围的附件投影。
+    security: bearer
+    success_status: 200
+    errors: [400, 401, 403, 404, 429, 500, 502, 503, 504]
+  CreateAttachment:
+    tag: 文档附件
+    summary: 创建文档附件上传
+    description: 创建旧文档范围附件上传并返回预签名地址。
+    security: bearer
+    success_status: 201
+    response_headers: [Location, X-Request-ID, X-Trace-ID]
+    errors: [400, 401, 403, 404, 409, 429, 500, 502, 503, 504]
+  CompleteAttachment:
+    tag: 文档附件
+    summary: 完成文档附件上传
+    description: 完成旧文档范围附件的预签名上传。
+    security: bearer
+    success_status: 200
+    errors: [400, 401, 403, 404, 409, 429, 500, 502, 503, 504]
+  DeleteAttachment:
+    tag: 文档附件
+    summary: 删除文档附件
+    description: 删除旧文档范围附件。
+    security: bearer
+    success_status: 204
+    errors: [400, 401, 403, 404, 409, 429, 500, 502, 503, 504]
+  ListDeletedDocuments:
+    tag: 回收站
+    summary: 列出已删除文档
+    description: 按游标分页列出当前用户回收站中的文档。
+    security: bearer
+    success_status: 200
+    errors: [400, 401, 403, 429, 500, 502, 503, 504]
+  RestoreDeletedDocument:
+    tag: 回收站
+    summary: 恢复已删除文档
+    description: 从回收站恢复指定文档。
+    security: bearer
+    success_status: 200
+    response_headers: [ETag, X-Request-ID, X-Trace-ID]
+    errors: [400, 401, 403, 404, 409, 429, 500, 502, 503, 504]
