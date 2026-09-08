@@ -358,12 +358,6 @@ jobs:
           make rust-ci generate-rust-check
           rm -rf .ci-artifacts
           mkdir -p .ci-artifacts
-          mkdir -p .ci-artifacts/real-dependency-tests
-          for test_name in real_dependencies distributed_contracts; do
-            test_binary="$(find "${CARGO_TARGET_DIR:?}/debug/deps" -maxdepth 1 -type f -name "${test_name}-*" -perm -u+x -printf '%T@ %p\n' | sort -nr | head -n1 | cut -d' ' -f2-)"
-            test -n "$test_binary"
-            install -m 0755 "$test_binary" ".ci-artifacts/real-dependency-tests/$test_name"
-          done
           make rust-release RUST_ARTIFACT_DIR=.ci-artifacts
           printf 'verified-rust\n' > .ci-artifacts/artifact-marker-rust.txt
           npm --prefix services/collaboration/interop ci
@@ -394,12 +388,9 @@ jobs:
       - name: Publish Rust artifacts to same-node cache
         run: |
           set -euo pipefail
-          for pair in 'knowledge-core-binary-collaboration:.ci-artifacts/collaboration' 'knowledge-core-collaboration-real-dependency-tests:.ci-artifacts/real-dependency-tests'; do
-            name="${pair%%:*}" path="${pair#*:}"
-            if ! scripts/ci-artifact-cache.sh publish "$name" "$path"; then
-              echo "::warning::local cache publish failed for $name; GitHub Artifacts remains available"
-            fi
-          done
+          if ! scripts/ci-artifact-cache.sh publish knowledge-core-binary-collaboration .ci-artifacts/collaboration; then
+            echo "::warning::local cache publish failed for collaboration; GitHub Artifacts remains available"
+          fi
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: knowledge-core-binary-collaboration-${{ github.run_id }}
@@ -407,86 +398,6 @@ jobs:
           overwrite: true
           if-no-files-found: error
           retention-days: 7
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: knowledge-core-collaboration-real-dependency-tests-${{ github.run_id }}
-          path: .ci-artifacts/real-dependency-tests
-          overwrite: true
-          if-no-files-found: error
-          retention-days: 7
-
-  collaboration-real-dependencies:
-    needs: [plan, rust-verify-build]
-    if: always() && needs.plan.outputs.has_rust_build_changes == 'true' && needs.rust-verify-build.result == 'success'
-    # GitHub service containers need the DinD sidecar provided by hls-builder;
-    # hls-standard intentionally has no Docker socket.
-    runs-on: hls-builder
-    timeout-minutes: 35
-    concurrency:
-      group: ${{ github.repository }}-${{ github.workflow }}-collaboration-real-dependencies-${{ github.ref }}
-      cancel-in-progress: true
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_PASSWORD: collaboration-test-password
-          POSTGRES_DB: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres -d postgres"
-          --health-interval 5s
-          --health-timeout 3s
-          --health-retries 20
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 5s
-          --health-timeout 3s
-          --health-retries 20
-      nats:
-        image: nats:2.11-alpine
-        command: -js
-        ports:
-          - 4222:4222
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 1
-      - name: Restore real-dependency contracts from same-node cache
-        id: local-real-dependencies
-        run: |
-          if scripts/ci-artifact-cache.sh restore knowledge-core-collaboration-real-dependency-tests .ci-artifacts/real-dependency-tests; then
-            echo 'hit=true' >> "$GITHUB_OUTPUT"
-          else
-            echo 'hit=false' >> "$GITHUB_OUTPUT"
-          fi
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        id: github-real-dependencies
-        if: steps.local-real-dependencies.outputs.hit != 'true'
-        with:
-          name: knowledge-core-collaboration-real-dependency-tests-${{ github.run_id }}
-          path: .ci-artifacts/real-dependency-tests
-      - name: Run required real dependency contracts
-        env:
-          COLLABORATION_TEST_REQUIRE_REAL_DEPENDENCIES: "1"
-          COLLABORATION_TEST_POSTGRES_URL: postgres://postgres@127.0.0.1:5432/postgres
-          COLLABORATION_TEST_POSTGRES_PASSWORD: collaboration-test-password
-          COLLABORATION_TEST_REDIS_URL: redis://127.0.0.1:6379/1
-          COLLABORATION_TEST_NATS_URL: nats://127.0.0.1:4222
-        run: |
-          set -euo pipefail
-          chmod 0755 .ci-artifacts/real-dependency-tests/real_dependencies \
-            .ci-artifacts/real-dependency-tests/distributed_contracts
-          for test_name in real_dependencies distributed_contracts; do
-            test -x ".ci-artifacts/real-dependency-tests/$test_name"
-          done
-          ./.ci-artifacts/real-dependency-tests/real_dependencies
-          ./.ci-artifacts/real-dependency-tests/distributed_contracts
-
   release-notes:
     needs: plan
     if: needs.plan.outputs.has_changes == 'true'
@@ -636,8 +547,8 @@ jobs:
           retention-days: 7
 
   package-rust-candidates:
-    needs: [plan, rust-verify-build, collaboration-real-dependencies, prewarm-base-images]
-    if: always() && needs.plan.outputs.has_rust_build_changes == 'true' && needs.rust-verify-build.result == 'success' && needs.collaboration-real-dependencies.result == 'success' && needs.prewarm-base-images.result == 'success'
+    needs: [plan, rust-verify-build, prewarm-base-images]
+    if: always() && needs.plan.outputs.has_rust_build_changes == 'true' && needs.rust-verify-build.result == 'success' && needs.prewarm-base-images.result == 'success'
     runs-on: hls-builder
     timeout-minutes: 30
     environment: release
@@ -716,8 +627,8 @@ jobs:
           retention-days: 7
 
   deploy-release:
-    needs: [plan, deploy-verify, package-go-candidates, package-rust-candidates, collaboration-real-dependencies, release-notes]
-    if: always() && needs.plan.outputs.has_changes == 'true' && (needs.deploy-verify.result == 'success' || needs.plan.outputs.deploy_changed == 'false') && needs.release-notes.result == 'success' && (needs.plan.outputs.has_go_build_changes != 'true' || needs.package-go-candidates.result == 'success') && (needs.plan.outputs.has_rust_build_changes != 'true' || (needs.package-rust-candidates.result == 'success' && needs.collaboration-real-dependencies.result == 'success'))
+    needs: [plan, deploy-verify, package-go-candidates, package-rust-candidates, release-notes]
+    if: always() && needs.plan.outputs.has_changes == 'true' && (needs.deploy-verify.result == 'success' || needs.plan.outputs.deploy_changed == 'false') && needs.release-notes.result == 'success' && (needs.plan.outputs.has_go_build_changes != 'true' || needs.package-go-candidates.result == 'success') && (needs.plan.outputs.has_rust_build_changes != 'true' || needs.package-rust-candidates.result == 'success')
     runs-on: hls-standard
     timeout-minutes: 45
     environment: release

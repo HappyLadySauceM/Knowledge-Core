@@ -1059,11 +1059,11 @@
     "profile": "generic",
     "slug": "knowledge-core"
   },
-  "revision": 169,
+  "revision": 170,
   "scan": {
-    "fingerprint": "1083b09a1c18bbc0b5ca6c92a933363be1ccdb2bc3a67928c497f6e3a4d20a83",
+    "fingerprint": "680cb69582dde8b7110f19e505dd6bb0a0c9387f7ed99cb217b7fb6fe1064d44",
     "inventoryCount": 454
   },
   "schemaVersion": 3,
-  "updatedAt": "2026-09-08T12:13:25Z"
+  "updatedAt": "2026-09-08T13:27:10Z"
 }
