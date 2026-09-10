@@ -83,17 +83,17 @@ func (l *ActionLogic) VerifyEmail(ctx context.Context, token string) error {
 	if atomic, ok := l.actions.(interface {
 		ConsumeAndVerifyEmail(context.Context, []byte, time.Time) error
 	}); ok {
-		if err := atomic.ConsumeAndVerifyEmail(ctx, digest, now); err != nil {
-			return identityerrors.InvalidInput.Wrap(err)
-		}
-		return nil
+		return mapActionTokenError(atomic.ConsumeAndVerifyEmail(ctx, digest, now))
 	}
 	entry, err := l.actions.Consume(ctx, domain.ActionEmailVerification, digest, now)
 	if err != nil {
-		return identityerrors.InvalidInput.Wrap(err)
+		return mapActionTokenError(err)
 	}
 	if _, err := l.users.MarkEmailVerified(ctx, entry.UserID, l.now().UTC()); err != nil {
-		return identityerrors.InvalidInput.Wrap(err)
+		if errors.Is(err, repository.ErrUserNotFound) {
+			return identityerrors.InvalidInput.Wrap(err)
+		}
+		return fmt.Errorf("mark identity email verified: %w", err)
 	}
 	return nil
 }
@@ -113,28 +113,50 @@ func (l *ActionLogic) ResetPassword(ctx context.Context, token, password string)
 	if err := domain.ValidatePassword(password); err != nil {
 		return identityerrors.InvalidInput.Wrap(err)
 	}
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return identityerrors.InvalidInput.New()
+	}
 	hash, err := l.passwords.Hash(password)
 	if err != nil {
 		return fmt.Errorf("hash identity reset password: %w", err)
 	}
 	now := l.now().UTC()
-	digest := security.DigestActionToken(strings.TrimSpace(token), l.pepper)
+	digest := security.DigestActionToken(token, l.pepper)
 	if atomic, ok := l.actions.(interface {
 		ConsumeAndResetPassword(context.Context, []byte, string, time.Time) error
 	}); ok {
-		if err := atomic.ConsumeAndResetPassword(ctx, digest, hash, now); err != nil {
-			return identityerrors.InvalidInput.Wrap(err)
-		}
-		return nil
+		return mapActionTokenError(atomic.ConsumeAndResetPassword(ctx, digest, hash, now))
 	}
 	entry, err := l.actions.Consume(ctx, domain.ActionPasswordReset, digest, now)
 	if err != nil {
-		return identityerrors.InvalidInput.Wrap(err)
+		return mapActionTokenError(err)
 	}
 	if _, err := l.users.UpdatePassword(ctx, entry.UserID, hash, now); err != nil {
-		return identityerrors.InvalidInput.Wrap(err)
+		if errors.Is(err, repository.ErrUserNotFound) {
+			return identityerrors.InvalidInput.Wrap(err)
+		}
+		return fmt.Errorf("update identity password: %w", err)
 	}
 	return nil
+}
+
+func mapActionTokenError(err error) error {
+	if err == nil {
+		return nil
+	}
+	// Keep unknown digests as invalid_input so callers cannot enumerate expired tokens.
+	// 未知 digest 仍返回 invalid_input，避免靠乱猜 token 探测过期行。
+	switch {
+	case errors.Is(err, repository.ErrActionNotFound):
+		return identityerrors.InvalidInput.Wrap(err)
+	case errors.Is(err, repository.ErrActionExpired):
+		return identityerrors.ActionExpired.Wrap(err)
+	case errors.Is(err, repository.ErrActionAlreadyUsed):
+		return identityerrors.ActionAlreadyUsed.Wrap(err)
+	default:
+		return fmt.Errorf("consume identity action token: %w", err)
+	}
 }
 
 func (l *ActionLogic) Deactivate(ctx context.Context, userID int64, password string) error {

@@ -1,7 +1,10 @@
 // Package errors defines Identity's stable, transport-safe error catalog.
 package errors
 
-import apperror "github.com/HappyLadySauce/Knowledge-Core/pkg/error"
+import (
+	identityv1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/identity"
+	apperror "github.com/HappyLadySauce/Knowledge-Core/pkg/error"
+)
 
 var (
 	InvalidInput = apperror.MustDefine(
@@ -59,7 +62,13 @@ var (
 		"access is forbidden",
 	)
 	EmailNotVerified = apperror.MustDefine(20010, "identity.email_not_verified", apperror.KindPermissionDenied, "email verification is required")
-	Unimplemented    = apperror.MustDefine(
+	// ActionExpired is returned when the token digest matches a row past expires_at.
+	// 令牌 digest 能命中行，但已超过 expires_at。
+	ActionExpired = apperror.MustDefine(identityv1.CodeActionExpired, "identity.action_expired", apperror.KindInvalidArgument, "action token has expired")
+	// ActionAlreadyUsed is returned when the token digest matches a consumed row.
+	// 令牌 digest 能命中行，但 used_at 已写入。
+	ActionAlreadyUsed = apperror.MustDefine(identityv1.CodeActionAlreadyUsed, "identity.action_already_used", apperror.KindConflict, "action token has already been used")
+	Unimplemented     = apperror.MustDefine(
 		20009,
 		"identity.unimplemented",
 		apperror.KindUnimplemented,

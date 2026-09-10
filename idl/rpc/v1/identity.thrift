@@ -11,6 +11,8 @@ const i32 CodeUserNotFound = 20006
 const i32 CodeUnauthenticated = 20007
 const i32 CodeForbidden = 20008
 const i32 CodeEmailNotVerified = 20010
+const i32 CodeActionExpired = 20011
+const i32 CodeActionAlreadyUsed = 20012
 const i32 CodeInternal = 20999
 
 struct User {

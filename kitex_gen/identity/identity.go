@@ -27,6 +27,10 @@ const (
 
 	CodeEmailNotVerified = 20010
 
+	CodeActionExpired = 20011
+
+	CodeActionAlreadyUsed = 20012
+
 	CodeInternal = 20999
 )
 

@@ -15,8 +15,53 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-var ErrActionNotFound = errors.New("identity repository: action token not found")
-var ErrOutboxEmpty = errors.New("identity repository: email outbox empty")
+var (
+	ErrActionNotFound    = errors.New("identity repository: action token not found")
+	ErrActionExpired     = errors.New("identity repository: action token expired")
+	ErrActionAlreadyUsed = errors.New("identity repository: action token already used")
+	ErrOutboxEmpty       = errors.New("identity repository: email outbox empty")
+)
+
+// classifyActionToken inspects a locked action_tokens row without used_at/expires_at in the lookup.
+// 在仅按 kind+digest 加锁命中后，拆开已用与过期，避免一律变成 not found。
+func classifyActionToken(action *model.ActionToken, now time.Time) error {
+	if action == nil {
+		return ErrActionNotFound
+	}
+	if action.UsedAt != nil {
+		return ErrActionAlreadyUsed
+	}
+	if !action.ExpiresAt.After(now.UTC()) {
+		return ErrActionExpired
+	}
+	return nil
+}
+
+func lockActionByDigest(tx *gorm.DB, kind string, digest []byte) (*model.ActionToken, error) {
+	var action model.ActionToken
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("kind = ? AND digest = ?", kind, digest).First(&action).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrActionNotFound
+		}
+		return nil, fmt.Errorf("find identity action token: %w", err)
+	}
+	if subtle.ConstantTimeCompare(action.Digest, digest) != 1 {
+		return nil, ErrActionNotFound
+	}
+	return &action, nil
+}
+
+func consumeLockedAction(tx *gorm.DB, action *model.ActionToken, now time.Time) error {
+	if err := classifyActionToken(action, now); err != nil {
+		return err
+	}
+	when := now.UTC()
+	if err := tx.Model(action).Update("used_at", when).Error; err != nil {
+		return fmt.Errorf("consume identity action token: %w", err)
+	}
+	action.UsedAt = &when
+	return nil
+}
 
 type ActionRepository interface {
 	Create(context.Context, *domain.ActionToken) error
@@ -93,17 +138,14 @@ func (r *postgresActionRepository) CreateUserAndEnqueue(ctx context.Context, use
 
 func (r *postgresActionRepository) ConsumeAndVerifyEmail(ctx context.Context, digest []byte, now time.Time) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var action model.ActionToken
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("kind = ? AND digest = ? AND used_at IS NULL AND expires_at > ?", domain.ActionEmailVerification, digest, now.UTC()).First(&action).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return ErrActionNotFound
-			}
-			return fmt.Errorf("find identity verification token: %w", err)
+		action, err := lockActionByDigest(tx, domain.ActionEmailVerification, digest)
+		if err != nil {
+			return err
+		}
+		if err := consumeLockedAction(tx, action, now); err != nil {
+			return err
 		}
 		when := now.UTC()
-		if err := tx.Model(&action).Update("used_at", when).Error; err != nil {
-			return fmt.Errorf("consume identity verification token: %w", err)
-		}
 		var user model.User
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&user, "id = ?", action.UserID).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -122,17 +164,14 @@ func (r *postgresActionRepository) ConsumeAndVerifyEmail(ctx context.Context, di
 
 func (r *postgresActionRepository) ConsumeAndResetPassword(ctx context.Context, digest []byte, passwordHash string, now time.Time) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var action model.ActionToken
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("kind = ? AND digest = ? AND used_at IS NULL AND expires_at > ?", domain.ActionPasswordReset, digest, now.UTC()).First(&action).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return ErrActionNotFound
-			}
-			return fmt.Errorf("find identity password reset token: %w", err)
+		action, err := lockActionByDigest(tx, domain.ActionPasswordReset, digest)
+		if err != nil {
+			return err
+		}
+		if err := consumeLockedAction(tx, action, now); err != nil {
+			return err
 		}
 		when := now.UTC()
-		if err := tx.Model(&action).Update("used_at", when).Error; err != nil {
-			return fmt.Errorf("consume identity password reset token: %w", err)
-		}
 		var user model.User
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&user, "id = ?", action.UserID).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -164,21 +203,13 @@ func (r *postgresActionRepository) Create(ctx context.Context, token *domain.Act
 func (r *postgresActionRepository) Consume(ctx context.Context, kind string, digest []byte, now time.Time) (*domain.ActionToken, error) {
 	var result *domain.ActionToken
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var record model.ActionToken
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("kind = ? AND digest = ? AND used_at IS NULL AND expires_at > ?", kind, digest, now.UTC()).First(&record).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return ErrActionNotFound
-			}
-			return fmt.Errorf("find identity action token: %w", err)
+		record, err := lockActionByDigest(tx, kind, digest)
+		if err != nil {
+			return err
 		}
-		if subtle.ConstantTimeCompare(record.Digest, digest) != 1 || record.UsedAt != nil || !record.ExpiresAt.After(now.UTC()) {
-			return ErrActionNotFound
+		if err := consumeLockedAction(tx, record, now); err != nil {
+			return err
 		}
-		when := now.UTC()
-		if err := tx.Model(&record).Update("used_at", when).Error; err != nil {
-			return fmt.Errorf("consume identity action token: %w", err)
-		}
-		record.UsedAt = &when
 		result = &domain.ActionToken{ID: record.ID, UserID: record.UserID, Kind: record.Kind, Digest: record.Digest, ExpiresAt: record.ExpiresAt, UsedAt: record.UsedAt, CreatedAt: record.CreatedAt}
 		return nil
 	})
