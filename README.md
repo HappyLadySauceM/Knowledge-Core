@@ -50,7 +50,7 @@ Admin `:8082` 的以下路径提供：`/docs/`、`/docs/http`、`/docs/websocket
 
 - JSON 请求必须使用 `Content-Type: application/json`。未知字段、额外 JSON 值、重复关键 header/query、非法数字和未知 query 均被拒绝。
 - 成功响应直接返回资源或分页对象，不使用 envelope。
-- 失败响应使用 RFC 9457 `application/problem+json`，包含稳定的 `code`、`key`、`request_id`，可用时包含 `trace_id`。
+- 失败响应使用 RFC 9457 `application/problem+json`，包含稳定的 `code`、`key`、`request_id`，可用时包含 `trace_id`。Gateway 按上游 Kitex BizStatus 的 code/key/kind/message 还原 problem，不把 `KindInternal` 改写成服务不可用；依赖不可达为 503 `gateway.dependency_unavailable`，无效 BizStatus 为 502 `gateway.invalid_upstream_response`，传输超时为 504 `gateway.upstream_timeout`。
 - 文档和成员写操作使用强 ETag。响应示例为 `ETag: "12"`，调用方必须把该值原样放入 `If-Match`。
 - 支持幂等的创建/恢复操作通过 `Idempotency-Key` 传入 1-128 个可见 ASCII 字符。
 - 分页 `cursor` 是 opaque token；客户端只能保存并原样回传，不能依赖其内部结构。
@@ -117,7 +117,7 @@ Knowledge 不保存 Yjs update、快照或版本；这些数据属于 Collaborat
 
 ## CI 构建路径
 
-`.github/workflows/pipeline.yml` 按 `plan → Go/Rust 门禁 → candidates → release summary → Argo 部署` 拆分任务。质量检查直接生成 `.ci-artifacts/` 二进制；镜像阶段只做运行时打包并校验 artifact SHA256，不再重复编译。候选镜像使用提交 SHA 标签，Smoke 通过后才提升为 `dev`；失败时只回滚尚未通过 Smoke 的 GitOps 修订。
+`.github/workflows/pipeline.yml` 按 `plan → Go/Rust 门禁 → candidates → release summary → Argo 部署` 拆分任务。质量检查直接生成 `.ci-artifacts/` 二进制；镜像阶段只做运行时打包并校验 artifact SHA256，不再重复编译。候选镜像使用提交 SHA 标签，Smoke 通过后才提升为 `dev`；失败时只回滚尚未通过 Smoke 的 GitOps 修订，并保留 Harbor 候选 tag 供同一 SHA 重跑复用。只有候选成功提升为 active tag 后才清理。
 
 主要端口：
 

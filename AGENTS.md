@@ -57,7 +57,7 @@
 ## Go、依赖与调用链
 
 - 构造函数校验必需依赖并返回 `(T, error)`；不要新增 `Must*`、用 panic 表达业务失败，或在公共包中调用 `os.Exit`。`os.Exit` 只允许出现在进程入口。
-- 错误必须提供操作上下文并使用 `%w` 保留 cause；用 `errors.Is/As` 判断。跨 Kitex/Hertz 边界使用 `pkg/error` 的稳定 code/key/kind 契约，未知内部错误不得向外泄漏 SQL、地址、堆栈或 cause。
+- 错误必须提供操作上下文并使用 `%w` 保留 cause；用 `errors.Is/As` 判断。跨 Kitex/Hertz 边界使用 `pkg/error` 的稳定 code/key/kind 契约，未知内部错误不得向外泄漏 SQL、地址、堆栈或 cause。Gateway 必须按上游 BizStatus 的 code/key/kind/message 生成 RFC 9457，不得把 `KindInternal` 改写成 unavailable。
 - `context.Context`、deadline、request ID 和 trace 必须从入口贯穿 logic、repository、RPC、数据库与缓存调用。不得用 `context.Background()` 逃避请求取消；仅允许在有明确超时的 shutdown/cleanup 边界使用独立 context。
 - 每个 goroutine 必须有明确 owner、停止条件、错误回收和等待路径；禁止无边界后台 goroutine。
 - HTTP JSON 统一使用 `pkg/codec/json`。入口必须严格拒绝未知字段、多余 JSON 值和非法数字；禁止用 `encoding/json`、`PureJSON` 或 `stdjson` build tag 绕过公共 codec。

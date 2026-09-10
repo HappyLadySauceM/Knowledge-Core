@@ -7,6 +7,7 @@ import (
 
 	apperror "github.com/HappyLadySauce/Knowledge-Core/pkg/error"
 	"github.com/HappyLadySauce/Knowledge-Core/pkg/metadata"
+	"github.com/cloudwego/kitex/pkg/kerrors"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -79,6 +80,77 @@ func TestToBizStatusMapsUnknownErrorsToInternal(t *testing.T) {
 	}
 	if biz.BizExtra()[apperror.ExtraErrorKey] != apperror.Internal.Key {
 		t.Fatalf("business status extras = %#v", biz.BizExtra())
+	}
+}
+
+func TestFromKitexBizStatusRoundTripsCatalog(t *testing.T) {
+	cause := errors.New("ERROR: value too long for type character varying(16) (SQLSTATE 22001)")
+	biz := apperror.ToKitexBizStatus(context.Background(), errDocumentNotFound.Wrap(cause))
+
+	definition, ok := apperror.FromKitexBizStatus(biz)
+	if !ok {
+		t.Fatal("FromKitexBizStatus() = false, want true")
+	}
+	if definition != errDocumentNotFound {
+		t.Fatalf("FromKitexBizStatus() = %#v, want %#v", definition, errDocumentNotFound)
+	}
+	if definition.Message == cause.Error() || definition.Message != "document not found" {
+		t.Fatalf("reconstructed message leaked cause: %#v", definition)
+	}
+}
+
+func TestFromKitexBizStatusDistinguishesSharedCodesByKey(t *testing.T) {
+	usernameConflict := apperror.MustDefine(20002, "identity.username_conflict", apperror.KindConflict, "username already exists")
+	emailConflict := apperror.MustDefine(20002, "identity.email_conflict", apperror.KindConflict, "email already exists")
+
+	username, usernameOK := apperror.FromKitexBizStatus(apperror.ToKitexBizStatus(context.Background(), usernameConflict.New()))
+	email, emailOK := apperror.FromKitexBizStatus(apperror.ToKitexBizStatus(context.Background(), emailConflict.New()))
+	if !usernameOK || !emailOK {
+		t.Fatalf("FromKitexBizStatus() ok = %v, %v", usernameOK, emailOK)
+	}
+	if username != usernameConflict || email != emailConflict {
+		t.Fatalf("shared code reconstructions = %#v, %#v", username, email)
+	}
+}
+
+func TestFromKitexBizStatusRejectsIncompleteExtras(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+	}{
+		{name: "nil", err: nil},
+		{name: "plain", err: errors.New("connection refused")},
+		{
+			name: "missing extras",
+			err:  kerrors.NewBizStatusError(20004, "document not found"),
+		},
+		{
+			name: "missing kind",
+			err: kerrors.NewBizStatusErrorWithExtra(20004, "document not found", map[string]string{
+				apperror.ExtraErrorKey: "knowledge.document_not_found",
+			}),
+		},
+		{
+			name: "invalid kind",
+			err: kerrors.NewBizStatusErrorWithExtra(20004, "document not found", map[string]string{
+				apperror.ExtraErrorKey:  "knowledge.document_not_found",
+				apperror.ExtraErrorKind: "other",
+			}),
+		},
+		{
+			name: "unsafe message",
+			err: kerrors.NewBizStatusErrorWithExtra(20004, "ERROR: value too long for type character varying(16)\nSQLSTATE 22001", map[string]string{
+				apperror.ExtraErrorKey:  "knowledge.document_not_found",
+				apperror.ExtraErrorKind: string(apperror.KindNotFound),
+			}),
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if definition, ok := apperror.FromKitexBizStatus(test.err); ok {
+				t.Fatalf("FromKitexBizStatus() = %#v, true", definition)
+			}
+		})
 	}
 }
 

@@ -4,7 +4,7 @@
 
 ## 错误
 
-Go 构造函数校验必需依赖并返回 `(T, error)`。错误补充操作上下文，用 `%w` 保留 cause，并用 `errors.Is` / `errors.As` 判断。跨边界错误使用 `pkg/error` 的 code/key/kind。禁止 `Must*`、用 panic 表达业务失败、或在进程入口之外 `os.Exit`。
+Go 构造函数校验必需依赖并返回 `(T, error)`。错误补充操作上下文，用 `%w` 保留 cause，并用 `errors.Is` / `errors.As` 判断。跨边界错误使用 `pkg/error` 的 code/key/kind。禁止 `Must*`、用 panic 表达业务失败、或在进程入口之外 `os.Exit`。Gateway 从上游 Kitex BizStatus 的 code、key、kind 和 catalog message 重建公开 RFC 9457 problem，不得把 `KindInternal` 改写成 unavailable。没有 BizStatus 的传输失败仍映射为 `gateway.dependency_unavailable`（503）或 `gateway.upstream_timeout`（504）。extras 非法则映射为 `gateway.invalid_upstream_response`（502）。
 
 ## 日志与遥测
 
@@ -18,7 +18,7 @@ Go 构造函数校验必需依赖并返回 `(T, error)`。错误补充操作上�
 
 仓库文本使用 LF，`.bat` / `.cmd` 除外。模块与目录所有权写在 `conventions.code-layout`，不写在架构里。
 
-<!-- fact:conventions.code-style status:verified sources:docs/trace-architecture.md#4-噪音过滤, user-confirmed, user-confirmed-schema-v2-rerecord -->
+<!-- fact:conventions.code-style status:verified sources:AGENTS.md, docs/trace-architecture.md#4-噪音过滤, user-confirmed, user-confirmed-schema-v2-rerecord -->
 
 ## 4. 仓库模块
 
@@ -81,4 +81,4 @@ main/spec -> internal/config -> internal/context -> domain / logic / repository 
 
 密钥只能通过环境变量、Kubernetes Secrets 或经 SOPS 加密的 GitOps 清单注入。敏感值不得以明文形式存储在源代码、配置、日志、指标、追踪 span 或发布元数据中。
 
-<!-- fact:security.secrets-and-config status:verified sources:README.md#compose, README.md#k3s-gitops, README.md#section, deploy/base/README.md#application-deployment-base, deploy/nacos/README.md#nacos-application-configuration, deploy/overlay/dev/README.md#development-overlay, docs/framework-design.md#11, docs/framework-design.md#12, docs/framework-design.md#8-secret-tls, docs/migrations/2026-08-auth-productionization.md#section, docs/migrations/2026-08-platform-configuration.md#platform-configuration-migration, docs/platform-configuration.md#section, docs/rust-collaboration-design.md#2-1, docs/rust-collaboration-design.md#7, docs/trace-architecture.md#7-collector-tempo, AGENTS.md user-provided repository instructions, user-confirmed, user-confirmed-en-locale-source -->
+<!-- fact:security.secrets-and-config status:verified sources:README.md#compose, README.md#k3s-gitops, README.md#section, deploy/base/README.md#application-deployment-base, deploy/nacos/README.md#nacos-application-configuration, deploy/overlay/dev/README.md#development-overlay, docs/framework-design.md#11, docs/framework-design.md#12, docs/framework-design.md#8-secret-tls, docs/migrations/2026-08-auth-productionization.md#section, docs/migrations/2026-08-platform-configuration.md#platform-configuration-migration, docs/migrations/2026-09-retire-legacy-media.md#required-rollout-order, docs/platform-configuration.md#section, docs/rust-collaboration-design.md#2-1, docs/rust-collaboration-design.md#7, docs/trace-architecture.md#7-collector-tempo, AGENTS.md user-provided repository instructions, user-confirmed, user-confirmed-en-locale-source -->

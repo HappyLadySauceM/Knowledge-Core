@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"strings"
 	"testing"
 	"time"
 
@@ -175,6 +176,28 @@ func TestRegisterMapsIdentityBusinessError(t *testing.T) {
 	Register(context.Background(), request)
 	if request.Response.StatusCode() != 423 {
 		t.Fatalf("status = %d, body = %s", request.Response.StatusCode(), request.Response.Body())
+	}
+}
+
+func TestRegisterMapsIdentityInternalErrorWithoutUnavailableCopy(t *testing.T) {
+	definition := apperror.MustDefine(
+		identityv1.CodeInternal, "identity.internal", apperror.KindInternal, "internal identity service error",
+	)
+	identity := &identityStub{registerErr: apperror.ToKitexBizStatus(context.Background(), definition.Wrap(errors.New("ERROR: value too long for type character varying(16) (SQLSTATE 22001)")))}
+	request := handlerRequest(identity, `{"username":"alice","email":"alice@example.com","password":"password"}`)
+	Register(context.Background(), request)
+	if request.Response.StatusCode() != consts.StatusInternalServerError {
+		t.Fatalf("status = %d, body = %s", request.Response.StatusCode(), request.Response.Body())
+	}
+	var problem apperror.HTTPProblem
+	if err := jsoncodec.Unmarshal(request.Response.Body(), &problem); err != nil {
+		t.Fatalf("decode problem: %v", err)
+	}
+	if problem.Key != "identity.internal" || problem.Detail != "internal identity service error" {
+		t.Fatalf("problem = %#v", problem)
+	}
+	if strings.Contains(string(request.Response.Body()), "SQLSTATE") || strings.Contains(problem.Detail, "unavailable") {
+		t.Fatalf("problem leaked internals or used unavailable copy: %#v", problem)
 	}
 }
 

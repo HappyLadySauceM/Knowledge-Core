@@ -42,6 +42,31 @@ func ToKitexBizStatus(ctx context.Context, err error) error {
 	return ToBizStatus(ctx, err)
 }
 
+// FromKitexBizStatus rebuilds a catalog definition from a Kitex business
+// status.
+// 从 Kitex 业务状态重建 catalog 定义。
+// Only the serialized code, catalog message, error_key, and error_kind are
+// used. Missing or invalid extras return false so callers do not guess from
+// code alone.
+// 只使用序列化的 code、catalog message、error_key 和 error_kind。extras 缺失或非法时返回 false，避免仅凭 code 猜测。
+func FromKitexBizStatus(err error) (Definition, bool) {
+	business, ok := kerrors.FromBizStatusError(err)
+	if !ok || business == nil {
+		return Definition{}, false
+	}
+	extra := business.BizExtra()
+	definition, defineErr := Define(
+		business.BizStatusCode(),
+		extra[ExtraErrorKey],
+		Kind(extra[ExtraErrorKind]),
+		business.BizMessage(),
+	)
+	if defineErr != nil {
+		return Definition{}, false
+	}
+	return definition, true
+}
+
 func traceIDFromContext(ctx context.Context) string {
 	if ctx == nil {
 		return ""

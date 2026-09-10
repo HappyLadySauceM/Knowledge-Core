@@ -5,11 +5,6 @@ import (
 	"errors"
 	"net/http"
 
-	attachmentv1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/attachment"
-	collaborationv1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/collaboration"
-	identityv1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/identity"
-	knowledgev1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/knowledge"
-	platformv1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/platform"
 	jsoncodec "github.com/HappyLadySauce/Knowledge-Core/pkg/codec/json"
 	apperror "github.com/HappyLadySauce/Knowledge-Core/pkg/error"
 	"github.com/HappyLadySauce/Knowledge-Core/pkg/metadata"
@@ -42,71 +37,15 @@ var (
 	ErrInternal                = responseError(gatewaymodel.CodeInternal, "gateway.internal", apperror.KindInternal, "internal server error")
 )
 
-var identityErrors = []rpcErrorMapping{
-	{identityv1.CodeInvalidInput, "identity.invalid_input", responseError(identityv1.CodeInvalidInput, "identity.invalid_input", apperror.KindInvalidArgument, "invalid identity input")},
-	{identityv1.CodeConflict, "identity.username_conflict", responseError(identityv1.CodeConflict, "identity.username_conflict", apperror.KindConflict, "username already exists")},
-	{identityv1.CodeConflict, "identity.email_conflict", responseError(identityv1.CodeConflict, "identity.email_conflict", apperror.KindConflict, "email already exists")},
-	{identityv1.CodeInvalidCredentials, "identity.invalid_credentials", responseError(identityv1.CodeInvalidCredentials, "identity.invalid_credentials", apperror.KindUnauthenticated, "invalid credentials")},
-	{identityv1.CodeAccountLocked, "identity.account_locked", responseErrorWithStatus(identityv1.CodeAccountLocked, http.StatusLocked, "identity.account_locked", apperror.KindPermissionDenied, "account is locked")},
-	{identityv1.CodeUserDisabled, "identity.user_disabled", responseError(identityv1.CodeUserDisabled, "identity.user_disabled", apperror.KindPermissionDenied, "user is disabled")},
-	{identityv1.CodeUserNotFound, "identity.user_not_found", responseError(identityv1.CodeUserNotFound, "identity.user_not_found", apperror.KindNotFound, "user not found")},
-	{identityv1.CodeUnauthenticated, "identity.unauthenticated", responseError(identityv1.CodeUnauthenticated, "identity.unauthenticated", apperror.KindUnauthenticated, "authentication is required")},
-	{identityv1.CodeForbidden, "identity.forbidden", responseError(identityv1.CodeForbidden, "identity.forbidden", apperror.KindPermissionDenied, "access is forbidden")},
-	{identityv1.CodeEmailNotVerified, "identity.email_not_verified", responseError(identityv1.CodeEmailNotVerified, "identity.email_not_verified", apperror.KindPermissionDenied, "email verification is required")},
-	{identityv1.CodeInternal, "identity.internal", responseErrorWithStatus(identityv1.CodeInternal, http.StatusBadGateway, "identity.internal", apperror.KindUnavailable, "identity service unavailable")},
-}
-
-var knowledgeErrors = []rpcErrorMapping{
-	{knowledgev1.CodeInvalidInput, "knowledge.invalid_input", responseError(knowledgev1.CodeInvalidInput, "knowledge.invalid_input", apperror.KindInvalidArgument, "invalid knowledge input")},
-	{knowledgev1.CodeNotFound, "knowledge.not_found", responseError(knowledgev1.CodeNotFound, "knowledge.not_found", apperror.KindNotFound, "resource not found")},
-	{knowledgev1.CodeConflict, "knowledge.conflict", responseError(knowledgev1.CodeConflict, "knowledge.conflict", apperror.KindConflict, "resource conflict")},
-	{knowledgev1.CodeForbidden, "knowledge.forbidden", responseError(knowledgev1.CodeForbidden, "knowledge.forbidden", apperror.KindPermissionDenied, "permission denied")},
-	{knowledgev1.CodeUnauthenticated, "knowledge.unauthenticated", responseError(knowledgev1.CodeUnauthenticated, "knowledge.unauthenticated", apperror.KindUnauthenticated, "authentication required")},
-	{knowledgev1.CodeUnavailable, "knowledge.unavailable", responseError(knowledgev1.CodeUnavailable, "knowledge.unavailable", apperror.KindUnavailable, "service unavailable")},
-	{knowledgev1.CodePreconditionFailed, "knowledge.precondition_failed", responseErrorWithStatus(knowledgev1.CodePreconditionFailed, http.StatusPreconditionFailed, "knowledge.precondition_failed", apperror.KindConflict, "resource revision does not match")},
-	{knowledgev1.CodeGone, "knowledge.gone", responseErrorWithStatus(knowledgev1.CodeGone, http.StatusGone, "knowledge.gone", apperror.KindNotFound, "resource is permanently unavailable")},
-	{knowledgev1.CodeQuotaExceeded, "knowledge.quota_exceeded", responseError(knowledgev1.CodeQuotaExceeded, "knowledge.quota_exceeded", apperror.KindConflict, "storage quota exceeded")},
-	{knowledgev1.CodeInternal, "knowledge.internal", responseErrorWithStatus(knowledgev1.CodeInternal, http.StatusBadGateway, "knowledge.internal", apperror.KindUnavailable, "knowledge service unavailable")},
-}
-
-var attachmentErrors = []rpcErrorMapping{
-	{attachmentv1.CodeInvalidInput, "attachment.invalid_input", responseError(attachmentv1.CodeInvalidInput, "attachment.invalid_input", apperror.KindInvalidArgument, "invalid attachment input")},
-	{attachmentv1.CodeNotFound, "attachment.not_found", responseError(attachmentv1.CodeNotFound, "attachment.not_found", apperror.KindNotFound, "attachment not found")},
-	{attachmentv1.CodeConflict, "attachment.conflict", responseError(attachmentv1.CodeConflict, "attachment.conflict", apperror.KindConflict, "attachment state conflict")},
-	{attachmentv1.CodeForbidden, "attachment.forbidden", responseError(attachmentv1.CodeForbidden, "attachment.forbidden", apperror.KindPermissionDenied, "attachment access denied")},
-	{attachmentv1.CodeUnauthenticated, "attachment.unauthenticated", responseError(attachmentv1.CodeUnauthenticated, "attachment.unauthenticated", apperror.KindUnauthenticated, "authentication required")},
-	{attachmentv1.CodeUnavailable, "attachment.unavailable", responseError(attachmentv1.CodeUnavailable, "attachment.unavailable", apperror.KindUnavailable, "attachment service unavailable")},
-	{attachmentv1.CodeQuotaExceeded, "attachment.quota_exceeded", responseError(attachmentv1.CodeQuotaExceeded, "attachment.quota_exceeded", apperror.KindConflict, "attachment quota exceeded")},
-	{attachmentv1.CodeInternal, "attachment.internal", responseErrorWithStatus(attachmentv1.CodeInternal, http.StatusBadGateway, "attachment.internal", apperror.KindUnavailable, "attachment service unavailable")},
-}
-
-var collaborationErrors = []rpcErrorMapping{
-	{collaborationv1.CodeInvalidInput, "collaboration.invalid_input", responseErrorWithStatus(collaborationv1.CodeInvalidInput, http.StatusBadRequest, "collaboration.invalid_input", apperror.KindInvalidArgument, "invalid collaboration input")},
-	{collaborationv1.CodeUnauthenticated, "collaboration.unauthenticated", responseErrorWithStatus(collaborationv1.CodeUnauthenticated, http.StatusUnauthorized, "collaboration.unauthenticated", apperror.KindUnauthenticated, "authentication required")},
-	{collaborationv1.CodeForbidden, "collaboration.forbidden", responseErrorWithStatus(collaborationv1.CodeForbidden, http.StatusForbidden, "collaboration.forbidden", apperror.KindPermissionDenied, "permission denied")},
-	{collaborationv1.CodeNotFound, "collaboration.not_found", responseErrorWithStatus(collaborationv1.CodeNotFound, http.StatusNotFound, "collaboration.not_found", apperror.KindNotFound, "version not found")},
-	{collaborationv1.CodeConflict, "collaboration.conflict", responseErrorWithStatus(collaborationv1.CodeConflict, http.StatusConflict, "collaboration.conflict", apperror.KindConflict, "resource conflict")},
-	{collaborationv1.CodePreconditionFailed, "collaboration.precondition_failed", responseErrorWithStatus(collaborationv1.CodePreconditionFailed, http.StatusPreconditionFailed, "collaboration.precondition_failed", apperror.KindConflict, "document sequence does not match")},
-	{collaborationv1.CodeUnavailable, "collaboration.unavailable", responseErrorWithStatus(collaborationv1.CodeUnavailable, http.StatusServiceUnavailable, "collaboration.unavailable", apperror.KindUnavailable, "service unavailable")},
-	{collaborationv1.CodeUnavailable, "collaboration.deadline_exceeded", ErrUpstreamTimeout},
-	{collaborationv1.CodeInternal, "collaboration.internal", responseErrorWithStatus(collaborationv1.CodeInternal, http.StatusBadGateway, "collaboration.internal", apperror.KindUnavailable, "collaboration service unavailable")},
-}
-
-var platformErrors = []rpcErrorMapping{
-	{platformv1.CodeInvalidInput, "platform.invalid_input", responseError(platformv1.CodeInvalidInput, "platform.invalid_input", apperror.KindInvalidArgument, "invalid configuration input")},
-	{platformv1.CodeNotFound, "platform.not_found", responseError(platformv1.CodeNotFound, "platform.not_found", apperror.KindNotFound, "configuration not found")},
-	{platformv1.CodeConflict, "platform.conflict", responseError(platformv1.CodeConflict, "platform.conflict", apperror.KindConflict, "configuration conflict")},
-	{platformv1.CodeForbidden, "platform.forbidden", responseError(platformv1.CodeForbidden, "platform.forbidden", apperror.KindPermissionDenied, "administrator access is required")},
-	{platformv1.CodeUnauthenticated, "platform.unauthenticated", responseError(platformv1.CodeUnauthenticated, "platform.unauthenticated", apperror.KindUnauthenticated, "authentication required")},
-	{platformv1.CodeUnavailable, "platform.unavailable", responseError(platformv1.CodeUnavailable, "platform.unavailable", apperror.KindUnavailable, "platform service unavailable")},
-	{platformv1.CodePreconditionFailed, "platform.precondition_failed", responseErrorWithStatus(platformv1.CodePreconditionFailed, http.StatusPreconditionFailed, "platform.precondition_failed", apperror.KindConflict, "configuration revision does not match")},
-	{platformv1.CodeInternal, "platform.internal", responseErrorWithStatus(platformv1.CodeInternal, http.StatusBadGateway, "platform.internal", apperror.KindUnavailable, "platform service unavailable")},
-}
-
-type rpcErrorMapping struct {
-	code     int32
-	key      string
-	response ResponseError
+// catalogHTTPStatus overrides Kind-derived HTTP status for protocol-specific
+// codes that RFC mapping cannot express.
+// catalogHTTPStatus 覆盖 kind 推导出的 HTTP 状态，用于 kind 无法表达的协议特例。
+var catalogHTTPStatus = map[string]int{
+	"identity.account_locked":           http.StatusLocked,
+	"knowledge.gone":                    http.StatusGone,
+	"knowledge.precondition_failed":     http.StatusPreconditionFailed,
+	"collaboration.precondition_failed": http.StatusPreconditionFailed,
+	"platform.precondition_failed":      http.StatusPreconditionFailed,
 }
 
 func WriteError(ctx context.Context, request *app.RequestContext, responseError ResponseError) {
@@ -121,34 +60,31 @@ func WriteError(ctx context.Context, request *app.RequestContext, responseError 
 }
 
 func WriteIdentityError(ctx context.Context, request *app.RequestContext, err error) {
-	writeRPCError(ctx, request, err, identityErrors)
+	writeRPCError(ctx, request, err)
 }
 
 func WriteKnowledgeError(ctx context.Context, request *app.RequestContext, err error) {
-	writeRPCError(ctx, request, err, knowledgeErrors)
+	writeRPCError(ctx, request, err)
 }
 
 func WriteAttachmentError(ctx context.Context, request *app.RequestContext, err error) {
-	writeRPCError(ctx, request, err, attachmentErrors)
+	writeRPCError(ctx, request, err)
 }
 
 func WriteCollaborationError(ctx context.Context, request *app.RequestContext, err error) {
-	writeRPCError(ctx, request, err, collaborationErrors)
+	writeRPCError(ctx, request, err)
 }
 
 func WritePlatformError(ctx context.Context, request *app.RequestContext, err error) {
-	writeRPCError(ctx, request, err, platformErrors)
+	writeRPCError(ctx, request, err)
 }
 
-func writeRPCError(ctx context.Context, request *app.RequestContext, err error, mappings []rpcErrorMapping) {
-	if businessError, ok := kerrors.FromBizStatusError(err); ok {
-		key := businessError.BizExtra()[apperror.ExtraErrorKey]
-		for _, mapping := range mappings {
-			if mapping.code == businessError.BizStatusCode() && mapping.key == key {
-				WriteError(ctx, request, mapping.response)
-				return
-			}
-		}
+func writeRPCError(ctx context.Context, request *app.RequestContext, err error) {
+	if definition, ok := apperror.FromKitexBizStatus(err); ok {
+		writeCatalogError(ctx, request, definition)
+		return
+	}
+	if _, isBiz := kerrors.FromBizStatusError(err); isBiz {
 		WriteError(ctx, request, ErrInvalidUpstreamResponse)
 		return
 	}
@@ -157,6 +93,21 @@ func writeRPCError(ctx context.Context, request *app.RequestContext, err error, 
 		return
 	}
 	WriteError(ctx, request, ErrDependencyUnavailable)
+}
+
+func writeCatalogError(ctx context.Context, request *app.RequestContext, definition apperror.Definition) {
+	requestID, traceID := responseMetadata(ctx, request)
+	problemContext := metadata.WithRequestID(ctx, requestID)
+	status, payload := apperror.ToHTTPError(problemContext, definition.New())
+	if override, found := catalogHTTPStatus[definition.Key]; found {
+		status = override
+		payload = apperror.ToHTTPProblem(problemContext, status, definition.New())
+	}
+	if traceID != nil {
+		payload.TraceID = *traceID
+	}
+	request.Abort()
+	writeProblem(request, status, payload)
 }
 
 func isTimeout(err error) bool {

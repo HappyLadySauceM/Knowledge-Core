@@ -140,7 +140,7 @@ Gateway 的 HTTP 规则：
 - 需要 body 的请求必须使用 `Content-Type: application/json`。
 - Go HTTP 入口统一使用 `pkg/codec/json`，拒绝未知字段、多余 JSON 值、非法数字、未知 query、重复关键 header/query 和非法 path 参数。
 - 成功响应直接返回资源或分页对象，不使用 envelope。
-- 错误响应使用 RFC 9457 `application/problem+json`，包含稳定 `code`、`key`、`request_id`，可用时包含 `trace_id`。未知内部错误不暴露 cause、SQL、地址或堆栈。
+- 错误响应使用 RFC 9457 `application/problem+json`，包含稳定 `code`、`key`、`request_id`，可用时包含 `trace_id`。未知内部错误不暴露 cause、SQL、地址或堆栈。Gateway 从上游 Kitex BizStatus extras 重建 catalog，按 kind 映射 HTTP 状态，不把 `KindInternal` 改写成 unavailable；仅 `identity.account_locked` / `knowledge.gone` / 各服务 `precondition_failed` 覆盖为 423/410/412。无 BizStatus 的熔断或拨号失败映射为 `gateway.dependency_unavailable`（503），传输超时映射为 `gateway.upstream_timeout`（504），extras 非法映射为 `gateway.invalid_upstream_response`（502）。
 - Studio 路由和 `/users/me` 必须认证；公开文档允许匿名读取，并可在携带有效 token 时返回调用方可见的访问上下文。
 - 文档和成员写操作使用强 ETag，格式为 `"<revision>"`；调用方必须把读取到的值原样放入 `If-Match`。
 - 支持幂等的创建/恢复操作使用 `Idempotency-Key`；分页 cursor 是 opaque token。

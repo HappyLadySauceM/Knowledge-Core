@@ -4,7 +4,7 @@
 
 ## Errors
 
-Go constructors validate required dependencies and return `(T, error)`. Errors add operation context, keep the cause with `%w`, and use `errors.Is` / `errors.As`. Cross-boundary errors use `pkg/error` code/key/kind. Do not use `Must*`, panic for business failure, or `os.Exit` outside the process entrypoint.
+Go constructors validate required dependencies and return `(T, error)`. Errors add operation context, keep the cause with `%w`, and use `errors.Is` / `errors.As`. Cross-boundary errors use `pkg/error` code/key/kind. Do not use `Must*`, panic for business failure, or `os.Exit` outside the process entrypoint. Gateway reconstructs public RFC 9457 problems from upstream Kitex BizStatus code, key, kind, and catalog message; it must not rewrite `KindInternal` as unavailable. Transport failures without BizStatus remain `gateway.dependency_unavailable` (503) or `gateway.upstream_timeout` (504). Invalid extras map to `gateway.invalid_upstream_response` (502).
 
 ## Logging and telemetry
 
@@ -18,7 +18,7 @@ Tests stay close to implementation and cover success, edges, dependency failure,
 
 Repository text uses LF except `.bat` / `.cmd`. Module and directory ownership lives in `conventions.code-layout`, not architecture.
 
-<!-- fact:conventions.code-style status:verified sources:docs/trace-architecture.md#4-噪音过滤, user-confirmed, user-confirmed-schema-v2-rerecord -->
+<!-- fact:conventions.code-style status:verified sources:AGENTS.md, docs/trace-architecture.md#4-噪音过滤, user-confirmed, user-confirmed-schema-v2-rerecord -->
 
 ## 4. Repository modules
 
@@ -81,4 +81,4 @@ Layer responsibilities:
 
 Secrets may be injected only from environment variables, Kubernetes Secrets, or SOPS-encrypted GitOps manifests. Sensitive values must not be stored in plaintext in source, configuration, logs, metrics, trace spans, or release metadata.
 
-<!-- fact:security.secrets-and-config status:verified sources:README.md#compose, README.md#k3s-gitops, README.md#section, deploy/base/README.md#application-deployment-base, deploy/nacos/README.md#nacos-application-configuration, deploy/overlay/dev/README.md#development-overlay, docs/framework-design.md#11, docs/framework-design.md#12, docs/framework-design.md#8-secret-tls, docs/migrations/2026-08-auth-productionization.md#section, docs/migrations/2026-08-platform-configuration.md#platform-configuration-migration, docs/platform-configuration.md#section, docs/rust-collaboration-design.md#2-1, docs/rust-collaboration-design.md#7, docs/trace-architecture.md#7-collector-tempo, AGENTS.md user-provided repository instructions, user-confirmed, user-confirmed-en-locale-source -->
+<!-- fact:security.secrets-and-config status:verified sources:README.md#compose, README.md#k3s-gitops, README.md#section, deploy/base/README.md#application-deployment-base, deploy/nacos/README.md#nacos-application-configuration, deploy/overlay/dev/README.md#development-overlay, docs/framework-design.md#11, docs/framework-design.md#12, docs/framework-design.md#8-secret-tls, docs/migrations/2026-08-auth-productionization.md#section, docs/migrations/2026-08-platform-configuration.md#platform-configuration-migration, docs/migrations/2026-09-retire-legacy-media.md#required-rollout-order, docs/platform-configuration.md#section, docs/rust-collaboration-design.md#2-1, docs/rust-collaboration-design.md#7, docs/trace-architecture.md#7-collector-tempo, AGENTS.md user-provided repository instructions, user-confirmed, user-confirmed-en-locale-source -->
