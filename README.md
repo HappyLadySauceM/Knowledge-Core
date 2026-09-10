@@ -257,7 +257,10 @@ Secret 不得写入 workflow、项目配置或日志。
 
 共享基础设施的声明源是 `deploy/k3s`，服务器路径为 `/opt/k3s`。它复用已有
 PostgreSQL 和 Redis，并在独立 namespace 提供 Nacos、NATS、MinIO 与 ClamAV；Nacos
-使用共享 PostgreSQL。项目 namespace 只接收项目级账号，平台 root/admin Secret 不进入应用。
+使用共享 PostgreSQL。验证邮件 SMTP **不在 Nacos**：管理员在网站 `/{locale}/admin`
+的 **email** tab 写入后，Identity 探测成功才热加载；发送走共享 Kubernetes namespace
+`email` 中的 Maddy（集群内 `api.rainafter.cn:587` STARTTLS，证书为公网 LE）。
+项目 namespace 只接收项目级账号，平台 root/admin Secret 不进入应用。
 
 应用部署模板按服务放在 `deploy/<service>/`。每个服务自主维护 `base/`
 中的 Deployment、Service 与 Kustomization，以及 `overlay/dev/` 中的日志、运行环境、

@@ -20,11 +20,11 @@
 
 - **apis**：RPC IdentityService：Register、Authenticate、RefreshSession、邮箱/密码操作、会话撤销、DeactivateAccount、GetCurrentUser、ResolveUser、Ping
 - **data**：PostgreSQL schema identity
-- **dependencies**：PostgreSQL、Redis、可选 Platform 邮件配置
+- **dependencies**：PostgreSQL、Redis、Platform 管理员 email 配置、Kubernetes namespace email 中的集群 Maddy SMTP
 - **doesNotOwn**：文档、附件或协作 CRDT 状态
 - **language**：Go
 - **ports**：{"admin":8081,"rpc":8881}
-- **role**：用户、凭据、会话与 token version
+- **role**：用户、凭据、会话、token version 与验证邮件 outbox
 
 ### Knowledge
 
@@ -66,7 +66,7 @@
 - **ports**：{"admin":8086,"rpc":8885}
 - **role**：管理员可写的站点、邮件与 AI 配置
 
-<!-- fact:services.catalog status:verified sources:filesystem:service-definitions, idl/rpc/v1 and architecture-design.md, user-confirmed -->
+<!-- fact:services.catalog status:verified sources:filesystem:service-definitions, identity-maddy-smtp-probe, idl/rpc/v1 and architecture-design.md, user-confirmed -->
 
 ## 附录
 

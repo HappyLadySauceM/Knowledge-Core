@@ -533,7 +533,7 @@
     },
     {
       "id": "environment.definitions",
-      "revision": 139,
+      "revision": 178,
       "section": "environment",
       "sources": [
         {
@@ -543,10 +543,14 @@
         {
           "kind": "observed",
           "reference": "kubectl-context-default"
+        },
+        {
+          "kind": "observed",
+          "reference": "kubectl-n-email-maddy"
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-08-27T11:54:55Z",
+      "updatedAt": "2026-09-10T09:13:39Z",
       "value": [
         {
           "evidenceCommand": "docker compose -f docker/infrastructure/docker-compose.yml ps",
@@ -572,6 +576,13 @@
         {
           "kind": "kubernetes",
           "name": "canary-gray"
+        },
+        {
+          "evidenceCommand": "kubectl -n email get sts,svc,certificate",
+          "kind": "kubernetes",
+          "name": "k3s-email",
+          "namespace": "email",
+          "path": "deploy"
         }
       ]
     },
@@ -657,21 +668,21 @@
     },
     {
       "id": "security.secrets-and-config",
-      "revision": 176,
+      "revision": 179,
       "section": "conventions",
       "sources": [
         {
-          "detail": "evidence-sha256:e4a2db3fa2b915ef5947349414bf94c2390f56514e7c46112e1fbc589c2ebfdf",
+          "detail": "evidence-sha256:284e8a63df399a1222a9445114d9c87b3750962333f6a795a9370c788a0ab964",
           "kind": "documented",
           "reference": "README.md#compose"
         },
         {
-          "detail": "evidence-sha256:e4a2db3fa2b915ef5947349414bf94c2390f56514e7c46112e1fbc589c2ebfdf",
+          "detail": "evidence-sha256:284e8a63df399a1222a9445114d9c87b3750962333f6a795a9370c788a0ab964",
           "kind": "documented",
           "reference": "README.md#k3s-gitops"
         },
         {
-          "detail": "evidence-sha256:e4a2db3fa2b915ef5947349414bf94c2390f56514e7c46112e1fbc589c2ebfdf",
+          "detail": "evidence-sha256:284e8a63df399a1222a9445114d9c87b3750962333f6a795a9370c788a0ab964",
           "kind": "documented",
           "reference": "README.md#section"
         },
@@ -681,7 +692,7 @@
           "reference": "deploy/base/README.md#application-deployment-base"
         },
         {
-          "detail": "evidence-sha256:e4a2db3fa2b915ef5947349414bf94c2390f56514e7c46112e1fbc589c2ebfdf",
+          "detail": "evidence-sha256:284e8a63df399a1222a9445114d9c87b3750962333f6a795a9370c788a0ab964",
           "kind": "documented",
           "reference": "deploy/nacos/README.md#nacos-application-configuration"
         },
@@ -691,27 +702,27 @@
           "reference": "deploy/overlay/dev/README.md#development-overlay"
         },
         {
-          "detail": "evidence-sha256:e4a2db3fa2b915ef5947349414bf94c2390f56514e7c46112e1fbc589c2ebfdf",
+          "detail": "evidence-sha256:284e8a63df399a1222a9445114d9c87b3750962333f6a795a9370c788a0ab964",
           "kind": "documented",
           "reference": "docs/framework-design.md#11"
         },
         {
-          "detail": "evidence-sha256:e4a2db3fa2b915ef5947349414bf94c2390f56514e7c46112e1fbc589c2ebfdf",
+          "detail": "evidence-sha256:284e8a63df399a1222a9445114d9c87b3750962333f6a795a9370c788a0ab964",
           "kind": "documented",
           "reference": "docs/framework-design.md#12"
         },
         {
-          "detail": "evidence-sha256:e4a2db3fa2b915ef5947349414bf94c2390f56514e7c46112e1fbc589c2ebfdf",
+          "detail": "evidence-sha256:284e8a63df399a1222a9445114d9c87b3750962333f6a795a9370c788a0ab964",
           "kind": "documented",
           "reference": "docs/framework-design.md#8-secret-tls"
         },
         {
-          "detail": "evidence-sha256:e4a2db3fa2b915ef5947349414bf94c2390f56514e7c46112e1fbc589c2ebfdf",
+          "detail": "evidence-sha256:284e8a63df399a1222a9445114d9c87b3750962333f6a795a9370c788a0ab964",
           "kind": "documented",
           "reference": "docs/migrations/2026-08-auth-productionization.md#section"
         },
         {
-          "detail": "evidence-sha256:e4a2db3fa2b915ef5947349414bf94c2390f56514e7c46112e1fbc589c2ebfdf",
+          "detail": "evidence-sha256:284e8a63df399a1222a9445114d9c87b3750962333f6a795a9370c788a0ab964",
           "kind": "documented",
           "reference": "docs/migrations/2026-08-platform-configuration.md#platform-configuration-migration"
         },
@@ -721,22 +732,22 @@
           "reference": "docs/migrations/2026-09-retire-legacy-media.md#required-rollout-order"
         },
         {
-          "detail": "evidence-sha256:e4a2db3fa2b915ef5947349414bf94c2390f56514e7c46112e1fbc589c2ebfdf",
+          "detail": "evidence-sha256:284e8a63df399a1222a9445114d9c87b3750962333f6a795a9370c788a0ab964",
           "kind": "documented",
           "reference": "docs/platform-configuration.md#section"
         },
         {
-          "detail": "evidence-sha256:e4a2db3fa2b915ef5947349414bf94c2390f56514e7c46112e1fbc589c2ebfdf",
+          "detail": "evidence-sha256:284e8a63df399a1222a9445114d9c87b3750962333f6a795a9370c788a0ab964",
           "kind": "documented",
           "reference": "docs/rust-collaboration-design.md#2-1"
         },
         {
-          "detail": "evidence-sha256:e4a2db3fa2b915ef5947349414bf94c2390f56514e7c46112e1fbc589c2ebfdf",
+          "detail": "evidence-sha256:284e8a63df399a1222a9445114d9c87b3750962333f6a795a9370c788a0ab964",
           "kind": "documented",
           "reference": "docs/rust-collaboration-design.md#7"
         },
         {
-          "detail": "evidence-sha256:e4a2db3fa2b915ef5947349414bf94c2390f56514e7c46112e1fbc589c2ebfdf",
+          "detail": "evidence-sha256:284e8a63df399a1222a9445114d9c87b3750962333f6a795a9370c788a0ab964",
           "kind": "documented",
           "reference": "docs/trace-architecture.md#7-collector-tempo"
         },
@@ -754,18 +765,22 @@
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-09-10T07:01:53Z",
+      "updatedAt": "2026-09-10T09:14:25Z",
       "value": "Secrets may be injected only from environment variables, Kubernetes Secrets, or SOPS-encrypted GitOps manifests. Sensitive values must not be stored in plaintext in source, configuration, logs, metrics, trace spans, or release metadata."
     },
     {
       "id": "services.catalog",
-      "revision": 136,
+      "revision": 178,
       "section": "services",
       "sources": [
         {
           "detail": "evidence-sha256:4861a558e13e8261cad5522bcd050aeb7c528bee7c7ce522497d57fee6c27f8e",
           "kind": "detected",
           "reference": "filesystem:service-definitions"
+        },
+        {
+          "kind": "observed",
+          "reference": "identity-maddy-smtp-probe"
         },
         {
           "kind": "user",
@@ -777,7 +792,7 @@
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-08-27T06:01:01Z",
+      "updatedAt": "2026-09-10T09:13:39Z",
       "value": [
         {
           "apis": [
@@ -812,7 +827,8 @@
           "dependencies": [
             "PostgreSQL",
             "Redis",
-            "optional Platform email config"
+            "Platform Admin email configuration",
+            "cluster Maddy SMTP in Kubernetes namespace email"
           ],
           "doesNotOwn": "Documents, attachments, or collaboration CRDT state",
           "language": "Go",
@@ -821,7 +837,7 @@
             "admin": 8081,
             "rpc": 8881
           },
-          "role": "Users, credentials, sessions, and token version"
+          "role": "Users, credentials, sessions, token version, and verification email outbox"
         },
         {
           "apis": [
@@ -1097,11 +1113,11 @@
     "profile": "generic",
     "slug": "knowledge-core"
   },
-  "revision": 177,
+  "revision": 179,
   "scan": {
-    "fingerprint": "b893bb150814703510fb773105ecb4a297162a0b4d1b3dacc51e5174d3cc23af",
-    "inventoryCount": 457
+    "fingerprint": "750f73439b85d6f24b368064b52a5b7703afd48fa737d13f53af3c414f9f8392",
+    "inventoryCount": 459
   },
   "schemaVersion": 3,
-  "updatedAt": "2026-09-10T07:05:17Z"
+  "updatedAt": "2026-09-10T09:14:25Z"
 }

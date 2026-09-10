@@ -20,11 +20,11 @@ Clients enter through Gateway HTTP or Collaboration WebSocket. Gateway calls Ide
 
 - **apis**: RPC IdentityService: Register, Authenticate, RefreshSession, email/password actions, session revoke, DeactivateAccount, GetCurrentUser, ResolveUser, Ping
 - **data**: PostgreSQL schema identity
-- **dependencies**: PostgreSQL, Redis, optional Platform email config
+- **dependencies**: PostgreSQL, Redis, Platform Admin email configuration, cluster Maddy SMTP in Kubernetes namespace email
 - **doesNotOwn**: Documents, attachments, or collaboration CRDT state
 - **language**: Go
 - **ports**: {"admin":8081,"rpc":8881}
-- **role**: Users, credentials, sessions, and token version
+- **role**: Users, credentials, sessions, token version, and verification email outbox
 
 ### Knowledge
 
@@ -67,7 +67,7 @@ Clients enter through Gateway HTTP or Collaboration WebSocket. Gateway calls Ide
 - **role**: Admin-writable site, email, and AI configuration
 
 
-<!-- fact:services.catalog status:verified sources:filesystem:service-definitions, idl/rpc/v1 and architecture-design.md, user-confirmed -->
+<!-- fact:services.catalog status:verified sources:filesystem:service-definitions, identity-maddy-smtp-probe, idl/rpc/v1 and architecture-design.md, user-confirmed -->
 
 ## Appendix
 
