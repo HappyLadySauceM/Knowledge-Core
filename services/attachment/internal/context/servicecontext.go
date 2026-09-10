@@ -76,7 +76,7 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 	if err := runtime.Health.AddReadiness("clamav", scan.Ping); err != nil {
 		return nil, err
 	}
-	handler, err := attachmentrpc.NewHandler(svc, verifier, runtime.Health, runtime.Logger)
+	handler, err := attachmentrpc.NewHandler(svc, verifier, runtime.Health, runtime.Logger, cfg.Auth.InternalToken)
 	if err != nil {
 		return nil, err
 	}

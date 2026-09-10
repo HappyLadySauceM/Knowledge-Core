@@ -8,6 +8,7 @@ import (
 	"errors"
 	"io"
 	"math"
+	"sort"
 	"strings"
 	"time"
 
@@ -18,6 +19,7 @@ import (
 	"github.com/HappyLadySauce/Knowledge-Core/services/attachment/internal/repository"
 	"github.com/HappyLadySauce/Knowledge-Core/services/attachment/internal/scanner"
 	"github.com/HappyLadySauce/Knowledge-Core/services/attachment/internal/storage"
+	"github.com/google/uuid"
 	"github.com/minio/minio-go/v7"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -174,14 +176,36 @@ func (s *Service) List(ctx context.Context, owner int64, req *attachmentv1.ListA
 	if owner <= 0 || req == nil {
 		return nil, attachmenterrors.InvalidInput.New()
 	}
-	rows, err := s.repo.List(ctx, owner, req.GetStatus(), req.GetCategory(), int(req.GetLimit()))
+	limit := int(req.GetLimit())
+	if limit <= 0 || limit > 100 {
+		limit = 50
+	}
+	cursor, err := repository.DecodeCursor(req.GetCursor())
+	if err != nil {
+		return nil, attachmenterrors.InvalidInput.Wrap(err)
+	}
+	rows, err := s.repo.List(ctx, owner, req.GetStatus(), req.GetCategory(), cursor, limit)
 	if err != nil {
 		return nil, attachmenterrors.Internal.Wrap(err)
+	}
+	hasMore := len(rows) > limit
+	if hasMore {
+		rows = rows[:limit]
 	}
 	out := &attachmentv1.AttachmentList{Items: make([]*attachmentv1.Attachment, 0, len(rows))}
 	for _, row := range rows {
 		out.Items = append(out.Items, toTransport(row))
 	}
+	page := &attachmentv1.AttachmentPageInfo{HasMore: hasMore}
+	if hasMore && len(rows) > 0 {
+		last := rows[len(rows)-1]
+		next, cursorErr := repository.EncodeCursor(repository.Cursor{Time: last.CreatedAt, ID: last.ID})
+		if cursorErr != nil {
+			return nil, attachmenterrors.Internal.Wrap(cursorErr)
+		}
+		page.NextCursor = &next
+	}
+	out.Page = page
 	return out, nil
 }
 func (s *Service) Get(ctx context.Context, owner int64, id string) (*attachmentv1.Attachment, error) {
@@ -219,6 +243,91 @@ func (s *Service) Restore(ctx context.Context, owner int64, id string) error {
 		return attachmenterrors.InvalidInput.New()
 	}
 	return mapRepositoryError(s.repo.Restore(ctx, id, owner))
+}
+
+func (s *Service) StagePublicationReferences(ctx context.Context, req *attachmentv1.PublicationReferenceCommand) error {
+	command, err := publicationCommand(req, false)
+	if err != nil {
+		return attachmenterrors.InvalidInput.Wrap(err)
+	}
+	return mapRepositoryError(s.repo.StagePublicationReferences(ctx, command))
+}
+
+func (s *Service) FinalizePublicationReferences(ctx context.Context, req *attachmentv1.PublicationReferenceCommand) error {
+	command, err := publicationCommand(req, false)
+	if err != nil {
+		return attachmenterrors.InvalidInput.Wrap(err)
+	}
+	return mapRepositoryError(s.repo.FinalizePublicationReferences(ctx, command))
+}
+
+func (s *Service) ClearPublicationReferences(ctx context.Context, req *attachmentv1.PublicationReferenceCommand) error {
+	command, err := publicationCommand(req, true)
+	if err != nil {
+		return attachmenterrors.InvalidInput.Wrap(err)
+	}
+	return mapRepositoryError(s.repo.ClearPublicationReferences(ctx, command))
+}
+
+func publicationCommand(req *attachmentv1.PublicationReferenceCommand, requireEmpty bool) (repository.PublicationReferenceCommand, error) {
+	if req == nil || req.OwnerId <= 0 || req.Generation <= 0 || !validUUIDv7(req.MessageId) || !validUUIDv7(req.DocumentId) {
+		return repository.PublicationReferenceCommand{}, errors.New("publication reference command is invalid")
+	}
+	ids := append([]string(nil), req.AttachmentIds...)
+	sort.Strings(ids)
+	for index, id := range ids {
+		if !validUUIDv7(id) || index > 0 && ids[index-1] == id {
+			return repository.PublicationReferenceCommand{}, errors.New("publication attachment IDs are invalid")
+		}
+	}
+	if requireEmpty && len(ids) != 0 {
+		return repository.PublicationReferenceCommand{}, errors.New("clear publication command must not contain attachments")
+	}
+	payload, err := json.Marshal(struct {
+		DocumentID string   `json:"document_id"`
+		OwnerID    int64    `json:"owner_id"`
+		Generation int64    `json:"generation"`
+		IDs        []string `json:"attachment_ids"`
+	}{req.DocumentId, req.OwnerId, req.Generation, ids})
+	if err != nil {
+		return repository.PublicationReferenceCommand{}, err
+	}
+	digest := sha256.Sum256(payload)
+	return repository.PublicationReferenceCommand{
+		DocumentID: req.DocumentId, OwnerID: req.OwnerId, Generation: req.Generation,
+		AttachmentIDs: ids, RequestHash: hex.EncodeToString(digest[:]),
+	}, nil
+}
+
+func validUUIDv7(value string) bool {
+	id, err := uuid.Parse(strings.TrimSpace(value))
+	return err == nil && id.Version() == 7
+}
+
+func (s *Service) PublicationReferenceState(ctx context.Context, documentID string) (*attachmentv1.PublicationReferenceState, error) {
+	if !validUUIDv7(documentID) {
+		return nil, attachmenterrors.InvalidInput.New()
+	}
+	state, err := s.repo.PublicationReferenceState(ctx, documentID)
+	if err != nil {
+		return nil, attachmenterrors.Internal.Wrap(err)
+	}
+	return &attachmentv1.PublicationReferenceState{DocumentId: state.DocumentID, ActiveGeneration: state.ActiveGeneration, StagedGeneration: state.StagedGeneration}, nil
+}
+
+func (s *Service) PublishedContent(ctx context.Context, attachmentID string) (*attachmentv1.AttachmentContent, error) {
+	if !validUUIDv7(attachmentID) {
+		return nil, attachmenterrors.InvalidInput.New()
+	}
+	record, err := s.repo.GetPublished(ctx, attachmentID)
+	if err != nil {
+		return nil, mapRepositoryError(err)
+	}
+	u, expires, err := s.objects.PresignDownload(ctx, record.ObjectKey)
+	if err != nil {
+		return nil, attachmenterrors.Unavailable.Wrap(err)
+	}
+	return &attachmentv1.AttachmentContent{Url: u, ExpiresAt: expires.Format(time.RFC3339Nano)}, nil
 }
 func (s *Service) ScanOnce(ctx context.Context) error {
 	return scanOnce(ctx, s.repo, s.objects, s.scanner)
@@ -284,7 +393,7 @@ func mapRepositoryError(err error) error {
 	if errors.Is(err, repository.ErrNotFound) {
 		return attachmenterrors.NotFound.New()
 	}
-	if errors.Is(err, repository.ErrConflict) {
+	if errors.Is(err, repository.ErrConflict) || errors.Is(err, repository.ErrIdempotencyConflict) {
 		return attachmenterrors.Conflict.New()
 	}
 	return attachmenterrors.Internal.Wrap(err)

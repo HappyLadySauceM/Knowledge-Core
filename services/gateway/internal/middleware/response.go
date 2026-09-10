@@ -33,6 +33,7 @@ var (
 	ErrPermissionDenied        = responseError(gatewaymodel.CodePermissionDenied, "gateway.permission_denied", apperror.KindPermissionDenied, "permission denied")
 	ErrDependencyUnavailable   = responseError(gatewaymodel.CodeDependencyUnavailable, "gateway.dependency_unavailable", apperror.KindUnavailable, "service unavailable")
 	ErrRouteNotFound           = responseError(gatewaymodel.CodeRouteNotFound, "gateway.route_not_found", apperror.KindNotFound, "route not found")
+	ErrResourceNotFound        = responseError(gatewaymodel.CodeRouteNotFound, "gateway.resource_not_found", apperror.KindNotFound, "resource not found")
 	ErrMethodNotAllowed        = responseErrorWithStatus(gatewaymodel.CodeMethodNotAllowed, http.StatusMethodNotAllowed, "gateway.method_not_allowed", apperror.KindInvalidArgument, "method not allowed")
 	ErrRateLimited             = responseError(gatewaymodel.CodeRateLimited, "gateway.rate_limited", apperror.KindRateLimited, "rate limit exceeded")
 	ErrUpstreamTimeout         = responseError(gatewaymodel.CodeUpstreamTimeout, "gateway.upstream_timeout", apperror.KindDeadlineExceeded, "upstream request timed out")

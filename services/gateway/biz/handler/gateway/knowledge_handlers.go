@@ -78,12 +78,39 @@ func handleGetAttachmentContent(ctx context.Context, request *app.RequestContext
 		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInternal)
 		return
 	}
-	// Generic attachments are owner-scoped and are served through the same
-	// stable URL. Keep the legacy Knowledge lookup as a compatibility fallback
-	// for the two-release migration window.
-	if _, authenticated := gatewaymiddleware.Principal(request); authenticated && dependencies.Attachment != nil {
+	if dependencies.Attachment == nil {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInternal)
+		return
+	}
+	workCtx := upstreamContext(ctx, request)
+	authorization, authErr := dependencies.Knowledge.IsMediaPublished(
+		workCtx, &knowledgev1.PublishedMediaRequest{AttachmentId: attachmentID},
+	)
+	if authErr != nil {
+		gatewaymiddleware.WriteKnowledgeError(ctx, request, authErr)
+		return
+	}
+	if authorization != nil && authorization.Published {
+		content, contentErr := dependencies.Attachment.GetPublishedAttachmentContent(
+			workCtx, &attachmentv1.AttachmentIDRequest{AttachmentId: attachmentID},
+		)
+		if contentErr != nil {
+			gatewaymiddleware.WriteAttachmentError(ctx, request, contentErr)
+			return
+		}
+		if content == nil || !validRFC3339(content.ExpiresAt) || !validRedirectURL(content.Url) {
+			gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidUpstreamResponse)
+			return
+		}
+		gatewaymiddleware.ResponseMetadata(ctx, request)
+		request.Header("Cache-Control", "public, max-age=60")
+		request.Header("Location", content.Url)
+		request.Status(http.StatusSeeOther)
+		return
+	}
+	if _, authenticated := gatewaymiddleware.Principal(request); authenticated {
 		attachment, attachmentErr := dependencies.Attachment.GetAttachment(
-			upstreamContext(ctx, request), &attachmentv1.AttachmentIDRequest{AttachmentId: attachmentID},
+			workCtx, &attachmentv1.AttachmentIDRequest{AttachmentId: attachmentID},
 		)
 		if attachmentErr == nil {
 			if attachment == nil || attachment.Status != "ready" || attachment.DownloadUrl == nil || attachment.DownloadExpiresAt == nil || !validRFC3339(*attachment.DownloadExpiresAt) || !validRedirectURL(*attachment.DownloadUrl) {
@@ -96,22 +123,10 @@ func handleGetAttachmentContent(ctx context.Context, request *app.RequestContext
 			request.Status(http.StatusSeeOther)
 			return
 		}
-	}
-	content, err := dependencies.Knowledge.GetAttachmentContent(
-		upstreamContext(ctx, request), &knowledgev1.AttachmentContentRequest{AttachmentId: attachmentID},
-	)
-	if err != nil {
-		gatewaymiddleware.WriteKnowledgeError(ctx, request, err)
+		gatewaymiddleware.WriteAttachmentError(ctx, request, attachmentErr)
 		return
 	}
-	if content == nil || !validRFC3339(content.ExpiresAt) || !validRedirectURL(content.Url) {
-		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidUpstreamResponse)
-		return
-	}
-	gatewaymiddleware.ResponseMetadata(ctx, request)
-	request.Header("Cache-Control", "private, no-store")
-	request.Header("Location", content.Url)
-	request.Status(http.StatusSeeOther)
+	gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrResourceNotFound)
 }
 
 func handleListDocuments(ctx context.Context, request *app.RequestContext) {
@@ -312,7 +327,7 @@ func handlePublishDocument(ctx context.Context, request *app.RequestContext) {
 		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidUpstreamResponse)
 		return
 	}
-	writeDocument(ctx, request, consts.StatusOK, data)
+	writeDocument(ctx, request, consts.StatusAccepted, data)
 }
 
 func handleUnpublishDocument(ctx context.Context, request *app.RequestContext) {
@@ -482,105 +497,6 @@ func handleDeleteMember(ctx context.Context, request *app.RequestContext) {
 		return
 	}
 	writeNoContent(ctx, request)
-}
-
-func handleListAttachments(ctx context.Context, request *app.RequestContext) {
-	documentID, err := pathUUID(request, "document_id")
-	if err != nil || requireNoQuery(request) != nil || requireNoBody(request) != nil {
-		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidRequest)
-		return
-	}
-	dependencies, ok := gatewaymiddleware.FromRequest(request)
-	if !ok {
-		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInternal)
-		return
-	}
-	attachments, err := dependencies.Knowledge.ListAttachments(
-		upstreamContext(ctx, request), &knowledgev1.DocumentIDRequest{DocumentId: documentID},
-	)
-	if err != nil {
-		gatewaymiddleware.WriteKnowledgeError(ctx, request, err)
-		return
-	}
-	data, err := toAttachmentListData(attachments, dependencies.EndpointOptions())
-	if err != nil {
-		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidUpstreamResponse)
-		return
-	}
-	writeJSON(ctx, request, consts.StatusOK, data)
-}
-
-func handleCreateAttachment(ctx context.Context, request *app.RequestContext) {
-	documentID, pathErr := pathUUID(request, "document_id")
-	idempotency, keyErr := idempotencyKey(request)
-	var body createAttachmentBody
-	if pathErr != nil || keyErr != nil || requireNoQuery(request) != nil || decodeJSONBody(request, &body) != nil ||
-		body.Filename == "" || body.MediaType == "" || body.SizeBytes <= 0 || body.SHA256 == "" {
-		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidRequest)
-		return
-	}
-	dependencies, ok := gatewaymiddleware.FromRequest(request)
-	if !ok {
-		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInternal)
-		return
-	}
-	upload, err := dependencies.Knowledge.CreateAttachment(upstreamContext(ctx, request), &knowledgev1.CreateAttachmentRequest{
-		DocumentId: documentID, Filename: body.Filename, MediaType: body.MediaType, SizeBytes: body.SizeBytes,
-		Sha256: body.SHA256, IdempotencyKey: optionalString(idempotency),
-	})
-	if err != nil {
-		gatewaymiddleware.WriteKnowledgeError(ctx, request, err)
-		return
-	}
-	data, err := toAttachmentUploadData(upload, dependencies.EndpointOptions())
-	if err != nil {
-		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidUpstreamResponse)
-		return
-	}
-	request.Header("Location", endpointURL(dependencies.EndpointOptions(), "/api/v1/studio/documents/"+url.PathEscape(documentID)+"/attachments/"+url.PathEscape(data.Attachment.ID)))
-	writeJSON(ctx, request, consts.StatusCreated, data)
-}
-
-func handleCompleteAttachment(ctx context.Context, request *app.RequestContext) {
-	mutateAttachment(ctx, request, true)
-}
-
-func handleDeleteAttachment(ctx context.Context, request *app.RequestContext) {
-	mutateAttachment(ctx, request, false)
-}
-
-func mutateAttachment(ctx context.Context, request *app.RequestContext, complete bool) {
-	documentID, documentErr := pathUUID(request, "document_id")
-	attachmentID, attachmentErr := pathUUID(request, "attachment_id")
-	if documentErr != nil || attachmentErr != nil || requireNoQuery(request) != nil || requireNoBody(request) != nil {
-		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidRequest)
-		return
-	}
-	dependencies, ok := gatewaymiddleware.FromRequest(request)
-	if !ok {
-		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInternal)
-		return
-	}
-	input := &knowledgev1.AttachmentIDRequest{DocumentId: documentID, AttachmentId: attachmentID}
-	if !complete {
-		if err := dependencies.Knowledge.DeleteAttachment(upstreamContext(ctx, request), input); err != nil {
-			gatewaymiddleware.WriteKnowledgeError(ctx, request, err)
-			return
-		}
-		writeNoContent(ctx, request)
-		return
-	}
-	attachment, err := dependencies.Knowledge.CompleteAttachment(upstreamContext(ctx, request), input)
-	if err != nil {
-		gatewaymiddleware.WriteKnowledgeError(ctx, request, err)
-		return
-	}
-	data, err := toAttachmentData(attachment, dependencies.EndpointOptions())
-	if err != nil {
-		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidUpstreamResponse)
-		return
-	}
-	writeJSON(ctx, request, consts.StatusOK, data)
 }
 
 func listRequest(input listInput) *knowledgev1.ListDocumentsRequest {

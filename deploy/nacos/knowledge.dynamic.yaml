@@ -1,7 +1,7 @@
 api_version: knowledge-core.io/v1beta1
 kind: ApplicationConfig
 service: knowledge
-revision: 3
+revision: 4
 config:
   app: {name: knowledge, environment: development, startup_timeout: 30s, shutdown_timeout: 45s}
   log: {level: info, add_source: false, health_check_requests: false}
@@ -12,7 +12,6 @@ config:
   nats: {servers: [nats://nats.infrastructure-dev.svc.cluster.local:4222], name: knowledge-core.knowledge, connect_timeout: 5s, request_timeout: 5s, max_reconnects: -1, reconnect_wait: 2s, ping_interval: 2m, max_pings_out: 2, drain_timeout: 10s, tls: {enabled: false}}
   identity_rpc: {service_name: knowledge-core.identity, address: knowledge-core-identity.knowledge-core-dev.svc.cluster.local:8881, connect_timeout: 500ms, request_timeout: 3s, tls: {enabled: false}}
   auth: {}
-  object_storage: {endpoint: minio.infrastructure-dev.svc.cluster.local:9000, region: us-east-1, bucket: knowledge-core, secure: false, auto_create_bucket: true, upload_ttl: 15m, download_ttl: 5m}
-  scanner: {address: clamav.infrastructure-dev.svc.cluster.local:3310, dial_timeout: 3s, scan_timeout: 30s, maximum_stream: 67108864}
+  attachment_rpc: {service_name: knowledge-core.attachment, address: knowledge-core-attachment.knowledge-core-dev.svc.cluster.local:8884, connect_timeout: 500ms, request_timeout: 5s, tls: {enabled: false}}
   collaboration_rpc: {service_name: knowledge-core.collaboration, address: knowledge-core-collaboration.knowledge-core-dev.svc.cluster.local:8883, connect_timeout: 500ms, request_timeout: 5s, tls: {enabled: false}}
   workers: {poll_interval: 30s, operation_timeout: 30s}

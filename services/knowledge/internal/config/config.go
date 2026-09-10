@@ -20,8 +20,7 @@ type Config struct {
 	NATS             *option.NATSOptions        `mapstructure:"nats" json:"nats" yaml:"nats"`
 	IdentityRPC      *option.KitexClientOptions `mapstructure:"identity_rpc" json:"identity_rpc" yaml:"identity_rpc"`
 	Auth             *AuthOptions               `mapstructure:"auth" json:"auth" yaml:"auth"`
-	ObjectStorage    *ObjectStorageOptions      `mapstructure:"object_storage" json:"object_storage" yaml:"object_storage"`
-	Scanner          *ScannerOptions            `mapstructure:"scanner" json:"scanner" yaml:"scanner"`
+	AttachmentRPC    *option.KitexClientOptions `mapstructure:"attachment_rpc" json:"attachment_rpc" yaml:"attachment_rpc"`
 	CollaborationRPC *option.KitexClientOptions `mapstructure:"collaboration_rpc" json:"collaboration_rpc" yaml:"collaboration_rpc"`
 	Workers          *WorkerOptions             `mapstructure:"workers" json:"workers" yaml:"workers"`
 }
@@ -41,14 +40,17 @@ func New() Config {
 	collaboration.ServiceName = "knowledge-core.collaboration"
 	collaboration.Address = "127.0.0.1:8883"
 	collaboration.RequestTimeout = 5 * time.Second
+	attachment := option.NewKitexClientOptions()
+	attachment.ServiceName = "knowledge-core.attachment"
+	attachment.Address = "127.0.0.1:8884"
+	attachment.RequestTimeout = 5 * time.Second
 	natsOptions := option.NewNATSOptions()
 	natsOptions.Name = "knowledge-core.knowledge"
 	return Config{
 		App: app, Log: option.NewLogOptions(), Trace: option.NewTraceOptions(), RPC: rpc,
 		AdminHTTP: admin, PostgreSQL: option.NewPostgreSQLOptions(),
 		NATS: natsOptions, IdentityRPC: identity,
-		Auth: NewAuthOptions(), ObjectStorage: NewObjectStorageOptions(), Scanner: NewScannerOptions(),
-		CollaborationRPC: collaboration, Workers: NewWorkerOptions(),
+		Auth: NewAuthOptions(), AttachmentRPC: attachment, CollaborationRPC: collaboration, Workers: NewWorkerOptions(),
 	}
 }
 
@@ -64,11 +66,10 @@ func (c Config) Validate() error {
 	if c.App.Environment != "development" {
 		productionErr = errors.Join(productionErr, requireServerMutualTLS("rpc", c.RPC.TLS))
 		productionErr = errors.Join(productionErr, requireClientMutualTLS("collaboration_rpc", c.CollaborationRPC.TLS))
+		productionErr = errors.Join(productionErr, requireClientMutualTLS("attachment_rpc", c.AttachmentRPC.TLS))
 		productionErr = errors.Join(productionErr, option.RejectLoopbackEndpoint("identity_rpc.address", c.IdentityRPC.Address))
 		productionErr = errors.Join(productionErr, option.RejectLoopbackEndpoint("collaboration_rpc.address", c.CollaborationRPC.Address))
-		if c.ObjectStorage.AutoCreateBucket {
-			productionErr = errors.Join(productionErr, errors.New("production object storage must not auto-create its bucket"))
-		}
+		productionErr = errors.Join(productionErr, option.RejectLoopbackEndpoint("attachment_rpc.address", c.AttachmentRPC.Address))
 	}
 	transportBudget := c.RPC.ExitWaitTimeout + c.AdminHTTP.ShutdownTimeout
 	var lifecycleErr error
@@ -84,8 +85,8 @@ func (c Config) Validate() error {
 		wrapValidation("admin_http", c.AdminHTTP.Validate()),
 		wrapValidation("postgres", c.PostgreSQL.Validate()),
 		wrapValidation("nats", c.NATS.Validate()), wrapValidation("identity_rpc", c.IdentityRPC.Validate()),
-		wrapValidation("auth", c.Auth.Validate()), wrapValidation("object_storage", c.ObjectStorage.Validate()),
-		wrapValidation("scanner", c.Scanner.Validate()), wrapValidation("collaboration_rpc", c.CollaborationRPC.Validate()),
+		wrapValidation("auth", c.Auth.Validate()), wrapValidation("attachment_rpc", c.AttachmentRPC.Validate()),
+		wrapValidation("collaboration_rpc", c.CollaborationRPC.Validate()),
 		wrapValidation("workers", c.Workers.Validate()), addressErr, productionErr, lifecycleErr,
 	)
 }
@@ -95,7 +96,7 @@ func (c Config) requireSections() error {
 		"app": c.App, "log": c.Log, "trace": c.Trace, "rpc": c.RPC,
 		"admin_http": c.AdminHTTP, "postgres": c.PostgreSQL,
 		"nats": c.NATS, "identity_rpc": c.IdentityRPC, "auth": c.Auth,
-		"object_storage": c.ObjectStorage, "scanner": c.Scanner, "collaboration_rpc": c.CollaborationRPC, "workers": c.Workers,
+		"attachment_rpc": c.AttachmentRPC, "collaboration_rpc": c.CollaborationRPC, "workers": c.Workers,
 	}
 	var joined error
 	for name, section := range sections {

@@ -282,7 +282,7 @@ operations:
     summary: 发布文档
     description: 使用当前 rich-text state vector 创建版本并发布文档公开投影。
     security: bearer
-    success_status: 200
+    success_status: 202
     required_body: [state_vector]
     response_headers: [ETag, X-Request-ID, X-Trace-ID]
     errors: [400, 401, 403, 404, 409, 412, 429, 500, 502, 503, 504]
@@ -352,35 +352,6 @@ operations:
     security: bearer
     success_status: 201
     errors: [400, 401, 403, 404, 409, 412, 429, 500, 502, 503, 504]
-  ListAttachments:
-    tag: 文档附件
-    summary: 列出文档附件
-    description: 列出迁移窗口内文档范围的附件投影。
-    security: bearer
-    success_status: 200
-    errors: [400, 401, 403, 404, 429, 500, 502, 503, 504]
-  CreateAttachment:
-    tag: 文档附件
-    summary: 创建文档附件上传
-    description: 创建旧文档范围附件上传并返回预签名地址。
-    security: bearer
-    success_status: 201
-    response_headers: [Location, X-Request-ID, X-Trace-ID]
-    errors: [400, 401, 403, 404, 409, 429, 500, 502, 503, 504]
-  CompleteAttachment:
-    tag: 文档附件
-    summary: 完成文档附件上传
-    description: 完成旧文档范围附件的预签名上传。
-    security: bearer
-    success_status: 200
-    errors: [400, 401, 403, 404, 409, 429, 500, 502, 503, 504]
-  DeleteAttachment:
-    tag: 文档附件
-    summary: 删除文档附件
-    description: 删除旧文档范围附件。
-    security: bearer
-    success_status: 204
-    errors: [400, 401, 403, 404, 409, 429, 500, 502, 503, 504]
   ListDeletedDocuments:
     tag: 回收站
     summary: 列出已删除文档

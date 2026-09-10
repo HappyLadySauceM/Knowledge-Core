@@ -61,6 +61,7 @@ type PublicationSnapshotInput struct {
 	Tags            []string
 	Content         domain.RichTextDocument
 	PlainText       string
+	MediaIDs        []string
 	Idempotency     Idempotency
 }
 
@@ -279,7 +280,8 @@ func (s *Store) replaceDocumentTags(tx *gorm.DB, ownerID int64, documentID strin
 	return nil
 }
 
-func (s *Store) PublishSnapshot(ctx context.Context, id string, actorID, expected int64, input PublicationSnapshotInput) (*domain.Document, error) {
+//nolint:unused // Removed after the destructive legacy-publication migration is deployed everywhere.
+func (s *Store) publishSnapshotLegacy(ctx context.Context, id string, actorID, expected int64, input PublicationSnapshotInput) (*domain.Document, error) {
 	var result *domain.Document
 	content, err := jsoncodec.Marshal(input.Content)
 	if err != nil {
@@ -564,7 +566,8 @@ func (s *Store) UpdateDocument(ctx context.Context, id string, actorID, expected
 	return result, err
 }
 
-func (s *Store) SetPublication(ctx context.Context, id string, actorID, expected int64, published bool) (*domain.Document, error) {
+//nolint:unused // Removed after the destructive legacy-publication migration is deployed everywhere.
+func (s *Store) setPublicationLegacy(ctx context.Context, id string, actorID, expected int64, published bool) (*domain.Document, error) {
 	var result *domain.Document
 	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		record, access, err := lockDocument(tx, id, actorID, false)
@@ -620,8 +623,22 @@ func (s *Store) SoftDeleteDocument(ctx context.Context, id string, actorID, expe
 			return ErrPrecondition
 		}
 		now := s.now().UTC()
+		generation := record.PublicationGeneration + 1
+		if err := tx.Where("document_id = ?", id).Delete(&model.PublicationCandidate{}).Error; err != nil {
+			return fmt.Errorf("remove deleted publication candidate: %w", err)
+		}
+		if err := tx.Where("document_id = ?", id).Delete(&model.DocumentPublication{}).Error; err != nil {
+			return fmt.Errorf("remove deleted live publication: %w", err)
+		}
+		if err := tx.Where("document_id = ? AND parked_at IS NULL", id).Delete(&model.PublicationReferenceJob{}).Error; err != nil {
+			return fmt.Errorf("supersede deleted publication job: %w", err)
+		}
+		if err := s.enqueuePublicationReferenceJob(tx, record, generation, publicationActionClear, nil, now); err != nil {
+			return err
+		}
 		if err := tx.Model(record).Updates(map[string]any{
 			"published": false, "published_at": nil, "deleted_at": now, "purge_after": now.Add(30 * 24 * time.Hour),
+			"publication_status": domain.PublicationUnpublishing, "publication_error": nil, "publication_generation": generation,
 			"metadata_revision": gorm.Expr("metadata_revision + 1"), "permission_revision": gorm.Expr("permission_revision + 1"), "updated_at": now,
 		}).Error; err != nil {
 			return fmt.Errorf("soft-delete document: %w", err)

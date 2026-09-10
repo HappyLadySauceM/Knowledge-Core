@@ -144,7 +144,7 @@ Gateway 的 HTTP 规则：
 - Studio 路由和 `/users/me` 必须认证；公开文档允许匿名读取，并可在携带有效 token 时返回调用方可见的访问上下文。
 - 文档和成员写操作使用强 ETag，格式为 `"<revision>"`；调用方必须把读取到的值原样放入 `If-Match`。
 - 支持幂等的创建/恢复操作使用 `Idempotency-Key`；分页 cursor 是 opaque token。
-- 附件下载返回 `303 See Other` 和短期预签名 `Location`，不代理对象正文。
+- 附件下载返回 `303 See Other` 和短期预签名 `Location`，不代理对象正文。通用附件列表按 `(created_at, id)` 降序使用不透明稳定游标分页；响应中的可选 `page` 字段用于兼容旧客户端，当前服务始终返回 `next_cursor` 与 `has_more`。
 - 响应中的公开 HTTP/WebSocket URL 只来自已校验配置，不信任请求 `Host`。
 
 API 文档由 `scripts/apidocgen` 生成，输入为 `idl/http/v1/gateway.thrift`、

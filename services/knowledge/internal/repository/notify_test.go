@@ -19,7 +19,7 @@ func TestWorkerWakeConstantsStayLowCardinality(t *testing.T) {
 	if WorkerWakeChannel != "knowledge_workers" {
 		t.Fatalf("WorkerWakeChannel = %q", WorkerWakeChannel)
 	}
-	if WorkerWakePayloadOutbox != "outbox" || WorkerWakePayloadAttachment != "attachment" {
-		t.Fatalf("wake payloads = %q / %q", WorkerWakePayloadOutbox, WorkerWakePayloadAttachment)
+	if WorkerWakePayloadOutbox != "outbox" || WorkerWakePayloadPublication != "publication" {
+		t.Fatalf("wake payloads = %q / %q", WorkerWakePayloadOutbox, WorkerWakePayloadPublication)
 	}
 }

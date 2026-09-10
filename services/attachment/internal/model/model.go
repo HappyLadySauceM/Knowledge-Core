@@ -41,7 +41,21 @@ type Reference struct {
 	AttachmentID string    `gorm:"type:uuid;primaryKey"`
 	RefType      string    `gorm:"size:32;primaryKey"`
 	RefID        string    `gorm:"size:128;primaryKey"`
+	Generation   int64     `gorm:"primaryKey"`
 	CreatedAt    time.Time `gorm:"type:timestamptz;not null"`
 }
 
 func (Reference) TableName() string { return "attachment.references" }
+
+type ReferenceHead struct {
+	RefType          string    `gorm:"size:32;primaryKey"`
+	RefID            string    `gorm:"size:128;primaryKey"`
+	OwnerID          int64     `gorm:"not null"`
+	ActiveGeneration int64     `gorm:"not null"`
+	ActiveHash       string    `gorm:"size:64;not null"`
+	StagedGeneration *int64    `gorm:"type:bigint"`
+	StagedHash       string    `gorm:"size:64;not null"`
+	UpdatedAt        time.Time `gorm:"type:timestamptz;not null"`
+}
+
+func (ReferenceHead) TableName() string { return "attachment.reference_heads" }

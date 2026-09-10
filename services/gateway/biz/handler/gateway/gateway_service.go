@@ -246,22 +246,6 @@ func RestoreVersion(ctx context.Context, request *app.RequestContext) {
 	handleRestoreVersion(ctx, request)
 }
 
-func ListAttachments(ctx context.Context, request *app.RequestContext) {
-	handleListAttachments(ctx, request)
-}
-
-func CreateAttachment(ctx context.Context, request *app.RequestContext) {
-	handleCreateAttachment(ctx, request)
-}
-
-func CompleteAttachment(ctx context.Context, request *app.RequestContext) {
-	handleCompleteAttachment(ctx, request)
-}
-
-func DeleteAttachment(ctx context.Context, request *app.RequestContext) {
-	handleDeleteAttachment(ctx, request)
-}
-
 func ListDeletedDocuments(ctx context.Context, request *app.RequestContext) {
 	handleListDeletedDocuments(ctx, request)
 }

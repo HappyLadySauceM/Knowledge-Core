@@ -33,11 +33,7 @@ type Client interface {
 	AddMember(ctx context.Context, request *knowledge.AddMemberRequest, callOptions ...callopt.Option) (r *knowledge.Member, err error)
 	UpdateMember(ctx context.Context, request *knowledge.UpdateMemberRequest, callOptions ...callopt.Option) (r *knowledge.Member, err error)
 	DeleteMember(ctx context.Context, request *knowledge.DeleteMemberRequest, callOptions ...callopt.Option) (err error)
-	ListAttachments(ctx context.Context, request *knowledge.DocumentIDRequest, callOptions ...callopt.Option) (r *knowledge.AttachmentList, err error)
-	CreateAttachment(ctx context.Context, request *knowledge.CreateAttachmentRequest, callOptions ...callopt.Option) (r *knowledge.AttachmentUpload, err error)
-	CompleteAttachment(ctx context.Context, request *knowledge.AttachmentIDRequest, callOptions ...callopt.Option) (r *knowledge.Attachment, err error)
-	DeleteAttachment(ctx context.Context, request *knowledge.AttachmentIDRequest, callOptions ...callopt.Option) (err error)
-	GetAttachmentContent(ctx context.Context, request *knowledge.AttachmentContentRequest, callOptions ...callopt.Option) (r *knowledge.AttachmentContent, err error)
+	IsMediaPublished(ctx context.Context, request *knowledge.PublishedMediaRequest, callOptions ...callopt.Option) (r *knowledge.PublishedMediaAuthorization, err error)
 	AuthorizeCollaboration(ctx context.Context, request *knowledge.AuthorizeCollaborationRequest, callOptions ...callopt.Option) (r *knowledge.CollaborationAuthorization, err error)
 	ProjectCollaboration(ctx context.Context, request *knowledge.ProjectCollaborationRequest, callOptions ...callopt.Option) (err error)
 }
@@ -176,29 +172,9 @@ func (p *kKnowledgeServiceClient) DeleteMember(ctx context.Context, request *kno
 	return p.kClient.DeleteMember(ctx, request)
 }
 
-func (p *kKnowledgeServiceClient) ListAttachments(ctx context.Context, request *knowledge.DocumentIDRequest, callOptions ...callopt.Option) (r *knowledge.AttachmentList, err error) {
+func (p *kKnowledgeServiceClient) IsMediaPublished(ctx context.Context, request *knowledge.PublishedMediaRequest, callOptions ...callopt.Option) (r *knowledge.PublishedMediaAuthorization, err error) {
 	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
-	return p.kClient.ListAttachments(ctx, request)
-}
-
-func (p *kKnowledgeServiceClient) CreateAttachment(ctx context.Context, request *knowledge.CreateAttachmentRequest, callOptions ...callopt.Option) (r *knowledge.AttachmentUpload, err error) {
-	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
-	return p.kClient.CreateAttachment(ctx, request)
-}
-
-func (p *kKnowledgeServiceClient) CompleteAttachment(ctx context.Context, request *knowledge.AttachmentIDRequest, callOptions ...callopt.Option) (r *knowledge.Attachment, err error) {
-	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
-	return p.kClient.CompleteAttachment(ctx, request)
-}
-
-func (p *kKnowledgeServiceClient) DeleteAttachment(ctx context.Context, request *knowledge.AttachmentIDRequest, callOptions ...callopt.Option) (err error) {
-	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
-	return p.kClient.DeleteAttachment(ctx, request)
-}
-
-func (p *kKnowledgeServiceClient) GetAttachmentContent(ctx context.Context, request *knowledge.AttachmentContentRequest, callOptions ...callopt.Option) (r *knowledge.AttachmentContent, err error) {
-	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
-	return p.kClient.GetAttachmentContent(ctx, request)
+	return p.kClient.IsMediaPublished(ctx, request)
 }
 
 func (p *kKnowledgeServiceClient) AuthorizeCollaboration(ctx context.Context, request *knowledge.AuthorizeCollaborationRequest, callOptions ...callopt.Option) (r *knowledge.CollaborationAuthorization, err error) {

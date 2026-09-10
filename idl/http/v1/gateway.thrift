@@ -188,24 +188,14 @@ struct DocumentData {
   15: optional string language (api.body="language")
   16: optional list<string> tags (api.body="tags")
   17: optional string folder_id (api.body="folder_id")
-}
-
-struct AttachmentData {
-  1: required string id (api.body="id")
-  2: required string document_id (api.body="document_id")
-  3: required string filename (api.body="filename")
-  4: required string media_type (api.body="media_type")
-  5: required i64 size_bytes (api.body="size_bytes")
-  6: required string status (api.body="status")
-  7: required string content_url (api.body="content_url")
-  8: required string created_at (api.body="created_at")
+  18: required string publication_status (api.body="publication_status")
+  19: optional string publication_error (api.body="publication_error")
 }
 
 struct DocumentDetailData {
   1: required DocumentData document (api.body="document")
   2: required RichTextDocumentData content (api.body="content")
   3: required string plain_text (api.body="plain_text")
-  4: required list<AttachmentData> attachments (api.body="attachments")
 }
 
 struct CollaborationSessionData {
@@ -372,33 +362,9 @@ struct RestoreVersionRequest {
   4: optional string idempotency_key (api.header="Idempotency-Key")
 }
 
-struct CreateAttachmentRequest {
-  1: required string document_id (api.path="document_id")
-  2: required string filename (api.body="filename")
-  3: required string media_type (api.body="media_type")
-  4: required i64 size_bytes (api.body="size_bytes")
-  5: required string sha256 (api.body="sha256")
-  6: optional string idempotency_key (api.header="Idempotency-Key")
-}
-
-struct AttachmentUploadData {
-  1: required AttachmentData attachment (api.body="attachment")
-  2: required string upload_url (api.body="upload_url")
-  3: required map<string,string> required_headers (api.body="required_headers")
-  4: required string expires_at (api.body="expires_at")
-}
-
-struct AttachmentPathRequest {
-  1: required string document_id (api.path="document_id")
-  2: required string attachment_id (api.path="attachment_id")
-}
-
 struct PublicAttachmentRequest { 1: required string attachment_id (api.path="attachment_id") }
-struct AttachmentListData { 1: required list<AttachmentData> items (api.body="items") }
 
-// Attachment service façade. These types are deliberately separate from the
-// legacy document-scoped attachment projection above so clients can migrate
-// without mixing document ownership with the generic media library.
+// Attachment service façade.
 struct MediaAttachmentData {
   1: required string id (api.body="id")
   2: required i64 owner_id (api.body="owner_id")
@@ -447,7 +413,10 @@ struct ListMediaAttachmentsRequest {
   3: optional string cursor (api.query="cursor")
   4: optional i32 limit (api.query="limit")
 }
-struct MediaAttachmentListData { 1: required list<MediaAttachmentData> items (api.body="items") }
+struct MediaAttachmentListData {
+  1: required list<MediaAttachmentData> items (api.body="items")
+  2: optional PageInfoData page (api.body="page")
+}
 
 service GatewayService {
   HealthData Live(1: EmptyRequest request) (api.get="/health/live")
@@ -498,10 +467,6 @@ service GatewayService {
   VersionData CreateVersion(1: CreateVersionRequest request) (api.post="/api/v1/studio/documents/:document_id/versions")
   VersionDetailData GetVersion(1: VersionPathRequest request) (api.get="/api/v1/studio/documents/:document_id/versions/:version_id")
   VersionData RestoreVersion(1: RestoreVersionRequest request) (api.post="/api/v1/studio/documents/:document_id/versions/:version_id/restorations")
-  AttachmentListData ListAttachments(1: DocumentIDRequest request) (api.get="/api/v1/studio/documents/:document_id/attachments")
-  AttachmentUploadData CreateAttachment(1: CreateAttachmentRequest request) (api.post="/api/v1/studio/documents/:document_id/attachments")
-  AttachmentData CompleteAttachment(1: AttachmentPathRequest request) (api.post="/api/v1/studio/documents/:document_id/attachments/:attachment_id/complete")
-  EmptyResponse DeleteAttachment(1: AttachmentPathRequest request) (api.delete="/api/v1/studio/documents/:document_id/attachments/:attachment_id")
   DocumentPageData ListDeletedDocuments(1: ListDocumentsRequest request) (api.get="/api/v1/studio/trash")
   DocumentData RestoreDeletedDocument(1: DocumentIDRequest request) (api.post="/api/v1/studio/trash/:document_id/restore")
 }

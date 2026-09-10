@@ -83,8 +83,6 @@ func Register(r *server.Hertz) {
 					_documents0.PATCH("/:document_id", append(_updatedocumentMw(), gateway.UpdateDocument)...)
 					{
 						_document_id := _documents0.Group("/:document_id", _document_idMw()...)
-						_document_id.GET("/attachments", append(_listattachmentsMw(), gateway.ListAttachments)...)
-						_document_id.POST("/attachments", append(_createattachmentMw(), gateway.CreateAttachment)...)
 						_document_id.POST("/collaboration-sessions", append(_createcollaborationsessionMw(), gateway.CreateCollaborationSession)...)
 						_document_id.GET("/members", append(_listmembersMw(), gateway.ListMembers)...)
 						_document_id.POST("/members", append(_addmemberMw(), gateway.AddMember)...)
@@ -92,14 +90,6 @@ func Register(r *server.Hertz) {
 						_document_id.PUT("/publication", append(_publishdocumentMw(), gateway.PublishDocument)...)
 						_document_id.GET("/versions", append(_listversionsMw(), gateway.ListVersions)...)
 						_document_id.POST("/versions", append(_createversionMw(), gateway.CreateVersion)...)
-						{
-							_attachments0 := _document_id.Group("/attachments", _attachments0Mw()...)
-							_attachments0.DELETE("/:attachment_id", append(_deleteattachmentMw(), gateway.DeleteAttachment)...)
-							{
-								_attachment_id0 := _attachments0.Group("/:attachment_id", _attachment_id0Mw()...)
-								_attachment_id0.POST("/complete", append(_completeattachmentMw(), gateway.CompleteAttachment)...)
-							}
-						}
 						{
 							_members := _document_id.Group("/members", _membersMw()...)
 							_members.DELETE("/:user_id", append(_deletememberMw(), gateway.DeleteMember)...)

@@ -2,7 +2,6 @@ package gateway
 
 import (
 	"errors"
-	"net/url"
 	"strconv"
 	"strings"
 
@@ -42,7 +41,8 @@ func toDocumentData(value *knowledgev1.Document) (*gatewaymodel.DocumentData, er
 	if value == nil || !validUUIDv7(value.Id) || strings.TrimSpace(value.Title) == "" ||
 		!slugPattern.MatchString(value.Slug) || value.MetadataRevision <= 0 || value.ContentRevision < 0 ||
 		!validDocumentAccess(value.Access) || !validRFC3339(value.CreatedAt) || !validRFC3339(value.UpdatedAt) ||
-		!validOptionalTime(value.PublishedAt) || !validOptionalTime(value.DeletedAt) || !validOptionalTime(value.ProjectedAt) {
+		!validPublicationStatus(value.PublicationStatus) || !validOptionalTime(value.PublishedAt) ||
+		!validOptionalTime(value.DeletedAt) || !validOptionalTime(value.ProjectedAt) {
 		return nil, errors.New("knowledge document is incomplete")
 	}
 	owner, err := toPublicUserData(value.Owner)
@@ -55,10 +55,20 @@ func toDocumentData(value *knowledgev1.Document) (*gatewaymodel.DocumentData, er
 		ContentRevision: value.ContentRevision, PublishedAt: copyString(value.PublishedAt), DeletedAt: copyString(value.DeletedAt),
 		ProjectedAt: copyString(value.ProjectedAt), CreatedAt: value.CreatedAt, UpdatedAt: value.UpdatedAt,
 		Language: copyString(value.Language), Tags: append([]string(nil), value.Tags...), FolderID: copyString(value.FolderId),
+		PublicationStatus: value.PublicationStatus, PublicationError: copyString(value.PublicationError),
 	}, nil
 }
 
-func toDocumentDetailData(value *knowledgev1.DocumentDetail, endpoints config.EndpointOptions) (*gatewaymodel.DocumentDetailData, error) {
+func validPublicationStatus(value string) bool {
+	switch value {
+	case "draft", "publishing", "published", "publish_failed", "unpublishing", "unpublish_failed":
+		return true
+	default:
+		return false
+	}
+}
+
+func toDocumentDetailData(value *knowledgev1.DocumentDetail, _ config.EndpointOptions) (*gatewaymodel.DocumentDetailData, error) {
 	if value == nil || value.Content == nil {
 		return nil, errors.New("knowledge document detail is incomplete")
 	}
@@ -70,16 +80,8 @@ func toDocumentDetailData(value *knowledgev1.DocumentDetail, endpoints config.En
 	if err != nil {
 		return nil, err
 	}
-	attachments := make([]*gatewaymodel.AttachmentData, 0, len(value.Attachments))
-	for _, attachment := range value.Attachments {
-		converted, conversionErr := toAttachmentData(attachment, endpoints)
-		if conversionErr != nil {
-			return nil, conversionErr
-		}
-		attachments = append(attachments, converted)
-	}
 	return &gatewaymodel.DocumentDetailData{
-		Document: document, Content: content, PlainText: value.PlainText, Attachments: attachments,
+		Document: document, Content: content, PlainText: value.PlainText,
 	}, nil
 }
 
@@ -110,66 +112,6 @@ func toMemberData(value *knowledgev1.Member) (*gatewaymodel.MemberData, error) {
 	return &gatewaymodel.MemberData{
 		User: user, Role: value.Role, Revision: value.Revision, CreatedAt: value.CreatedAt, UpdatedAt: value.UpdatedAt,
 	}, nil
-}
-
-func toAttachmentListData(value *knowledgev1.AttachmentList, endpoints config.EndpointOptions) (*gatewaymodel.AttachmentListData, error) {
-	if value == nil {
-		return nil, errors.New("knowledge attachment list is nil")
-	}
-	items := make([]*gatewaymodel.AttachmentData, 0, len(value.Items))
-	for _, attachment := range value.Items {
-		converted, err := toAttachmentData(attachment, endpoints)
-		if err != nil {
-			return nil, err
-		}
-		items = append(items, converted)
-	}
-	return &gatewaymodel.AttachmentListData{Items: items}, nil
-}
-
-func toAttachmentData(value *knowledgev1.Attachment, endpoints config.EndpointOptions) (*gatewaymodel.AttachmentData, error) {
-	if value == nil || !validUUIDv7(value.Id) || !validUUIDv7(value.DocumentId) || strings.TrimSpace(value.Filename) == "" ||
-		strings.TrimSpace(value.MediaType) == "" || value.SizeBytes <= 0 || !validAttachmentStatus(value.Status) ||
-		!validRFC3339(value.CreatedAt) {
-		return nil, errors.New("knowledge attachment is incomplete")
-	}
-	return &gatewaymodel.AttachmentData{
-		ID: value.Id, DocumentID: value.DocumentId, Filename: value.Filename, MediaType: value.MediaType,
-		SizeBytes: value.SizeBytes, Status: value.Status,
-		ContentURL: endpointURL(endpoints, "/api/v1/attachments/"+url.PathEscape(value.Id)+"/content"), CreatedAt: value.CreatedAt,
-	}, nil
-}
-
-func toAttachmentUploadData(value *knowledgev1.AttachmentUpload, endpoints config.EndpointOptions) (*gatewaymodel.AttachmentUploadData, error) {
-	if value == nil || !validRedirectURL(value.UploadUrl) || !validRFC3339(value.ExpiresAt) || value.RequiredHeaders == nil {
-		return nil, errors.New("knowledge attachment upload is incomplete")
-	}
-	attachment, err := toAttachmentData(value.Attachment, endpoints)
-	if err != nil {
-		return nil, err
-	}
-	headers := make(map[string]string, len(value.RequiredHeaders))
-	for name, headerValue := range value.RequiredHeaders {
-		if !validHeaderName(name) || strings.ContainsAny(headerValue, "\r\n") {
-			return nil, errors.New("knowledge attachment upload contains invalid headers")
-		}
-		headers[name] = headerValue
-	}
-	return &gatewaymodel.AttachmentUploadData{
-		Attachment: attachment, UploadURL: value.UploadUrl, RequiredHeaders: headers, ExpiresAt: value.ExpiresAt,
-	}, nil
-}
-
-func validHeaderName(value string) bool {
-	if value == "" {
-		return false
-	}
-	for _, char := range value {
-		if !strings.ContainsRune("!#$%&'*+-.^_`|~0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ", char) {
-			return false
-		}
-	}
-	return true
 }
 
 func toPublicUserData(value *knowledgev1.PublicUser) (*gatewaymodel.PublicUserData, error) {
@@ -251,15 +193,6 @@ func validOptionalTime(value *string) bool {
 
 func validDocumentAccess(value string) bool {
 	return value == "viewer" || value == "editor" || value == "owner"
-}
-
-func validAttachmentStatus(value string) bool {
-	switch value {
-	case "pending_upload", "scanning", "ready", "rejected", "deleting":
-		return true
-	default:
-		return false
-	}
 }
 
 func copyString(value *string) *string {

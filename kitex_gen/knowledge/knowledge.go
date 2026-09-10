@@ -500,23 +500,25 @@ var fieldIDToName_RichTextDocument = map[int16]string{
 }
 
 type Document struct {
-	Id               string      `thrift:"id,1,required" frugal:"1,required,string" json:"id"`
-	Title            string      `thrift:"title,2,required" frugal:"2,required,string" json:"title"`
-	Summary          string      `thrift:"summary,3,required" frugal:"3,required,string" json:"summary"`
-	Slug             string      `thrift:"slug,4,required" frugal:"4,required,string" json:"slug"`
-	Owner            *PublicUser `thrift:"owner,5,required" frugal:"5,required,PublicUser" json:"owner"`
-	Access           string      `thrift:"access,6,required" frugal:"6,required,string" json:"access"`
-	Published        bool        `thrift:"published,7,required" frugal:"7,required,bool" json:"published"`
-	MetadataRevision int64       `thrift:"metadata_revision,8,required" frugal:"8,required,i64" json:"metadata_revision"`
-	ContentRevision  int64       `thrift:"content_revision,9,required" frugal:"9,required,i64" json:"content_revision"`
-	PublishedAt      *string     `thrift:"published_at,10,optional" frugal:"10,optional,string" json:"published_at,omitempty"`
-	DeletedAt        *string     `thrift:"deleted_at,11,optional" frugal:"11,optional,string" json:"deleted_at,omitempty"`
-	ProjectedAt      *string     `thrift:"projected_at,12,optional" frugal:"12,optional,string" json:"projected_at,omitempty"`
-	CreatedAt        string      `thrift:"created_at,13,required" frugal:"13,required,string" json:"created_at"`
-	UpdatedAt        string      `thrift:"updated_at,14,required" frugal:"14,required,string" json:"updated_at"`
-	Language         *string     `thrift:"language,15,optional" frugal:"15,optional,string" json:"language,omitempty"`
-	Tags             []string    `thrift:"tags,16,optional" frugal:"16,optional,list<string>" json:"tags,omitempty"`
-	FolderId         *string     `thrift:"folder_id,17,optional" frugal:"17,optional,string" json:"folder_id,omitempty"`
+	Id                string      `thrift:"id,1,required" frugal:"1,required,string" json:"id"`
+	Title             string      `thrift:"title,2,required" frugal:"2,required,string" json:"title"`
+	Summary           string      `thrift:"summary,3,required" frugal:"3,required,string" json:"summary"`
+	Slug              string      `thrift:"slug,4,required" frugal:"4,required,string" json:"slug"`
+	Owner             *PublicUser `thrift:"owner,5,required" frugal:"5,required,PublicUser" json:"owner"`
+	Access            string      `thrift:"access,6,required" frugal:"6,required,string" json:"access"`
+	Published         bool        `thrift:"published,7,required" frugal:"7,required,bool" json:"published"`
+	MetadataRevision  int64       `thrift:"metadata_revision,8,required" frugal:"8,required,i64" json:"metadata_revision"`
+	ContentRevision   int64       `thrift:"content_revision,9,required" frugal:"9,required,i64" json:"content_revision"`
+	PublishedAt       *string     `thrift:"published_at,10,optional" frugal:"10,optional,string" json:"published_at,omitempty"`
+	DeletedAt         *string     `thrift:"deleted_at,11,optional" frugal:"11,optional,string" json:"deleted_at,omitempty"`
+	ProjectedAt       *string     `thrift:"projected_at,12,optional" frugal:"12,optional,string" json:"projected_at,omitempty"`
+	CreatedAt         string      `thrift:"created_at,13,required" frugal:"13,required,string" json:"created_at"`
+	UpdatedAt         string      `thrift:"updated_at,14,required" frugal:"14,required,string" json:"updated_at"`
+	Language          *string     `thrift:"language,15,optional" frugal:"15,optional,string" json:"language,omitempty"`
+	Tags              []string    `thrift:"tags,16,optional" frugal:"16,optional,list<string>" json:"tags,omitempty"`
+	FolderId          *string     `thrift:"folder_id,17,optional" frugal:"17,optional,string" json:"folder_id,omitempty"`
+	PublicationStatus string      `thrift:"publication_status,18,required" frugal:"18,required,string" json:"publication_status"`
+	PublicationError  *string     `thrift:"publication_error,19,optional" frugal:"19,optional,string" json:"publication_error,omitempty"`
 }
 
 func NewDocument() *Document {
@@ -628,6 +630,19 @@ func (p *Document) GetFolderId() (v string) {
 	}
 	return *p.FolderId
 }
+
+func (p *Document) GetPublicationStatus() (v string) {
+	return p.PublicationStatus
+}
+
+var Document_PublicationError_DEFAULT string
+
+func (p *Document) GetPublicationError() (v string) {
+	if !p.IsSetPublicationError() {
+		return Document_PublicationError_DEFAULT
+	}
+	return *p.PublicationError
+}
 func (p *Document) SetId(val string) {
 	p.Id = val
 }
@@ -679,6 +694,12 @@ func (p *Document) SetTags(val []string) {
 func (p *Document) SetFolderId(val *string) {
 	p.FolderId = val
 }
+func (p *Document) SetPublicationStatus(val string) {
+	p.PublicationStatus = val
+}
+func (p *Document) SetPublicationError(val *string) {
+	p.PublicationError = val
+}
 
 func (p *Document) IsSetOwner() bool {
 	return p.Owner != nil
@@ -708,6 +729,10 @@ func (p *Document) IsSetFolderId() bool {
 	return p.FolderId != nil
 }
 
+func (p *Document) IsSetPublicationError() bool {
+	return p.PublicationError != nil
+}
+
 func (p *Document) String() string {
 	if p == nil {
 		return "<nil>"
@@ -733,96 +758,14 @@ var fieldIDToName_Document = map[int16]string{
 	15: "language",
 	16: "tags",
 	17: "folder_id",
-}
-
-type Attachment struct {
-	Id         string `thrift:"id,1,required" frugal:"1,required,string" json:"id"`
-	DocumentId string `thrift:"document_id,2,required" frugal:"2,required,string" json:"document_id"`
-	Filename   string `thrift:"filename,3,required" frugal:"3,required,string" json:"filename"`
-	MediaType  string `thrift:"media_type,4,required" frugal:"4,required,string" json:"media_type"`
-	SizeBytes  int64  `thrift:"size_bytes,5,required" frugal:"5,required,i64" json:"size_bytes"`
-	Status     string `thrift:"status,6,required" frugal:"6,required,string" json:"status"`
-	CreatedAt  string `thrift:"created_at,7,required" frugal:"7,required,string" json:"created_at"`
-}
-
-func NewAttachment() *Attachment {
-	return &Attachment{}
-}
-
-func (p *Attachment) InitDefault() {
-}
-
-func (p *Attachment) GetId() (v string) {
-	return p.Id
-}
-
-func (p *Attachment) GetDocumentId() (v string) {
-	return p.DocumentId
-}
-
-func (p *Attachment) GetFilename() (v string) {
-	return p.Filename
-}
-
-func (p *Attachment) GetMediaType() (v string) {
-	return p.MediaType
-}
-
-func (p *Attachment) GetSizeBytes() (v int64) {
-	return p.SizeBytes
-}
-
-func (p *Attachment) GetStatus() (v string) {
-	return p.Status
-}
-
-func (p *Attachment) GetCreatedAt() (v string) {
-	return p.CreatedAt
-}
-func (p *Attachment) SetId(val string) {
-	p.Id = val
-}
-func (p *Attachment) SetDocumentId(val string) {
-	p.DocumentId = val
-}
-func (p *Attachment) SetFilename(val string) {
-	p.Filename = val
-}
-func (p *Attachment) SetMediaType(val string) {
-	p.MediaType = val
-}
-func (p *Attachment) SetSizeBytes(val int64) {
-	p.SizeBytes = val
-}
-func (p *Attachment) SetStatus(val string) {
-	p.Status = val
-}
-func (p *Attachment) SetCreatedAt(val string) {
-	p.CreatedAt = val
-}
-
-func (p *Attachment) String() string {
-	if p == nil {
-		return "<nil>"
-	}
-	return fmt.Sprintf("Attachment(%+v)", *p)
-}
-
-var fieldIDToName_Attachment = map[int16]string{
-	1: "id",
-	2: "document_id",
-	3: "filename",
-	4: "media_type",
-	5: "size_bytes",
-	6: "status",
-	7: "created_at",
+	18: "publication_status",
+	19: "publication_error",
 }
 
 type DocumentDetail struct {
-	Document    *Document         `thrift:"document,1,required" frugal:"1,required,Document" json:"document"`
-	Content     *RichTextDocument `thrift:"content,2,required" frugal:"2,required,RichTextDocument" json:"content"`
-	PlainText   string            `thrift:"plain_text,3,required" frugal:"3,required,string" json:"plain_text"`
-	Attachments []*Attachment     `thrift:"attachments,4,required" frugal:"4,required,list<Attachment>" json:"attachments"`
+	Document  *Document         `thrift:"document,1,required" frugal:"1,required,Document" json:"document"`
+	Content   *RichTextDocument `thrift:"content,2,required" frugal:"2,required,RichTextDocument" json:"content"`
+	PlainText string            `thrift:"plain_text,3,required" frugal:"3,required,string" json:"plain_text"`
 }
 
 func NewDocumentDetail() *DocumentDetail {
@@ -853,10 +796,6 @@ func (p *DocumentDetail) GetContent() (v *RichTextDocument) {
 func (p *DocumentDetail) GetPlainText() (v string) {
 	return p.PlainText
 }
-
-func (p *DocumentDetail) GetAttachments() (v []*Attachment) {
-	return p.Attachments
-}
 func (p *DocumentDetail) SetDocument(val *Document) {
 	p.Document = val
 }
@@ -865,9 +804,6 @@ func (p *DocumentDetail) SetContent(val *RichTextDocument) {
 }
 func (p *DocumentDetail) SetPlainText(val string) {
 	p.PlainText = val
-}
-func (p *DocumentDetail) SetAttachments(val []*Attachment) {
-	p.Attachments = val
 }
 
 func (p *DocumentDetail) IsSetDocument() bool {
@@ -889,7 +825,6 @@ var fieldIDToName_DocumentDetail = map[int16]string{
 	1: "document",
 	2: "content",
 	3: "plain_text",
-	4: "attachments",
 }
 
 type PageInfo struct {
@@ -2240,286 +2175,62 @@ var fieldIDToName_DeleteMemberRequest = map[int16]string{
 	3: "expected_revision",
 }
 
-type CreateAttachmentRequest struct {
-	DocumentId     string  `thrift:"document_id,1,required" frugal:"1,required,string" json:"document_id"`
-	Filename       string  `thrift:"filename,2,required" frugal:"2,required,string" json:"filename"`
-	MediaType      string  `thrift:"media_type,3,required" frugal:"3,required,string" json:"media_type"`
-	SizeBytes      int64   `thrift:"size_bytes,4,required" frugal:"4,required,i64" json:"size_bytes"`
-	Sha256         string  `thrift:"sha256,5,required" frugal:"5,required,string" json:"sha256"`
-	IdempotencyKey *string `thrift:"idempotency_key,6,optional" frugal:"6,optional,string" json:"idempotency_key,omitempty"`
-}
-
-func NewCreateAttachmentRequest() *CreateAttachmentRequest {
-	return &CreateAttachmentRequest{}
-}
-
-func (p *CreateAttachmentRequest) InitDefault() {
-}
-
-func (p *CreateAttachmentRequest) GetDocumentId() (v string) {
-	return p.DocumentId
-}
-
-func (p *CreateAttachmentRequest) GetFilename() (v string) {
-	return p.Filename
-}
-
-func (p *CreateAttachmentRequest) GetMediaType() (v string) {
-	return p.MediaType
-}
-
-func (p *CreateAttachmentRequest) GetSizeBytes() (v int64) {
-	return p.SizeBytes
-}
-
-func (p *CreateAttachmentRequest) GetSha256() (v string) {
-	return p.Sha256
-}
-
-var CreateAttachmentRequest_IdempotencyKey_DEFAULT string
-
-func (p *CreateAttachmentRequest) GetIdempotencyKey() (v string) {
-	if !p.IsSetIdempotencyKey() {
-		return CreateAttachmentRequest_IdempotencyKey_DEFAULT
-	}
-	return *p.IdempotencyKey
-}
-func (p *CreateAttachmentRequest) SetDocumentId(val string) {
-	p.DocumentId = val
-}
-func (p *CreateAttachmentRequest) SetFilename(val string) {
-	p.Filename = val
-}
-func (p *CreateAttachmentRequest) SetMediaType(val string) {
-	p.MediaType = val
-}
-func (p *CreateAttachmentRequest) SetSizeBytes(val int64) {
-	p.SizeBytes = val
-}
-func (p *CreateAttachmentRequest) SetSha256(val string) {
-	p.Sha256 = val
-}
-func (p *CreateAttachmentRequest) SetIdempotencyKey(val *string) {
-	p.IdempotencyKey = val
-}
-
-func (p *CreateAttachmentRequest) IsSetIdempotencyKey() bool {
-	return p.IdempotencyKey != nil
-}
-
-func (p *CreateAttachmentRequest) String() string {
-	if p == nil {
-		return "<nil>"
-	}
-	return fmt.Sprintf("CreateAttachmentRequest(%+v)", *p)
-}
-
-var fieldIDToName_CreateAttachmentRequest = map[int16]string{
-	1: "document_id",
-	2: "filename",
-	3: "media_type",
-	4: "size_bytes",
-	5: "sha256",
-	6: "idempotency_key",
-}
-
-type AttachmentUpload struct {
-	Attachment      *Attachment       `thrift:"attachment,1,required" frugal:"1,required,Attachment" json:"attachment"`
-	UploadUrl       string            `thrift:"upload_url,2,required" frugal:"2,required,string" json:"upload_url"`
-	RequiredHeaders map[string]string `thrift:"required_headers,3,required" frugal:"3,required,map<string:string>" json:"required_headers"`
-	ExpiresAt       string            `thrift:"expires_at,4,required" frugal:"4,required,string" json:"expires_at"`
-}
-
-func NewAttachmentUpload() *AttachmentUpload {
-	return &AttachmentUpload{}
-}
-
-func (p *AttachmentUpload) InitDefault() {
-}
-
-var AttachmentUpload_Attachment_DEFAULT *Attachment
-
-func (p *AttachmentUpload) GetAttachment() (v *Attachment) {
-	if !p.IsSetAttachment() {
-		return AttachmentUpload_Attachment_DEFAULT
-	}
-	return p.Attachment
-}
-
-func (p *AttachmentUpload) GetUploadUrl() (v string) {
-	return p.UploadUrl
-}
-
-func (p *AttachmentUpload) GetRequiredHeaders() (v map[string]string) {
-	return p.RequiredHeaders
-}
-
-func (p *AttachmentUpload) GetExpiresAt() (v string) {
-	return p.ExpiresAt
-}
-func (p *AttachmentUpload) SetAttachment(val *Attachment) {
-	p.Attachment = val
-}
-func (p *AttachmentUpload) SetUploadUrl(val string) {
-	p.UploadUrl = val
-}
-func (p *AttachmentUpload) SetRequiredHeaders(val map[string]string) {
-	p.RequiredHeaders = val
-}
-func (p *AttachmentUpload) SetExpiresAt(val string) {
-	p.ExpiresAt = val
-}
-
-func (p *AttachmentUpload) IsSetAttachment() bool {
-	return p.Attachment != nil
-}
-
-func (p *AttachmentUpload) String() string {
-	if p == nil {
-		return "<nil>"
-	}
-	return fmt.Sprintf("AttachmentUpload(%+v)", *p)
-}
-
-var fieldIDToName_AttachmentUpload = map[int16]string{
-	1: "attachment",
-	2: "upload_url",
-	3: "required_headers",
-	4: "expires_at",
-}
-
-type AttachmentIDRequest struct {
-	DocumentId   string `thrift:"document_id,1,required" frugal:"1,required,string" json:"document_id"`
-	AttachmentId string `thrift:"attachment_id,2,required" frugal:"2,required,string" json:"attachment_id"`
-}
-
-func NewAttachmentIDRequest() *AttachmentIDRequest {
-	return &AttachmentIDRequest{}
-}
-
-func (p *AttachmentIDRequest) InitDefault() {
-}
-
-func (p *AttachmentIDRequest) GetDocumentId() (v string) {
-	return p.DocumentId
-}
-
-func (p *AttachmentIDRequest) GetAttachmentId() (v string) {
-	return p.AttachmentId
-}
-func (p *AttachmentIDRequest) SetDocumentId(val string) {
-	p.DocumentId = val
-}
-func (p *AttachmentIDRequest) SetAttachmentId(val string) {
-	p.AttachmentId = val
-}
-
-func (p *AttachmentIDRequest) String() string {
-	if p == nil {
-		return "<nil>"
-	}
-	return fmt.Sprintf("AttachmentIDRequest(%+v)", *p)
-}
-
-var fieldIDToName_AttachmentIDRequest = map[int16]string{
-	1: "document_id",
-	2: "attachment_id",
-}
-
-type AttachmentList struct {
-	Items []*Attachment `thrift:"items,1,required" frugal:"1,required,list<Attachment>" json:"items"`
-}
-
-func NewAttachmentList() *AttachmentList {
-	return &AttachmentList{}
-}
-
-func (p *AttachmentList) InitDefault() {
-}
-
-func (p *AttachmentList) GetItems() (v []*Attachment) {
-	return p.Items
-}
-func (p *AttachmentList) SetItems(val []*Attachment) {
-	p.Items = val
-}
-
-func (p *AttachmentList) String() string {
-	if p == nil {
-		return "<nil>"
-	}
-	return fmt.Sprintf("AttachmentList(%+v)", *p)
-}
-
-var fieldIDToName_AttachmentList = map[int16]string{
-	1: "items",
-}
-
-type AttachmentContentRequest struct {
+type PublishedMediaRequest struct {
 	AttachmentId string `thrift:"attachment_id,1,required" frugal:"1,required,string" json:"attachment_id"`
 }
 
-func NewAttachmentContentRequest() *AttachmentContentRequest {
-	return &AttachmentContentRequest{}
+func NewPublishedMediaRequest() *PublishedMediaRequest {
+	return &PublishedMediaRequest{}
 }
 
-func (p *AttachmentContentRequest) InitDefault() {
+func (p *PublishedMediaRequest) InitDefault() {
 }
 
-func (p *AttachmentContentRequest) GetAttachmentId() (v string) {
+func (p *PublishedMediaRequest) GetAttachmentId() (v string) {
 	return p.AttachmentId
 }
-func (p *AttachmentContentRequest) SetAttachmentId(val string) {
+func (p *PublishedMediaRequest) SetAttachmentId(val string) {
 	p.AttachmentId = val
 }
 
-func (p *AttachmentContentRequest) String() string {
+func (p *PublishedMediaRequest) String() string {
 	if p == nil {
 		return "<nil>"
 	}
-	return fmt.Sprintf("AttachmentContentRequest(%+v)", *p)
+	return fmt.Sprintf("PublishedMediaRequest(%+v)", *p)
 }
 
-var fieldIDToName_AttachmentContentRequest = map[int16]string{
+var fieldIDToName_PublishedMediaRequest = map[int16]string{
 	1: "attachment_id",
 }
 
-type AttachmentContent struct {
-	Url       string `thrift:"url,1,required" frugal:"1,required,string" json:"url"`
-	ExpiresAt string `thrift:"expires_at,2,required" frugal:"2,required,string" json:"expires_at"`
+type PublishedMediaAuthorization struct {
+	Published bool `thrift:"published,1,required" frugal:"1,required,bool" json:"published"`
 }
 
-func NewAttachmentContent() *AttachmentContent {
-	return &AttachmentContent{}
+func NewPublishedMediaAuthorization() *PublishedMediaAuthorization {
+	return &PublishedMediaAuthorization{}
 }
 
-func (p *AttachmentContent) InitDefault() {
+func (p *PublishedMediaAuthorization) InitDefault() {
 }
 
-func (p *AttachmentContent) GetUrl() (v string) {
-	return p.Url
+func (p *PublishedMediaAuthorization) GetPublished() (v bool) {
+	return p.Published
+}
+func (p *PublishedMediaAuthorization) SetPublished(val bool) {
+	p.Published = val
 }
 
-func (p *AttachmentContent) GetExpiresAt() (v string) {
-	return p.ExpiresAt
-}
-func (p *AttachmentContent) SetUrl(val string) {
-	p.Url = val
-}
-func (p *AttachmentContent) SetExpiresAt(val string) {
-	p.ExpiresAt = val
-}
-
-func (p *AttachmentContent) String() string {
+func (p *PublishedMediaAuthorization) String() string {
 	if p == nil {
 		return "<nil>"
 	}
-	return fmt.Sprintf("AttachmentContent(%+v)", *p)
+	return fmt.Sprintf("PublishedMediaAuthorization(%+v)", *p)
 }
 
-var fieldIDToName_AttachmentContent = map[int16]string{
-	1: "url",
-	2: "expires_at",
+var fieldIDToName_PublishedMediaAuthorization = map[int16]string{
+	1: "published",
 }
 
 type AuthorizeCollaborationRequest struct {
@@ -2733,15 +2444,7 @@ type KnowledgeService interface {
 
 	DeleteMember(ctx context.Context, request *DeleteMemberRequest) (err error)
 
-	ListAttachments(ctx context.Context, request *DocumentIDRequest) (r *AttachmentList, err error)
-
-	CreateAttachment(ctx context.Context, request *CreateAttachmentRequest) (r *AttachmentUpload, err error)
-
-	CompleteAttachment(ctx context.Context, request *AttachmentIDRequest) (r *Attachment, err error)
-
-	DeleteAttachment(ctx context.Context, request *AttachmentIDRequest) (err error)
-
-	GetAttachmentContent(ctx context.Context, request *AttachmentContentRequest) (r *AttachmentContent, err error)
+	IsMediaPublished(ctx context.Context, request *PublishedMediaRequest) (r *PublishedMediaAuthorization, err error)
 
 	AuthorizeCollaboration(ctx context.Context, request *AuthorizeCollaborationRequest) (r *CollaborationAuthorization, err error)
 
@@ -4306,364 +4009,79 @@ func (p *KnowledgeServiceDeleteMemberResult) String() string {
 
 var fieldIDToName_KnowledgeServiceDeleteMemberResult = map[int16]string{}
 
-type KnowledgeServiceListAttachmentsArgs struct {
-	Request *DocumentIDRequest `thrift:"request,1" frugal:"1,default,DocumentIDRequest" json:"request"`
+type KnowledgeServiceIsMediaPublishedArgs struct {
+	Request *PublishedMediaRequest `thrift:"request,1" frugal:"1,default,PublishedMediaRequest" json:"request"`
 }
 
-func NewKnowledgeServiceListAttachmentsArgs() *KnowledgeServiceListAttachmentsArgs {
-	return &KnowledgeServiceListAttachmentsArgs{}
+func NewKnowledgeServiceIsMediaPublishedArgs() *KnowledgeServiceIsMediaPublishedArgs {
+	return &KnowledgeServiceIsMediaPublishedArgs{}
 }
 
-func (p *KnowledgeServiceListAttachmentsArgs) InitDefault() {
+func (p *KnowledgeServiceIsMediaPublishedArgs) InitDefault() {
 }
 
-var KnowledgeServiceListAttachmentsArgs_Request_DEFAULT *DocumentIDRequest
+var KnowledgeServiceIsMediaPublishedArgs_Request_DEFAULT *PublishedMediaRequest
 
-func (p *KnowledgeServiceListAttachmentsArgs) GetRequest() (v *DocumentIDRequest) {
+func (p *KnowledgeServiceIsMediaPublishedArgs) GetRequest() (v *PublishedMediaRequest) {
 	if !p.IsSetRequest() {
-		return KnowledgeServiceListAttachmentsArgs_Request_DEFAULT
+		return KnowledgeServiceIsMediaPublishedArgs_Request_DEFAULT
 	}
 	return p.Request
 }
-func (p *KnowledgeServiceListAttachmentsArgs) SetRequest(val *DocumentIDRequest) {
+func (p *KnowledgeServiceIsMediaPublishedArgs) SetRequest(val *PublishedMediaRequest) {
 	p.Request = val
 }
 
-func (p *KnowledgeServiceListAttachmentsArgs) IsSetRequest() bool {
+func (p *KnowledgeServiceIsMediaPublishedArgs) IsSetRequest() bool {
 	return p.Request != nil
 }
 
-func (p *KnowledgeServiceListAttachmentsArgs) String() string {
+func (p *KnowledgeServiceIsMediaPublishedArgs) String() string {
 	if p == nil {
 		return "<nil>"
 	}
-	return fmt.Sprintf("KnowledgeServiceListAttachmentsArgs(%+v)", *p)
+	return fmt.Sprintf("KnowledgeServiceIsMediaPublishedArgs(%+v)", *p)
 }
 
-var fieldIDToName_KnowledgeServiceListAttachmentsArgs = map[int16]string{
+var fieldIDToName_KnowledgeServiceIsMediaPublishedArgs = map[int16]string{
 	1: "request",
 }
 
-type KnowledgeServiceListAttachmentsResult struct {
-	Success *AttachmentList `thrift:"success,0,optional" frugal:"0,optional,AttachmentList" json:"success,omitempty"`
+type KnowledgeServiceIsMediaPublishedResult struct {
+	Success *PublishedMediaAuthorization `thrift:"success,0,optional" frugal:"0,optional,PublishedMediaAuthorization" json:"success,omitempty"`
 }
 
-func NewKnowledgeServiceListAttachmentsResult() *KnowledgeServiceListAttachmentsResult {
-	return &KnowledgeServiceListAttachmentsResult{}
+func NewKnowledgeServiceIsMediaPublishedResult() *KnowledgeServiceIsMediaPublishedResult {
+	return &KnowledgeServiceIsMediaPublishedResult{}
 }
 
-func (p *KnowledgeServiceListAttachmentsResult) InitDefault() {
+func (p *KnowledgeServiceIsMediaPublishedResult) InitDefault() {
 }
 
-var KnowledgeServiceListAttachmentsResult_Success_DEFAULT *AttachmentList
+var KnowledgeServiceIsMediaPublishedResult_Success_DEFAULT *PublishedMediaAuthorization
 
-func (p *KnowledgeServiceListAttachmentsResult) GetSuccess() (v *AttachmentList) {
+func (p *KnowledgeServiceIsMediaPublishedResult) GetSuccess() (v *PublishedMediaAuthorization) {
 	if !p.IsSetSuccess() {
-		return KnowledgeServiceListAttachmentsResult_Success_DEFAULT
+		return KnowledgeServiceIsMediaPublishedResult_Success_DEFAULT
 	}
 	return p.Success
 }
-func (p *KnowledgeServiceListAttachmentsResult) SetSuccess(x interface{}) {
-	p.Success = x.(*AttachmentList)
+func (p *KnowledgeServiceIsMediaPublishedResult) SetSuccess(x interface{}) {
+	p.Success = x.(*PublishedMediaAuthorization)
 }
 
-func (p *KnowledgeServiceListAttachmentsResult) IsSetSuccess() bool {
+func (p *KnowledgeServiceIsMediaPublishedResult) IsSetSuccess() bool {
 	return p.Success != nil
 }
 
-func (p *KnowledgeServiceListAttachmentsResult) String() string {
+func (p *KnowledgeServiceIsMediaPublishedResult) String() string {
 	if p == nil {
 		return "<nil>"
 	}
-	return fmt.Sprintf("KnowledgeServiceListAttachmentsResult(%+v)", *p)
+	return fmt.Sprintf("KnowledgeServiceIsMediaPublishedResult(%+v)", *p)
 }
 
-var fieldIDToName_KnowledgeServiceListAttachmentsResult = map[int16]string{
-	0: "success",
-}
-
-type KnowledgeServiceCreateAttachmentArgs struct {
-	Request *CreateAttachmentRequest `thrift:"request,1" frugal:"1,default,CreateAttachmentRequest" json:"request"`
-}
-
-func NewKnowledgeServiceCreateAttachmentArgs() *KnowledgeServiceCreateAttachmentArgs {
-	return &KnowledgeServiceCreateAttachmentArgs{}
-}
-
-func (p *KnowledgeServiceCreateAttachmentArgs) InitDefault() {
-}
-
-var KnowledgeServiceCreateAttachmentArgs_Request_DEFAULT *CreateAttachmentRequest
-
-func (p *KnowledgeServiceCreateAttachmentArgs) GetRequest() (v *CreateAttachmentRequest) {
-	if !p.IsSetRequest() {
-		return KnowledgeServiceCreateAttachmentArgs_Request_DEFAULT
-	}
-	return p.Request
-}
-func (p *KnowledgeServiceCreateAttachmentArgs) SetRequest(val *CreateAttachmentRequest) {
-	p.Request = val
-}
-
-func (p *KnowledgeServiceCreateAttachmentArgs) IsSetRequest() bool {
-	return p.Request != nil
-}
-
-func (p *KnowledgeServiceCreateAttachmentArgs) String() string {
-	if p == nil {
-		return "<nil>"
-	}
-	return fmt.Sprintf("KnowledgeServiceCreateAttachmentArgs(%+v)", *p)
-}
-
-var fieldIDToName_KnowledgeServiceCreateAttachmentArgs = map[int16]string{
-	1: "request",
-}
-
-type KnowledgeServiceCreateAttachmentResult struct {
-	Success *AttachmentUpload `thrift:"success,0,optional" frugal:"0,optional,AttachmentUpload" json:"success,omitempty"`
-}
-
-func NewKnowledgeServiceCreateAttachmentResult() *KnowledgeServiceCreateAttachmentResult {
-	return &KnowledgeServiceCreateAttachmentResult{}
-}
-
-func (p *KnowledgeServiceCreateAttachmentResult) InitDefault() {
-}
-
-var KnowledgeServiceCreateAttachmentResult_Success_DEFAULT *AttachmentUpload
-
-func (p *KnowledgeServiceCreateAttachmentResult) GetSuccess() (v *AttachmentUpload) {
-	if !p.IsSetSuccess() {
-		return KnowledgeServiceCreateAttachmentResult_Success_DEFAULT
-	}
-	return p.Success
-}
-func (p *KnowledgeServiceCreateAttachmentResult) SetSuccess(x interface{}) {
-	p.Success = x.(*AttachmentUpload)
-}
-
-func (p *KnowledgeServiceCreateAttachmentResult) IsSetSuccess() bool {
-	return p.Success != nil
-}
-
-func (p *KnowledgeServiceCreateAttachmentResult) String() string {
-	if p == nil {
-		return "<nil>"
-	}
-	return fmt.Sprintf("KnowledgeServiceCreateAttachmentResult(%+v)", *p)
-}
-
-var fieldIDToName_KnowledgeServiceCreateAttachmentResult = map[int16]string{
-	0: "success",
-}
-
-type KnowledgeServiceCompleteAttachmentArgs struct {
-	Request *AttachmentIDRequest `thrift:"request,1" frugal:"1,default,AttachmentIDRequest" json:"request"`
-}
-
-func NewKnowledgeServiceCompleteAttachmentArgs() *KnowledgeServiceCompleteAttachmentArgs {
-	return &KnowledgeServiceCompleteAttachmentArgs{}
-}
-
-func (p *KnowledgeServiceCompleteAttachmentArgs) InitDefault() {
-}
-
-var KnowledgeServiceCompleteAttachmentArgs_Request_DEFAULT *AttachmentIDRequest
-
-func (p *KnowledgeServiceCompleteAttachmentArgs) GetRequest() (v *AttachmentIDRequest) {
-	if !p.IsSetRequest() {
-		return KnowledgeServiceCompleteAttachmentArgs_Request_DEFAULT
-	}
-	return p.Request
-}
-func (p *KnowledgeServiceCompleteAttachmentArgs) SetRequest(val *AttachmentIDRequest) {
-	p.Request = val
-}
-
-func (p *KnowledgeServiceCompleteAttachmentArgs) IsSetRequest() bool {
-	return p.Request != nil
-}
-
-func (p *KnowledgeServiceCompleteAttachmentArgs) String() string {
-	if p == nil {
-		return "<nil>"
-	}
-	return fmt.Sprintf("KnowledgeServiceCompleteAttachmentArgs(%+v)", *p)
-}
-
-var fieldIDToName_KnowledgeServiceCompleteAttachmentArgs = map[int16]string{
-	1: "request",
-}
-
-type KnowledgeServiceCompleteAttachmentResult struct {
-	Success *Attachment `thrift:"success,0,optional" frugal:"0,optional,Attachment" json:"success,omitempty"`
-}
-
-func NewKnowledgeServiceCompleteAttachmentResult() *KnowledgeServiceCompleteAttachmentResult {
-	return &KnowledgeServiceCompleteAttachmentResult{}
-}
-
-func (p *KnowledgeServiceCompleteAttachmentResult) InitDefault() {
-}
-
-var KnowledgeServiceCompleteAttachmentResult_Success_DEFAULT *Attachment
-
-func (p *KnowledgeServiceCompleteAttachmentResult) GetSuccess() (v *Attachment) {
-	if !p.IsSetSuccess() {
-		return KnowledgeServiceCompleteAttachmentResult_Success_DEFAULT
-	}
-	return p.Success
-}
-func (p *KnowledgeServiceCompleteAttachmentResult) SetSuccess(x interface{}) {
-	p.Success = x.(*Attachment)
-}
-
-func (p *KnowledgeServiceCompleteAttachmentResult) IsSetSuccess() bool {
-	return p.Success != nil
-}
-
-func (p *KnowledgeServiceCompleteAttachmentResult) String() string {
-	if p == nil {
-		return "<nil>"
-	}
-	return fmt.Sprintf("KnowledgeServiceCompleteAttachmentResult(%+v)", *p)
-}
-
-var fieldIDToName_KnowledgeServiceCompleteAttachmentResult = map[int16]string{
-	0: "success",
-}
-
-type KnowledgeServiceDeleteAttachmentArgs struct {
-	Request *AttachmentIDRequest `thrift:"request,1" frugal:"1,default,AttachmentIDRequest" json:"request"`
-}
-
-func NewKnowledgeServiceDeleteAttachmentArgs() *KnowledgeServiceDeleteAttachmentArgs {
-	return &KnowledgeServiceDeleteAttachmentArgs{}
-}
-
-func (p *KnowledgeServiceDeleteAttachmentArgs) InitDefault() {
-}
-
-var KnowledgeServiceDeleteAttachmentArgs_Request_DEFAULT *AttachmentIDRequest
-
-func (p *KnowledgeServiceDeleteAttachmentArgs) GetRequest() (v *AttachmentIDRequest) {
-	if !p.IsSetRequest() {
-		return KnowledgeServiceDeleteAttachmentArgs_Request_DEFAULT
-	}
-	return p.Request
-}
-func (p *KnowledgeServiceDeleteAttachmentArgs) SetRequest(val *AttachmentIDRequest) {
-	p.Request = val
-}
-
-func (p *KnowledgeServiceDeleteAttachmentArgs) IsSetRequest() bool {
-	return p.Request != nil
-}
-
-func (p *KnowledgeServiceDeleteAttachmentArgs) String() string {
-	if p == nil {
-		return "<nil>"
-	}
-	return fmt.Sprintf("KnowledgeServiceDeleteAttachmentArgs(%+v)", *p)
-}
-
-var fieldIDToName_KnowledgeServiceDeleteAttachmentArgs = map[int16]string{
-	1: "request",
-}
-
-type KnowledgeServiceDeleteAttachmentResult struct {
-}
-
-func NewKnowledgeServiceDeleteAttachmentResult() *KnowledgeServiceDeleteAttachmentResult {
-	return &KnowledgeServiceDeleteAttachmentResult{}
-}
-
-func (p *KnowledgeServiceDeleteAttachmentResult) InitDefault() {
-}
-
-func (p *KnowledgeServiceDeleteAttachmentResult) String() string {
-	if p == nil {
-		return "<nil>"
-	}
-	return fmt.Sprintf("KnowledgeServiceDeleteAttachmentResult(%+v)", *p)
-}
-
-var fieldIDToName_KnowledgeServiceDeleteAttachmentResult = map[int16]string{}
-
-type KnowledgeServiceGetAttachmentContentArgs struct {
-	Request *AttachmentContentRequest `thrift:"request,1" frugal:"1,default,AttachmentContentRequest" json:"request"`
-}
-
-func NewKnowledgeServiceGetAttachmentContentArgs() *KnowledgeServiceGetAttachmentContentArgs {
-	return &KnowledgeServiceGetAttachmentContentArgs{}
-}
-
-func (p *KnowledgeServiceGetAttachmentContentArgs) InitDefault() {
-}
-
-var KnowledgeServiceGetAttachmentContentArgs_Request_DEFAULT *AttachmentContentRequest
-
-func (p *KnowledgeServiceGetAttachmentContentArgs) GetRequest() (v *AttachmentContentRequest) {
-	if !p.IsSetRequest() {
-		return KnowledgeServiceGetAttachmentContentArgs_Request_DEFAULT
-	}
-	return p.Request
-}
-func (p *KnowledgeServiceGetAttachmentContentArgs) SetRequest(val *AttachmentContentRequest) {
-	p.Request = val
-}
-
-func (p *KnowledgeServiceGetAttachmentContentArgs) IsSetRequest() bool {
-	return p.Request != nil
-}
-
-func (p *KnowledgeServiceGetAttachmentContentArgs) String() string {
-	if p == nil {
-		return "<nil>"
-	}
-	return fmt.Sprintf("KnowledgeServiceGetAttachmentContentArgs(%+v)", *p)
-}
-
-var fieldIDToName_KnowledgeServiceGetAttachmentContentArgs = map[int16]string{
-	1: "request",
-}
-
-type KnowledgeServiceGetAttachmentContentResult struct {
-	Success *AttachmentContent `thrift:"success,0,optional" frugal:"0,optional,AttachmentContent" json:"success,omitempty"`
-}
-
-func NewKnowledgeServiceGetAttachmentContentResult() *KnowledgeServiceGetAttachmentContentResult {
-	return &KnowledgeServiceGetAttachmentContentResult{}
-}
-
-func (p *KnowledgeServiceGetAttachmentContentResult) InitDefault() {
-}
-
-var KnowledgeServiceGetAttachmentContentResult_Success_DEFAULT *AttachmentContent
-
-func (p *KnowledgeServiceGetAttachmentContentResult) GetSuccess() (v *AttachmentContent) {
-	if !p.IsSetSuccess() {
-		return KnowledgeServiceGetAttachmentContentResult_Success_DEFAULT
-	}
-	return p.Success
-}
-func (p *KnowledgeServiceGetAttachmentContentResult) SetSuccess(x interface{}) {
-	p.Success = x.(*AttachmentContent)
-}
-
-func (p *KnowledgeServiceGetAttachmentContentResult) IsSetSuccess() bool {
-	return p.Success != nil
-}
-
-func (p *KnowledgeServiceGetAttachmentContentResult) String() string {
-	if p == nil {
-		return "<nil>"
-	}
-	return fmt.Sprintf("KnowledgeServiceGetAttachmentContentResult(%+v)", *p)
-}
-
-var fieldIDToName_KnowledgeServiceGetAttachmentContentResult = map[int16]string{
+var fieldIDToName_KnowledgeServiceIsMediaPublishedResult = map[int16]string{
 	0: "success",
 }
 

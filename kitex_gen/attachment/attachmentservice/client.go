@@ -20,6 +20,11 @@ type Client interface {
 	GetAttachment(ctx context.Context, request *attachment.AttachmentIDRequest, callOptions ...callopt.Option) (r *attachment.Attachment, err error)
 	TrashAttachment(ctx context.Context, request *attachment.AttachmentIDRequest, callOptions ...callopt.Option) (err error)
 	RestoreAttachment(ctx context.Context, request *attachment.AttachmentIDRequest, callOptions ...callopt.Option) (r *attachment.Attachment, err error)
+	StagePublicationReferences(ctx context.Context, request *attachment.PublicationReferenceCommand, callOptions ...callopt.Option) (err error)
+	FinalizePublicationReferences(ctx context.Context, request *attachment.PublicationReferenceCommand, callOptions ...callopt.Option) (err error)
+	ClearPublicationReferences(ctx context.Context, request *attachment.PublicationReferenceCommand, callOptions ...callopt.Option) (err error)
+	GetPublicationReferenceState(ctx context.Context, request *attachment.PublicationReferenceStateRequest, callOptions ...callopt.Option) (r *attachment.PublicationReferenceState, err error)
+	GetPublishedAttachmentContent(ctx context.Context, request *attachment.AttachmentIDRequest, callOptions ...callopt.Option) (r *attachment.AttachmentContent, err error)
 }
 
 // NewClient creates a client for the service defined in IDL.
@@ -89,4 +94,29 @@ func (p *kAttachmentServiceClient) TrashAttachment(ctx context.Context, request 
 func (p *kAttachmentServiceClient) RestoreAttachment(ctx context.Context, request *attachment.AttachmentIDRequest, callOptions ...callopt.Option) (r *attachment.Attachment, err error) {
 	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
 	return p.kClient.RestoreAttachment(ctx, request)
+}
+
+func (p *kAttachmentServiceClient) StagePublicationReferences(ctx context.Context, request *attachment.PublicationReferenceCommand, callOptions ...callopt.Option) (err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.StagePublicationReferences(ctx, request)
+}
+
+func (p *kAttachmentServiceClient) FinalizePublicationReferences(ctx context.Context, request *attachment.PublicationReferenceCommand, callOptions ...callopt.Option) (err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.FinalizePublicationReferences(ctx, request)
+}
+
+func (p *kAttachmentServiceClient) ClearPublicationReferences(ctx context.Context, request *attachment.PublicationReferenceCommand, callOptions ...callopt.Option) (err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.ClearPublicationReferences(ctx, request)
+}
+
+func (p *kAttachmentServiceClient) GetPublicationReferenceState(ctx context.Context, request *attachment.PublicationReferenceStateRequest, callOptions ...callopt.Option) (r *attachment.PublicationReferenceState, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.GetPublicationReferenceState(ctx, request)
+}
+
+func (p *kAttachmentServiceClient) GetPublishedAttachmentContent(ctx context.Context, request *attachment.AttachmentIDRequest, callOptions ...callopt.Option) (r *attachment.AttachmentContent, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.GetPublishedAttachmentContent(ctx, request)
 }

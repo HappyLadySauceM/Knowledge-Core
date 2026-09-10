@@ -161,38 +161,10 @@ var serviceMethods = map[string]kitex.MethodInfo{
 		false,
 		kitex.WithStreamingMode(kitex.StreamingNone),
 	),
-	"ListAttachments": kitex.NewMethodInfo(
-		listAttachmentsHandler,
-		newKnowledgeServiceListAttachmentsArgs,
-		newKnowledgeServiceListAttachmentsResult,
-		false,
-		kitex.WithStreamingMode(kitex.StreamingNone),
-	),
-	"CreateAttachment": kitex.NewMethodInfo(
-		createAttachmentHandler,
-		newKnowledgeServiceCreateAttachmentArgs,
-		newKnowledgeServiceCreateAttachmentResult,
-		false,
-		kitex.WithStreamingMode(kitex.StreamingNone),
-	),
-	"CompleteAttachment": kitex.NewMethodInfo(
-		completeAttachmentHandler,
-		newKnowledgeServiceCompleteAttachmentArgs,
-		newKnowledgeServiceCompleteAttachmentResult,
-		false,
-		kitex.WithStreamingMode(kitex.StreamingNone),
-	),
-	"DeleteAttachment": kitex.NewMethodInfo(
-		deleteAttachmentHandler,
-		newKnowledgeServiceDeleteAttachmentArgs,
-		newKnowledgeServiceDeleteAttachmentResult,
-		false,
-		kitex.WithStreamingMode(kitex.StreamingNone),
-	),
-	"GetAttachmentContent": kitex.NewMethodInfo(
-		getAttachmentContentHandler,
-		newKnowledgeServiceGetAttachmentContentArgs,
-		newKnowledgeServiceGetAttachmentContentResult,
+	"IsMediaPublished": kitex.NewMethodInfo(
+		isMediaPublishedHandler,
+		newKnowledgeServiceIsMediaPublishedArgs,
+		newKnowledgeServiceIsMediaPublishedResult,
 		false,
 		kitex.WithStreamingMode(kitex.StreamingNone),
 	),
@@ -654,94 +626,22 @@ func newKnowledgeServiceDeleteMemberResult() interface{} {
 	return knowledge.NewKnowledgeServiceDeleteMemberResult()
 }
 
-func listAttachmentsHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
-	realArg := arg.(*knowledge.KnowledgeServiceListAttachmentsArgs)
-	realResult := result.(*knowledge.KnowledgeServiceListAttachmentsResult)
-	success, err := handler.(knowledge.KnowledgeService).ListAttachments(ctx, realArg.Request)
+func isMediaPublishedHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*knowledge.KnowledgeServiceIsMediaPublishedArgs)
+	realResult := result.(*knowledge.KnowledgeServiceIsMediaPublishedResult)
+	success, err := handler.(knowledge.KnowledgeService).IsMediaPublished(ctx, realArg.Request)
 	if err != nil {
 		return err
 	}
 	realResult.Success = success
 	return nil
 }
-func newKnowledgeServiceListAttachmentsArgs() interface{} {
-	return knowledge.NewKnowledgeServiceListAttachmentsArgs()
+func newKnowledgeServiceIsMediaPublishedArgs() interface{} {
+	return knowledge.NewKnowledgeServiceIsMediaPublishedArgs()
 }
 
-func newKnowledgeServiceListAttachmentsResult() interface{} {
-	return knowledge.NewKnowledgeServiceListAttachmentsResult()
-}
-
-func createAttachmentHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
-	realArg := arg.(*knowledge.KnowledgeServiceCreateAttachmentArgs)
-	realResult := result.(*knowledge.KnowledgeServiceCreateAttachmentResult)
-	success, err := handler.(knowledge.KnowledgeService).CreateAttachment(ctx, realArg.Request)
-	if err != nil {
-		return err
-	}
-	realResult.Success = success
-	return nil
-}
-func newKnowledgeServiceCreateAttachmentArgs() interface{} {
-	return knowledge.NewKnowledgeServiceCreateAttachmentArgs()
-}
-
-func newKnowledgeServiceCreateAttachmentResult() interface{} {
-	return knowledge.NewKnowledgeServiceCreateAttachmentResult()
-}
-
-func completeAttachmentHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
-	realArg := arg.(*knowledge.KnowledgeServiceCompleteAttachmentArgs)
-	realResult := result.(*knowledge.KnowledgeServiceCompleteAttachmentResult)
-	success, err := handler.(knowledge.KnowledgeService).CompleteAttachment(ctx, realArg.Request)
-	if err != nil {
-		return err
-	}
-	realResult.Success = success
-	return nil
-}
-func newKnowledgeServiceCompleteAttachmentArgs() interface{} {
-	return knowledge.NewKnowledgeServiceCompleteAttachmentArgs()
-}
-
-func newKnowledgeServiceCompleteAttachmentResult() interface{} {
-	return knowledge.NewKnowledgeServiceCompleteAttachmentResult()
-}
-
-func deleteAttachmentHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
-	realArg := arg.(*knowledge.KnowledgeServiceDeleteAttachmentArgs)
-
-	err := handler.(knowledge.KnowledgeService).DeleteAttachment(ctx, realArg.Request)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-func newKnowledgeServiceDeleteAttachmentArgs() interface{} {
-	return knowledge.NewKnowledgeServiceDeleteAttachmentArgs()
-}
-
-func newKnowledgeServiceDeleteAttachmentResult() interface{} {
-	return knowledge.NewKnowledgeServiceDeleteAttachmentResult()
-}
-
-func getAttachmentContentHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
-	realArg := arg.(*knowledge.KnowledgeServiceGetAttachmentContentArgs)
-	realResult := result.(*knowledge.KnowledgeServiceGetAttachmentContentResult)
-	success, err := handler.(knowledge.KnowledgeService).GetAttachmentContent(ctx, realArg.Request)
-	if err != nil {
-		return err
-	}
-	realResult.Success = success
-	return nil
-}
-func newKnowledgeServiceGetAttachmentContentArgs() interface{} {
-	return knowledge.NewKnowledgeServiceGetAttachmentContentArgs()
-}
-
-func newKnowledgeServiceGetAttachmentContentResult() interface{} {
-	return knowledge.NewKnowledgeServiceGetAttachmentContentResult()
+func newKnowledgeServiceIsMediaPublishedResult() interface{} {
+	return knowledge.NewKnowledgeServiceIsMediaPublishedResult()
 }
 
 func authorizeCollaborationHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
@@ -1000,51 +900,11 @@ func (p *kClient) DeleteMember(ctx context.Context, request *knowledge.DeleteMem
 	return nil
 }
 
-func (p *kClient) ListAttachments(ctx context.Context, request *knowledge.DocumentIDRequest) (r *knowledge.AttachmentList, err error) {
-	var _args knowledge.KnowledgeServiceListAttachmentsArgs
+func (p *kClient) IsMediaPublished(ctx context.Context, request *knowledge.PublishedMediaRequest) (r *knowledge.PublishedMediaAuthorization, err error) {
+	var _args knowledge.KnowledgeServiceIsMediaPublishedArgs
 	_args.Request = request
-	var _result knowledge.KnowledgeServiceListAttachmentsResult
-	if err = p.c.Call(ctx, "ListAttachments", &_args, &_result); err != nil {
-		return
-	}
-	return _result.GetSuccess(), nil
-}
-
-func (p *kClient) CreateAttachment(ctx context.Context, request *knowledge.CreateAttachmentRequest) (r *knowledge.AttachmentUpload, err error) {
-	var _args knowledge.KnowledgeServiceCreateAttachmentArgs
-	_args.Request = request
-	var _result knowledge.KnowledgeServiceCreateAttachmentResult
-	if err = p.c.Call(ctx, "CreateAttachment", &_args, &_result); err != nil {
-		return
-	}
-	return _result.GetSuccess(), nil
-}
-
-func (p *kClient) CompleteAttachment(ctx context.Context, request *knowledge.AttachmentIDRequest) (r *knowledge.Attachment, err error) {
-	var _args knowledge.KnowledgeServiceCompleteAttachmentArgs
-	_args.Request = request
-	var _result knowledge.KnowledgeServiceCompleteAttachmentResult
-	if err = p.c.Call(ctx, "CompleteAttachment", &_args, &_result); err != nil {
-		return
-	}
-	return _result.GetSuccess(), nil
-}
-
-func (p *kClient) DeleteAttachment(ctx context.Context, request *knowledge.AttachmentIDRequest) (err error) {
-	var _args knowledge.KnowledgeServiceDeleteAttachmentArgs
-	_args.Request = request
-	var _result knowledge.KnowledgeServiceDeleteAttachmentResult
-	if err = p.c.Call(ctx, "DeleteAttachment", &_args, &_result); err != nil {
-		return
-	}
-	return nil
-}
-
-func (p *kClient) GetAttachmentContent(ctx context.Context, request *knowledge.AttachmentContentRequest) (r *knowledge.AttachmentContent, err error) {
-	var _args knowledge.KnowledgeServiceGetAttachmentContentArgs
-	_args.Request = request
-	var _result knowledge.KnowledgeServiceGetAttachmentContentResult
-	if err = p.c.Call(ctx, "GetAttachmentContent", &_args, &_result); err != nil {
+	var _result knowledge.KnowledgeServiceIsMediaPublishedResult
+	if err = p.c.Call(ctx, "IsMediaPublished", &_args, &_result); err != nil {
 		return
 	}
 	return _result.GetSuccess(), nil

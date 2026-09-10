@@ -3,12 +3,9 @@ package domain
 import (
 	"errors"
 	"fmt"
-	"mime"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
-	"unicode"
 
 	jsoncodec "github.com/HappyLadySauce/Knowledge-Core/pkg/codec/json"
 	"github.com/google/uuid"
@@ -20,22 +17,19 @@ const (
 	AccessEditor = "editor"
 	AccessOwner  = "owner"
 
-	AttachmentPendingUpload = "pending_upload"
-	AttachmentScanning      = "scanning"
-	AttachmentReady         = "ready"
-	AttachmentRejected      = "rejected"
-	AttachmentDeleting      = "deleting"
+	PublicationDraft           = "draft"
+	PublicationPublishing      = "publishing"
+	PublicationPublished       = "published"
+	PublicationPublishFailed   = "publish_failed"
+	PublicationUnpublishing    = "unpublishing"
+	PublicationUnpublishFailed = "unpublish_failed"
 
-	MaxImageBytes          int64 = 10 << 20
-	MaxFileBytes           int64 = 50 << 20
-	MaxDocumentBytes       int64 = 1 << 30
-	MaxUserAttachmentBytes int64 = 10 << 30
-	MaxProjectionBytes           = 16 << 20
+	MaxDocumentBytes   int64 = 1 << 30
+	MaxProjectionBytes       = 16 << 20
 )
 
 var (
 	slugPattern           = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
-	sha256Pattern         = regexp.MustCompile(`^[0-9a-f]{64}$`)
 	idempotencyKeyPattern = regexp.MustCompile(`^[\x21-\x7e]{1,128}$`)
 )
 
@@ -53,25 +47,28 @@ type PublicUser struct {
 }
 
 type Document struct {
-	ID                 string
-	Title              string
-	Summary            string
-	Slug               string
-	Language           string
-	Tags               []string
-	FolderID           *string
-	Owner              PublicUser
-	Access             string
-	Published          bool
-	MetadataRevision   int64
-	ContentRevision    int64
-	PermissionRevision int64
-	PublishedAt        *time.Time
-	DeletedAt          *time.Time
-	PurgeAfter         *time.Time
-	ProjectedAt        *time.Time
-	CreatedAt          time.Time
-	UpdatedAt          time.Time
+	ID                    string
+	Title                 string
+	Summary               string
+	Slug                  string
+	Language              string
+	Tags                  []string
+	FolderID              *string
+	Owner                 PublicUser
+	Access                string
+	Published             bool
+	PublicationStatus     string
+	PublicationError      *string
+	PublicationGeneration int64
+	MetadataRevision      int64
+	ContentRevision       int64
+	PermissionRevision    int64
+	PublishedAt           *time.Time
+	DeletedAt             *time.Time
+	PurgeAfter            *time.Time
+	ProjectedAt           *time.Time
+	CreatedAt             time.Time
+	UpdatedAt             time.Time
 }
 
 type PublicationSnapshot struct {
@@ -117,49 +114,16 @@ type Member struct {
 	UpdatedAt  time.Time
 }
 
-type Attachment struct {
+type PublicationReferenceJob struct {
 	ID            string
 	DocumentID    string
-	UploaderID    int64
-	Filename      string
-	DeclaredType  string
-	DetectedType  string
-	SizeBytes     int64
-	SHA256        string
-	ObjectKey     string
-	Status        string
-	FailureReason string
-	UploadExpires time.Time
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
-}
-
-type AttachmentUpload struct {
-	Attachment      *Attachment
-	URL             string
-	RequiredHeaders map[string]string
-	ExpiresAt       time.Time
-}
-
-type UploadTarget struct {
-	URL             string
-	RequiredHeaders map[string]string
-	ExpiresAt       time.Time
-}
-
-type AttachmentContent struct {
-	URL       string
-	ExpiresAt time.Time
-}
-
-type ScanJob struct {
-	Attachment Attachment
-	Attempts   int
-}
-
-type ScanResult struct {
-	Clean        bool
-	DetectedType string
+	OwnerID       int64
+	Generation    int64
+	Action        string
+	AttachmentIDs []string
+	State         string
+	Attempts      int
+	Headers       map[string]string
 }
 
 type OutboxMessage struct {
@@ -300,37 +264,6 @@ func ValidateIdempotencyKey(value string) error {
 		return &ValidationError{Field: "idempotency_key", Reason: "must contain 1-128 visible ASCII characters"}
 	}
 	return nil
-}
-
-func ValidateAttachment(filename, mediaType string, sizeBytes int64, checksum string) error {
-	filename = strings.TrimSpace(filename)
-	mediaType = strings.TrimSpace(mediaType)
-	var joined error
-	if len([]rune(filename)) < 1 || len([]rune(filename)) > 255 || filename != filepath.Base(filename) || strings.ContainsAny(filename, `/\\`) {
-		joined = errors.Join(joined, &ValidationError{Field: "filename", Reason: "must be a basename containing 1-255 characters"})
-	} else {
-		for _, value := range filename {
-			if unicode.IsControl(value) {
-				joined = errors.Join(joined, &ValidationError{Field: "filename", Reason: "must not contain control characters"})
-				break
-			}
-		}
-	}
-	parsedType, _, err := mime.ParseMediaType(mediaType)
-	if err != nil || parsedType != mediaType || len(mediaType) > 127 {
-		joined = errors.Join(joined, &ValidationError{Field: "media_type", Reason: "must be a canonical media type"})
-	}
-	maximum := MaxFileBytes
-	if strings.HasPrefix(mediaType, "image/") {
-		maximum = MaxImageBytes
-	}
-	if sizeBytes <= 0 || sizeBytes > maximum {
-		joined = errors.Join(joined, &ValidationError{Field: "size_bytes", Reason: fmt.Sprintf("must be between 1 and %d", maximum)})
-	}
-	if !sha256Pattern.MatchString(checksum) {
-		joined = errors.Join(joined, &ValidationError{Field: "sha256", Reason: "must be 64 lowercase hexadecimal characters"})
-	}
-	return joined
 }
 
 func ValidateProjection(content []byte, plainText string) error {

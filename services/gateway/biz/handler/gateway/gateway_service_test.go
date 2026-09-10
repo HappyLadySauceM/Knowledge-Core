@@ -409,7 +409,8 @@ func completeDocument() *knowledgev1.Document {
 	return &knowledgev1.Document{
 		Id: "0198f0e0-7b6d-7a11-8e21-1123456789ab", Title: "Design", Summary: "Current state", Slug: "design-doc",
 		Owner: &knowledgev1.PublicUser{Id: 7, Username: "alice", Avatar: ""}, Access: "owner",
-		MetadataRevision: 1, ContentRevision: 0, CreatedAt: "2026-08-02T12:00:00Z", UpdatedAt: "2026-08-02T12:00:00Z",
+		PublicationStatus: "draft",
+		MetadataRevision:  1, ContentRevision: 0, CreatedAt: "2026-08-02T12:00:00Z", UpdatedAt: "2026-08-02T12:00:00Z",
 	}
 }
 

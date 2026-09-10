@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -22,7 +23,7 @@ type DocumentRepository interface {
 	PublishSnapshot(context.Context, string, int64, int64, repository.PublicationSnapshotInput) (*domain.Document, error)
 	SoftDeleteDocument(context.Context, string, int64, int64) (*domain.Document, error)
 	RestoreDeletedDocument(context.Context, string, int64) (*domain.Document, error)
-	ListReadyAttachments(context.Context, string) ([]*domain.Attachment, error)
+	IsMediaPublished(context.Context, string) (bool, error)
 	ListFolders(context.Context, int64, *string) ([]*domain.Folder, error)
 	CreateFolder(context.Context, int64, string, *string, repository.Idempotency) (*domain.Folder, error)
 	UpdateFolder(context.Context, int64, string, int64, *string, *string) (*domain.Folder, error)
@@ -145,11 +146,10 @@ type DocumentPage struct {
 }
 
 type DocumentDetail struct {
-	Document    *domain.Document
-	Content     domain.RichTextDocument
-	PlainText   string
-	Attachments []*domain.Attachment
-	Redirect    bool
+	Document  *domain.Document
+	Content   domain.RichTextDocument
+	PlainText string
+	Redirect  bool
 }
 
 type CreateDocumentInput struct {
@@ -228,14 +228,21 @@ func (l *DocumentLogic) GetPublished(ctx context.Context, slug string, actorID i
 	if err != nil {
 		return nil, mapError(err)
 	}
-	attachments, err := l.repository.ListReadyAttachments(ctx, document.ID)
-	if err != nil {
-		return nil, mapError(err)
-	}
 	return &DocumentDetail{
 		Document: document, Content: content, PlainText: projection.PlainText,
-		Attachments: attachments, Redirect: redirect || requested != normalized,
+		Redirect: redirect || requested != normalized,
 	}, nil
+}
+
+func (l *DocumentLogic) IsMediaPublished(ctx context.Context, attachmentID string) (bool, error) {
+	if err := domain.ValidateID("attachment_id", attachmentID); err != nil {
+		return false, mapError(err)
+	}
+	published, err := l.repository.IsMediaPublished(ctx, attachmentID)
+	if err != nil {
+		return false, mapError(err)
+	}
+	return published, nil
 }
 
 func (l *DocumentLogic) List(ctx context.Context, input ListDocumentsInput) (DocumentPage, error) {
@@ -324,7 +331,7 @@ func (l *DocumentLogic) Create(ctx context.Context, input CreateDocumentInput) (
 	now := l.now().UTC()
 	document := &domain.Document{
 		ID: id, Title: input.Title, Summary: summary, Slug: slug, Language: "zh-CN", Owner: owner,
-		Access: domain.AccessOwner, MetadataRevision: 1, PermissionRevision: 1,
+		Access: domain.AccessOwner, PublicationStatus: domain.PublicationDraft, MetadataRevision: 1, PermissionRevision: 1,
 		CreatedAt: now, UpdatedAt: now,
 	}
 	if err := l.repository.CreateDocument(ctx, document, idempotencyValue); err != nil {
@@ -469,12 +476,35 @@ func (l *DocumentLogic) PublishSnapshot(ctx context.Context, documentID string, 
 	result, err := l.repository.PublishSnapshot(ctx, documentID, actorID, expected, repository.PublicationSnapshotInput{
 		VersionID: input.VersionID, VersionSequence: input.VersionSequence, Title: input.Title, Summary: input.Summary,
 		Slug: input.Slug, Language: input.Language, Tags: append([]string(nil), input.Tags...), Content: input.Content,
-		PlainText: input.PlainText, Idempotency: idempotencyValue,
+		PlainText: input.PlainText, MediaIDs: publicationMediaIDs(input.Content), Idempotency: idempotencyValue,
 	})
 	if err != nil {
 		return nil, mapError(err)
 	}
 	return result, nil
+}
+
+func publicationMediaIDs(content domain.RichTextDocument) []string {
+	seen := make(map[string]struct{})
+	var visit func([]*domain.RichTextNode)
+	visit = func(nodes []*domain.RichTextNode) {
+		for _, node := range nodes {
+			if node == nil {
+				continue
+			}
+			if node.Attrs != nil && node.Attrs.AttachmentID != nil {
+				seen[*node.Attrs.AttachmentID] = struct{}{}
+			}
+			visit(node.Content)
+		}
+	}
+	visit(content.Content)
+	result := make([]string, 0, len(seen))
+	for id := range seen {
+		result = append(result, id)
+	}
+	sort.Strings(result)
+	return result
 }
 
 func (l *DocumentLogic) Delete(ctx context.Context, documentID string, actorID, expected int64) (*domain.Document, error) {

@@ -71,23 +71,14 @@ struct Document {
   15: optional string language
   16: optional list<string> tags
   17: optional string folder_id
-}
-
-struct Attachment {
-  1: required string id
-  2: required string document_id
-  3: required string filename
-  4: required string media_type
-  5: required i64 size_bytes
-  6: required string status
-  7: required string created_at
+  18: required string publication_status
+  19: optional string publication_error
 }
 
 struct DocumentDetail {
   1: required Document document
   2: required RichTextDocument content
   3: required string plain_text
-  4: required list<Attachment> attachments
 }
 
 struct PageInfo {
@@ -216,35 +207,8 @@ struct DeleteMemberRequest {
   3: required i64 expected_revision
 }
 
-struct CreateAttachmentRequest {
-  1: required string document_id
-  2: required string filename
-  3: required string media_type
-  4: required i64 size_bytes
-  5: required string sha256
-  6: optional string idempotency_key
-}
-
-struct AttachmentUpload {
-  1: required Attachment attachment
-  2: required string upload_url
-  3: required map<string,string> required_headers
-  4: required string expires_at
-}
-
-struct AttachmentIDRequest {
-  1: required string document_id
-  2: required string attachment_id
-}
-
-struct AttachmentList { 1: required list<Attachment> items }
-
-struct AttachmentContentRequest { 1: required string attachment_id }
-
-struct AttachmentContent {
-  1: required string url
-  2: required string expires_at
-}
+struct PublishedMediaRequest { 1: required string attachment_id }
+struct PublishedMediaAuthorization { 1: required bool published }
 
 struct AuthorizeCollaborationRequest {
   1: required string document_id
@@ -287,11 +251,7 @@ service KnowledgeService {
   Member AddMember(1: AddMemberRequest request)
   Member UpdateMember(1: UpdateMemberRequest request)
   void DeleteMember(1: DeleteMemberRequest request)
-  AttachmentList ListAttachments(1: DocumentIDRequest request)
-  AttachmentUpload CreateAttachment(1: CreateAttachmentRequest request)
-  Attachment CompleteAttachment(1: AttachmentIDRequest request)
-  void DeleteAttachment(1: AttachmentIDRequest request)
-  AttachmentContent GetAttachmentContent(1: AttachmentContentRequest request)
+  PublishedMediaAuthorization IsMediaPublished(1: PublishedMediaRequest request)
   CollaborationAuthorization AuthorizeCollaboration(1: AuthorizeCollaborationRequest request)
   void ProjectCollaboration(1: ProjectCollaborationRequest request)
 }

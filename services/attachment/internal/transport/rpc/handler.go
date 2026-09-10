@@ -2,6 +2,7 @@ package rpc
 
 import (
 	"context"
+	"crypto/subtle"
 	"errors"
 	"log/slog"
 	"strings"
@@ -18,18 +19,19 @@ import (
 
 type Readiness interface{ Ready(context.Context) error }
 type Handler struct {
-	service   *service.Service
-	verifier  *coreauth.Verifier
-	readiness Readiness
-	logger    *slog.Logger
-	now       func() time.Time
+	service       *service.Service
+	verifier      *coreauth.Verifier
+	readiness     Readiness
+	logger        *slog.Logger
+	internalToken string
+	now           func() time.Time
 }
 
-func NewHandler(svc *service.Service, verifier *coreauth.Verifier, readiness Readiness, logger *slog.Logger) (*Handler, error) {
-	if svc == nil || verifier == nil || readiness == nil || logger == nil {
+func NewHandler(svc *service.Service, verifier *coreauth.Verifier, readiness Readiness, logger *slog.Logger, internalToken string) (*Handler, error) {
+	if svc == nil || verifier == nil || readiness == nil || logger == nil || strings.TrimSpace(internalToken) == "" {
 		return nil, errors.New("attachment RPC handler dependencies are required")
 	}
-	return &Handler{service: svc, verifier: verifier, readiness: readiness, logger: logger, now: time.Now}, nil
+	return &Handler{service: svc, verifier: verifier, readiness: readiness, logger: logger, internalToken: strings.TrimSpace(internalToken), now: time.Now}, nil
 }
 func (h *Handler) Ping(ctx context.Context, req *commonv1.PingRequest) (*commonv1.PingResponse, error) {
 	ctx = metadata.EnsureRequestID(ctx)
@@ -121,6 +123,69 @@ func (h *Handler) RestoreAttachment(ctx context.Context, req *attachmentv1.Attac
 		return nil, h.mapError(ctx, err)
 	}
 	return out, nil
+}
+
+func (h *Handler) StagePublicationReferences(ctx context.Context, req *attachmentv1.PublicationReferenceCommand) error {
+	if err := h.internal(ctx, req != nil); err != nil {
+		return err
+	}
+	if err := h.service.StagePublicationReferences(ctx, req); err != nil {
+		return h.mapError(ctx, err)
+	}
+	return nil
+}
+
+func (h *Handler) FinalizePublicationReferences(ctx context.Context, req *attachmentv1.PublicationReferenceCommand) error {
+	if err := h.internal(ctx, req != nil); err != nil {
+		return err
+	}
+	if err := h.service.FinalizePublicationReferences(ctx, req); err != nil {
+		return h.mapError(ctx, err)
+	}
+	return nil
+}
+
+func (h *Handler) ClearPublicationReferences(ctx context.Context, req *attachmentv1.PublicationReferenceCommand) error {
+	if err := h.internal(ctx, req != nil); err != nil {
+		return err
+	}
+	if err := h.service.ClearPublicationReferences(ctx, req); err != nil {
+		return h.mapError(ctx, err)
+	}
+	return nil
+}
+
+func (h *Handler) GetPublicationReferenceState(ctx context.Context, req *attachmentv1.PublicationReferenceStateRequest) (*attachmentv1.PublicationReferenceState, error) {
+	if err := h.internal(ctx, req != nil); err != nil {
+		return nil, err
+	}
+	state, err := h.service.PublicationReferenceState(ctx, req.DocumentId)
+	if err != nil {
+		return nil, h.mapError(ctx, err)
+	}
+	return state, nil
+}
+
+func (h *Handler) GetPublishedAttachmentContent(ctx context.Context, req *attachmentv1.AttachmentIDRequest) (*attachmentv1.AttachmentContent, error) {
+	if req == nil {
+		return nil, apperror.ToKitexBizStatus(ctx, attachmenterrors.InvalidInput.New())
+	}
+	content, err := h.service.PublishedContent(ctx, req.AttachmentId)
+	if err != nil {
+		return nil, h.mapError(ctx, err)
+	}
+	return content, nil
+}
+
+func (h *Handler) internal(ctx context.Context, valid bool) error {
+	if !valid {
+		return apperror.ToKitexBizStatus(ctx, attachmenterrors.InvalidInput.New())
+	}
+	provided := coreauth.ServiceToken(ctx)
+	if provided == "" || subtle.ConstantTimeCompare([]byte(provided), []byte(h.internalToken)) != 1 {
+		return apperror.ToKitexBizStatus(ctx, attachmenterrors.Unauthenticated.New())
+	}
+	return nil
 }
 func (h *Handler) owner(ctx context.Context, valid bool) (int64, error) {
 	if !valid {

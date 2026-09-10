@@ -2,13 +2,16 @@ package repository
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"strings"
 	"time"
 
+	jsoncodec "github.com/HappyLadySauce/Knowledge-Core/pkg/codec/json"
 	"github.com/HappyLadySauce/Knowledge-Core/services/attachment/internal/domain"
 	"github.com/HappyLadySauce/Knowledge-Core/services/attachment/internal/model"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -24,6 +27,39 @@ type Idempotency struct {
 	OwnerID     int64
 	Key         string
 	RequestHash string
+}
+
+type Cursor struct {
+	Version int       `json:"v"`
+	Time    time.Time `json:"time"`
+	ID      string    `json:"id"`
+}
+
+func EncodeCursor(value Cursor) (string, error) {
+	value.Version = 1
+	payload, err := jsoncodec.Marshal(value)
+	if err != nil {
+		return "", fmt.Errorf("encode attachment cursor: %w", err)
+	}
+	return base64.RawURLEncoding.EncodeToString(payload), nil
+}
+
+func DecodeCursor(value string) (*Cursor, error) {
+	if strings.TrimSpace(value) == "" {
+		return nil, nil
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(value)
+	if err != nil {
+		return nil, fmt.Errorf("decode attachment cursor: %w", err)
+	}
+	var result Cursor
+	if err := jsoncodec.Unmarshal(payload, &result); err != nil || result.Version != 1 || result.Time.IsZero() {
+		return nil, errors.New("decode attachment cursor: invalid cursor")
+	}
+	if _, err := uuid.Parse(result.ID); err != nil {
+		return nil, errors.New("decode attachment cursor: invalid cursor")
+	}
+	return &result, nil
 }
 
 const (
@@ -103,7 +139,7 @@ func (s *Store) Get(ctx context.Context, id string, owner int64) (*domain.Attach
 	}
 	return toDomain(&r), nil
 }
-func (s *Store) List(ctx context.Context, owner int64, status, category string, limit int) ([]*domain.Attachment, error) {
+func (s *Store) List(ctx context.Context, owner int64, status, category string, cursor *Cursor, limit int) ([]*domain.Attachment, error) {
 	if limit <= 0 || limit > 100 {
 		limit = 50
 	}
@@ -114,8 +150,11 @@ func (s *Store) List(ctx context.Context, owner int64, status, category string, 
 	if category != "" {
 		q = q.Where("category = ?", category)
 	}
+	if cursor != nil {
+		q = q.Where("(created_at, id) < (?, ?)", cursor.Time, cursor.ID)
+	}
 	var rows []model.Attachment
-	if err := q.Order("created_at DESC,id DESC").Limit(limit).Find(&rows).Error; err != nil {
+	if err := q.Order("created_at DESC,id DESC").Limit(limit + 1).Find(&rows).Error; err != nil {
 		return nil, err
 	}
 	out := make([]*domain.Attachment, 0, len(rows))

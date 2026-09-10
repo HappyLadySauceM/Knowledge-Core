@@ -18,7 +18,7 @@ type WakeKind uint8
 
 const (
 	WakeOutbox WakeKind = 1 << iota
-	WakeAttachment
+	WakePublication
 	WakeAll
 )
 
@@ -26,8 +26,8 @@ func parseWakePayload(payload string) WakeKind {
 	switch payload {
 	case repository.WorkerWakePayloadOutbox:
 		return WakeOutbox
-	case repository.WorkerWakePayloadAttachment:
-		return WakeAttachment
+	case repository.WorkerWakePayloadPublication:
+		return WakePublication
 	default:
 		return 0
 	}

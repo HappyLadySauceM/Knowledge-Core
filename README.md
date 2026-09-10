@@ -23,7 +23,7 @@ Knowledge Core 是一个支持文档元数据、权限、通用附件、实时�
 | 当前用户 | `GET /api/v1/users/me` | 验签后向 Identity 复核 active 状态与 token version |
 | 公开文档 | `GET /api/v1/documents`、`GET /api/v1/documents/:slug` | 发布列表、投影内容和附件元数据 |
 | 附件下载 | `GET /api/v1/attachments/:attachment_id/content` | 返回 `303 See Other` 到短期预签名地址 |
-| 通用附件 | `/api/v1/attachments` | Attachment façade、16MiB 分片上传、幂等重试、扫描状态和回收 |
+| 通用附件 | `/api/v1/attachments` | Attachment façade、稳定游标分页、16MiB 分片上传、幂等重试、扫描状态和回收 |
 | 站点配置 | `GET /api/v1/site-profile` | 站点标题、双语标语、首图和焦点位置 |
 | 管理员配置 | `/api/v1/admin/configuration/:namespace` | 管理员读取/写入 `site`、`email`、`ai`；使用强 ETag 和幂等键 |
 | Studio 文档 | `/api/v1/studio/documents` | 列表、创建、读取、更新、删除、发布和取消发布 |

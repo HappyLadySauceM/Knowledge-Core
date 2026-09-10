@@ -20,8 +20,6 @@ import (
 	knowledgelogic "github.com/HappyLadySauce/Knowledge-Core/services/knowledge/internal/logic"
 	"github.com/HappyLadySauce/Knowledge-Core/services/knowledge/internal/migration"
 	knowledgerepository "github.com/HappyLadySauce/Knowledge-Core/services/knowledge/internal/repository"
-	"github.com/HappyLadySauce/Knowledge-Core/services/knowledge/internal/scanner"
-	"github.com/HappyLadySauce/Knowledge-Core/services/knowledge/internal/storage"
 	knowledgerpc "github.com/HappyLadySauce/Knowledge-Core/services/knowledge/internal/transport/rpc"
 	"github.com/HappyLadySauce/Knowledge-Core/services/knowledge/internal/worker"
 	"gorm.io/gorm"
@@ -34,12 +32,10 @@ type ServiceContext struct {
 	Identity         identityservice.Client
 	Directory        *knowledgeclient.Directory
 	Collaboration    *knowledgeclient.Collaboration
-	Objects          *storage.S3
-	Scanner          *scanner.ClamAV
+	Attachment       *knowledgeclient.Attachment
 	Store            *knowledgerepository.Store
 	Documents        *knowledgelogic.DocumentLogic
 	Members          *knowledgelogic.MemberLogic
-	Attachments      *knowledgelogic.AttachmentLogic
 	CollaborationAPI *knowledgelogic.CollaborationLogic
 	RPCHandler       *knowledgerpc.Handler
 	RPCServer        *knowledgerpc.RPCServer
@@ -95,12 +91,9 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 	if err != nil {
 		return nil, err
 	}
-
-	objects, err := storage.Open(ctx, *cfg.ObjectStorage)
-	if err != nil {
-		return nil, err
-	}
-	malwareScanner, err := scanner.New(*cfg.Scanner)
+	attachment, err := knowledgeclient.NewAttachment(
+		*cfg.AttachmentRPC, cfg.Auth.AttachmentServiceToken, runtime.Trace, runtime.Metrics,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -120,20 +113,16 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 	if err != nil {
 		return nil, err
 	}
-	attachments, err := knowledgelogic.NewAttachmentLogic(store, objects, cfg.ObjectStorage.UploadTTL)
-	if err != nil {
-		return nil, err
-	}
 	collaborationLogic, err := knowledgelogic.NewCollaborationLogic(store, directory)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := addReadinessChecks(runtime.Health, cfg, db, events, objects, malwareScanner); err != nil {
+	if err := addReadinessChecks(runtime.Health, cfg, db, events); err != nil {
 		return nil, err
 	}
 	rpcHandler, err := knowledgerpc.NewHandler(
-		documents, members, attachments, collaborationLogic, verifier, runtime.Health, runtime.Logger,
+		documents, members, collaborationLogic, verifier, runtime.Health, runtime.Logger,
 	)
 	if err != nil {
 		return nil, err
@@ -159,7 +148,7 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 	}
 
 	workers, err := worker.New(
-		ctx, *cfg.Workers, sqlDB, store, objects, malwareScanner, events, collaboration, runtime.Logger,
+		ctx, *cfg.Workers, sqlDB, store, attachment, events, collaboration, runtime.Logger,
 	)
 	if err != nil {
 		return nil, err
@@ -187,21 +176,18 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 		slog.String("component", "knowledge.context"), slog.String("event", "dependencies_ready"))
 	return &ServiceContext{
 		Config: cfg, Database: db, NATS: events,
-		Identity: identity, Directory: directory, Collaboration: collaboration, Objects: objects,
-		Scanner: malwareScanner, Store: store, Documents: documents, Members: members,
-		Attachments: attachments, CollaborationAPI: collaborationLogic, RPCHandler: rpcHandler,
+		Identity: identity, Directory: directory, Collaboration: collaboration, Attachment: attachment,
+		Store: store, Documents: documents, Members: members,
+		CollaborationAPI: collaborationLogic, RPCHandler: rpcHandler,
 		RPCServer: rpcServer,
 		Workers:   workers, Admin: admin,
 	}, nil
 }
 
 func (s *ServiceContext) ApplyDynamicConfig(cfg config.Config) error {
-	if s == nil || s.Objects == nil || s.Scanner == nil || s.Attachments == nil || s.Workers == nil {
+	if s == nil || s.Workers == nil {
 		return errors.New("apply knowledge dynamic configuration: service context is required")
 	}
-	s.Objects.SetTTLs(cfg.ObjectStorage.UploadTTL, cfg.ObjectStorage.DownloadTTL)
-	s.Scanner.SetLimits(cfg.Scanner.DialTimeout, cfg.Scanner.ScanTimeout, cfg.Scanner.MaximumStream)
-	s.Attachments.SetUploadTTL(cfg.ObjectStorage.UploadTTL)
 	s.Workers.SetOptions(*cfg.Workers)
 	return nil
 }
@@ -211,16 +197,12 @@ func addReadinessChecks(
 	cfg config.Config,
 	db *gorm.DB,
 	events *natsresource.DurableBroker,
-	objects *storage.S3,
-	malwareScanner *scanner.ClamAV,
 ) error {
 	return errors.Join(
 		registry.AddReadiness("postgres", withTimeout(cfg.PostgreSQL.ConnectTimeout, func(ctx stdcontext.Context) error {
 			return postgres.Ping(ctx, db)
 		})),
 		registry.AddReadiness("nats", withTimeout(cfg.NATS.RequestTimeout, events.Ping)),
-		registry.AddReadiness("object-storage", withTimeout(cfg.ObjectStorage.DownloadTTL, objects.Ping)),
-		registry.AddReadiness("clamav", withTimeout(cfg.Scanner.DialTimeout+cfg.Scanner.ScanTimeout, malwareScanner.Ping)),
 	)
 }
 

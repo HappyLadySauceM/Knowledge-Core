@@ -10,12 +10,13 @@ import (
 )
 
 type AuthOptions struct {
-	PublicKey string `mapstructure:"public_key" json:"public_key" yaml:"public_key"`
+	PublicKey     string `mapstructure:"public_key" json:"public_key" yaml:"public_key"`
+	InternalToken string `mapstructure:"internal_token" json:"internal_token" yaml:"internal_token"`
 }
 
 func (o AuthOptions) Validate() error {
-	if strings.TrimSpace(o.PublicKey) == "" {
-		return errors.New("auth.public_key is required")
+	if strings.TrimSpace(o.PublicKey) == "" || strings.TrimSpace(o.InternalToken) == "" {
+		return errors.New("auth.public_key and auth.internal_token are required")
 	}
 	return nil
 }

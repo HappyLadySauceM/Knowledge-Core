@@ -128,16 +128,6 @@ func _listdeleteddocumentsMw() []app.HandlerFunc {
 	return nil
 }
 
-func _listattachmentsMw() []app.HandlerFunc {
-	// your code...
-	return nil
-}
-
-func _createattachmentMw() []app.HandlerFunc {
-	// your code...
-	return nil
-}
-
 func _listmembersMw() []app.HandlerFunc {
 	// your code...
 	return nil
@@ -164,26 +154,6 @@ func _listversionsMw() []app.HandlerFunc {
 }
 
 func _createversionMw() []app.HandlerFunc {
-	// your code...
-	return nil
-}
-
-func _attachments0Mw() []app.HandlerFunc {
-	// your code...
-	return nil
-}
-
-func _deleteattachmentMw() []app.HandlerFunc {
-	// your code...
-	return nil
-}
-
-func _attachment_id0Mw() []app.HandlerFunc {
-	// your code...
-	return nil
-}
-
-func _completeattachmentMw() []app.HandlerFunc {
 	// your code...
 	return nil
 }

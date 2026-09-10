@@ -40,8 +40,8 @@ func TestGenerateCoversGatewayAndCollaborationContracts(t *testing.T) {
 			}
 		}
 	}
-	if operationCount != 54 {
-		t.Fatalf("OpenAPI operation count = %d, want 54", operationCount)
+	if operationCount != 50 {
+		t.Fatalf("OpenAPI operation count = %d, want 50", operationCount)
 	}
 	if got := value.AsyncAPI["asyncapi"]; got != "3.0.0" {
 		t.Fatalf("AsyncAPI version = %#v", got)

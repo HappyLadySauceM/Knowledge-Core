@@ -50,7 +50,8 @@ postgres:
   prepare_stmt: false
   tls:
     enabled: false
-auth: {}
+auth:
+  internal_token: ""
 object_storage:
   endpoint: 127.0.0.1:9000
   public_endpoint: 127.0.0.1:9000

@@ -60,6 +60,9 @@ func (s *documentServiceStub) Delete(context.Context, string, int64, int64) (*do
 func (s *documentServiceStub) Restore(context.Context, string, int64) (*domain.Document, error) {
 	return s.document, s.err
 }
+func (s *documentServiceStub) IsMediaPublished(context.Context, string) (bool, error) {
+	return false, s.err
+}
 
 type memberServiceStub struct{}
 
@@ -73,22 +76,6 @@ func (*memberServiceStub) Update(context.Context, string, int64, int64, int64, s
 	return nil, nil
 }
 func (*memberServiceStub) Delete(context.Context, string, int64, int64, int64) error { return nil }
-
-type attachmentServiceStub struct{}
-
-func (*attachmentServiceStub) List(context.Context, string, int64) ([]*domain.Attachment, error) {
-	return nil, nil
-}
-func (*attachmentServiceStub) Create(context.Context, knowledgelogic.CreateAttachmentInput) (*domain.AttachmentUpload, error) {
-	return nil, nil
-}
-func (*attachmentServiceStub) Complete(context.Context, string, string, int64) (*domain.Attachment, error) {
-	return nil, nil
-}
-func (*attachmentServiceStub) Delete(context.Context, string, string, int64) error { return nil }
-func (*attachmentServiceStub) Content(context.Context, string, int64) (*domain.AttachmentContent, error) {
-	return nil, nil
-}
 
 type collaborationServiceStub struct {
 	authorization *knowledgelogic.CollaborationAuthorization
@@ -307,7 +294,7 @@ func newTestHandlerWithDependencies(
 ) *Handler {
 	t.Helper()
 	handler, err := NewHandler(
-		documents, &memberServiceStub{}, &attachmentServiceStub{}, collaboration, verifier, readiness,
+		documents, &memberServiceStub{}, collaboration, verifier, readiness,
 		slog.New(slog.NewTextHandler(io.Discard, nil)),
 	)
 	if err != nil {

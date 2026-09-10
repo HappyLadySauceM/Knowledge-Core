@@ -9,9 +9,9 @@ import (
 // Worker wake channel and payloads are fixed, low-cardinality hints.
 // Worker 唤醒 channel 与 payload 为固定低基数 hint。
 const (
-	WorkerWakeChannel           = "knowledge_workers"
-	WorkerWakePayloadOutbox     = "outbox"
-	WorkerWakePayloadAttachment = "attachment"
+	WorkerWakeChannel            = "knowledge_workers"
+	WorkerWakePayloadOutbox      = "outbox"
+	WorkerWakePayloadPublication = "publication"
 )
 
 // notifyWorkers emits a same-transaction PostgreSQL NOTIFY for worker wake.
@@ -21,7 +21,7 @@ func notifyWorkers(tx *gorm.DB, payload string) error {
 		return fmt.Errorf("notify knowledge workers: transaction is required")
 	}
 	switch payload {
-	case WorkerWakePayloadOutbox, WorkerWakePayloadAttachment:
+	case WorkerWakePayloadOutbox, WorkerWakePayloadPublication:
 	default:
 		return fmt.Errorf("notify knowledge workers: unsupported payload %q", payload)
 	}

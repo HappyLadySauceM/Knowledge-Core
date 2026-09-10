@@ -12,7 +12,6 @@ import (
 
 type PurgeCandidate struct {
 	DocumentID string
-	ObjectKeys []string
 }
 
 func (s *Store) ListPurgeCandidates(ctx context.Context, limit int) ([]PurgeCandidate, error) {
@@ -26,12 +25,7 @@ func (s *Store) ListPurgeCandidates(ctx context.Context, limit int) ([]PurgeCand
 	}
 	result := make([]PurgeCandidate, 0, len(documents))
 	for index := range documents {
-		var keys []string
-		if err := s.db.WithContext(ctx).Model(&model.Attachment{}).Where("document_id = ?", documents[index].ID).
-			Pluck("object_key", &keys).Error; err != nil {
-			return nil, fmt.Errorf("list purge attachment objects: %w", err)
-		}
-		result = append(result, PurgeCandidate{DocumentID: documents[index].ID, ObjectKeys: keys})
+		result = append(result, PurgeCandidate{DocumentID: documents[index].ID})
 	}
 	return result, nil
 }

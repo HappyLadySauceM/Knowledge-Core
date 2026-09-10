@@ -70,6 +70,41 @@ var serviceMethods = map[string]kitex.MethodInfo{
 		false,
 		kitex.WithStreamingMode(kitex.StreamingNone),
 	),
+	"StagePublicationReferences": kitex.NewMethodInfo(
+		stagePublicationReferencesHandler,
+		newAttachmentServiceStagePublicationReferencesArgs,
+		newAttachmentServiceStagePublicationReferencesResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
+	"FinalizePublicationReferences": kitex.NewMethodInfo(
+		finalizePublicationReferencesHandler,
+		newAttachmentServiceFinalizePublicationReferencesArgs,
+		newAttachmentServiceFinalizePublicationReferencesResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
+	"ClearPublicationReferences": kitex.NewMethodInfo(
+		clearPublicationReferencesHandler,
+		newAttachmentServiceClearPublicationReferencesArgs,
+		newAttachmentServiceClearPublicationReferencesResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
+	"GetPublicationReferenceState": kitex.NewMethodInfo(
+		getPublicationReferenceStateHandler,
+		newAttachmentServiceGetPublicationReferenceStateArgs,
+		newAttachmentServiceGetPublicationReferenceStateResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
+	"GetPublishedAttachmentContent": kitex.NewMethodInfo(
+		getPublishedAttachmentContentHandler,
+		newAttachmentServiceGetPublishedAttachmentContentArgs,
+		newAttachmentServiceGetPublishedAttachmentContentResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
 }
 
 var (
@@ -280,6 +315,96 @@ func newAttachmentServiceRestoreAttachmentResult() interface{} {
 	return attachment.NewAttachmentServiceRestoreAttachmentResult()
 }
 
+func stagePublicationReferencesHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*attachment.AttachmentServiceStagePublicationReferencesArgs)
+
+	err := handler.(attachment.AttachmentService).StagePublicationReferences(ctx, realArg.Request)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+func newAttachmentServiceStagePublicationReferencesArgs() interface{} {
+	return attachment.NewAttachmentServiceStagePublicationReferencesArgs()
+}
+
+func newAttachmentServiceStagePublicationReferencesResult() interface{} {
+	return attachment.NewAttachmentServiceStagePublicationReferencesResult()
+}
+
+func finalizePublicationReferencesHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*attachment.AttachmentServiceFinalizePublicationReferencesArgs)
+
+	err := handler.(attachment.AttachmentService).FinalizePublicationReferences(ctx, realArg.Request)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+func newAttachmentServiceFinalizePublicationReferencesArgs() interface{} {
+	return attachment.NewAttachmentServiceFinalizePublicationReferencesArgs()
+}
+
+func newAttachmentServiceFinalizePublicationReferencesResult() interface{} {
+	return attachment.NewAttachmentServiceFinalizePublicationReferencesResult()
+}
+
+func clearPublicationReferencesHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*attachment.AttachmentServiceClearPublicationReferencesArgs)
+
+	err := handler.(attachment.AttachmentService).ClearPublicationReferences(ctx, realArg.Request)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+func newAttachmentServiceClearPublicationReferencesArgs() interface{} {
+	return attachment.NewAttachmentServiceClearPublicationReferencesArgs()
+}
+
+func newAttachmentServiceClearPublicationReferencesResult() interface{} {
+	return attachment.NewAttachmentServiceClearPublicationReferencesResult()
+}
+
+func getPublicationReferenceStateHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*attachment.AttachmentServiceGetPublicationReferenceStateArgs)
+	realResult := result.(*attachment.AttachmentServiceGetPublicationReferenceStateResult)
+	success, err := handler.(attachment.AttachmentService).GetPublicationReferenceState(ctx, realArg.Request)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newAttachmentServiceGetPublicationReferenceStateArgs() interface{} {
+	return attachment.NewAttachmentServiceGetPublicationReferenceStateArgs()
+}
+
+func newAttachmentServiceGetPublicationReferenceStateResult() interface{} {
+	return attachment.NewAttachmentServiceGetPublicationReferenceStateResult()
+}
+
+func getPublishedAttachmentContentHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*attachment.AttachmentServiceGetPublishedAttachmentContentArgs)
+	realResult := result.(*attachment.AttachmentServiceGetPublishedAttachmentContentResult)
+	success, err := handler.(attachment.AttachmentService).GetPublishedAttachmentContent(ctx, realArg.Request)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newAttachmentServiceGetPublishedAttachmentContentArgs() interface{} {
+	return attachment.NewAttachmentServiceGetPublishedAttachmentContentArgs()
+}
+
+func newAttachmentServiceGetPublishedAttachmentContentResult() interface{} {
+	return attachment.NewAttachmentServiceGetPublishedAttachmentContentResult()
+}
+
 type kClient struct {
 	c client.Client
 }
@@ -365,6 +490,56 @@ func (p *kClient) RestoreAttachment(ctx context.Context, request *attachment.Att
 	_args.Request = request
 	var _result attachment.AttachmentServiceRestoreAttachmentResult
 	if err = p.c.Call(ctx, "RestoreAttachment", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) StagePublicationReferences(ctx context.Context, request *attachment.PublicationReferenceCommand) (err error) {
+	var _args attachment.AttachmentServiceStagePublicationReferencesArgs
+	_args.Request = request
+	var _result attachment.AttachmentServiceStagePublicationReferencesResult
+	if err = p.c.Call(ctx, "StagePublicationReferences", &_args, &_result); err != nil {
+		return
+	}
+	return nil
+}
+
+func (p *kClient) FinalizePublicationReferences(ctx context.Context, request *attachment.PublicationReferenceCommand) (err error) {
+	var _args attachment.AttachmentServiceFinalizePublicationReferencesArgs
+	_args.Request = request
+	var _result attachment.AttachmentServiceFinalizePublicationReferencesResult
+	if err = p.c.Call(ctx, "FinalizePublicationReferences", &_args, &_result); err != nil {
+		return
+	}
+	return nil
+}
+
+func (p *kClient) ClearPublicationReferences(ctx context.Context, request *attachment.PublicationReferenceCommand) (err error) {
+	var _args attachment.AttachmentServiceClearPublicationReferencesArgs
+	_args.Request = request
+	var _result attachment.AttachmentServiceClearPublicationReferencesResult
+	if err = p.c.Call(ctx, "ClearPublicationReferences", &_args, &_result); err != nil {
+		return
+	}
+	return nil
+}
+
+func (p *kClient) GetPublicationReferenceState(ctx context.Context, request *attachment.PublicationReferenceStateRequest) (r *attachment.PublicationReferenceState, err error) {
+	var _args attachment.AttachmentServiceGetPublicationReferenceStateArgs
+	_args.Request = request
+	var _result attachment.AttachmentServiceGetPublicationReferenceStateResult
+	if err = p.c.Call(ctx, "GetPublicationReferenceState", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) GetPublishedAttachmentContent(ctx context.Context, request *attachment.AttachmentIDRequest) (r *attachment.AttachmentContent, err error) {
+	var _args attachment.AttachmentServiceGetPublishedAttachmentContentArgs
+	_args.Request = request
+	var _result attachment.AttachmentServiceGetPublishedAttachmentContentResult
+	if err = p.c.Call(ctx, "GetPublishedAttachmentContent", &_args, &_result); err != nil {
 		return
 	}
 	return _result.GetSuccess(), nil

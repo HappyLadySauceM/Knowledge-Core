@@ -494,8 +494,56 @@ var fieldIDToName_AttachmentIDRequest = map[int16]string{
 	1: "attachment_id",
 }
 
+type AttachmentPageInfo struct {
+	NextCursor *string `thrift:"next_cursor,1,optional" frugal:"1,optional,string" json:"next_cursor,omitempty"`
+	HasMore    bool    `thrift:"has_more,2,required" frugal:"2,required,bool" json:"has_more"`
+}
+
+func NewAttachmentPageInfo() *AttachmentPageInfo {
+	return &AttachmentPageInfo{}
+}
+
+func (p *AttachmentPageInfo) InitDefault() {
+}
+
+var AttachmentPageInfo_NextCursor_DEFAULT string
+
+func (p *AttachmentPageInfo) GetNextCursor() (v string) {
+	if !p.IsSetNextCursor() {
+		return AttachmentPageInfo_NextCursor_DEFAULT
+	}
+	return *p.NextCursor
+}
+
+func (p *AttachmentPageInfo) GetHasMore() (v bool) {
+	return p.HasMore
+}
+func (p *AttachmentPageInfo) SetNextCursor(val *string) {
+	p.NextCursor = val
+}
+func (p *AttachmentPageInfo) SetHasMore(val bool) {
+	p.HasMore = val
+}
+
+func (p *AttachmentPageInfo) IsSetNextCursor() bool {
+	return p.NextCursor != nil
+}
+
+func (p *AttachmentPageInfo) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("AttachmentPageInfo(%+v)", *p)
+}
+
+var fieldIDToName_AttachmentPageInfo = map[int16]string{
+	1: "next_cursor",
+	2: "has_more",
+}
+
 type AttachmentList struct {
-	Items []*Attachment `thrift:"items,1,required" frugal:"1,required,list<Attachment>" json:"items"`
+	Items []*Attachment       `thrift:"items,1,required" frugal:"1,required,list<Attachment>" json:"items"`
+	Page  *AttachmentPageInfo `thrift:"page,2,optional" frugal:"2,optional,AttachmentPageInfo" json:"page,omitempty"`
 }
 
 func NewAttachmentList() *AttachmentList {
@@ -508,8 +556,24 @@ func (p *AttachmentList) InitDefault() {
 func (p *AttachmentList) GetItems() (v []*Attachment) {
 	return p.Items
 }
+
+var AttachmentList_Page_DEFAULT *AttachmentPageInfo
+
+func (p *AttachmentList) GetPage() (v *AttachmentPageInfo) {
+	if !p.IsSetPage() {
+		return AttachmentList_Page_DEFAULT
+	}
+	return p.Page
+}
 func (p *AttachmentList) SetItems(val []*Attachment) {
 	p.Items = val
+}
+func (p *AttachmentList) SetPage(val *AttachmentPageInfo) {
+	p.Page = val
+}
+
+func (p *AttachmentList) IsSetPage() bool {
+	return p.Page != nil
 }
 
 func (p *AttachmentList) String() string {
@@ -521,6 +585,7 @@ func (p *AttachmentList) String() string {
 
 var fieldIDToName_AttachmentList = map[int16]string{
 	1: "items",
+	2: "page",
 }
 
 type ListAttachmentsRequest struct {
@@ -615,6 +680,194 @@ var fieldIDToName_ListAttachmentsRequest = map[int16]string{
 	4: "limit",
 }
 
+type PublicationReferenceCommand struct {
+	MessageId     string   `thrift:"message_id,1,required" frugal:"1,required,string" json:"message_id"`
+	DocumentId    string   `thrift:"document_id,2,required" frugal:"2,required,string" json:"document_id"`
+	OwnerId       int64    `thrift:"owner_id,3,required" frugal:"3,required,i64" json:"owner_id"`
+	Generation    int64    `thrift:"generation,4,required" frugal:"4,required,i64" json:"generation"`
+	AttachmentIds []string `thrift:"attachment_ids,5,required" frugal:"5,required,list<string>" json:"attachment_ids"`
+}
+
+func NewPublicationReferenceCommand() *PublicationReferenceCommand {
+	return &PublicationReferenceCommand{}
+}
+
+func (p *PublicationReferenceCommand) InitDefault() {
+}
+
+func (p *PublicationReferenceCommand) GetMessageId() (v string) {
+	return p.MessageId
+}
+
+func (p *PublicationReferenceCommand) GetDocumentId() (v string) {
+	return p.DocumentId
+}
+
+func (p *PublicationReferenceCommand) GetOwnerId() (v int64) {
+	return p.OwnerId
+}
+
+func (p *PublicationReferenceCommand) GetGeneration() (v int64) {
+	return p.Generation
+}
+
+func (p *PublicationReferenceCommand) GetAttachmentIds() (v []string) {
+	return p.AttachmentIds
+}
+func (p *PublicationReferenceCommand) SetMessageId(val string) {
+	p.MessageId = val
+}
+func (p *PublicationReferenceCommand) SetDocumentId(val string) {
+	p.DocumentId = val
+}
+func (p *PublicationReferenceCommand) SetOwnerId(val int64) {
+	p.OwnerId = val
+}
+func (p *PublicationReferenceCommand) SetGeneration(val int64) {
+	p.Generation = val
+}
+func (p *PublicationReferenceCommand) SetAttachmentIds(val []string) {
+	p.AttachmentIds = val
+}
+
+func (p *PublicationReferenceCommand) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("PublicationReferenceCommand(%+v)", *p)
+}
+
+var fieldIDToName_PublicationReferenceCommand = map[int16]string{
+	1: "message_id",
+	2: "document_id",
+	3: "owner_id",
+	4: "generation",
+	5: "attachment_ids",
+}
+
+type PublicationReferenceStateRequest struct {
+	DocumentId string `thrift:"document_id,1,required" frugal:"1,required,string" json:"document_id"`
+}
+
+func NewPublicationReferenceStateRequest() *PublicationReferenceStateRequest {
+	return &PublicationReferenceStateRequest{}
+}
+
+func (p *PublicationReferenceStateRequest) InitDefault() {
+}
+
+func (p *PublicationReferenceStateRequest) GetDocumentId() (v string) {
+	return p.DocumentId
+}
+func (p *PublicationReferenceStateRequest) SetDocumentId(val string) {
+	p.DocumentId = val
+}
+
+func (p *PublicationReferenceStateRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("PublicationReferenceStateRequest(%+v)", *p)
+}
+
+var fieldIDToName_PublicationReferenceStateRequest = map[int16]string{
+	1: "document_id",
+}
+
+type PublicationReferenceState struct {
+	DocumentId       string `thrift:"document_id,1,required" frugal:"1,required,string" json:"document_id"`
+	ActiveGeneration int64  `thrift:"active_generation,2,required" frugal:"2,required,i64" json:"active_generation"`
+	StagedGeneration *int64 `thrift:"staged_generation,3,optional" frugal:"3,optional,i64" json:"staged_generation,omitempty"`
+}
+
+func NewPublicationReferenceState() *PublicationReferenceState {
+	return &PublicationReferenceState{}
+}
+
+func (p *PublicationReferenceState) InitDefault() {
+}
+
+func (p *PublicationReferenceState) GetDocumentId() (v string) {
+	return p.DocumentId
+}
+
+func (p *PublicationReferenceState) GetActiveGeneration() (v int64) {
+	return p.ActiveGeneration
+}
+
+var PublicationReferenceState_StagedGeneration_DEFAULT int64
+
+func (p *PublicationReferenceState) GetStagedGeneration() (v int64) {
+	if !p.IsSetStagedGeneration() {
+		return PublicationReferenceState_StagedGeneration_DEFAULT
+	}
+	return *p.StagedGeneration
+}
+func (p *PublicationReferenceState) SetDocumentId(val string) {
+	p.DocumentId = val
+}
+func (p *PublicationReferenceState) SetActiveGeneration(val int64) {
+	p.ActiveGeneration = val
+}
+func (p *PublicationReferenceState) SetStagedGeneration(val *int64) {
+	p.StagedGeneration = val
+}
+
+func (p *PublicationReferenceState) IsSetStagedGeneration() bool {
+	return p.StagedGeneration != nil
+}
+
+func (p *PublicationReferenceState) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("PublicationReferenceState(%+v)", *p)
+}
+
+var fieldIDToName_PublicationReferenceState = map[int16]string{
+	1: "document_id",
+	2: "active_generation",
+	3: "staged_generation",
+}
+
+type AttachmentContent struct {
+	Url       string `thrift:"url,1,required" frugal:"1,required,string" json:"url"`
+	ExpiresAt string `thrift:"expires_at,2,required" frugal:"2,required,string" json:"expires_at"`
+}
+
+func NewAttachmentContent() *AttachmentContent {
+	return &AttachmentContent{}
+}
+
+func (p *AttachmentContent) InitDefault() {
+}
+
+func (p *AttachmentContent) GetUrl() (v string) {
+	return p.Url
+}
+
+func (p *AttachmentContent) GetExpiresAt() (v string) {
+	return p.ExpiresAt
+}
+func (p *AttachmentContent) SetUrl(val string) {
+	p.Url = val
+}
+func (p *AttachmentContent) SetExpiresAt(val string) {
+	p.ExpiresAt = val
+}
+
+func (p *AttachmentContent) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("AttachmentContent(%+v)", *p)
+}
+
+var fieldIDToName_AttachmentContent = map[int16]string{
+	1: "url",
+	2: "expires_at",
+}
+
 type AttachmentService interface {
 	Ping(ctx context.Context, request *common.PingRequest) (r *common.PingResponse, err error)
 
@@ -631,6 +884,16 @@ type AttachmentService interface {
 	TrashAttachment(ctx context.Context, request *AttachmentIDRequest) (err error)
 
 	RestoreAttachment(ctx context.Context, request *AttachmentIDRequest) (r *Attachment, err error)
+
+	StagePublicationReferences(ctx context.Context, request *PublicationReferenceCommand) (err error)
+
+	FinalizePublicationReferences(ctx context.Context, request *PublicationReferenceCommand) (err error)
+
+	ClearPublicationReferences(ctx context.Context, request *PublicationReferenceCommand) (err error)
+
+	GetPublicationReferenceState(ctx context.Context, request *PublicationReferenceStateRequest) (r *PublicationReferenceState, err error)
+
+	GetPublishedAttachmentContent(ctx context.Context, request *AttachmentIDRequest) (r *AttachmentContent, err error)
 }
 
 type AttachmentServicePingArgs struct {
@@ -1219,5 +1482,328 @@ func (p *AttachmentServiceRestoreAttachmentResult) String() string {
 }
 
 var fieldIDToName_AttachmentServiceRestoreAttachmentResult = map[int16]string{
+	0: "success",
+}
+
+type AttachmentServiceStagePublicationReferencesArgs struct {
+	Request *PublicationReferenceCommand `thrift:"request,1" frugal:"1,default,PublicationReferenceCommand" json:"request"`
+}
+
+func NewAttachmentServiceStagePublicationReferencesArgs() *AttachmentServiceStagePublicationReferencesArgs {
+	return &AttachmentServiceStagePublicationReferencesArgs{}
+}
+
+func (p *AttachmentServiceStagePublicationReferencesArgs) InitDefault() {
+}
+
+var AttachmentServiceStagePublicationReferencesArgs_Request_DEFAULT *PublicationReferenceCommand
+
+func (p *AttachmentServiceStagePublicationReferencesArgs) GetRequest() (v *PublicationReferenceCommand) {
+	if !p.IsSetRequest() {
+		return AttachmentServiceStagePublicationReferencesArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+func (p *AttachmentServiceStagePublicationReferencesArgs) SetRequest(val *PublicationReferenceCommand) {
+	p.Request = val
+}
+
+func (p *AttachmentServiceStagePublicationReferencesArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *AttachmentServiceStagePublicationReferencesArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("AttachmentServiceStagePublicationReferencesArgs(%+v)", *p)
+}
+
+var fieldIDToName_AttachmentServiceStagePublicationReferencesArgs = map[int16]string{
+	1: "request",
+}
+
+type AttachmentServiceStagePublicationReferencesResult struct {
+}
+
+func NewAttachmentServiceStagePublicationReferencesResult() *AttachmentServiceStagePublicationReferencesResult {
+	return &AttachmentServiceStagePublicationReferencesResult{}
+}
+
+func (p *AttachmentServiceStagePublicationReferencesResult) InitDefault() {
+}
+
+func (p *AttachmentServiceStagePublicationReferencesResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("AttachmentServiceStagePublicationReferencesResult(%+v)", *p)
+}
+
+var fieldIDToName_AttachmentServiceStagePublicationReferencesResult = map[int16]string{}
+
+type AttachmentServiceFinalizePublicationReferencesArgs struct {
+	Request *PublicationReferenceCommand `thrift:"request,1" frugal:"1,default,PublicationReferenceCommand" json:"request"`
+}
+
+func NewAttachmentServiceFinalizePublicationReferencesArgs() *AttachmentServiceFinalizePublicationReferencesArgs {
+	return &AttachmentServiceFinalizePublicationReferencesArgs{}
+}
+
+func (p *AttachmentServiceFinalizePublicationReferencesArgs) InitDefault() {
+}
+
+var AttachmentServiceFinalizePublicationReferencesArgs_Request_DEFAULT *PublicationReferenceCommand
+
+func (p *AttachmentServiceFinalizePublicationReferencesArgs) GetRequest() (v *PublicationReferenceCommand) {
+	if !p.IsSetRequest() {
+		return AttachmentServiceFinalizePublicationReferencesArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+func (p *AttachmentServiceFinalizePublicationReferencesArgs) SetRequest(val *PublicationReferenceCommand) {
+	p.Request = val
+}
+
+func (p *AttachmentServiceFinalizePublicationReferencesArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *AttachmentServiceFinalizePublicationReferencesArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("AttachmentServiceFinalizePublicationReferencesArgs(%+v)", *p)
+}
+
+var fieldIDToName_AttachmentServiceFinalizePublicationReferencesArgs = map[int16]string{
+	1: "request",
+}
+
+type AttachmentServiceFinalizePublicationReferencesResult struct {
+}
+
+func NewAttachmentServiceFinalizePublicationReferencesResult() *AttachmentServiceFinalizePublicationReferencesResult {
+	return &AttachmentServiceFinalizePublicationReferencesResult{}
+}
+
+func (p *AttachmentServiceFinalizePublicationReferencesResult) InitDefault() {
+}
+
+func (p *AttachmentServiceFinalizePublicationReferencesResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("AttachmentServiceFinalizePublicationReferencesResult(%+v)", *p)
+}
+
+var fieldIDToName_AttachmentServiceFinalizePublicationReferencesResult = map[int16]string{}
+
+type AttachmentServiceClearPublicationReferencesArgs struct {
+	Request *PublicationReferenceCommand `thrift:"request,1" frugal:"1,default,PublicationReferenceCommand" json:"request"`
+}
+
+func NewAttachmentServiceClearPublicationReferencesArgs() *AttachmentServiceClearPublicationReferencesArgs {
+	return &AttachmentServiceClearPublicationReferencesArgs{}
+}
+
+func (p *AttachmentServiceClearPublicationReferencesArgs) InitDefault() {
+}
+
+var AttachmentServiceClearPublicationReferencesArgs_Request_DEFAULT *PublicationReferenceCommand
+
+func (p *AttachmentServiceClearPublicationReferencesArgs) GetRequest() (v *PublicationReferenceCommand) {
+	if !p.IsSetRequest() {
+		return AttachmentServiceClearPublicationReferencesArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+func (p *AttachmentServiceClearPublicationReferencesArgs) SetRequest(val *PublicationReferenceCommand) {
+	p.Request = val
+}
+
+func (p *AttachmentServiceClearPublicationReferencesArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *AttachmentServiceClearPublicationReferencesArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("AttachmentServiceClearPublicationReferencesArgs(%+v)", *p)
+}
+
+var fieldIDToName_AttachmentServiceClearPublicationReferencesArgs = map[int16]string{
+	1: "request",
+}
+
+type AttachmentServiceClearPublicationReferencesResult struct {
+}
+
+func NewAttachmentServiceClearPublicationReferencesResult() *AttachmentServiceClearPublicationReferencesResult {
+	return &AttachmentServiceClearPublicationReferencesResult{}
+}
+
+func (p *AttachmentServiceClearPublicationReferencesResult) InitDefault() {
+}
+
+func (p *AttachmentServiceClearPublicationReferencesResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("AttachmentServiceClearPublicationReferencesResult(%+v)", *p)
+}
+
+var fieldIDToName_AttachmentServiceClearPublicationReferencesResult = map[int16]string{}
+
+type AttachmentServiceGetPublicationReferenceStateArgs struct {
+	Request *PublicationReferenceStateRequest `thrift:"request,1" frugal:"1,default,PublicationReferenceStateRequest" json:"request"`
+}
+
+func NewAttachmentServiceGetPublicationReferenceStateArgs() *AttachmentServiceGetPublicationReferenceStateArgs {
+	return &AttachmentServiceGetPublicationReferenceStateArgs{}
+}
+
+func (p *AttachmentServiceGetPublicationReferenceStateArgs) InitDefault() {
+}
+
+var AttachmentServiceGetPublicationReferenceStateArgs_Request_DEFAULT *PublicationReferenceStateRequest
+
+func (p *AttachmentServiceGetPublicationReferenceStateArgs) GetRequest() (v *PublicationReferenceStateRequest) {
+	if !p.IsSetRequest() {
+		return AttachmentServiceGetPublicationReferenceStateArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+func (p *AttachmentServiceGetPublicationReferenceStateArgs) SetRequest(val *PublicationReferenceStateRequest) {
+	p.Request = val
+}
+
+func (p *AttachmentServiceGetPublicationReferenceStateArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *AttachmentServiceGetPublicationReferenceStateArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("AttachmentServiceGetPublicationReferenceStateArgs(%+v)", *p)
+}
+
+var fieldIDToName_AttachmentServiceGetPublicationReferenceStateArgs = map[int16]string{
+	1: "request",
+}
+
+type AttachmentServiceGetPublicationReferenceStateResult struct {
+	Success *PublicationReferenceState `thrift:"success,0,optional" frugal:"0,optional,PublicationReferenceState" json:"success,omitempty"`
+}
+
+func NewAttachmentServiceGetPublicationReferenceStateResult() *AttachmentServiceGetPublicationReferenceStateResult {
+	return &AttachmentServiceGetPublicationReferenceStateResult{}
+}
+
+func (p *AttachmentServiceGetPublicationReferenceStateResult) InitDefault() {
+}
+
+var AttachmentServiceGetPublicationReferenceStateResult_Success_DEFAULT *PublicationReferenceState
+
+func (p *AttachmentServiceGetPublicationReferenceStateResult) GetSuccess() (v *PublicationReferenceState) {
+	if !p.IsSetSuccess() {
+		return AttachmentServiceGetPublicationReferenceStateResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *AttachmentServiceGetPublicationReferenceStateResult) SetSuccess(x interface{}) {
+	p.Success = x.(*PublicationReferenceState)
+}
+
+func (p *AttachmentServiceGetPublicationReferenceStateResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *AttachmentServiceGetPublicationReferenceStateResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("AttachmentServiceGetPublicationReferenceStateResult(%+v)", *p)
+}
+
+var fieldIDToName_AttachmentServiceGetPublicationReferenceStateResult = map[int16]string{
+	0: "success",
+}
+
+type AttachmentServiceGetPublishedAttachmentContentArgs struct {
+	Request *AttachmentIDRequest `thrift:"request,1" frugal:"1,default,AttachmentIDRequest" json:"request"`
+}
+
+func NewAttachmentServiceGetPublishedAttachmentContentArgs() *AttachmentServiceGetPublishedAttachmentContentArgs {
+	return &AttachmentServiceGetPublishedAttachmentContentArgs{}
+}
+
+func (p *AttachmentServiceGetPublishedAttachmentContentArgs) InitDefault() {
+}
+
+var AttachmentServiceGetPublishedAttachmentContentArgs_Request_DEFAULT *AttachmentIDRequest
+
+func (p *AttachmentServiceGetPublishedAttachmentContentArgs) GetRequest() (v *AttachmentIDRequest) {
+	if !p.IsSetRequest() {
+		return AttachmentServiceGetPublishedAttachmentContentArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+func (p *AttachmentServiceGetPublishedAttachmentContentArgs) SetRequest(val *AttachmentIDRequest) {
+	p.Request = val
+}
+
+func (p *AttachmentServiceGetPublishedAttachmentContentArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *AttachmentServiceGetPublishedAttachmentContentArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("AttachmentServiceGetPublishedAttachmentContentArgs(%+v)", *p)
+}
+
+var fieldIDToName_AttachmentServiceGetPublishedAttachmentContentArgs = map[int16]string{
+	1: "request",
+}
+
+type AttachmentServiceGetPublishedAttachmentContentResult struct {
+	Success *AttachmentContent `thrift:"success,0,optional" frugal:"0,optional,AttachmentContent" json:"success,omitempty"`
+}
+
+func NewAttachmentServiceGetPublishedAttachmentContentResult() *AttachmentServiceGetPublishedAttachmentContentResult {
+	return &AttachmentServiceGetPublishedAttachmentContentResult{}
+}
+
+func (p *AttachmentServiceGetPublishedAttachmentContentResult) InitDefault() {
+}
+
+var AttachmentServiceGetPublishedAttachmentContentResult_Success_DEFAULT *AttachmentContent
+
+func (p *AttachmentServiceGetPublishedAttachmentContentResult) GetSuccess() (v *AttachmentContent) {
+	if !p.IsSetSuccess() {
+		return AttachmentServiceGetPublishedAttachmentContentResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *AttachmentServiceGetPublishedAttachmentContentResult) SetSuccess(x interface{}) {
+	p.Success = x.(*AttachmentContent)
+}
+
+func (p *AttachmentServiceGetPublishedAttachmentContentResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *AttachmentServiceGetPublishedAttachmentContentResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("AttachmentServiceGetPublishedAttachmentContentResult(%+v)", *p)
+}
+
+var fieldIDToName_AttachmentServiceGetPublishedAttachmentContentResult = map[int16]string{
 	0: "success",
 }

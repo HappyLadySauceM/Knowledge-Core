@@ -63,12 +63,39 @@ struct CompleteAttachmentRequest {
 }
 
 struct AttachmentIDRequest { 1: required string attachment_id }
-struct AttachmentList { 1: required list<Attachment> items }
+struct AttachmentPageInfo {
+  1: optional string next_cursor
+  2: required bool has_more
+}
+struct AttachmentList {
+  1: required list<Attachment> items
+  2: optional AttachmentPageInfo page
+}
 struct ListAttachmentsRequest {
   1: optional string status
   2: optional string category
   3: optional string cursor
   4: optional i32 limit
+}
+
+struct PublicationReferenceCommand {
+  1: required string message_id
+  2: required string document_id
+  3: required i64 owner_id
+  4: required i64 generation
+  5: required list<string> attachment_ids
+}
+
+struct PublicationReferenceStateRequest { 1: required string document_id }
+struct PublicationReferenceState {
+  1: required string document_id
+  2: required i64 active_generation
+  3: optional i64 staged_generation
+}
+
+struct AttachmentContent {
+  1: required string url
+  2: required string expires_at
 }
 
 service AttachmentService {
@@ -80,4 +107,9 @@ service AttachmentService {
   Attachment GetAttachment(1: AttachmentIDRequest request)
   void TrashAttachment(1: AttachmentIDRequest request)
   Attachment RestoreAttachment(1: AttachmentIDRequest request)
+  void StagePublicationReferences(1: PublicationReferenceCommand request)
+  void FinalizePublicationReferences(1: PublicationReferenceCommand request)
+  void ClearPublicationReferences(1: PublicationReferenceCommand request)
+  PublicationReferenceState GetPublicationReferenceState(1: PublicationReferenceStateRequest request)
+  AttachmentContent GetPublishedAttachmentContent(1: AttachmentIDRequest request)
 }

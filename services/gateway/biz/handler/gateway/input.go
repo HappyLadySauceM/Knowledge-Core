@@ -65,13 +65,6 @@ type restoreVersionBody struct {
 	ExpectedSequence int64 `json:"expected_sequence"`
 }
 
-type createAttachmentBody struct {
-	Filename  string `json:"filename"`
-	MediaType string `json:"media_type"`
-	SizeBytes int64  `json:"size_bytes"`
-	SHA256    string `json:"sha256"`
-}
-
 type createMediaAttachmentBody struct {
 	Filename  string `json:"filename"`
 	MediaType string `json:"media_type"`

@@ -32,6 +32,7 @@ type DocumentService interface {
 	PublishSnapshot(context.Context, string, int64, int64, knowledgelogic.PublishSnapshotInput) (*domain.Document, error)
 	Delete(context.Context, string, int64, int64) (*domain.Document, error)
 	Restore(context.Context, string, int64) (*domain.Document, error)
+	IsMediaPublished(context.Context, string) (bool, error)
 }
 
 type FolderService interface {
@@ -46,14 +47,6 @@ type MemberService interface {
 	Add(context.Context, knowledgelogic.AddMemberInput) (*domain.Member, error)
 	Update(context.Context, string, int64, int64, int64, string) (*domain.Member, error)
 	Delete(context.Context, string, int64, int64, int64) error
-}
-
-type AttachmentService interface {
-	List(context.Context, string, int64) ([]*domain.Attachment, error)
-	Create(context.Context, knowledgelogic.CreateAttachmentInput) (*domain.AttachmentUpload, error)
-	Complete(context.Context, string, string, int64) (*domain.Attachment, error)
-	Delete(context.Context, string, string, int64) error
-	Content(context.Context, string, int64) (*domain.AttachmentContent, error)
 }
 
 type CollaborationService interface {
@@ -72,7 +65,6 @@ type Readiness interface {
 type Handler struct {
 	documents     DocumentService
 	members       MemberService
-	attachments   AttachmentService
 	collaboration CollaborationService
 	verifier      TokenVerifier
 	readiness     Readiness
@@ -84,17 +76,16 @@ type Handler struct {
 func NewHandler(
 	documents DocumentService,
 	members MemberService,
-	attachments AttachmentService,
 	collaboration CollaborationService,
 	verifier TokenVerifier,
 	readiness Readiness,
 	logger *slog.Logger,
 ) (*Handler, error) {
-	if documents == nil || members == nil || attachments == nil || collaboration == nil || verifier == nil || readiness == nil || logger == nil {
+	if documents == nil || members == nil || collaboration == nil || verifier == nil || readiness == nil || logger == nil {
 		return nil, errors.New("create knowledge RPC handler: use cases, verifier, readiness, and logger are required")
 	}
 	handler := &Handler{
-		documents: documents, members: members, attachments: attachments, collaboration: collaboration,
+		documents: documents, members: members, collaboration: collaboration,
 		verifier: verifier, readiness: readiness, logger: logger, now: time.Now,
 	}
 	if folders, ok := documents.(FolderService); ok {
@@ -422,91 +413,16 @@ func (h *Handler) DeleteMember(ctx context.Context, request *knowledgev1.DeleteM
 	return nil
 }
 
-func (h *Handler) ListAttachments(ctx context.Context, request *knowledgev1.DocumentIDRequest) (*knowledgev1.AttachmentList, error) {
-	ctx = metadata.EnsureRequestID(ctx)
-	actorID, err := h.requireActor(ctx, request != nil)
-	if err != nil {
-		return nil, err
-	}
-	attachments, serviceErr := h.attachments.List(ctx, request.DocumentId, actorID)
-	if serviceErr != nil {
-		return nil, h.transportError(ctx, "list_attachments_failed", serviceErr)
-	}
-	result := make([]*knowledgev1.Attachment, 0, len(attachments))
-	for _, attachment := range attachments {
-		result = append(result, toTransportAttachment(attachment))
-	}
-	return &knowledgev1.AttachmentList{Items: result}, nil
-}
-
-func (h *Handler) CreateAttachment(ctx context.Context, request *knowledgev1.CreateAttachmentRequest) (*knowledgev1.AttachmentUpload, error) {
-	ctx = metadata.EnsureRequestID(ctx)
-	actorID, err := h.requireActor(ctx, request != nil)
-	if err != nil {
-		return nil, err
-	}
-	upload, serviceErr := h.attachments.Create(ctx, knowledgelogic.CreateAttachmentInput{
-		DocumentID: request.DocumentId, ActorID: actorID, Filename: request.Filename,
-		MediaType: request.MediaType, SizeBytes: request.SizeBytes, SHA256: request.Sha256,
-		IdempotencyKey: stringValue(request.IdempotencyKey),
-	})
-	if serviceErr != nil {
-		return nil, h.transportError(ctx, "create_attachment_failed", serviceErr)
-	}
-	if upload == nil || upload.Attachment == nil {
-		return nil, h.transportError(ctx, "create_attachment_failed", errors.New("knowledge returned an incomplete attachment upload"))
-	}
-	return &knowledgev1.AttachmentUpload{
-		Attachment: toTransportAttachment(upload.Attachment), UploadUrl: upload.URL,
-		RequiredHeaders: upload.RequiredHeaders, ExpiresAt: upload.ExpiresAt.UTC().Format(time.RFC3339Nano),
-	}, nil
-}
-
-func (h *Handler) CompleteAttachment(ctx context.Context, request *knowledgev1.AttachmentIDRequest) (*knowledgev1.Attachment, error) {
-	ctx = metadata.EnsureRequestID(ctx)
-	actorID, err := h.requireActor(ctx, request != nil)
-	if err != nil {
-		return nil, err
-	}
-	attachment, serviceErr := h.attachments.Complete(ctx, request.DocumentId, request.AttachmentId, actorID)
-	if serviceErr != nil {
-		return nil, h.transportError(ctx, "complete_attachment_failed", serviceErr)
-	}
-	if attachment == nil {
-		return nil, h.transportError(ctx, "complete_attachment_failed", errors.New("knowledge returned a nil attachment"))
-	}
-	return toTransportAttachment(attachment), nil
-}
-
-func (h *Handler) DeleteAttachment(ctx context.Context, request *knowledgev1.AttachmentIDRequest) error {
-	ctx = metadata.EnsureRequestID(ctx)
-	actorID, err := h.requireActor(ctx, request != nil)
-	if err != nil {
-		return err
-	}
-	if serviceErr := h.attachments.Delete(ctx, request.DocumentId, request.AttachmentId, actorID); serviceErr != nil {
-		return h.transportError(ctx, "delete_attachment_failed", serviceErr)
-	}
-	return nil
-}
-
-func (h *Handler) GetAttachmentContent(ctx context.Context, request *knowledgev1.AttachmentContentRequest) (*knowledgev1.AttachmentContent, error) {
+func (h *Handler) IsMediaPublished(ctx context.Context, request *knowledgev1.PublishedMediaRequest) (*knowledgev1.PublishedMediaAuthorization, error) {
 	ctx = metadata.EnsureRequestID(ctx)
 	if request == nil {
 		return nil, h.invalidInput(ctx)
 	}
-	actorID, err := h.optionalActor(ctx)
-	if err != nil {
-		return nil, err
-	}
-	content, serviceErr := h.attachments.Content(ctx, request.AttachmentId, actorID)
+	published, serviceErr := h.documents.IsMediaPublished(ctx, request.AttachmentId)
 	if serviceErr != nil {
-		return nil, h.transportError(ctx, "get_attachment_content_failed", serviceErr)
+		return nil, h.transportError(ctx, "authorize_published_media_failed", serviceErr)
 	}
-	if content == nil || content.URL == "" || content.ExpiresAt.IsZero() {
-		return nil, h.transportError(ctx, "get_attachment_content_failed", errors.New("knowledge returned incomplete attachment content"))
-	}
-	return &knowledgev1.AttachmentContent{Url: content.URL, ExpiresAt: content.ExpiresAt.UTC().Format(time.RFC3339Nano)}, nil
+	return &knowledgev1.PublishedMediaAuthorization{Published: published}, nil
 }
 
 func (h *Handler) AuthorizeCollaboration(
@@ -648,17 +564,14 @@ func toTransportDocument(value *domain.Document) *knowledgev1.Document {
 		ProjectedAt: timePointer(value.ProjectedAt), CreatedAt: value.CreatedAt.UTC().Format(time.RFC3339Nano),
 		UpdatedAt: value.UpdatedAt.UTC().Format(time.RFC3339Nano), Language: nonEmptyStringPointer(value.Language),
 		Tags: append([]string(nil), value.Tags...), FolderId: value.FolderID,
+		PublicationStatus: value.PublicationStatus, PublicationError: value.PublicationError,
 	}
 }
 
 func toTransportDocumentDetail(value *knowledgelogic.DocumentDetail) *knowledgev1.DocumentDetail {
-	attachments := make([]*knowledgev1.Attachment, 0, len(value.Attachments))
-	for _, attachment := range value.Attachments {
-		attachments = append(attachments, toTransportAttachment(attachment))
-	}
 	return &knowledgev1.DocumentDetail{
 		Document: toTransportDocument(value.Document), Content: toTransportRichText(value.Content),
-		PlainText: value.PlainText, Attachments: attachments,
+		PlainText: value.PlainText,
 	}
 }
 
@@ -680,21 +593,6 @@ func toTransportMember(value *domain.Member) *knowledgev1.Member {
 	return &knowledgev1.Member{
 		User: toTransportUser(value.User), Role: value.Role, Revision: value.Revision,
 		CreatedAt: value.CreatedAt.UTC().Format(time.RFC3339Nano), UpdatedAt: value.UpdatedAt.UTC().Format(time.RFC3339Nano),
-	}
-}
-
-func toTransportAttachment(value *domain.Attachment) *knowledgev1.Attachment {
-	if value == nil {
-		return nil
-	}
-	mediaType := value.DetectedType
-	if mediaType == "" {
-		mediaType = value.DeclaredType
-	}
-	return &knowledgev1.Attachment{
-		Id: value.ID, DocumentId: value.DocumentID, Filename: value.Filename,
-		MediaType: mediaType, SizeBytes: value.SizeBytes, Status: value.Status,
-		CreatedAt: value.CreatedAt.UTC().Format(time.RFC3339Nano),
 	}
 }
 

@@ -3,23 +3,26 @@ package model
 import "time"
 
 type Document struct {
-	ID                 string     `gorm:"type:uuid;primaryKey"`
-	Title              string     `gorm:"size:200;not null"`
-	Summary            string     `gorm:"size:1000;not null;default:''"`
-	Slug               string     `gorm:"size:80;not null"`
-	Language           string     `gorm:"size:16;not null;default:'zh-CN'"`
-	OwnerID            int64      `gorm:"not null"`
-	OwnerUsername      string     `gorm:"size:32;not null"`
-	OwnerAvatar        string     `gorm:"type:text;not null;default:''"`
-	Published          bool       `gorm:"not null;default:false"`
-	MetadataRevision   int64      `gorm:"not null;default:1"`
-	ContentRevision    int64      `gorm:"not null;default:0"`
-	PermissionRevision int64      `gorm:"not null;default:1"`
-	PublishedAt        *time.Time `gorm:"type:timestamptz"`
-	DeletedAt          *time.Time `gorm:"type:timestamptz"`
-	PurgeAfter         *time.Time `gorm:"type:timestamptz"`
-	CreatedAt          time.Time  `gorm:"type:timestamptz;not null"`
-	UpdatedAt          time.Time  `gorm:"type:timestamptz;not null"`
+	ID                    string     `gorm:"type:uuid;primaryKey"`
+	Title                 string     `gorm:"size:200;not null"`
+	Summary               string     `gorm:"size:1000;not null;default:''"`
+	Slug                  string     `gorm:"size:80;not null"`
+	Language              string     `gorm:"size:16;not null;default:'zh-CN'"`
+	OwnerID               int64      `gorm:"not null"`
+	OwnerUsername         string     `gorm:"size:32;not null"`
+	OwnerAvatar           string     `gorm:"type:text;not null;default:''"`
+	Published             bool       `gorm:"not null;default:false"`
+	PublicationStatus     string     `gorm:"size:32;not null;default:'draft'"`
+	PublicationError      *string    `gorm:"size:64"`
+	PublicationGeneration int64      `gorm:"not null;default:0"`
+	MetadataRevision      int64      `gorm:"not null;default:1"`
+	ContentRevision       int64      `gorm:"not null;default:0"`
+	PermissionRevision    int64      `gorm:"not null;default:1"`
+	PublishedAt           *time.Time `gorm:"type:timestamptz"`
+	DeletedAt             *time.Time `gorm:"type:timestamptz"`
+	PurgeAfter            *time.Time `gorm:"type:timestamptz"`
+	CreatedAt             time.Time  `gorm:"type:timestamptz;not null"`
+	UpdatedAt             time.Time  `gorm:"type:timestamptz;not null"`
 }
 
 func (Document) TableName() string { return "knowledge.documents" }
@@ -120,42 +123,56 @@ type DocumentPublication struct {
 
 func (DocumentPublication) TableName() string { return "knowledge.document_publications" }
 
-type PublicationAttachment struct {
-	DocumentID   string `gorm:"type:uuid;primaryKey"`
-	AttachmentID string `gorm:"type:uuid;primaryKey"`
+type PublicationCandidate struct {
+	DocumentID      string    `gorm:"type:uuid;primaryKey"`
+	Generation      int64     `gorm:"not null"`
+	VersionID       *string   `gorm:"type:uuid"`
+	VersionSequence int64     `gorm:"not null"`
+	Title           string    `gorm:"size:200;not null"`
+	Summary         string    `gorm:"size:1000;not null"`
+	Slug            string    `gorm:"size:80;not null"`
+	Language        string    `gorm:"size:16;not null"`
+	Tags            []byte    `gorm:"type:jsonb;not null"`
+	OwnerID         int64     `gorm:"not null"`
+	OwnerUsername   string    `gorm:"size:32;not null"`
+	OwnerAvatar     string    `gorm:"type:text;not null"`
+	Content         []byte    `gorm:"type:jsonb;not null"`
+	PlainText       string    `gorm:"type:text;not null"`
+	MediaIDs        []byte    `gorm:"type:jsonb;not null"`
+	CreatedAt       time.Time `gorm:"type:timestamptz;not null"`
+	UpdatedAt       time.Time `gorm:"type:timestamptz;not null"`
 }
 
-func (PublicationAttachment) TableName() string { return "knowledge.publication_attachments" }
+func (PublicationCandidate) TableName() string { return "knowledge.publication_candidates" }
 
-type Attachment struct {
-	ID            string    `gorm:"type:uuid;primaryKey"`
-	DocumentID    string    `gorm:"type:uuid;not null"`
-	UploaderID    int64     `gorm:"not null"`
-	Filename      string    `gorm:"size:255;not null"`
-	DeclaredType  string    `gorm:"size:127;not null"`
-	DetectedType  string    `gorm:"size:127;not null;default:''"`
-	SizeBytes     int64     `gorm:"not null"`
-	SHA256        string    `gorm:"size:64;not null"`
-	ObjectKey     string    `gorm:"size:512;not null"`
-	Status        string    `gorm:"size:32;not null"`
-	FailureReason string    `gorm:"size:64;not null;default:''"`
-	UploadExpires time.Time `gorm:"type:timestamptz;not null"`
-	CreatedAt     time.Time `gorm:"type:timestamptz;not null"`
-	UpdatedAt     time.Time `gorm:"type:timestamptz;not null"`
+type PublishedMediaReference struct {
+	DocumentID   string    `gorm:"type:uuid;primaryKey"`
+	AttachmentID string    `gorm:"type:uuid;primaryKey"`
+	Generation   int64     `gorm:"not null"`
+	CreatedAt    time.Time `gorm:"type:timestamptz;not null"`
 }
 
-func (Attachment) TableName() string { return "knowledge.attachments" }
+func (PublishedMediaReference) TableName() string { return "knowledge.published_media_references" }
 
-type AttachmentScanJob struct {
-	AttachmentID  string    `gorm:"type:uuid;primaryKey"`
-	Attempts      int       `gorm:"not null;default:0"`
-	NextAttemptAt time.Time `gorm:"type:timestamptz;not null"`
-	LastErrorKey  string    `gorm:"size:64;not null;default:''"`
-	CreatedAt     time.Time `gorm:"type:timestamptz;not null"`
-	UpdatedAt     time.Time `gorm:"type:timestamptz;not null"`
+type PublicationReferenceJob struct {
+	ID            string     `gorm:"type:uuid;primaryKey"`
+	DocumentID    string     `gorm:"type:uuid;not null"`
+	OwnerID       int64      `gorm:"not null"`
+	Generation    int64      `gorm:"not null"`
+	Action        string     `gorm:"size:16;not null"`
+	AttachmentIDs []byte     `gorm:"type:jsonb;not null"`
+	State         string     `gorm:"size:16;not null"`
+	Attempts      int        `gorm:"not null;default:0"`
+	NextAttemptAt time.Time  `gorm:"type:timestamptz;not null"`
+	LeaseUntil    *time.Time `gorm:"type:timestamptz"`
+	ParkedAt      *time.Time `gorm:"type:timestamptz"`
+	LastErrorKey  string     `gorm:"size:64;not null"`
+	TraceHeaders  []byte     `gorm:"type:jsonb;not null"`
+	CreatedAt     time.Time  `gorm:"type:timestamptz;not null"`
+	UpdatedAt     time.Time  `gorm:"type:timestamptz;not null"`
 }
 
-func (AttachmentScanJob) TableName() string { return "knowledge.attachment_scan_jobs" }
+func (PublicationReferenceJob) TableName() string { return "knowledge.publication_reference_jobs" }
 
 type Outbox struct {
 	ID            string     `gorm:"type:uuid;primaryKey"`

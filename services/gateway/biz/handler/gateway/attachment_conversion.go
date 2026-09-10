@@ -37,7 +37,11 @@ func toMediaAttachmentListData(value *attachmentv1.AttachmentList, endpoints con
 		}
 		items = append(items, converted)
 	}
-	return &gatewaymodel.MediaAttachmentListData{Items: items}, nil
+	result := &gatewaymodel.MediaAttachmentListData{Items: items}
+	if value.Page != nil {
+		result.Page = &gatewaymodel.PageInfoData{HasMore: value.Page.HasMore, NextCursor: copyString(value.Page.NextCursor)}
+	}
+	return result, nil
 }
 
 func toMediaAttachmentUploadData(value *attachmentv1.AttachmentUpload, endpoints config.EndpointOptions) (*gatewaymodel.MediaAttachmentUploadData, error) {

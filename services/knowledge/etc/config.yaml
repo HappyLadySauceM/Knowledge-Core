@@ -80,20 +80,13 @@ identity_rpc:
 
 auth: {}
 
-object_storage:
-  endpoint: 127.0.0.1:9000
-  region: us-east-1
-  bucket: knowledge-core
-  secure: false
-  auto_create_bucket: true
-  upload_ttl: 15m
-  download_ttl: 5m
-
-scanner:
-  address: 127.0.0.1:3310
-  dial_timeout: 3s
-  scan_timeout: 30s
-  maximum_stream: 67108864
+attachment_rpc:
+  service_name: knowledge-core.attachment
+  address: 127.0.0.1:8884
+  connect_timeout: 500ms
+  request_timeout: 5s
+  tls:
+    enabled: false
 
 collaboration_rpc:
   service_name: knowledge-core.collaboration
@@ -104,7 +97,7 @@ collaboration_rpc:
     enabled: false
 
 workers:
-  # Fallback poll for due retries, expired uploads, and purge maintenance.
-  # 到期重试、过期上传与 purge 维护的兜底轮询。
+  # Fallback poll for publication-reference retries and purge maintenance.
+  # 发布引用重试与 purge 维护的兜底轮询。
   poll_interval: 30s
   operation_timeout: 30s

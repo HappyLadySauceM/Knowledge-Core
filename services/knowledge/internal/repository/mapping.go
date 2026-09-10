@@ -16,6 +16,7 @@ func documentToModel(value *domain.Document) *model.Document {
 		Language: value.Language,
 		OwnerID:  value.Owner.ID, OwnerUsername: value.Owner.Username, OwnerAvatar: value.Owner.Avatar,
 		Published: value.Published, MetadataRevision: value.MetadataRevision, ContentRevision: value.ContentRevision,
+		PublicationStatus: value.PublicationStatus, PublicationError: value.PublicationError, PublicationGeneration: value.PublicationGeneration,
 		PermissionRevision: value.PermissionRevision, PublishedAt: value.PublishedAt,
 		DeletedAt: value.DeletedAt, PurgeAfter: value.PurgeAfter, CreatedAt: value.CreatedAt.UTC(), UpdatedAt: value.UpdatedAt.UTC(),
 	}
@@ -29,7 +30,8 @@ func documentFromModel(value *model.Document, access string, projection *model.P
 		ID: value.ID, Title: value.Title, Summary: value.Summary, Slug: value.Slug,
 		Language: value.Language,
 		Owner:    domain.PublicUser{ID: value.OwnerID, Username: value.OwnerUsername, Avatar: value.OwnerAvatar},
-		Access:   access, Published: value.Published, MetadataRevision: value.MetadataRevision,
+		Access:   access, Published: value.Published, PublicationStatus: value.PublicationStatus,
+		PublicationError: value.PublicationError, PublicationGeneration: value.PublicationGeneration, MetadataRevision: value.MetadataRevision,
 		ContentRevision: value.ContentRevision, PermissionRevision: value.PermissionRevision,
 		PublishedAt: value.PublishedAt, DeletedAt: value.DeletedAt, PurgeAfter: value.PurgeAfter,
 		CreatedAt: value.CreatedAt, UpdatedAt: value.UpdatedAt,
@@ -62,18 +64,6 @@ func memberFromModel(value *model.Member) *domain.Member {
 		Revision:   value.Revision,
 		CreatedAt:  value.CreatedAt,
 		UpdatedAt:  value.UpdatedAt,
-	}
-}
-
-func attachmentFromModel(value *model.Attachment) *domain.Attachment {
-	if value == nil {
-		return nil
-	}
-	return &domain.Attachment{
-		ID: value.ID, DocumentID: value.DocumentID, UploaderID: value.UploaderID, Filename: value.Filename,
-		DeclaredType: value.DeclaredType, DetectedType: value.DetectedType, SizeBytes: value.SizeBytes,
-		SHA256: value.SHA256, ObjectKey: value.ObjectKey, Status: value.Status, FailureReason: value.FailureReason,
-		UploadExpires: value.UploadExpires, CreatedAt: value.CreatedAt, UpdatedAt: value.UpdatedAt,
 	}
 }
 

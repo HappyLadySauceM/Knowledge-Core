@@ -9,4 +9,4 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
 data:
   KNOWLEDGE_APP_ENVIRONMENT: development
-  KNOWLEDGE_OBJECT_STORAGE_AUTO_CREATE_BUCKET: "false"
+  KNOWLEDGE_ATTACHMENT_RPC_ADDRESS: knowledge-core-attachment.knowledge-core-dev.svc.cluster.local:8884
