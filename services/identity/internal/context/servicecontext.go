@@ -171,7 +171,7 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 	if err != nil {
 		return nil, err
 	}
-	syncWorker, err := identityconfigsync.New(ctx, events, platformClient, worker, cfg.Auth.PlatformServiceToken, runtime.Logger)
+	syncWorker, err := identityconfigsync.New(ctx, events, platformClient, worker, runtime.Logger)
 	if err != nil {
 		return nil, err
 	}

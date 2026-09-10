@@ -2,7 +2,6 @@ package rpc
 
 import (
 	"context"
-	"crypto/subtle"
 	"errors"
 	"log/slog"
 	"strings"
@@ -19,19 +18,18 @@ import (
 
 type Readiness interface{ Ready(context.Context) error }
 type Handler struct {
-	service       *service.Service
-	verifier      *coreauth.Verifier
-	readiness     Readiness
-	logger        *slog.Logger
-	internalToken string
-	now           func() time.Time
+	service   *service.Service
+	verifier  *coreauth.Verifier
+	readiness Readiness
+	logger    *slog.Logger
+	now       func() time.Time
 }
 
-func NewHandler(svc *service.Service, verifier *coreauth.Verifier, readiness Readiness, logger *slog.Logger, internalToken string) (*Handler, error) {
-	if svc == nil || verifier == nil || readiness == nil || logger == nil || strings.TrimSpace(internalToken) == "" {
+func NewHandler(svc *service.Service, verifier *coreauth.Verifier, readiness Readiness, logger *slog.Logger) (*Handler, error) {
+	if svc == nil || verifier == nil || readiness == nil || logger == nil {
 		return nil, errors.New("attachment RPC handler dependencies are required")
 	}
-	return &Handler{service: svc, verifier: verifier, readiness: readiness, logger: logger, internalToken: strings.TrimSpace(internalToken), now: time.Now}, nil
+	return &Handler{service: svc, verifier: verifier, readiness: readiness, logger: logger, now: time.Now}, nil
 }
 func (h *Handler) Ping(ctx context.Context, req *commonv1.PingRequest) (*commonv1.PingResponse, error) {
 	ctx = metadata.EnsureRequestID(ctx)
@@ -126,8 +124,8 @@ func (h *Handler) RestoreAttachment(ctx context.Context, req *attachmentv1.Attac
 }
 
 func (h *Handler) StagePublicationReferences(ctx context.Context, req *attachmentv1.PublicationReferenceCommand) error {
-	if err := h.internal(ctx, req != nil); err != nil {
-		return err
+	if req == nil {
+		return apperror.ToKitexBizStatus(ctx, attachmenterrors.InvalidInput.New())
 	}
 	if err := h.service.StagePublicationReferences(ctx, req); err != nil {
 		return h.mapError(ctx, err)
@@ -136,8 +134,8 @@ func (h *Handler) StagePublicationReferences(ctx context.Context, req *attachmen
 }
 
 func (h *Handler) FinalizePublicationReferences(ctx context.Context, req *attachmentv1.PublicationReferenceCommand) error {
-	if err := h.internal(ctx, req != nil); err != nil {
-		return err
+	if req == nil {
+		return apperror.ToKitexBizStatus(ctx, attachmenterrors.InvalidInput.New())
 	}
 	if err := h.service.FinalizePublicationReferences(ctx, req); err != nil {
 		return h.mapError(ctx, err)
@@ -146,8 +144,8 @@ func (h *Handler) FinalizePublicationReferences(ctx context.Context, req *attach
 }
 
 func (h *Handler) ClearPublicationReferences(ctx context.Context, req *attachmentv1.PublicationReferenceCommand) error {
-	if err := h.internal(ctx, req != nil); err != nil {
-		return err
+	if req == nil {
+		return apperror.ToKitexBizStatus(ctx, attachmenterrors.InvalidInput.New())
 	}
 	if err := h.service.ClearPublicationReferences(ctx, req); err != nil {
 		return h.mapError(ctx, err)
@@ -156,8 +154,8 @@ func (h *Handler) ClearPublicationReferences(ctx context.Context, req *attachmen
 }
 
 func (h *Handler) GetPublicationReferenceState(ctx context.Context, req *attachmentv1.PublicationReferenceStateRequest) (*attachmentv1.PublicationReferenceState, error) {
-	if err := h.internal(ctx, req != nil); err != nil {
-		return nil, err
+	if req == nil {
+		return nil, apperror.ToKitexBizStatus(ctx, attachmenterrors.InvalidInput.New())
 	}
 	state, err := h.service.PublicationReferenceState(ctx, req.DocumentId)
 	if err != nil {
@@ -177,16 +175,6 @@ func (h *Handler) GetPublishedAttachmentContent(ctx context.Context, req *attach
 	return content, nil
 }
 
-func (h *Handler) internal(ctx context.Context, valid bool) error {
-	if !valid {
-		return apperror.ToKitexBizStatus(ctx, attachmenterrors.InvalidInput.New())
-	}
-	provided := coreauth.ServiceToken(ctx)
-	if provided == "" || subtle.ConstantTimeCompare([]byte(provided), []byte(h.internalToken)) != 1 {
-		return apperror.ToKitexBizStatus(ctx, attachmenterrors.Unauthenticated.New())
-	}
-	return nil
-}
 func (h *Handler) owner(ctx context.Context, valid bool) (int64, error) {
 	if !valid {
 		return 0, apperror.ToKitexBizStatus(ctx, attachmenterrors.InvalidInput.New())

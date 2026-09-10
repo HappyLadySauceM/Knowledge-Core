@@ -15,7 +15,6 @@ import (
 	platformv1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/platform"
 	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/platform/platformservice"
 	coreapp "github.com/HappyLadySauce/Knowledge-Core/pkg/app"
-	coreauth "github.com/HappyLadySauce/Knowledge-Core/pkg/auth"
 	natsresource "github.com/HappyLadySauce/Knowledge-Core/pkg/nats"
 	"github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/config"
 	identityemail "github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/email"
@@ -39,30 +38,29 @@ type event struct {
 }
 
 type Worker struct {
-	broker       *natsresource.DurableBroker
-	platform     platformClient
-	email        *identityemail.Worker
-	serviceToken string
-	logger       *slog.Logger
-	ctx          context.Context
-	cancel       context.CancelFunc
-	sub          *natsresource.Subscription
-	ready        atomic.Bool
-	startupDone  chan struct{}
-	startupMu    sync.Mutex
-	startupErr   error
-	lastApplied  atomic.Int64
-	startOnce    sync.Once
-	stopOnce     sync.Once
-	done         chan struct{}
+	broker      *natsresource.DurableBroker
+	platform    platformClient
+	email       *identityemail.Worker
+	logger      *slog.Logger
+	ctx         context.Context
+	cancel      context.CancelFunc
+	sub         *natsresource.Subscription
+	ready       atomic.Bool
+	startupDone chan struct{}
+	startupMu   sync.Mutex
+	startupErr  error
+	lastApplied atomic.Int64
+	startOnce   sync.Once
+	stopOnce    sync.Once
+	done        chan struct{}
 }
 
-func New(ctx context.Context, broker *natsresource.DurableBroker, platform platformservice.Client, email *identityemail.Worker, serviceToken string, logger *slog.Logger) (*Worker, error) {
-	if ctx == nil || broker == nil || platform == nil || email == nil || serviceToken == "" || logger == nil {
+func New(ctx context.Context, broker *natsresource.DurableBroker, platform platformservice.Client, email *identityemail.Worker, logger *slog.Logger) (*Worker, error) {
+	if ctx == nil || broker == nil || platform == nil || email == nil || logger == nil {
 		return nil, errors.New("create identity configuration sync worker: dependencies are required")
 	}
 	runCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
-	return &Worker{broker: broker, platform: platform, email: email, serviceToken: serviceToken, logger: logger, ctx: runCtx, cancel: cancel, done: make(chan struct{}), startupDone: make(chan struct{})}, nil
+	return &Worker{broker: broker, platform: platform, email: email, logger: logger, ctx: runCtx, cancel: cancel, done: make(chan struct{}), startupDone: make(chan struct{})}, nil
 }
 
 func (w *Worker) Name() string { return "identity-configuration-sync" }
@@ -185,7 +183,7 @@ func (w *Worker) handle(ctx context.Context, delivery *natsresource.Delivery) {
 		_ = delivery.Nack(ctx, retryDelay(delivery.Attempt()))
 		return
 	}
-	configuration, err := w.platform.GetConsumerConfiguration(coreauth.WithServiceToken(ctx, w.serviceToken), &platformv1.GetConsumerConfigurationRequest{Namespace: "email", Revision: notification.Revision, Consumer: "identity.email"})
+	configuration, err := w.platform.GetConsumerConfiguration(ctx, &platformv1.GetConsumerConfigurationRequest{Namespace: "email", Revision: notification.Revision, Consumer: "identity.email"})
 	if err == nil {
 		candidate, parseErr := smtpOptions(configuration)
 		if parseErr != nil {
@@ -226,7 +224,7 @@ func (w *Worker) reconcile(ctx context.Context) error {
 		),
 	)
 	defer span.End()
-	state, err := w.platform.GetConsumerState(coreauth.WithServiceToken(ctx, w.serviceToken), &platformv1.GetConsumerStateRequest{Namespace: "email", Consumer: "identity.email"})
+	state, err := w.platform.GetConsumerState(ctx, &platformv1.GetConsumerStateRequest{Namespace: "email", Consumer: "identity.email"})
 	if err != nil {
 		return fmt.Errorf("read identity configuration consumer state: %w", err)
 	}
@@ -234,7 +232,7 @@ func (w *Worker) reconcile(ctx context.Context) error {
 		return nil
 	}
 	revision := state.DesiredRevision
-	configuration, err := w.platform.GetConsumerConfiguration(coreauth.WithServiceToken(ctx, w.serviceToken), &platformv1.GetConsumerConfigurationRequest{Namespace: "email", Revision: revision, Consumer: "identity.email"})
+	configuration, err := w.platform.GetConsumerConfiguration(ctx, &platformv1.GetConsumerConfigurationRequest{Namespace: "email", Revision: revision, Consumer: "identity.email"})
 	if err != nil {
 		return fmt.Errorf("read identity desired configuration revision: %w", err)
 	}
@@ -262,7 +260,7 @@ func (w *Worker) report(ctx context.Context, messageID string, revision int64, s
 	if errorKey != "" {
 		lastError = &errorKey
 	}
-	_, err := w.platform.ReportConfigurationApply(coreauth.WithServiceToken(ctx, w.serviceToken), &platformv1.ReportConfigurationApplyRequest{MessageId: messageID, Namespace: "email", Revision: revision, Consumer: "identity.email", Status: status, Attempts: int32(attempts), LastErrorKey: lastError})
+	_, err := w.platform.ReportConfigurationApply(ctx, &platformv1.ReportConfigurationApplyRequest{MessageId: messageID, Namespace: "email", Revision: revision, Consumer: "identity.email", Status: status, Attempts: int32(attempts), LastErrorKey: lastError})
 	return err
 }
 

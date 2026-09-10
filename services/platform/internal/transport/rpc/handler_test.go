@@ -55,7 +55,7 @@ func TestConfigurationRequiresAdministratorToken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("service.New() error = %v", err)
 	}
-	handler, err := NewHandler(service, verifier, readyStub{}, slog.New(slog.NewTextHandler(io.Discard, nil)), "internal")
+	handler, err := NewHandler(service, verifier, readyStub{}, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err != nil {
 		t.Fatalf("NewHandler() error = %v", err)
 	}
@@ -78,6 +78,9 @@ func TestConfigurationRequiresAdministratorToken(t *testing.T) {
 	configuration, err := handler.GetConfiguration(coreauth.WithAccessToken(context.Background(), adminToken.Value), request)
 	if err != nil || configuration == nil || configuration.Namespace != "site" {
 		t.Fatalf("GetConfiguration(admin) = %#v, %v", configuration, err)
+	}
+	if _, err := handler.GetConsumerState(context.Background(), &platformv1.GetConsumerStateRequest{Namespace: "email", Consumer: "identity.email"}); err != nil {
+		t.Fatalf("GetConsumerState(without application credential) error = %v", err)
 	}
 }
 

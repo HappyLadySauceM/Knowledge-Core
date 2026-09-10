@@ -3,15 +3,13 @@ package config
 import (
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	coreauth "github.com/HappyLadySauce/Knowledge-Core/pkg/auth"
 )
 
 type AuthOptions struct {
-	PublicKey              string `mapstructure:"public_key" json:"public_key" yaml:"public_key"`
-	AttachmentServiceToken string `mapstructure:"attachment_service_token" json:"attachment_service_token" yaml:"attachment_service_token"`
+	PublicKey string `mapstructure:"public_key" json:"public_key" yaml:"public_key"`
 }
 
 func NewAuthOptions() *AuthOptions { return &AuthOptions{} }
@@ -19,9 +17,6 @@ func NewAuthOptions() *AuthOptions { return &AuthOptions{} }
 func (o AuthOptions) Validate() error {
 	if _, err := coreauth.NewVerifier(o.PublicKey); err != nil {
 		return err
-	}
-	if strings.TrimSpace(o.AttachmentServiceToken) == "" {
-		return errors.New("attachment_service_token is required")
 	}
 	return nil
 }

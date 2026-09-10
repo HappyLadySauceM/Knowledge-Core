@@ -82,7 +82,7 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 	if err != nil {
 		return nil, fmt.Errorf("create platform access-token verifier: %w", err)
 	}
-	handler, err := platformrpc.NewHandler(svc, verifier, runtime.Health, runtime.Logger, cfg.Auth.InternalToken)
+	handler, err := platformrpc.NewHandler(svc, verifier, runtime.Health, runtime.Logger)
 	if err != nil {
 		return nil, err
 	}

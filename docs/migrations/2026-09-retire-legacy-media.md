@@ -16,9 +16,12 @@ This rollout is intentionally destructive. The document-scoped HTTP/RPC attachme
    `legacy` must be an `mc` alias for the deployment's old object-storage endpoint. These commands are irreversible. Do not target `knowledge-core-attachments`, which is owned by the new Attachment service.
 
 3. Deploy Attachment first and apply `services/attachment/internal/migration/migrations/003_publication_references.sql`.
-4. Set the same high-entropy secret in `ATTACHMENT_AUTH_INTERNAL_TOKEN` and `KNOWLEDGE_AUTH_ATTACHMENT_SERVICE_TOKEN`.
-5. Deploy Knowledge. Migration `005_media_publication_saga.sql` permanently drops the legacy attachment tables and installs the durable publication-reference jobs.
-6. Deploy Gateway and Web together. The four old `/api/v1/studio/documents/{document_id}/attachments...` operations are removed; `/api/v1/attachments...` is the only upload API.
+4. Deploy Knowledge. Migration `005_media_publication_saga.sql` permanently drops the legacy attachment tables and installs the durable publication-reference jobs.
+5. Deploy Gateway and Web together. The four old `/api/v1/studio/documents/{document_id}/attachments...` operations are removed; `/api/v1/attachments...` is the only upload API.
+
+Attachment publication-reference RPCs use the service-mesh transport boundary and do not require a second application service token.
+
+If the cluster still has pre-migration images, roll out the new Attachment, Knowledge, Platform, and Identity images first and wait for them to become ready before syncing the SOPS changes that remove the obsolete token keys. This prevents an old image from restarting without the configuration it still expects.
 
 ## Publication recovery
 

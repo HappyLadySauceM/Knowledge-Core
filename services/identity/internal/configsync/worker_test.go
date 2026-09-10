@@ -68,7 +68,7 @@ func TestSMTPOptionsRejectsInvalidRevisionPayload(t *testing.T) {
 
 func TestReconcileNoopsWhenDesiredRevisionIsZero(t *testing.T) {
 	stub := &platformStub{state: &platformv1.ConsumerConfigurationState{DesiredRevision: 0, AppliedRevision: 0}}
-	worker := &Worker{platform: stub, serviceToken: "token", logger: slog.Default()}
+	worker := &Worker{platform: stub, logger: slog.Default()}
 	if err := worker.reconcile(context.Background()); err != nil {
 		t.Fatalf("reconcile() error = %v", err)
 	}
@@ -88,7 +88,7 @@ func TestReconcileStartsParentSpan(t *testing.T) {
 	})
 
 	stub := &platformStub{state: &platformv1.ConsumerConfigurationState{DesiredRevision: 0}}
-	worker := &Worker{platform: stub, serviceToken: "token", logger: slog.Default()}
+	worker := &Worker{platform: stub, logger: slog.Default()}
 	if err := worker.reconcile(context.Background()); err != nil {
 		t.Fatalf("reconcile() error = %v", err)
 	}

@@ -43,4 +43,4 @@ Platform 是网页管理员可写业务配置的唯一数据所有者。当前 n
 
 Platform 需要独立 PostgreSQL role/schema、NATS 项目凭据、JWT 公钥和 32-byte base64 KEK。Kubernetes Secret 名为 `knowledge-core-platform-secrets`，必须由私有 GitOps/SOPS 或集群 Secret manager 提供，应用仓库不存放具体值。
 
-当前自动化覆盖字段校验、敏感值遮蔽、稳定请求摘要、JetStream stream 契约、服务令牌传播、消费者状态单调性，以及 outbox 成功、重试和停放。尚缺真实 PostgreSQL 的事务/并发/回滚故障注入、真实 NATS stop/start、真实 SMTP STARTTLS/AUTH 闭环和跨 Pod 重复/乱序/崩溃恢复测试；完成这些证据前，跨服务同步可靠性门禁不能标为生产 ready。
+当前自动化覆盖字段校验、敏感值遮蔽、稳定请求摘要、JetStream stream 契约、消费者 RPC 调用、消费者状态单调性，以及 outbox 成功、重试和停放。尚缺真实 PostgreSQL 的事务/并发/回滚故障注入、真实 NATS stop/start、真实 SMTP STARTTLS/AUTH 闭环和跨 Pod 重复/乱序/崩溃恢复测试；完成这些证据前，跨服务同步可靠性门禁不能标为生产 ready。

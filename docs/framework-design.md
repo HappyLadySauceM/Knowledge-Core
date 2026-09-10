@@ -167,7 +167,7 @@ Knowledge RPC 除文档、成员和附件用例外，还提供：
 - `Ping`：返回 Knowledge 本进程 readiness（PostgreSQL、NATS、S3、ClamAV），不探活 Identity 或 Collaboration。
 - `Live`：只证明 Knowledge RPC 进程存活，不读取 readiness。Collaboration 不再把它当作启动或 supervisor 的 Ready 门闩。
 
-Collaboration RPC 提供 `Ping`、`CreateSession`、版本列表/创建/详情/恢复和 `PurgeDocument`。除 `Ping` 外的六个业务 RPC 都先检查完整应用 readiness；not-ready 时统一返回 `40007 / collaboration.unavailable`，且不会调用 Knowledge、ticket、store 或 actor。Gateway 通过 `CreateSession` 获得短期 ticket；Knowledge 的清理 worker 通过 `PurgeDocument` 删除协作数据。生产 RPC 双向验证 mTLS，并通过 TTHeader 传播 deadline、request ID、W3C trace 和必要的敏感 token metadata；token 永不进入日志或 telemetry。
+Collaboration RPC 提供 `Ping`、`CreateSession`、版本列表/创建/详情/恢复和 `PurgeDocument`。除 `Ping` 外的六个业务 RPC 都先检查完整应用 readiness；not-ready 时统一返回 `40007 / collaboration.unavailable`，且不会调用 Knowledge、ticket、store 或 actor。Gateway 通过 `CreateSession` 获得短期 ticket；Knowledge 的清理 worker 通过 `PurgeDocument` 删除协作数据。生产 RPC 双向验证 mTLS，并通过 TTHeader 传播 deadline、request ID、W3C trace，以及确实需要用户上下文的 access-token metadata；不再使用应用层 service-token，token 永不进入日志或 telemetry。
 
 内部 RPC 客户端使用静态 `host:port`，由系统 DNS 解析：k3s 使用 ClusterIP Service FQDN，Compose/CI 使用 Docker 服务名。Go Kitex 通过 `WithHostPorts` 拨号；Collaboration 的 Volo Knowledge 客户端用 `StaticDiscover` 在每次 discover 时解析同一地址，非法 `host:port`、DNS 失败、空结果或超时均 fail closed，且不 watch Kubernetes EndpointSlice。进程不再向注册中心报名。Collaboration RPC 与 WebSocket 都走共享 ClusterIP Service；生产环境拒绝 `localhost` 与环回拨号地址。
 

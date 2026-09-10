@@ -152,7 +152,7 @@ func applyDocument(current, baseline, startup Config, document configcenter.Dyna
 	if err != nil {
 		return Config{}, result, err
 	}
-	if err := document.ValidateApplication("knowledge", "app.version", "auth.public_key", "auth.attachment_service_token", "postgres.dsn", "postgres.password", "nats.username", "nats.password", "nats.token", "trace.headers", "trace.tls.key_file", "rpc.tls.key_file", "admin_http.tls.key_file", "identity_rpc.tls.key_file", "attachment_rpc.tls.key_file", "collaboration_rpc.tls.key_file"); err != nil {
+	if err := document.ValidateApplication("knowledge", "app.version", "auth.public_key", "postgres.dsn", "postgres.password", "nats.username", "nats.password", "nats.token", "trace.headers", "trace.tls.key_file", "rpc.tls.key_file", "admin_http.tls.key_file", "identity_rpc.tls.key_file", "attachment_rpc.tls.key_file", "collaboration_rpc.tls.key_file"); err != nil {
 		return Config{}, result, err
 	}
 	if document.Legacy() {

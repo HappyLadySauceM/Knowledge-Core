@@ -51,7 +51,7 @@ postgres:
   tls:
     enabled: false
 auth:
-  internal_token: ""
+  public_key: ""
 object_storage:
   endpoint: 127.0.0.1:9000
   public_endpoint: 127.0.0.1:9000

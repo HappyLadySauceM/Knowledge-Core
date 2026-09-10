@@ -70,7 +70,6 @@ nats:
 
 auth:
   public_key: ""
-  internal_token: ""
 
 encryption:
   key_id: ""

@@ -92,7 +92,7 @@ func NewServiceContext(ctx stdcontext.Context, cfg config.Config, runtime *corea
 		return nil, err
 	}
 	attachment, err := knowledgeclient.NewAttachment(
-		*cfg.AttachmentRPC, cfg.Auth.AttachmentServiceToken, runtime.Trace, runtime.Metrics,
+		*cfg.AttachmentRPC, runtime.Trace, runtime.Metrics,
 	)
 	if err != nil {
 		return nil, err

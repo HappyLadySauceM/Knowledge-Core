@@ -2,7 +2,6 @@ package rpc
 
 import (
 	"context"
-	"crypto/subtle"
 	"errors"
 	"log/slog"
 	"strings"
@@ -21,19 +20,18 @@ import (
 type Readiness interface{ Ready(context.Context) error }
 
 type Handler struct {
-	service       *service.Service
-	verifier      *coreauth.Verifier
-	readiness     Readiness
-	logger        *slog.Logger
-	internalToken string
-	now           func() time.Time
+	service   *service.Service
+	verifier  *coreauth.Verifier
+	readiness Readiness
+	logger    *slog.Logger
+	now       func() time.Time
 }
 
-func NewHandler(service *service.Service, verifier *coreauth.Verifier, readiness Readiness, logger *slog.Logger, internalToken string) (*Handler, error) {
-	if service == nil || verifier == nil || readiness == nil || logger == nil || strings.TrimSpace(internalToken) == "" {
+func NewHandler(service *service.Service, verifier *coreauth.Verifier, readiness Readiness, logger *slog.Logger) (*Handler, error) {
+	if service == nil || verifier == nil || readiness == nil || logger == nil {
 		return nil, errors.New("platform RPC handler dependencies are required")
 	}
-	return &Handler{service: service, verifier: verifier, readiness: readiness, logger: logger, internalToken: strings.TrimSpace(internalToken), now: time.Now}, nil
+	return &Handler{service: service, verifier: verifier, readiness: readiness, logger: logger, now: time.Now}, nil
 }
 
 func (h *Handler) Ping(ctx context.Context, _ *commonv1.PingRequest) (*commonv1.PingResponse, error) {
@@ -95,8 +93,8 @@ func (h *Handler) GetConfigurationDelivery(ctx context.Context, request *platfor
 }
 
 func (h *Handler) GetConsumerConfiguration(ctx context.Context, request *platformv1.GetConsumerConfigurationRequest) (*platformv1.Configuration, error) {
-	if err := h.internal(ctx, request != nil); err != nil {
-		return nil, err
+	if request == nil {
+		return nil, apperror.ToKitexBizStatus(ctx, platformerrors.InvalidInput.New())
 	}
 	configuration, err := h.service.ConsumerConfiguration(ctx, request.Namespace, request.Revision, request.Consumer)
 	if err != nil {
@@ -106,8 +104,8 @@ func (h *Handler) GetConsumerConfiguration(ctx context.Context, request *platfor
 }
 
 func (h *Handler) GetConsumerState(ctx context.Context, request *platformv1.GetConsumerStateRequest) (*platformv1.ConsumerConfigurationState, error) {
-	if err := h.internal(ctx, request != nil); err != nil {
-		return nil, err
+	if request == nil {
+		return nil, apperror.ToKitexBizStatus(ctx, platformerrors.InvalidInput.New())
 	}
 	state, err := h.service.ConsumerState(ctx, request.Namespace, request.Consumer)
 	if err != nil {
@@ -117,8 +115,8 @@ func (h *Handler) GetConsumerState(ctx context.Context, request *platformv1.GetC
 }
 
 func (h *Handler) ReportConfigurationApply(ctx context.Context, request *platformv1.ReportConfigurationApplyRequest) (*commonv1.EmptyResponse, error) {
-	if err := h.internal(ctx, request != nil); err != nil {
-		return nil, err
+	if request == nil {
+		return nil, apperror.ToKitexBizStatus(ctx, platformerrors.InvalidInput.New())
 	}
 	if err := h.service.ReportConsumerApply(ctx, request); err != nil {
 		return nil, h.mapError(ctx, err)
@@ -142,17 +140,6 @@ func (h *Handler) admin(ctx context.Context, valid bool) (int64, error) {
 		return 0, apperror.ToKitexBizStatus(ctx, platformerrors.Forbidden.New())
 	}
 	return principal.UserID, nil
-}
-
-func (h *Handler) internal(ctx context.Context, valid bool) error {
-	if !valid {
-		return apperror.ToKitexBizStatus(ctx, platformerrors.InvalidInput.New())
-	}
-	provided := coreauth.ServiceToken(ctx)
-	if provided == "" || subtle.ConstantTimeCompare([]byte(provided), []byte(h.internalToken)) != 1 {
-		return apperror.ToKitexBizStatus(ctx, platformerrors.Unauthenticated.New())
-	}
-	return nil
 }
 
 func (h *Handler) mapError(ctx context.Context, err error) error {
