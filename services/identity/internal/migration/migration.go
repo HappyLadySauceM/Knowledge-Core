@@ -47,6 +47,9 @@ func AutoMigrate(ctx context.Context, db *gorm.DB) error {
 		if err := normalizeAvatarAttachmentColumn(tx); err != nil {
 			return err
 		}
+		if err := widenUsersStatusColumn(tx); err != nil {
+			return err
+		}
 		if err := tx.AutoMigrate(&model.User{}, &model.Session{}, &model.ActionToken{}, &model.EmailOutbox{}); err != nil {
 			return fmt.Errorf("auto-migrate identity schema: %w", err)
 		}
@@ -70,6 +73,31 @@ func AutoMigrate(ctx context.Context, db *gorm.DB) error {
 		}
 		return verifySchema(tx)
 	})
+}
+
+func widenUsersStatusColumn(tx *gorm.DB) error {
+	var length *int
+	if err := tx.Raw(`
+SELECT character_maximum_length
+FROM information_schema.columns
+WHERE table_schema = 'identity'
+  AND table_name = 'users'
+  AND column_name = 'status'
+`).Scan(&length).Error; err != nil {
+		return fmt.Errorf("check identity users status column: %w", err)
+	}
+	// Skip when the table is not created yet; AutoMigrate will emit varchar(32).
+	// 表尚未创建时跳过；AutoMigrate 会直接建成 varchar(32)。
+	if length == nil || *length >= model.StatusColumnSize {
+		return nil
+	}
+	if err := tx.Exec(fmt.Sprintf(
+		"ALTER TABLE identity.users ALTER COLUMN status TYPE varchar(%d)",
+		model.StatusColumnSize,
+	)).Error; err != nil {
+		return fmt.Errorf("widen identity users status column: %w", err)
+	}
+	return nil
 }
 
 func normalizeAvatarAttachmentColumn(tx *gorm.DB) error {
@@ -145,6 +173,20 @@ SELECT EXISTS (
 		if !exists {
 			return fmt.Errorf("verify identity schema: missing constraint %q", item.name)
 		}
+	}
+
+	var statusLength int
+	if err := tx.Raw(`
+SELECT character_maximum_length
+FROM information_schema.columns
+WHERE table_schema = 'identity'
+  AND table_name = 'users'
+  AND column_name = 'status'
+`).Scan(&statusLength).Error; err != nil {
+		return fmt.Errorf("verify identity users status column: %w", err)
+	}
+	if statusLength < model.StatusColumnSize {
+		return fmt.Errorf("verify identity schema: users.status length %d is below %d", statusLength, model.StatusColumnSize)
 	}
 
 	expectedIndexes := map[string]string{

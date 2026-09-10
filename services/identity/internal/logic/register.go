@@ -77,19 +77,25 @@ func (l *RegisterLogic) Register(ctx context.Context, input RegisterInput) (*dom
 		entry := &domain.ActionToken{ID: uuid.NewString(), UserID: user.ID, Kind: domain.ActionEmailVerification, Digest: security.DigestActionToken(token, l.pepper), ExpiresAt: now.Add(l.ttl), CreatedAt: now}
 		message := domain.EmailMessage{Kind: domain.ActionEmailVerification, To: user.Email, Subject: "Verify your email", Token: token, CreatedAt: now}
 		if err := l.verification.CreateUserAndEnqueue(ctx, user, entry, message); err != nil {
-			return nil, fmt.Errorf("register identity user and queue verification: %w", err)
+			return nil, mapRegisterCreateError(err, "register identity user and queue verification")
 		}
 		return user, nil
 	}
 	if err := l.users.Create(ctx, user); err != nil {
-		switch {
-		case errors.Is(err, repository.ErrUsernameConflict):
-			return nil, identityerrors.UsernameConflict.Wrap(err)
-		case errors.Is(err, repository.ErrEmailConflict):
-			return nil, identityerrors.EmailConflict.Wrap(err)
-		default:
-			return nil, fmt.Errorf("register identity user: %w", err)
-		}
+		return nil, mapRegisterCreateError(err, "register identity user")
 	}
 	return user, nil
+}
+
+func mapRegisterCreateError(err error, operation string) error {
+	// Map unique conflicts on both verification and direct-create register paths.
+	// 验证邮箱与直接建号两条注册路径共用唯一冲突映射。
+	switch {
+	case errors.Is(err, repository.ErrUsernameConflict):
+		return identityerrors.UsernameConflict.Wrap(err)
+	case errors.Is(err, repository.ErrEmailConflict):
+		return identityerrors.EmailConflict.Wrap(err)
+	default:
+		return fmt.Errorf("%s: %w", operation, err)
+	}
 }
