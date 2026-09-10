@@ -2,9 +2,9 @@
 
 # Knowledge-Core: Services
 
-Clients enter through Gateway HTTP or Collaboration WebSocket. Gateway calls Identity, Knowledge, Collaboration, Attachment, and Platform through typed Thrift RPC. Collaboration calls Knowledge for authorization and projection. Each stateful service persists only to its own PostgreSQL schema; Redis supports ephemeral coordination, JetStream carries durable events, S3 stores objects, and ClamAV scans uploads.
+Clients enter through Gateway HTTP or Collaboration WebSocket. Gateway calls Identity, Knowledge, Collaboration, Attachment, and Platform through typed Thrift RPC. Collaboration calls Knowledge for authorization and projection. Each stateful service persists only to its own PostgreSQL schema; Redis supports ephemeral coordination, JetStream carries durable events, S3 stores objects, and ClamAV scans uploads. Internal backend calls use the service-mesh mTLS boundary; Attachment publication-reference and Platform consumer RPCs intentionally omit application service tokens, while user/admin authorization remains method-specific.
 
-<!-- fact:services.relationships status:verified sources:docs/framework-design.md, user-confirmed-schema-v2-rerecord -->
+<!-- fact:services.relationships status:verified sources:docs/framework-design.md, user-confirmed-internal-rpc-auth-boundary, user-confirmed-schema-v2-rerecord -->
 
 ### Gateway
 

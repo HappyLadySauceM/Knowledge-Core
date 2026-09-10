@@ -32,7 +32,7 @@
 
 The project contains one Go module and a Rust workspace under services/collaboration. Use the repository-pinned generators (Kitex 0.16.2, hz 0.9.7 via `hz update` only, thriftgo 0.4.5) and rustc 1.97.1 from rust-toolchain.toml. Collaboration interop fixtures require Node.js >= 24.18.1 and `npm ci`; package tarballs use npmmirror via `services/collaboration/interop/.npmrc`, while `npm audit` uses `https://registry.npmjs.org` because npmmirror does not implement the security advisories API. ARC runners share node-local language caches at `/cache` (hostPath `/var/lib/hls-ci-cache`, uid 1001); do not enable GitHub Actions cache. Inject all non-public configuration through environment variables or the deploy platform's secret store; never store secret values in repository configuration.
 
-<!-- fact:environment.setup status:verified sources:services/collaboration/interop/.npmrc, services/collaboration/interop/package.json, user-confirmed, user-confirmed-4x8-hostpath-ubuntu-runtime, user-confirmed-en-locale-source -->
+<!-- fact:environment.setup status:verified sources:services/collaboration/interop/.npmrc, services/collaboration/interop/package.json, docs/migrations/2026-09-retire-legacy-media.md#required-rollout-order, user-confirmed, user-confirmed-4x8-hostpath-ubuntu-runtime, user-confirmed-en-locale-source -->
 
 ## Appendix
 

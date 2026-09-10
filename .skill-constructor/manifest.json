@@ -3,7 +3,7 @@
   "facts": [
     {
       "id": "architecture.design",
-      "revision": 164,
+      "revision": 175,
       "section": "architecture",
       "sources": [
         {
@@ -27,7 +27,7 @@
         },
         {
           "kind": "documented",
-          "reference": "docs/platform-configuration.md#配置同步"
+          "reference": "docs/platform-configuration.md#\u914d\u7f6e\u540c\u6b65"
         },
         {
           "detail": "evidence-sha256:e73402989739a97e69a9668bb05bd9ed6e4dc6f35d81bf011c66a5e4f18e1ee2",
@@ -41,10 +41,14 @@
         {
           "kind": "user",
           "reference": "user-confirmed-en-locale-source"
+        },
+        {
+          "kind": "user",
+          "reference": "user-confirmed-internal-rpc-auth-boundary"
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-09-07T03:59:23Z",
+      "updatedAt": "2026-09-10T06:56:39Z",
       "value": {
         "containers": [
           {
@@ -168,6 +172,14 @@
               "At-least-once delivery",
               "Consumers and redrive operations must be idempotent"
             ]
+          },
+          {
+            "name": "Mesh-authenticated internal RPCs",
+            "rationale": "Attachment publication-reference and Platform consumer RPCs are trusted backend operations inside the service mesh. Istio mTLS supplies workload and transport identity, so a second application service token would duplicate an inconsistent boundary. Access-token metadata remains only where a method requires user context, and administrator JWT checks remain on configuration write/read methods.",
+            "tradeoffs": [
+              "Any backend workload admitted to the trusted mesh can invoke these methods, including consumer configuration reads that return decrypted values by explicit trust decision.",
+              "If the mesh trust boundary changes, method-level authorization must be added through Istio AuthorizationPolicy/Waypoint or application authentication."
+            ]
           }
         ],
         "format": "structured-v1",
@@ -185,7 +197,7 @@
             "name": "Attachment lifecycle"
           },
           {
-            "description": "Platform commits revision, audit, idempotency, and outbox atomically, then publishes coordinate-only events. GetConsumerState returns DesiredRevision=0 idle state when a namespace has not been written, rather than NotFound.",
+            "description": "Platform commits revision, audit, idempotency, and outbox atomically, then publishes coordinate-only events. GetConsumerState returns DesiredRevision=0 idle state when a namespace has not been written, rather than NotFound. Identity reads Platform consumer snapshots and reports application status over the trusted mTLS mesh without an application service token.",
             "name": "Configuration change"
           }
         ],
@@ -375,7 +387,7 @@
     },
     {
       "id": "constraints.project",
-      "revision": 136,
+      "revision": 175,
       "section": "constraints",
       "sources": [
         {
@@ -384,12 +396,16 @@
         },
         {
           "kind": "user",
+          "reference": "user-confirmed-internal-rpc-auth-boundary"
+        },
+        {
+          "kind": "user",
           "reference": "user-confirmed-schema-v2-rerecord"
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-08-27T06:01:01Z",
-      "value": "- Keep service data ownership: no cross-schema SQL and no bypass of typed RPC.\n- Inject dependencies explicitly. Ban global mutable config, hidden service locators, unowned goroutines, and unbounded retries.\n- Ban panic or `os.Exit` outside the process entrypoint, and do not leak internal errors across public boundaries.\n- `scripts/generated-files.txt` is the only generated-file ownership list; never hand-edit files it lists, `kitex_gen`, or `services/collaboration/src/generated`.\n- IDL sources live in `idl/http/v1` and `idl/rpc/v1`; generate only through repository scripts.\n- Resource create, ready, close, and cleanup follow bounded reverse-order lifecycle rules.\n- Documents describe only implemented and verified behavior; update them when public runtime, contracts, boundaries, lifecycle, startup, or APIs change.\n- Fail closed on Redis, identity revalidation, collaboration authorization, and permission-invalidation ACK failures.\n"
+      "updatedAt": "2026-09-10T06:56:39Z",
+      "value": "- Keep service data ownership: no cross-schema SQL and no bypass of typed RPC.\n- Inject dependencies explicitly. Ban global mutable config, hidden service locators, unowned goroutines, and unbounded retries.\n- Ban panic or `os.Exit` outside the process entrypoint, and do not leak internal errors across public boundaries.\n- `scripts/generated-files.txt` is the only generated-file ownership list; never hand-edit files it lists, `kitex_gen`, or `services/collaboration/src/generated`.\n- IDL sources live in `idl/http/v1` and `idl/rpc/v1`; generate only through repository scripts.\n- Resource create, ready, close, and cleanup follow bounded reverse-order lifecycle rules.\n- Documents describe only implemented and verified behavior; update them when public runtime, contracts, boundaries, lifecycle, startup, or APIs change.\n- Fail closed on Redis, identity revalidation, collaboration authorization, and permission-invalidation ACK failures.\n\n- Attachment publication-reference and Platform consumer RPCs rely on the trusted service-mesh mTLS boundary and do not accept or propagate application service tokens; retain access-token/JWT checks where the contract requires user or administrator context.\n"
     },
     {
       "id": "conventions.code-layout",
@@ -420,7 +436,7 @@
     },
     {
       "id": "conventions.code-style",
-      "revision": 173,
+      "revision": 175,
       "section": "conventions",
       "sources": [
         {
@@ -429,7 +445,7 @@
         },
         {
           "kind": "documented",
-          "reference": "docs/trace-architecture.md#4-噪音过滤"
+          "reference": "docs/trace-architecture.md#4-\u566a\u97f3\u8fc7\u6ee4"
         },
         {
           "kind": "user",
@@ -437,12 +453,16 @@
         },
         {
           "kind": "user",
+          "reference": "user-confirmed-internal-rpc-auth-boundary"
+        },
+        {
+          "kind": "user",
           "reference": "user-confirmed-schema-v2-rerecord"
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-09-10T06:34:59Z",
-      "value": "## Errors\n\nGo constructors validate required dependencies and return `(T, error)`. Errors add operation context, keep the cause with `%w`, and use `errors.Is` / `errors.As`. Cross-boundary errors use `pkg/error` code/key/kind. Do not use `Must*`, panic for business failure, or `os.Exit` outside the process entrypoint. Gateway reconstructs public RFC 9457 problems from upstream Kitex BizStatus code, key, kind, and catalog message; it must not rewrite `KindInternal` as unavailable. Transport failures without BizStatus remain `gateway.dependency_unavailable` (503) or `gateway.upstream_timeout` (504). Invalid extras map to `gateway.invalid_upstream_response` (502).\n\n## Logging and telemetry\n\nPropagate `context.Context`, deadlines, request IDs, and W3C trace end to end. Metric labels and span attributes stay on route templates, RPC methods, status codes, stable business codes, and dependency names. Knowledge and Attachment worker empty-claim probes use `trace.Suppress` so idle SQL does not export orphan roots; claimed work uses a short unsuppressed span. GetConsumerState treats a missing namespace as DesiredRevision=0 idle state, not NotFound.\n\n## Tests\n\nTests stay close to implementation and cover success, edges, dependency failure, error mapping, cleanup/rollback, and deterministic concurrent behavior. Rust requires rustfmt, clippy `-D warnings`, and cargo deny.\n\n## Secrets and layout\n\nRepository text uses LF except `.bat` / `.cmd`. Module and directory ownership lives in `conventions.code-layout`, not architecture.\n"
+      "updatedAt": "2026-09-10T06:56:39Z",
+      "value": "## Errors\n\nGo constructors validate required dependencies and return `(T, error)`. Errors add operation context, keep the cause with `%w`, and use `errors.Is` / `errors.As`. Cross-boundary errors use `pkg/error` code/key/kind. Do not use `Must*`, panic for business failure, or `os.Exit` outside the process entrypoint. Gateway reconstructs public RFC 9457 problems from upstream Kitex BizStatus code, key, kind, and catalog message; it must not rewrite `KindInternal` as unavailable. Transport failures without BizStatus remain `gateway.dependency_unavailable` (503) or `gateway.upstream_timeout` (504). Invalid extras map to `gateway.invalid_upstream_response` (502).\n\n## Logging and telemetry\n\nPropagate `context.Context`, deadlines, request IDs, and W3C trace end to end. Metric labels and span attributes stay on route templates, RPC methods, status codes, stable business codes, and dependency names. Knowledge and Attachment worker empty-claim probes use `trace.Suppress` so idle SQL does not export orphan roots; claimed work uses a short unsuppressed span. GetConsumerState treats a missing namespace as DesiredRevision=0 idle state, not NotFound.\n\n## Tests\n\nTests stay close to implementation and cover success, edges, dependency failure, error mapping, cleanup/rollback, and deterministic concurrent behavior. Rust requires rustfmt, clippy `-D warnings`, and cargo deny.\n\n## Secrets and layout\n\nRepository text uses LF except `.bat` / `.cmd`. Module and directory ownership lives in `conventions.code-layout`, not architecture.\n\n## Internal RPC authentication\n\nUse the service-mesh mTLS boundary for trusted backend-only Attachment publication-reference and Platform consumer RPCs. Do not add a second application service token; preserve access-token metadata and administrator JWT checks for methods that require user context.\n"
     },
     {
       "id": "documents.managed",
@@ -557,7 +577,7 @@
     },
     {
       "id": "environment.setup",
-      "revision": 172,
+      "revision": 177,
       "section": "environment",
       "sources": [
         {
@@ -567,6 +587,11 @@
         {
           "kind": "detected",
           "reference": "services/collaboration/interop/package.json"
+        },
+        {
+          "detail": "evidence-sha256:13db72df263e8e2a1001161b841bb789eac58f7ccc0308540eaf3bebdef2d40d",
+          "kind": "documented",
+          "reference": "docs/migrations/2026-09-retire-legacy-media.md#required-rollout-order"
         },
         {
           "kind": "user",
@@ -582,7 +607,7 @@
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-09-10T06:00:15Z",
+      "updatedAt": "2026-09-10T07:05:17Z",
       "value": "The project contains one Go module and a Rust workspace under services/collaboration. Use the repository-pinned generators (Kitex 0.16.2, hz 0.9.7 via `hz update` only, thriftgo 0.4.5) and rustc 1.97.1 from rust-toolchain.toml. Collaboration interop fixtures require Node.js >= 24.18.1 and `npm ci`; package tarballs use npmmirror via `services/collaboration/interop/.npmrc`, while `npm audit` uses `https://registry.npmjs.org` because npmmirror does not implement the security advisories API. ARC runners share node-local language caches at `/cache` (hostPath `/var/lib/hls-ci-cache`, uid 1001); do not enable GitHub Actions cache. Inject all non-public configuration through environment variables or the deploy platform's secret store; never store secret values in repository configuration."
     },
     {
@@ -632,21 +657,21 @@
     },
     {
       "id": "security.secrets-and-config",
-      "revision": 172,
+      "revision": 176,
       "section": "conventions",
       "sources": [
         {
-          "detail": "evidence-sha256:cb76d752d998c3f98d34651a519580352ccaaa1489e524e4594ecbff48714bba",
+          "detail": "evidence-sha256:e4a2db3fa2b915ef5947349414bf94c2390f56514e7c46112e1fbc589c2ebfdf",
           "kind": "documented",
           "reference": "README.md#compose"
         },
         {
-          "detail": "evidence-sha256:cb76d752d998c3f98d34651a519580352ccaaa1489e524e4594ecbff48714bba",
+          "detail": "evidence-sha256:e4a2db3fa2b915ef5947349414bf94c2390f56514e7c46112e1fbc589c2ebfdf",
           "kind": "documented",
           "reference": "README.md#k3s-gitops"
         },
         {
-          "detail": "evidence-sha256:cb76d752d998c3f98d34651a519580352ccaaa1489e524e4594ecbff48714bba",
+          "detail": "evidence-sha256:e4a2db3fa2b915ef5947349414bf94c2390f56514e7c46112e1fbc589c2ebfdf",
           "kind": "documented",
           "reference": "README.md#section"
         },
@@ -656,7 +681,7 @@
           "reference": "deploy/base/README.md#application-deployment-base"
         },
         {
-          "detail": "evidence-sha256:cb76d752d998c3f98d34651a519580352ccaaa1489e524e4594ecbff48714bba",
+          "detail": "evidence-sha256:e4a2db3fa2b915ef5947349414bf94c2390f56514e7c46112e1fbc589c2ebfdf",
           "kind": "documented",
           "reference": "deploy/nacos/README.md#nacos-application-configuration"
         },
@@ -666,27 +691,27 @@
           "reference": "deploy/overlay/dev/README.md#development-overlay"
         },
         {
-          "detail": "evidence-sha256:cb76d752d998c3f98d34651a519580352ccaaa1489e524e4594ecbff48714bba",
+          "detail": "evidence-sha256:e4a2db3fa2b915ef5947349414bf94c2390f56514e7c46112e1fbc589c2ebfdf",
           "kind": "documented",
           "reference": "docs/framework-design.md#11"
         },
         {
-          "detail": "evidence-sha256:cb76d752d998c3f98d34651a519580352ccaaa1489e524e4594ecbff48714bba",
+          "detail": "evidence-sha256:e4a2db3fa2b915ef5947349414bf94c2390f56514e7c46112e1fbc589c2ebfdf",
           "kind": "documented",
           "reference": "docs/framework-design.md#12"
         },
         {
-          "detail": "evidence-sha256:cb76d752d998c3f98d34651a519580352ccaaa1489e524e4594ecbff48714bba",
+          "detail": "evidence-sha256:e4a2db3fa2b915ef5947349414bf94c2390f56514e7c46112e1fbc589c2ebfdf",
           "kind": "documented",
           "reference": "docs/framework-design.md#8-secret-tls"
         },
         {
-          "detail": "evidence-sha256:cb76d752d998c3f98d34651a519580352ccaaa1489e524e4594ecbff48714bba",
+          "detail": "evidence-sha256:e4a2db3fa2b915ef5947349414bf94c2390f56514e7c46112e1fbc589c2ebfdf",
           "kind": "documented",
           "reference": "docs/migrations/2026-08-auth-productionization.md#section"
         },
         {
-          "detail": "evidence-sha256:cb76d752d998c3f98d34651a519580352ccaaa1489e524e4594ecbff48714bba",
+          "detail": "evidence-sha256:e4a2db3fa2b915ef5947349414bf94c2390f56514e7c46112e1fbc589c2ebfdf",
           "kind": "documented",
           "reference": "docs/migrations/2026-08-platform-configuration.md#platform-configuration-migration"
         },
@@ -696,22 +721,22 @@
           "reference": "docs/migrations/2026-09-retire-legacy-media.md#required-rollout-order"
         },
         {
-          "detail": "evidence-sha256:cb76d752d998c3f98d34651a519580352ccaaa1489e524e4594ecbff48714bba",
+          "detail": "evidence-sha256:e4a2db3fa2b915ef5947349414bf94c2390f56514e7c46112e1fbc589c2ebfdf",
           "kind": "documented",
           "reference": "docs/platform-configuration.md#section"
         },
         {
-          "detail": "evidence-sha256:cb76d752d998c3f98d34651a519580352ccaaa1489e524e4594ecbff48714bba",
+          "detail": "evidence-sha256:e4a2db3fa2b915ef5947349414bf94c2390f56514e7c46112e1fbc589c2ebfdf",
           "kind": "documented",
           "reference": "docs/rust-collaboration-design.md#2-1"
         },
         {
-          "detail": "evidence-sha256:cb76d752d998c3f98d34651a519580352ccaaa1489e524e4594ecbff48714bba",
+          "detail": "evidence-sha256:e4a2db3fa2b915ef5947349414bf94c2390f56514e7c46112e1fbc589c2ebfdf",
           "kind": "documented",
           "reference": "docs/rust-collaboration-design.md#7"
         },
         {
-          "detail": "evidence-sha256:cb76d752d998c3f98d34651a519580352ccaaa1489e524e4594ecbff48714bba",
+          "detail": "evidence-sha256:e4a2db3fa2b915ef5947349414bf94c2390f56514e7c46112e1fbc589c2ebfdf",
           "kind": "documented",
           "reference": "docs/trace-architecture.md#7-collector-tempo"
         },
@@ -729,7 +754,7 @@
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-09-10T06:00:15Z",
+      "updatedAt": "2026-09-10T07:01:53Z",
       "value": "Secrets may be injected only from environment variables, Kubernetes Secrets, or SOPS-encrypted GitOps manifests. Sensitive values must not be stored in plaintext in source, configuration, logs, metrics, trace spans, or release metadata."
     },
     {
@@ -775,7 +800,7 @@
             "admin": 8082,
             "http": 8080
           },
-          "role": "Public HTTP edge and admin façade"
+          "role": "Public HTTP edge and admin fa\u00e7ade"
         },
         {
           "apis": [
@@ -886,7 +911,7 @@
     },
     {
       "id": "services.relationships",
-      "revision": 139,
+      "revision": 175,
       "section": "services",
       "sources": [
         {
@@ -895,12 +920,16 @@
         },
         {
           "kind": "user",
+          "reference": "user-confirmed-internal-rpc-auth-boundary"
+        },
+        {
+          "kind": "user",
           "reference": "user-confirmed-schema-v2-rerecord"
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-08-27T11:54:55Z",
-      "value": "Clients enter through Gateway HTTP or Collaboration WebSocket. Gateway calls Identity, Knowledge, Collaboration, Attachment, and Platform through typed Thrift RPC. Collaboration calls Knowledge for authorization and projection. Each stateful service persists only to its own PostgreSQL schema; Redis supports ephemeral coordination, JetStream carries durable events, S3 stores objects, and ClamAV scans uploads."
+      "updatedAt": "2026-09-10T06:56:39Z",
+      "value": "Clients enter through Gateway HTTP or Collaboration WebSocket. Gateway calls Identity, Knowledge, Collaboration, Attachment, and Platform through typed Thrift RPC. Collaboration calls Knowledge for authorization and projection. Each stateful service persists only to its own PostgreSQL schema; Redis supports ephemeral coordination, JetStream carries durable events, S3 stores objects, and ClamAV scans uploads. Internal backend calls use the service-mesh mTLS boundary; Attachment publication-reference and Platform consumer RPCs intentionally omit application service tokens, while user/admin authorization remains method-specific."
     },
     {
       "id": "validation.definition-of-done",
@@ -1068,11 +1097,11 @@
     "profile": "generic",
     "slug": "knowledge-core"
   },
-  "revision": 174,
+  "revision": 177,
   "scan": {
-    "fingerprint": "a8612eaefb32baed368982178b0f26b3ac7f47dac698c927909681a0a072adcb",
+    "fingerprint": "b893bb150814703510fb773105ecb4a297162a0b4d1b3dacc51e5174d3cc23af",
     "inventoryCount": 457
   },
   "schemaVersion": 3,
-  "updatedAt": "2026-09-10T06:36:55Z"
+  "updatedAt": "2026-09-10T07:05:17Z"
 }

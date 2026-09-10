@@ -18,7 +18,11 @@ Tests stay close to implementation and cover success, edges, dependency failure,
 
 Repository text uses LF except `.bat` / `.cmd`. Module and directory ownership lives in `conventions.code-layout`, not architecture.
 
-<!-- fact:conventions.code-style status:verified sources:AGENTS.md, docs/trace-architecture.md#4-噪音过滤, user-confirmed, user-confirmed-schema-v2-rerecord -->
+## Internal RPC authentication
+
+Use the service-mesh mTLS boundary for trusted backend-only Attachment publication-reference and Platform consumer RPCs. Do not add a second application service token; preserve access-token metadata and administrator JWT checks for methods that require user context.
+
+<!-- fact:conventions.code-style status:verified sources:AGENTS.md, docs/trace-architecture.md#4-噪音过滤, user-confirmed, user-confirmed-internal-rpc-auth-boundary, user-confirmed-schema-v2-rerecord -->
 
 ## 4. Repository modules
 

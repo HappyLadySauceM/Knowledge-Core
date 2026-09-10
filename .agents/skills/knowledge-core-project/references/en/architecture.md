@@ -115,7 +115,7 @@ flowchart LR
 
 ### Configuration change
 
-- **description**: Platform commits revision, audit, idempotency, and outbox atomically, then publishes coordinate-only events. GetConsumerState returns DesiredRevision=0 idle state when a namespace has not been written, rather than NotFound.
+- **description**: Platform commits revision, audit, idempotency, and outbox atomically, then publishes coordinate-only events. GetConsumerState returns DesiredRevision=0 idle state when a namespace has not been written, rather than NotFound. Identity reads Platform consumer snapshots and reports application status over the trusted mTLS mesh without an application service token.
 
 
 ## Quality attributes
@@ -171,6 +171,13 @@ flowchart LR
   - At-least-once delivery
   - Consumers and redrive operations must be idempotent
 
+### Mesh-authenticated internal RPCs
+
+- **rationale**: Attachment publication-reference and Platform consumer RPCs are trusted backend operations inside the service mesh. Istio mTLS supplies workload and transport identity, so a second application service token would duplicate an inconsistent boundary. Access-token metadata remains only where a method requires user context, and administrator JWT checks remain on configuration write/read methods.
+- **tradeoffs**:
+  - Any backend workload admitted to the trusted mesh can invoke these methods, including consumer configuration reads that return decrypted values by explicit trust decision.
+  - If the mesh trust boundary changes, method-level authorization must be added through Istio AuthorizationPolicy/Waypoint or application authentication.
+
 
 ## Risks
 
@@ -187,4 +194,4 @@ flowchart LR
 - **mitigation**: Pin IDL generation, enforce compatibility checks, and fail readiness on critical stream/subject mismatches.
 
 
-<!-- fact:architecture.design status:verified sources:README.md#knowledge-core, docs/framework-design.md, docs/framework-design.md#9, docs/framework-design.md#knowledge-core, docs/platform-configuration.md#配置同步, docs/rust-collaboration-design.md#rust-collaboration, Knowledge-Core/.tmp/architecture-design.md, user-confirmed-en-locale-source -->
+<!-- fact:architecture.design status:verified sources:README.md#knowledge-core, docs/framework-design.md, docs/framework-design.md#9, docs/framework-design.md#knowledge-core, docs/platform-configuration.md#配置同步, docs/rust-collaboration-design.md#rust-collaboration, Knowledge-Core/.tmp/architecture-design.md, user-confirmed-en-locale-source, user-confirmed-internal-rpc-auth-boundary -->

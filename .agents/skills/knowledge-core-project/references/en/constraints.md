@@ -11,4 +11,6 @@
 - Documents describe only implemented and verified behavior; update them when public runtime, contracts, boundaries, lifecycle, startup, or APIs change.
 - Fail closed on Redis, identity revalidation, collaboration authorization, and permission-invalidation ACK failures.
 
-<!-- fact:constraints.project status:verified sources:user-confirmed, user-confirmed-schema-v2-rerecord -->
+- Attachment publication-reference and Platform consumer RPCs rely on the trusted service-mesh mTLS boundary and do not accept or propagate application service tokens; retain access-token/JWT checks where the contract requires user or administrator context.
+
+<!-- fact:constraints.project status:verified sources:user-confirmed, user-confirmed-internal-rpc-auth-boundary, user-confirmed-schema-v2-rerecord -->
