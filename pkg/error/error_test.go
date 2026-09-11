@@ -73,6 +73,23 @@ func TestToBizStatusCarriesSafeContextMetadata(t *testing.T) {
 	}
 }
 
+func TestToBizStatusCarriesAllowlistedRetryAfter(t *testing.T) {
+	rateLimited := apperror.MustDefine(20013, "identity.verification_cooldown", apperror.KindRateLimited, "verification email was recently sent")
+	err := rateLimited.NewWithExtra(map[string]string{apperror.ExtraRetryAfter: "1800", "secret": "drop-me"})
+	biz := apperror.ToBizStatus(context.Background(), err)
+	extra := biz.BizExtra()
+	if extra[apperror.ExtraRetryAfter] != "1800" {
+		t.Fatalf("retry_after extra = %#v", extra)
+	}
+	if _, ok := extra["secret"]; ok {
+		t.Fatalf("unsafe extra leaked: %#v", extra)
+	}
+	status, problem := apperror.ToHTTPError(context.Background(), err)
+	if status != 429 || problem.RetryAfter != "1800" || problem.Key != "identity.verification_cooldown" {
+		t.Fatalf("ToHTTPError() = %d %#v", status, problem)
+	}
+}
+
 func TestToBizStatusMapsUnknownErrorsToInternal(t *testing.T) {
 	biz := apperror.ToBizStatus(context.Background(), errors.New("private detail"))
 	if biz.BizStatusCode() != apperror.Internal.Code || biz.BizMessage() != apperror.Internal.Message {

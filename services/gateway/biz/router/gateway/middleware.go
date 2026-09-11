@@ -223,7 +223,7 @@ func _refreshsessionMw() []app.HandlerFunc {
 }
 
 func _requestemailverificationMw() []app.HandlerFunc {
-	return []app.HandlerFunc{gatewaymiddleware.ActionRateLimit()}
+	return []app.HandlerFunc{gatewaymiddleware.RequireAuthenticated(), gatewaymiddleware.ActionRateLimit()}
 }
 
 func _verifyemailMw() []app.HandlerFunc {
@@ -346,4 +346,8 @@ func _deliveriesMw() []app.HandlerFunc {
 
 func _getconfigurationdeliveryMw() []app.HandlerFunc {
 	return []app.HandlerFunc{gatewaymiddleware.RequireAuthenticated(), gatewaymiddleware.RequireAdmin()}
+}
+
+func _getemailverificationstatusMw() []app.HandlerFunc {
+	return []app.HandlerFunc{gatewaymiddleware.RequireAuthenticated(), gatewaymiddleware.ActionRateLimit()}
 }

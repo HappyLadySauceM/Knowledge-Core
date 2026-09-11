@@ -35,7 +35,7 @@ func (s *authenticateUsersStub) RecordLoginFailure(_ context.Context, _ int64, _
 }
 
 func (s *authenticateUsersStub) CompleteLoginSuccess(_ context.Context, _ int64, now time.Time) (*domain.User, error) {
-	if s.user.IsLocked(now) || s.user.Status != domain.StatusActive {
+	if s.user.IsLocked(now) || !s.user.CanEstablishSession() {
 		clone := *s.user
 		return &clone, nil
 	}
@@ -113,25 +113,28 @@ func TestAuthenticateUnknownUserUsesSafeError(t *testing.T) {
 	}
 }
 
-func TestAuthenticatePendingUserRequiresEmailVerification(t *testing.T) {
+func TestAuthenticatePendingUserSucceeds(t *testing.T) {
 	users := &authenticateUsersStub{user: &domain.User{
 		ID: 1, Username: "alice", Email: "alice@example.com", PasswordHash: "hash:correct",
-		Role: domain.RoleUser, Status: domain.StatusPending, TokenVersion: 1,
+		Role: domain.RoleUser, Status: domain.StatusPending, TokenVersion: 1, FailedLoginAttempts: 2,
 	}}
 	logic, err := NewAuthenticateLogic(users, passwordVerifierStub{}, tokenIssuerStub{}, 5, time.Minute)
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = logic.Authenticate(context.Background(), AuthenticateInput{Identifier: "alice", Password: "correct"})
-	if !errors.Is(err, identityerrors.EmailNotVerified) {
+	authentication, err := logic.Authenticate(context.Background(), AuthenticateInput{Identifier: "alice", Password: "correct"})
+	if err != nil {
 		t.Fatalf("Authenticate() error = %v", err)
 	}
-	if details, ok := apperror.Details(err); !ok || details.Key != "identity.email_not_verified" {
-		t.Fatalf("Authenticate() details = %#v", details)
+	if authentication.AccessToken.Value != "access-token" || authentication.User.Status != domain.StatusPending {
+		t.Fatalf("authentication = %#v", authentication)
+	}
+	if users.user.FailedLoginAttempts != 0 {
+		t.Fatalf("FailedLoginAttempts = %d", users.user.FailedLoginAttempts)
 	}
 }
 
-func TestAuthenticatePendingUserKeepsInvalidCredentialsOnWrongPassword(t *testing.T) {
+func TestAuthenticatePendingUserRecordsWrongPasswordFailures(t *testing.T) {
 	users := &authenticateUsersStub{user: &domain.User{
 		ID: 1, Username: "alice", Email: "alice@example.com", PasswordHash: "hash:correct",
 		Role: domain.RoleUser, Status: domain.StatusPending, TokenVersion: 1,
@@ -142,6 +145,24 @@ func TestAuthenticatePendingUserKeepsInvalidCredentialsOnWrongPassword(t *testin
 	}
 	_, err = logic.Authenticate(context.Background(), AuthenticateInput{Identifier: "alice", Password: "wrong"})
 	if !errors.Is(err, identityerrors.InvalidCredentials) {
+		t.Fatalf("Authenticate() error = %v", err)
+	}
+	if users.user.FailedLoginAttempts != 1 {
+		t.Fatalf("FailedLoginAttempts = %d", users.user.FailedLoginAttempts)
+	}
+}
+
+func TestAuthenticateDisabledUserIsRejected(t *testing.T) {
+	users := &authenticateUsersStub{user: &domain.User{
+		ID: 1, Username: "alice", Email: "alice@example.com", PasswordHash: "hash:correct",
+		Role: domain.RoleUser, Status: domain.StatusDisabled, TokenVersion: 1,
+	}}
+	logic, err := NewAuthenticateLogic(users, passwordVerifierStub{}, tokenIssuerStub{}, 5, time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = logic.Authenticate(context.Background(), AuthenticateInput{Identifier: "alice", Password: "correct"})
+	if !errors.Is(err, identityerrors.UserDisabled) {
 		t.Fatalf("Authenticate() error = %v", err)
 	}
 }

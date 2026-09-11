@@ -31,6 +31,8 @@ const (
 
 	CodeActionAlreadyUsed = 20012
 
+	CodeVerificationCooldown = 20013
+
 	CodeInternal = 20999
 )
 
@@ -46,6 +48,7 @@ type User struct {
 	CreatedAt          string  `thrift:"created_at,9,required" frugal:"9,required,string" json:"created_at"`
 	UpdatedAt          string  `thrift:"updated_at,10,required" frugal:"10,required,string" json:"updated_at"`
 	AvatarAttachmentId *string `thrift:"avatar_attachment_id,11,optional" frugal:"11,optional,string" json:"avatar_attachment_id,omitempty"`
+	EmailVerifiedAt    *string `thrift:"email_verified_at,12,optional" frugal:"12,optional,string" json:"email_verified_at,omitempty"`
 }
 
 func NewUser() *User {
@@ -103,6 +106,15 @@ func (p *User) GetAvatarAttachmentId() (v string) {
 	}
 	return *p.AvatarAttachmentId
 }
+
+var User_EmailVerifiedAt_DEFAULT string
+
+func (p *User) GetEmailVerifiedAt() (v string) {
+	if !p.IsSetEmailVerifiedAt() {
+		return User_EmailVerifiedAt_DEFAULT
+	}
+	return *p.EmailVerifiedAt
+}
 func (p *User) SetId(val int64) {
 	p.Id = val
 }
@@ -136,9 +148,16 @@ func (p *User) SetUpdatedAt(val string) {
 func (p *User) SetAvatarAttachmentId(val *string) {
 	p.AvatarAttachmentId = val
 }
+func (p *User) SetEmailVerifiedAt(val *string) {
+	p.EmailVerifiedAt = val
+}
 
 func (p *User) IsSetAvatarAttachmentId() bool {
 	return p.AvatarAttachmentId != nil
+}
+
+func (p *User) IsSetEmailVerifiedAt() bool {
+	return p.EmailVerifiedAt != nil
 }
 
 func (p *User) String() string {
@@ -160,6 +179,7 @@ var fieldIDToName_User = map[int16]string{
 	9:  "created_at",
 	10: "updated_at",
 	11: "avatar_attachment_id",
+	12: "email_verified_at",
 }
 
 type PublicUser struct {
@@ -509,6 +529,71 @@ var fieldIDToName_EmailRequest = map[int16]string{
 	1: "email",
 }
 
+type EmailVerificationStatus struct {
+	State             string  `thrift:"state,1,required" frugal:"1,required,string" json:"state"`
+	ExpiresAt         *string `thrift:"expires_at,2,optional" frugal:"2,optional,string" json:"expires_at,omitempty"`
+	RetryAfterSeconds *int32  `thrift:"retry_after_seconds,3,optional" frugal:"3,optional,i32" json:"retry_after_seconds,omitempty"`
+}
+
+func NewEmailVerificationStatus() *EmailVerificationStatus {
+	return &EmailVerificationStatus{}
+}
+
+func (p *EmailVerificationStatus) InitDefault() {
+}
+
+func (p *EmailVerificationStatus) GetState() (v string) {
+	return p.State
+}
+
+var EmailVerificationStatus_ExpiresAt_DEFAULT string
+
+func (p *EmailVerificationStatus) GetExpiresAt() (v string) {
+	if !p.IsSetExpiresAt() {
+		return EmailVerificationStatus_ExpiresAt_DEFAULT
+	}
+	return *p.ExpiresAt
+}
+
+var EmailVerificationStatus_RetryAfterSeconds_DEFAULT int32
+
+func (p *EmailVerificationStatus) GetRetryAfterSeconds() (v int32) {
+	if !p.IsSetRetryAfterSeconds() {
+		return EmailVerificationStatus_RetryAfterSeconds_DEFAULT
+	}
+	return *p.RetryAfterSeconds
+}
+func (p *EmailVerificationStatus) SetState(val string) {
+	p.State = val
+}
+func (p *EmailVerificationStatus) SetExpiresAt(val *string) {
+	p.ExpiresAt = val
+}
+func (p *EmailVerificationStatus) SetRetryAfterSeconds(val *int32) {
+	p.RetryAfterSeconds = val
+}
+
+func (p *EmailVerificationStatus) IsSetExpiresAt() bool {
+	return p.ExpiresAt != nil
+}
+
+func (p *EmailVerificationStatus) IsSetRetryAfterSeconds() bool {
+	return p.RetryAfterSeconds != nil
+}
+
+func (p *EmailVerificationStatus) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("EmailVerificationStatus(%+v)", *p)
+}
+
+var fieldIDToName_EmailVerificationStatus = map[int16]string{
+	1: "state",
+	2: "expires_at",
+	3: "retry_after_seconds",
+}
+
 type PasswordResetRequest struct {
 	Token    string `thrift:"token,1,required" frugal:"1,required,string" json:"token"`
 	Password string `thrift:"password,2,required" frugal:"2,required,string" json:"password"`
@@ -794,7 +879,9 @@ type IdentityService interface {
 
 	RefreshSession(ctx context.Context, request *RefreshSessionRequest) (r *Authentication, err error)
 
-	RequestEmailVerification(ctx context.Context, request *EmailRequest) (r *common.EmptyResponse, err error)
+	GetEmailVerificationStatus(ctx context.Context, request *CurrentUserRequest) (r *EmailVerificationStatus, err error)
+
+	RequestEmailVerification(ctx context.Context, request *CurrentUserRequest) (r *EmailVerificationStatus, err error)
 
 	VerifyEmail(ctx context.Context, request *EmailTokenRequest) (r *common.EmptyResponse, err error)
 
@@ -1119,8 +1206,84 @@ var fieldIDToName_IdentityServiceRefreshSessionResult = map[int16]string{
 	0: "success",
 }
 
+type IdentityServiceGetEmailVerificationStatusArgs struct {
+	Request *CurrentUserRequest `thrift:"request,1" frugal:"1,default,CurrentUserRequest" json:"request"`
+}
+
+func NewIdentityServiceGetEmailVerificationStatusArgs() *IdentityServiceGetEmailVerificationStatusArgs {
+	return &IdentityServiceGetEmailVerificationStatusArgs{}
+}
+
+func (p *IdentityServiceGetEmailVerificationStatusArgs) InitDefault() {
+}
+
+var IdentityServiceGetEmailVerificationStatusArgs_Request_DEFAULT *CurrentUserRequest
+
+func (p *IdentityServiceGetEmailVerificationStatusArgs) GetRequest() (v *CurrentUserRequest) {
+	if !p.IsSetRequest() {
+		return IdentityServiceGetEmailVerificationStatusArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+func (p *IdentityServiceGetEmailVerificationStatusArgs) SetRequest(val *CurrentUserRequest) {
+	p.Request = val
+}
+
+func (p *IdentityServiceGetEmailVerificationStatusArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *IdentityServiceGetEmailVerificationStatusArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("IdentityServiceGetEmailVerificationStatusArgs(%+v)", *p)
+}
+
+var fieldIDToName_IdentityServiceGetEmailVerificationStatusArgs = map[int16]string{
+	1: "request",
+}
+
+type IdentityServiceGetEmailVerificationStatusResult struct {
+	Success *EmailVerificationStatus `thrift:"success,0,optional" frugal:"0,optional,EmailVerificationStatus" json:"success,omitempty"`
+}
+
+func NewIdentityServiceGetEmailVerificationStatusResult() *IdentityServiceGetEmailVerificationStatusResult {
+	return &IdentityServiceGetEmailVerificationStatusResult{}
+}
+
+func (p *IdentityServiceGetEmailVerificationStatusResult) InitDefault() {
+}
+
+var IdentityServiceGetEmailVerificationStatusResult_Success_DEFAULT *EmailVerificationStatus
+
+func (p *IdentityServiceGetEmailVerificationStatusResult) GetSuccess() (v *EmailVerificationStatus) {
+	if !p.IsSetSuccess() {
+		return IdentityServiceGetEmailVerificationStatusResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *IdentityServiceGetEmailVerificationStatusResult) SetSuccess(x interface{}) {
+	p.Success = x.(*EmailVerificationStatus)
+}
+
+func (p *IdentityServiceGetEmailVerificationStatusResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *IdentityServiceGetEmailVerificationStatusResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("IdentityServiceGetEmailVerificationStatusResult(%+v)", *p)
+}
+
+var fieldIDToName_IdentityServiceGetEmailVerificationStatusResult = map[int16]string{
+	0: "success",
+}
+
 type IdentityServiceRequestEmailVerificationArgs struct {
-	Request *EmailRequest `thrift:"request,1" frugal:"1,default,EmailRequest" json:"request"`
+	Request *CurrentUserRequest `thrift:"request,1" frugal:"1,default,CurrentUserRequest" json:"request"`
 }
 
 func NewIdentityServiceRequestEmailVerificationArgs() *IdentityServiceRequestEmailVerificationArgs {
@@ -1130,15 +1293,15 @@ func NewIdentityServiceRequestEmailVerificationArgs() *IdentityServiceRequestEma
 func (p *IdentityServiceRequestEmailVerificationArgs) InitDefault() {
 }
 
-var IdentityServiceRequestEmailVerificationArgs_Request_DEFAULT *EmailRequest
+var IdentityServiceRequestEmailVerificationArgs_Request_DEFAULT *CurrentUserRequest
 
-func (p *IdentityServiceRequestEmailVerificationArgs) GetRequest() (v *EmailRequest) {
+func (p *IdentityServiceRequestEmailVerificationArgs) GetRequest() (v *CurrentUserRequest) {
 	if !p.IsSetRequest() {
 		return IdentityServiceRequestEmailVerificationArgs_Request_DEFAULT
 	}
 	return p.Request
 }
-func (p *IdentityServiceRequestEmailVerificationArgs) SetRequest(val *EmailRequest) {
+func (p *IdentityServiceRequestEmailVerificationArgs) SetRequest(val *CurrentUserRequest) {
 	p.Request = val
 }
 
@@ -1158,7 +1321,7 @@ var fieldIDToName_IdentityServiceRequestEmailVerificationArgs = map[int16]string
 }
 
 type IdentityServiceRequestEmailVerificationResult struct {
-	Success *common.EmptyResponse `thrift:"success,0,optional" frugal:"0,optional,common.EmptyResponse" json:"success,omitempty"`
+	Success *EmailVerificationStatus `thrift:"success,0,optional" frugal:"0,optional,EmailVerificationStatus" json:"success,omitempty"`
 }
 
 func NewIdentityServiceRequestEmailVerificationResult() *IdentityServiceRequestEmailVerificationResult {
@@ -1168,16 +1331,16 @@ func NewIdentityServiceRequestEmailVerificationResult() *IdentityServiceRequestE
 func (p *IdentityServiceRequestEmailVerificationResult) InitDefault() {
 }
 
-var IdentityServiceRequestEmailVerificationResult_Success_DEFAULT *common.EmptyResponse
+var IdentityServiceRequestEmailVerificationResult_Success_DEFAULT *EmailVerificationStatus
 
-func (p *IdentityServiceRequestEmailVerificationResult) GetSuccess() (v *common.EmptyResponse) {
+func (p *IdentityServiceRequestEmailVerificationResult) GetSuccess() (v *EmailVerificationStatus) {
 	if !p.IsSetSuccess() {
 		return IdentityServiceRequestEmailVerificationResult_Success_DEFAULT
 	}
 	return p.Success
 }
 func (p *IdentityServiceRequestEmailVerificationResult) SetSuccess(x interface{}) {
-	p.Success = x.(*common.EmptyResponse)
+	p.Success = x.(*EmailVerificationStatus)
 }
 
 func (p *IdentityServiceRequestEmailVerificationResult) IsSetSuccess() bool {

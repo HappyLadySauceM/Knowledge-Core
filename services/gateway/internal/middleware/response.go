@@ -80,11 +80,17 @@ func WritePlatformError(ctx context.Context, request *app.RequestContext, err er
 }
 
 func writeRPCError(ctx context.Context, request *app.RequestContext, err error) {
-	if definition, ok := apperror.FromKitexBizStatus(err); ok {
-		writeCatalogError(ctx, request, definition)
-		return
-	}
-	if _, isBiz := kerrors.FromBizStatusError(err); isBiz {
+	if business, isBiz := kerrors.FromBizStatusError(err); isBiz {
+		if definition, ok := apperror.FromKitexBizStatus(err); ok {
+			appErr := definition.New()
+			if extra := business.BizExtra(); extra != nil {
+				if retryAfter := extra[apperror.ExtraRetryAfter]; retryAfter != "" {
+					appErr = definition.NewWithExtra(map[string]string{apperror.ExtraRetryAfter: retryAfter})
+				}
+			}
+			writeCatalogError(ctx, request, appErr)
+			return
+		}
 		WriteError(ctx, request, ErrInvalidUpstreamResponse)
 		return
 	}
@@ -95,16 +101,21 @@ func writeRPCError(ctx context.Context, request *app.RequestContext, err error) 
 	WriteError(ctx, request, ErrDependencyUnavailable)
 }
 
-func writeCatalogError(ctx context.Context, request *app.RequestContext, definition apperror.Definition) {
+func writeCatalogError(ctx context.Context, request *app.RequestContext, err error) {
 	requestID, traceID := responseMetadata(ctx, request)
 	problemContext := metadata.WithRequestID(ctx, requestID)
-	status, payload := apperror.ToHTTPError(problemContext, definition.New())
-	if override, found := catalogHTTPStatus[definition.Key]; found {
-		status = override
-		payload = apperror.ToHTTPProblem(problemContext, status, definition.New())
+	status, payload := apperror.ToHTTPError(problemContext, err)
+	if definition, ok := apperror.Details(err); ok {
+		if override, found := catalogHTTPStatus[definition.Key]; found {
+			status = override
+			payload = apperror.ToHTTPProblem(problemContext, status, err)
+		}
 	}
 	if traceID != nil {
 		payload.TraceID = *traceID
+	}
+	if payload.RetryAfter != "" {
+		request.Header("Retry-After", payload.RetryAfter)
 	}
 	request.Abort()
 	writeProblem(request, status, payload)

@@ -38,7 +38,8 @@ type SessionService interface {
 }
 
 type ActionService interface {
-	RequestEmailVerification(context.Context, string) error
+	RequestEmailVerification(context.Context, *domain.User) (*identitylogic.EmailVerificationStatus, error)
+	EmailVerificationStatus(context.Context, *domain.User) (*identitylogic.EmailVerificationStatus, error)
 	VerifyEmail(context.Context, string) error
 	RequestPasswordReset(context.Context, string) error
 	ResetPassword(context.Context, string, string) error
@@ -268,15 +269,36 @@ func optionalString(value string) *string {
 
 func emptyResponse() *commonv1.EmptyResponse { return &commonv1.EmptyResponse{} }
 
-func (h *Handler) RequestEmailVerification(ctx context.Context, request *identityv1.EmailRequest) (*commonv1.EmptyResponse, error) {
+func (h *Handler) GetEmailVerificationStatus(ctx context.Context, _ *identityv1.CurrentUserRequest) (*identityv1.EmailVerificationStatus, error) {
 	ctx = metadata.EnsureRequestID(ctx)
-	if request == nil || request.Email == "" || h.actions == nil {
+	if h.actions == nil {
 		return nil, apperror.ToKitexBizStatus(ctx, identityerrors.InvalidInput.New())
 	}
-	if err := h.actions.RequestEmailVerification(ctx, request.Email); err != nil {
+	_, user, err := h.authenticateRequest(ctx)
+	if err != nil {
+		return nil, err
+	}
+	status, err := h.actions.EmailVerificationStatus(ctx, user)
+	if err != nil {
+		return nil, h.transportError(ctx, "get_email_verification_status_failed", err)
+	}
+	return toTransportVerification(status), nil
+}
+
+func (h *Handler) RequestEmailVerification(ctx context.Context, _ *identityv1.CurrentUserRequest) (*identityv1.EmailVerificationStatus, error) {
+	ctx = metadata.EnsureRequestID(ctx)
+	if h.actions == nil {
+		return nil, apperror.ToKitexBizStatus(ctx, identityerrors.InvalidInput.New())
+	}
+	_, user, err := h.authenticateRequest(ctx)
+	if err != nil {
+		return nil, err
+	}
+	status, err := h.actions.RequestEmailVerification(ctx, user)
+	if err != nil {
 		return nil, h.transportError(ctx, "request_email_verification_failed", err)
 	}
-	return emptyResponse(), nil
+	return toTransportVerification(status), nil
 }
 
 func (h *Handler) VerifyEmail(ctx context.Context, request *identityv1.EmailTokenRequest) (*commonv1.EmptyResponse, error) {
@@ -429,7 +451,7 @@ func (h *Handler) authenticateRequest(ctx context.Context) (coreauth.Principal, 
 		}
 		return coreauth.Principal{}, nil, h.transportError(ctx, "get_current_user_failed", err)
 	}
-	if user == nil || user.Status != domain.StatusActive || user.TokenVersion != principal.TokenVersion {
+	if user == nil || !user.CanEstablishSession() || user.TokenVersion != principal.TokenVersion {
 		return coreauth.Principal{}, nil, apperror.ToKitexBizStatus(ctx, identityerrors.Unauthenticated.New())
 	}
 	return principal, user, nil
@@ -483,6 +505,26 @@ func toTransportUser(user *domain.User) *identityv1.User {
 	}
 	if user.AvatarAttachmentID != "" {
 		result.AvatarAttachmentId = &user.AvatarAttachmentID
+	}
+	if user.EmailVerifiedAt != nil {
+		verifiedAt := user.EmailVerifiedAt.UTC().Format(time.RFC3339Nano)
+		result.EmailVerifiedAt = &verifiedAt
+	}
+	return result
+}
+
+func toTransportVerification(status *identitylogic.EmailVerificationStatus) *identityv1.EmailVerificationStatus {
+	if status == nil {
+		return &identityv1.EmailVerificationStatus{State: identitylogic.EmailVerificationIdle}
+	}
+	result := &identityv1.EmailVerificationStatus{State: status.State}
+	if status.ExpiresAt != nil {
+		expiresAt := status.ExpiresAt.UTC().Format(time.RFC3339Nano)
+		result.ExpiresAt = &expiresAt
+	}
+	if status.RetryAfterSeconds > 0 {
+		seconds := status.RetryAfterSeconds
+		result.RetryAfterSeconds = &seconds
 	}
 	return result
 }

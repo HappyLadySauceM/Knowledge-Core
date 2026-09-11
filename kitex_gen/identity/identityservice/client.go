@@ -16,7 +16,8 @@ type Client interface {
 	Register(ctx context.Context, request *identity.RegisterRequest, callOptions ...callopt.Option) (r *identity.User, err error)
 	Authenticate(ctx context.Context, request *identity.AuthenticateRequest, callOptions ...callopt.Option) (r *identity.Authentication, err error)
 	RefreshSession(ctx context.Context, request *identity.RefreshSessionRequest, callOptions ...callopt.Option) (r *identity.Authentication, err error)
-	RequestEmailVerification(ctx context.Context, request *identity.EmailRequest, callOptions ...callopt.Option) (r *common.EmptyResponse, err error)
+	GetEmailVerificationStatus(ctx context.Context, request *identity.CurrentUserRequest, callOptions ...callopt.Option) (r *identity.EmailVerificationStatus, err error)
+	RequestEmailVerification(ctx context.Context, request *identity.CurrentUserRequest, callOptions ...callopt.Option) (r *identity.EmailVerificationStatus, err error)
 	VerifyEmail(ctx context.Context, request *identity.EmailTokenRequest, callOptions ...callopt.Option) (r *common.EmptyResponse, err error)
 	RequestPasswordReset(ctx context.Context, request *identity.PasswordResetRequestRequest, callOptions ...callopt.Option) (r *common.EmptyResponse, err error)
 	ResetPassword(ctx context.Context, request *identity.PasswordResetRequest, callOptions ...callopt.Option) (r *common.EmptyResponse, err error)
@@ -77,7 +78,12 @@ func (p *kIdentityServiceClient) RefreshSession(ctx context.Context, request *id
 	return p.kClient.RefreshSession(ctx, request)
 }
 
-func (p *kIdentityServiceClient) RequestEmailVerification(ctx context.Context, request *identity.EmailRequest, callOptions ...callopt.Option) (r *common.EmptyResponse, err error) {
+func (p *kIdentityServiceClient) GetEmailVerificationStatus(ctx context.Context, request *identity.CurrentUserRequest, callOptions ...callopt.Option) (r *identity.EmailVerificationStatus, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.GetEmailVerificationStatus(ctx, request)
+}
+
+func (p *kIdentityServiceClient) RequestEmailVerification(ctx context.Context, request *identity.CurrentUserRequest, callOptions ...callopt.Option) (r *identity.EmailVerificationStatus, err error) {
 	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
 	return p.kClient.RequestEmailVerification(ctx, request)
 }

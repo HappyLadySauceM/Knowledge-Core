@@ -68,7 +68,10 @@ var (
 	// ActionAlreadyUsed is returned when the token digest matches a consumed row.
 	// 令牌 digest 能命中行，但 used_at 已写入。
 	ActionAlreadyUsed = apperror.MustDefine(identityv1.CodeActionAlreadyUsed, "identity.action_already_used", apperror.KindConflict, "action token has already been used")
-	Unimplemented     = apperror.MustDefine(
+	// VerificationCooldown is returned when an unused verification token is still valid.
+	// 未使用且未过期的验证令牌仍在窗口内时拒绝再次发送。
+	VerificationCooldown = apperror.MustDefine(identityv1.CodeVerificationCooldown, "identity.verification_cooldown", apperror.KindRateLimited, "verification email was recently sent")
+	Unimplemented        = apperror.MustDefine(
 		20009,
 		"identity.unimplemented",
 		apperror.KindUnimplemented,

@@ -2887,6 +2887,7 @@ type UserData struct {
 	CreatedAt          string  `thrift:"created_at,8,required" form:"created_at,required" json:"created_at,required"`
 	UpdatedAt          string  `thrift:"updated_at,9,required" form:"updated_at,required" json:"updated_at,required"`
 	AvatarAttachmentID *string `thrift:"avatar_attachment_id,10,optional" form:"avatar_attachment_id" json:"avatar_attachment_id,omitempty"`
+	EmailVerifiedAt    *string `thrift:"email_verified_at,11,optional" form:"email_verified_at" json:"email_verified_at,omitempty"`
 }
 
 func NewUserData() *UserData {
@@ -2941,6 +2942,15 @@ func (p *UserData) GetAvatarAttachmentID() (v string) {
 	return *p.AvatarAttachmentID
 }
 
+var UserData_EmailVerifiedAt_DEFAULT string
+
+func (p *UserData) GetEmailVerifiedAt() (v string) {
+	if !p.IsSetEmailVerifiedAt() {
+		return UserData_EmailVerifiedAt_DEFAULT
+	}
+	return *p.EmailVerifiedAt
+}
+
 var fieldIDToName_UserData = map[int16]string{
 	1:  "id",
 	2:  "username",
@@ -2952,10 +2962,15 @@ var fieldIDToName_UserData = map[int16]string{
 	8:  "created_at",
 	9:  "updated_at",
 	10: "avatar_attachment_id",
+	11: "email_verified_at",
 }
 
 func (p *UserData) IsSetAvatarAttachmentID() bool {
 	return p.AvatarAttachmentID != nil
+}
+
+func (p *UserData) IsSetEmailVerifiedAt() bool {
+	return p.EmailVerifiedAt != nil
 }
 
 func (p *UserData) Read(iprot thrift.TProtocol) (err error) {
@@ -3070,6 +3085,14 @@ func (p *UserData) Read(iprot thrift.TProtocol) (err error) {
 		case 10:
 			if fieldTypeId == thrift.STRING {
 				if err = p.ReadField10(iprot); err != nil {
+					goto ReadFieldError
+				}
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		case 11:
+			if fieldTypeId == thrift.STRING {
+				if err = p.ReadField11(iprot); err != nil {
 					goto ReadFieldError
 				}
 			} else if err = iprot.Skip(fieldTypeId); err != nil {
@@ -3260,6 +3283,17 @@ func (p *UserData) ReadField10(iprot thrift.TProtocol) error {
 	p.AvatarAttachmentID = _field
 	return nil
 }
+func (p *UserData) ReadField11(iprot thrift.TProtocol) error {
+
+	var _field *string
+	if v, err := iprot.ReadString(); err != nil {
+		return err
+	} else {
+		_field = &v
+	}
+	p.EmailVerifiedAt = _field
+	return nil
+}
 
 func (p *UserData) Write(oprot thrift.TProtocol) (err error) {
 	var fieldId int16
@@ -3305,6 +3339,10 @@ func (p *UserData) Write(oprot thrift.TProtocol) (err error) {
 		}
 		if err = p.writeField10(oprot); err != nil {
 			fieldId = 10
+			goto WriteFieldError
+		}
+		if err = p.writeField11(oprot); err != nil {
+			fieldId = 11
 			goto WriteFieldError
 		}
 	}
@@ -3495,6 +3533,25 @@ WriteFieldBeginError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 10 begin error: ", p), err)
 WriteFieldEndError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 10 end error: ", p), err)
+}
+
+func (p *UserData) writeField11(oprot thrift.TProtocol) (err error) {
+	if p.IsSetEmailVerifiedAt() {
+		if err = oprot.WriteFieldBegin("email_verified_at", thrift.STRING, 11); err != nil {
+			goto WriteFieldBeginError
+		}
+		if err := oprot.WriteString(*p.EmailVerifiedAt); err != nil {
+			return err
+		}
+		if err = oprot.WriteFieldEnd(); err != nil {
+			goto WriteFieldEndError
+		}
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 11 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 11 end error: ", p), err)
 }
 
 func (p *UserData) String() string {
@@ -5139,6 +5196,268 @@ func (p *EmailRequest) String() string {
 		return "<nil>"
 	}
 	return fmt.Sprintf("EmailRequest(%+v)", *p)
+
+}
+
+type EmailVerificationStatusData struct {
+	State             string  `thrift:"state,1,required" form:"state,required" json:"state,required"`
+	ExpiresAt         *string `thrift:"expires_at,2,optional" form:"expires_at" json:"expires_at,omitempty"`
+	RetryAfterSeconds *int32  `thrift:"retry_after_seconds,3,optional" form:"retry_after_seconds" json:"retry_after_seconds,omitempty"`
+}
+
+func NewEmailVerificationStatusData() *EmailVerificationStatusData {
+	return &EmailVerificationStatusData{}
+}
+
+func (p *EmailVerificationStatusData) InitDefault() {
+}
+
+func (p *EmailVerificationStatusData) GetState() (v string) {
+	return p.State
+}
+
+var EmailVerificationStatusData_ExpiresAt_DEFAULT string
+
+func (p *EmailVerificationStatusData) GetExpiresAt() (v string) {
+	if !p.IsSetExpiresAt() {
+		return EmailVerificationStatusData_ExpiresAt_DEFAULT
+	}
+	return *p.ExpiresAt
+}
+
+var EmailVerificationStatusData_RetryAfterSeconds_DEFAULT int32
+
+func (p *EmailVerificationStatusData) GetRetryAfterSeconds() (v int32) {
+	if !p.IsSetRetryAfterSeconds() {
+		return EmailVerificationStatusData_RetryAfterSeconds_DEFAULT
+	}
+	return *p.RetryAfterSeconds
+}
+
+var fieldIDToName_EmailVerificationStatusData = map[int16]string{
+	1: "state",
+	2: "expires_at",
+	3: "retry_after_seconds",
+}
+
+func (p *EmailVerificationStatusData) IsSetExpiresAt() bool {
+	return p.ExpiresAt != nil
+}
+
+func (p *EmailVerificationStatusData) IsSetRetryAfterSeconds() bool {
+	return p.RetryAfterSeconds != nil
+}
+
+func (p *EmailVerificationStatusData) Read(iprot thrift.TProtocol) (err error) {
+
+	var fieldTypeId thrift.TType
+	var fieldId int16
+	var issetState bool = false
+
+	if _, err = iprot.ReadStructBegin(); err != nil {
+		goto ReadStructBeginError
+	}
+
+	for {
+		_, fieldTypeId, fieldId, err = iprot.ReadFieldBegin()
+		if err != nil {
+			goto ReadFieldBeginError
+		}
+		if fieldTypeId == thrift.STOP {
+			break
+		}
+
+		switch fieldId {
+		case 1:
+			if fieldTypeId == thrift.STRING {
+				if err = p.ReadField1(iprot); err != nil {
+					goto ReadFieldError
+				}
+				issetState = true
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		case 2:
+			if fieldTypeId == thrift.STRING {
+				if err = p.ReadField2(iprot); err != nil {
+					goto ReadFieldError
+				}
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		case 3:
+			if fieldTypeId == thrift.I32 {
+				if err = p.ReadField3(iprot); err != nil {
+					goto ReadFieldError
+				}
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		default:
+			if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		}
+		if err = iprot.ReadFieldEnd(); err != nil {
+			goto ReadFieldEndError
+		}
+	}
+	if err = iprot.ReadStructEnd(); err != nil {
+		goto ReadStructEndError
+	}
+
+	if !issetState {
+		fieldId = 1
+		goto RequiredFieldNotSetError
+	}
+	return nil
+ReadStructBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T read struct begin error: ", p), err)
+ReadFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
+ReadFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_EmailVerificationStatusData[fieldId]), err)
+SkipFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T field %d skip type %d error: ", p, fieldId, fieldTypeId), err)
+
+ReadFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T read field end error", p), err)
+ReadStructEndError:
+	return thrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
+RequiredFieldNotSetError:
+	return thrift.NewTProtocolExceptionWithType(thrift.INVALID_DATA, fmt.Errorf("required field %s is not set", fieldIDToName_EmailVerificationStatusData[fieldId]))
+}
+
+func (p *EmailVerificationStatusData) ReadField1(iprot thrift.TProtocol) error {
+
+	var _field string
+	if v, err := iprot.ReadString(); err != nil {
+		return err
+	} else {
+		_field = v
+	}
+	p.State = _field
+	return nil
+}
+func (p *EmailVerificationStatusData) ReadField2(iprot thrift.TProtocol) error {
+
+	var _field *string
+	if v, err := iprot.ReadString(); err != nil {
+		return err
+	} else {
+		_field = &v
+	}
+	p.ExpiresAt = _field
+	return nil
+}
+func (p *EmailVerificationStatusData) ReadField3(iprot thrift.TProtocol) error {
+
+	var _field *int32
+	if v, err := iprot.ReadI32(); err != nil {
+		return err
+	} else {
+		_field = &v
+	}
+	p.RetryAfterSeconds = _field
+	return nil
+}
+
+func (p *EmailVerificationStatusData) Write(oprot thrift.TProtocol) (err error) {
+	var fieldId int16
+	if err = oprot.WriteStructBegin("EmailVerificationStatusData"); err != nil {
+		goto WriteStructBeginError
+	}
+	if p != nil {
+		if err = p.writeField1(oprot); err != nil {
+			fieldId = 1
+			goto WriteFieldError
+		}
+		if err = p.writeField2(oprot); err != nil {
+			fieldId = 2
+			goto WriteFieldError
+		}
+		if err = p.writeField3(oprot); err != nil {
+			fieldId = 3
+			goto WriteFieldError
+		}
+	}
+	if err = oprot.WriteFieldStop(); err != nil {
+		goto WriteFieldStopError
+	}
+	if err = oprot.WriteStructEnd(); err != nil {
+		goto WriteStructEndError
+	}
+	return nil
+WriteStructBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
+WriteFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T write field %d error: ", p, fieldId), err)
+WriteFieldStopError:
+	return thrift.PrependError(fmt.Sprintf("%T write field stop error: ", p), err)
+WriteStructEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write struct end error: ", p), err)
+}
+
+func (p *EmailVerificationStatusData) writeField1(oprot thrift.TProtocol) (err error) {
+	if err = oprot.WriteFieldBegin("state", thrift.STRING, 1); err != nil {
+		goto WriteFieldBeginError
+	}
+	if err := oprot.WriteString(p.State); err != nil {
+		return err
+	}
+	if err = oprot.WriteFieldEnd(); err != nil {
+		goto WriteFieldEndError
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 1 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 1 end error: ", p), err)
+}
+
+func (p *EmailVerificationStatusData) writeField2(oprot thrift.TProtocol) (err error) {
+	if p.IsSetExpiresAt() {
+		if err = oprot.WriteFieldBegin("expires_at", thrift.STRING, 2); err != nil {
+			goto WriteFieldBeginError
+		}
+		if err := oprot.WriteString(*p.ExpiresAt); err != nil {
+			return err
+		}
+		if err = oprot.WriteFieldEnd(); err != nil {
+			goto WriteFieldEndError
+		}
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 2 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 2 end error: ", p), err)
+}
+
+func (p *EmailVerificationStatusData) writeField3(oprot thrift.TProtocol) (err error) {
+	if p.IsSetRetryAfterSeconds() {
+		if err = oprot.WriteFieldBegin("retry_after_seconds", thrift.I32, 3); err != nil {
+			goto WriteFieldBeginError
+		}
+		if err := oprot.WriteI32(*p.RetryAfterSeconds); err != nil {
+			return err
+		}
+		if err = oprot.WriteFieldEnd(); err != nil {
+			goto WriteFieldEndError
+		}
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 3 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 3 end error: ", p), err)
+}
+
+func (p *EmailVerificationStatusData) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("EmailVerificationStatusData(%+v)", *p)
 
 }
 
@@ -20394,7 +20713,9 @@ type GatewayService interface {
 
 	RevokeAllSessions(ctx context.Context, request *EmptyRequest) (r *EmptyResponse, err error)
 
-	RequestEmailVerification(ctx context.Context, request *EmailRequest) (r *EmptyResponse, err error)
+	GetEmailVerificationStatus(ctx context.Context, request *EmptyRequest) (r *EmailVerificationStatusData, err error)
+
+	RequestEmailVerification(ctx context.Context, request *EmptyRequest) (r *EmailVerificationStatusData, err error)
 
 	VerifyEmail(ctx context.Context, request *EmailTokenRequest) (r *EmptyResponse, err error)
 
@@ -20584,7 +20905,16 @@ func (p *GatewayServiceClient) RevokeAllSessions(ctx context.Context, request *E
 	}
 	return _result.GetSuccess(), nil
 }
-func (p *GatewayServiceClient) RequestEmailVerification(ctx context.Context, request *EmailRequest) (r *EmptyResponse, err error) {
+func (p *GatewayServiceClient) GetEmailVerificationStatus(ctx context.Context, request *EmptyRequest) (r *EmailVerificationStatusData, err error) {
+	var _args GatewayServiceGetEmailVerificationStatusArgs
+	_args.Request = request
+	var _result GatewayServiceGetEmailVerificationStatusResult
+	if err = p.Client_().Call(ctx, "GetEmailVerificationStatus", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+func (p *GatewayServiceClient) RequestEmailVerification(ctx context.Context, request *EmptyRequest) (r *EmailVerificationStatusData, err error) {
 	var _args GatewayServiceRequestEmailVerificationArgs
 	_args.Request = request
 	var _result GatewayServiceRequestEmailVerificationResult
@@ -20983,6 +21313,7 @@ func NewGatewayServiceProcessor(handler GatewayService) *GatewayServiceProcessor
 	self.AddToProcessorMap("ListSessions", &gatewayServiceProcessorListSessions{handler: handler})
 	self.AddToProcessorMap("RevokeSession", &gatewayServiceProcessorRevokeSession{handler: handler})
 	self.AddToProcessorMap("RevokeAllSessions", &gatewayServiceProcessorRevokeAllSessions{handler: handler})
+	self.AddToProcessorMap("GetEmailVerificationStatus", &gatewayServiceProcessorGetEmailVerificationStatus{handler: handler})
 	self.AddToProcessorMap("RequestEmailVerification", &gatewayServiceProcessorRequestEmailVerification{handler: handler})
 	self.AddToProcessorMap("VerifyEmail", &gatewayServiceProcessorVerifyEmail{handler: handler})
 	self.AddToProcessorMap("RequestPasswordReset", &gatewayServiceProcessorRequestPasswordReset{handler: handler})
@@ -21476,6 +21807,54 @@ func (p *gatewayServiceProcessorRevokeAllSessions) Process(ctx context.Context, 
 	return true, err
 }
 
+type gatewayServiceProcessorGetEmailVerificationStatus struct {
+	handler GatewayService
+}
+
+func (p *gatewayServiceProcessorGetEmailVerificationStatus) Process(ctx context.Context, seqId int32, iprot, oprot thrift.TProtocol) (success bool, err thrift.TException) {
+	args := GatewayServiceGetEmailVerificationStatusArgs{}
+	if err = args.Read(iprot); err != nil {
+		iprot.ReadMessageEnd()
+		x := thrift.NewTApplicationException(thrift.PROTOCOL_ERROR, err.Error())
+		oprot.WriteMessageBegin("GetEmailVerificationStatus", thrift.EXCEPTION, seqId)
+		x.Write(oprot)
+		oprot.WriteMessageEnd()
+		oprot.Flush(ctx)
+		return false, err
+	}
+
+	iprot.ReadMessageEnd()
+	var err2 error
+	result := GatewayServiceGetEmailVerificationStatusResult{}
+	var retval *EmailVerificationStatusData
+	if retval, err2 = p.handler.GetEmailVerificationStatus(ctx, args.Request); err2 != nil {
+		x := thrift.NewTApplicationException(thrift.INTERNAL_ERROR, "Internal error processing GetEmailVerificationStatus: "+err2.Error())
+		oprot.WriteMessageBegin("GetEmailVerificationStatus", thrift.EXCEPTION, seqId)
+		x.Write(oprot)
+		oprot.WriteMessageEnd()
+		oprot.Flush(ctx)
+		return true, err2
+	} else {
+		result.Success = retval
+	}
+	if err2 = oprot.WriteMessageBegin("GetEmailVerificationStatus", thrift.REPLY, seqId); err2 != nil {
+		err = err2
+	}
+	if err2 = result.Write(oprot); err == nil && err2 != nil {
+		err = err2
+	}
+	if err2 = oprot.WriteMessageEnd(); err == nil && err2 != nil {
+		err = err2
+	}
+	if err2 = oprot.Flush(ctx); err == nil && err2 != nil {
+		err = err2
+	}
+	if err != nil {
+		return
+	}
+	return true, err
+}
+
 type gatewayServiceProcessorRequestEmailVerification struct {
 	handler GatewayService
 }
@@ -21495,7 +21874,7 @@ func (p *gatewayServiceProcessorRequestEmailVerification) Process(ctx context.Co
 	iprot.ReadMessageEnd()
 	var err2 error
 	result := GatewayServiceRequestEmailVerificationResult{}
-	var retval *EmptyResponse
+	var retval *EmailVerificationStatusData
 	if retval, err2 = p.handler.RequestEmailVerification(ctx, args.Request); err2 != nil {
 		x := thrift.NewTApplicationException(thrift.INTERNAL_ERROR, "Internal error processing RequestEmailVerification: "+err2.Error())
 		oprot.WriteMessageBegin("RequestEmailVerification", thrift.EXCEPTION, seqId)
@@ -26090,8 +26469,302 @@ func (p *GatewayServiceRevokeAllSessionsResult) String() string {
 
 }
 
+type GatewayServiceGetEmailVerificationStatusArgs struct {
+	Request *EmptyRequest `thrift:"request,1"`
+}
+
+func NewGatewayServiceGetEmailVerificationStatusArgs() *GatewayServiceGetEmailVerificationStatusArgs {
+	return &GatewayServiceGetEmailVerificationStatusArgs{}
+}
+
+func (p *GatewayServiceGetEmailVerificationStatusArgs) InitDefault() {
+}
+
+var GatewayServiceGetEmailVerificationStatusArgs_Request_DEFAULT *EmptyRequest
+
+func (p *GatewayServiceGetEmailVerificationStatusArgs) GetRequest() (v *EmptyRequest) {
+	if !p.IsSetRequest() {
+		return GatewayServiceGetEmailVerificationStatusArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+
+var fieldIDToName_GatewayServiceGetEmailVerificationStatusArgs = map[int16]string{
+	1: "request",
+}
+
+func (p *GatewayServiceGetEmailVerificationStatusArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *GatewayServiceGetEmailVerificationStatusArgs) Read(iprot thrift.TProtocol) (err error) {
+
+	var fieldTypeId thrift.TType
+	var fieldId int16
+
+	if _, err = iprot.ReadStructBegin(); err != nil {
+		goto ReadStructBeginError
+	}
+
+	for {
+		_, fieldTypeId, fieldId, err = iprot.ReadFieldBegin()
+		if err != nil {
+			goto ReadFieldBeginError
+		}
+		if fieldTypeId == thrift.STOP {
+			break
+		}
+
+		switch fieldId {
+		case 1:
+			if fieldTypeId == thrift.STRUCT {
+				if err = p.ReadField1(iprot); err != nil {
+					goto ReadFieldError
+				}
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		default:
+			if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		}
+		if err = iprot.ReadFieldEnd(); err != nil {
+			goto ReadFieldEndError
+		}
+	}
+	if err = iprot.ReadStructEnd(); err != nil {
+		goto ReadStructEndError
+	}
+
+	return nil
+ReadStructBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T read struct begin error: ", p), err)
+ReadFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
+ReadFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_GatewayServiceGetEmailVerificationStatusArgs[fieldId]), err)
+SkipFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T field %d skip type %d error: ", p, fieldId, fieldTypeId), err)
+
+ReadFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T read field end error", p), err)
+ReadStructEndError:
+	return thrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
+}
+
+func (p *GatewayServiceGetEmailVerificationStatusArgs) ReadField1(iprot thrift.TProtocol) error {
+	_field := NewEmptyRequest()
+	if err := _field.Read(iprot); err != nil {
+		return err
+	}
+	p.Request = _field
+	return nil
+}
+
+func (p *GatewayServiceGetEmailVerificationStatusArgs) Write(oprot thrift.TProtocol) (err error) {
+	var fieldId int16
+	if err = oprot.WriteStructBegin("GetEmailVerificationStatus_args"); err != nil {
+		goto WriteStructBeginError
+	}
+	if p != nil {
+		if err = p.writeField1(oprot); err != nil {
+			fieldId = 1
+			goto WriteFieldError
+		}
+	}
+	if err = oprot.WriteFieldStop(); err != nil {
+		goto WriteFieldStopError
+	}
+	if err = oprot.WriteStructEnd(); err != nil {
+		goto WriteStructEndError
+	}
+	return nil
+WriteStructBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
+WriteFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T write field %d error: ", p, fieldId), err)
+WriteFieldStopError:
+	return thrift.PrependError(fmt.Sprintf("%T write field stop error: ", p), err)
+WriteStructEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write struct end error: ", p), err)
+}
+
+func (p *GatewayServiceGetEmailVerificationStatusArgs) writeField1(oprot thrift.TProtocol) (err error) {
+	if err = oprot.WriteFieldBegin("request", thrift.STRUCT, 1); err != nil {
+		goto WriteFieldBeginError
+	}
+	if err := p.Request.Write(oprot); err != nil {
+		return err
+	}
+	if err = oprot.WriteFieldEnd(); err != nil {
+		goto WriteFieldEndError
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 1 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 1 end error: ", p), err)
+}
+
+func (p *GatewayServiceGetEmailVerificationStatusArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("GatewayServiceGetEmailVerificationStatusArgs(%+v)", *p)
+
+}
+
+type GatewayServiceGetEmailVerificationStatusResult struct {
+	Success *EmailVerificationStatusData `thrift:"success,0,optional"`
+}
+
+func NewGatewayServiceGetEmailVerificationStatusResult() *GatewayServiceGetEmailVerificationStatusResult {
+	return &GatewayServiceGetEmailVerificationStatusResult{}
+}
+
+func (p *GatewayServiceGetEmailVerificationStatusResult) InitDefault() {
+}
+
+var GatewayServiceGetEmailVerificationStatusResult_Success_DEFAULT *EmailVerificationStatusData
+
+func (p *GatewayServiceGetEmailVerificationStatusResult) GetSuccess() (v *EmailVerificationStatusData) {
+	if !p.IsSetSuccess() {
+		return GatewayServiceGetEmailVerificationStatusResult_Success_DEFAULT
+	}
+	return p.Success
+}
+
+var fieldIDToName_GatewayServiceGetEmailVerificationStatusResult = map[int16]string{
+	0: "success",
+}
+
+func (p *GatewayServiceGetEmailVerificationStatusResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *GatewayServiceGetEmailVerificationStatusResult) Read(iprot thrift.TProtocol) (err error) {
+
+	var fieldTypeId thrift.TType
+	var fieldId int16
+
+	if _, err = iprot.ReadStructBegin(); err != nil {
+		goto ReadStructBeginError
+	}
+
+	for {
+		_, fieldTypeId, fieldId, err = iprot.ReadFieldBegin()
+		if err != nil {
+			goto ReadFieldBeginError
+		}
+		if fieldTypeId == thrift.STOP {
+			break
+		}
+
+		switch fieldId {
+		case 0:
+			if fieldTypeId == thrift.STRUCT {
+				if err = p.ReadField0(iprot); err != nil {
+					goto ReadFieldError
+				}
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		default:
+			if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		}
+		if err = iprot.ReadFieldEnd(); err != nil {
+			goto ReadFieldEndError
+		}
+	}
+	if err = iprot.ReadStructEnd(); err != nil {
+		goto ReadStructEndError
+	}
+
+	return nil
+ReadStructBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T read struct begin error: ", p), err)
+ReadFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
+ReadFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_GatewayServiceGetEmailVerificationStatusResult[fieldId]), err)
+SkipFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T field %d skip type %d error: ", p, fieldId, fieldTypeId), err)
+
+ReadFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T read field end error", p), err)
+ReadStructEndError:
+	return thrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
+}
+
+func (p *GatewayServiceGetEmailVerificationStatusResult) ReadField0(iprot thrift.TProtocol) error {
+	_field := NewEmailVerificationStatusData()
+	if err := _field.Read(iprot); err != nil {
+		return err
+	}
+	p.Success = _field
+	return nil
+}
+
+func (p *GatewayServiceGetEmailVerificationStatusResult) Write(oprot thrift.TProtocol) (err error) {
+	var fieldId int16
+	if err = oprot.WriteStructBegin("GetEmailVerificationStatus_result"); err != nil {
+		goto WriteStructBeginError
+	}
+	if p != nil {
+		if err = p.writeField0(oprot); err != nil {
+			fieldId = 0
+			goto WriteFieldError
+		}
+	}
+	if err = oprot.WriteFieldStop(); err != nil {
+		goto WriteFieldStopError
+	}
+	if err = oprot.WriteStructEnd(); err != nil {
+		goto WriteStructEndError
+	}
+	return nil
+WriteStructBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
+WriteFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T write field %d error: ", p, fieldId), err)
+WriteFieldStopError:
+	return thrift.PrependError(fmt.Sprintf("%T write field stop error: ", p), err)
+WriteStructEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write struct end error: ", p), err)
+}
+
+func (p *GatewayServiceGetEmailVerificationStatusResult) writeField0(oprot thrift.TProtocol) (err error) {
+	if p.IsSetSuccess() {
+		if err = oprot.WriteFieldBegin("success", thrift.STRUCT, 0); err != nil {
+			goto WriteFieldBeginError
+		}
+		if err := p.Success.Write(oprot); err != nil {
+			return err
+		}
+		if err = oprot.WriteFieldEnd(); err != nil {
+			goto WriteFieldEndError
+		}
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 0 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 0 end error: ", p), err)
+}
+
+func (p *GatewayServiceGetEmailVerificationStatusResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("GatewayServiceGetEmailVerificationStatusResult(%+v)", *p)
+
+}
+
 type GatewayServiceRequestEmailVerificationArgs struct {
-	Request *EmailRequest `thrift:"request,1"`
+	Request *EmptyRequest `thrift:"request,1"`
 }
 
 func NewGatewayServiceRequestEmailVerificationArgs() *GatewayServiceRequestEmailVerificationArgs {
@@ -26101,9 +26774,9 @@ func NewGatewayServiceRequestEmailVerificationArgs() *GatewayServiceRequestEmail
 func (p *GatewayServiceRequestEmailVerificationArgs) InitDefault() {
 }
 
-var GatewayServiceRequestEmailVerificationArgs_Request_DEFAULT *EmailRequest
+var GatewayServiceRequestEmailVerificationArgs_Request_DEFAULT *EmptyRequest
 
-func (p *GatewayServiceRequestEmailVerificationArgs) GetRequest() (v *EmailRequest) {
+func (p *GatewayServiceRequestEmailVerificationArgs) GetRequest() (v *EmptyRequest) {
 	if !p.IsSetRequest() {
 		return GatewayServiceRequestEmailVerificationArgs_Request_DEFAULT
 	}
@@ -26175,7 +26848,7 @@ ReadStructEndError:
 }
 
 func (p *GatewayServiceRequestEmailVerificationArgs) ReadField1(iprot thrift.TProtocol) error {
-	_field := NewEmailRequest()
+	_field := NewEmptyRequest()
 	if err := _field.Read(iprot); err != nil {
 		return err
 	}
@@ -26237,7 +26910,7 @@ func (p *GatewayServiceRequestEmailVerificationArgs) String() string {
 }
 
 type GatewayServiceRequestEmailVerificationResult struct {
-	Success *EmptyResponse `thrift:"success,0,optional"`
+	Success *EmailVerificationStatusData `thrift:"success,0,optional"`
 }
 
 func NewGatewayServiceRequestEmailVerificationResult() *GatewayServiceRequestEmailVerificationResult {
@@ -26247,9 +26920,9 @@ func NewGatewayServiceRequestEmailVerificationResult() *GatewayServiceRequestEma
 func (p *GatewayServiceRequestEmailVerificationResult) InitDefault() {
 }
 
-var GatewayServiceRequestEmailVerificationResult_Success_DEFAULT *EmptyResponse
+var GatewayServiceRequestEmailVerificationResult_Success_DEFAULT *EmailVerificationStatusData
 
-func (p *GatewayServiceRequestEmailVerificationResult) GetSuccess() (v *EmptyResponse) {
+func (p *GatewayServiceRequestEmailVerificationResult) GetSuccess() (v *EmailVerificationStatusData) {
 	if !p.IsSetSuccess() {
 		return GatewayServiceRequestEmailVerificationResult_Success_DEFAULT
 	}
@@ -26321,7 +26994,7 @@ ReadStructEndError:
 }
 
 func (p *GatewayServiceRequestEmailVerificationResult) ReadField0(iprot thrift.TProtocol) error {
-	_field := NewEmptyResponse()
+	_field := NewEmailVerificationStatusData()
 	if err := _field.Read(iprot); err != nil {
 		return err
 	}

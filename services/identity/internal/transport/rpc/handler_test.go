@@ -206,6 +206,42 @@ func TestHandlerGetCurrentUserRejectsStaleOrMismatchedUser(t *testing.T) {
 	}
 }
 
+func TestHandlerGetCurrentUserAllowsPendingUser(t *testing.T) {
+	now := time.Unix(500, 0)
+	verifiedAt := now.Add(-time.Hour)
+	user := &domain.User{
+		ID: 42, Username: "alice", Email: "alice@example.com", Role: domain.RoleUser,
+		Status: domain.StatusPending, TokenVersion: 3, CreatedAt: now, UpdatedAt: now, EmailVerifiedAt: nil,
+	}
+	handler, err := NewHandler(
+		serviceStub{register: unexpectedRegister(t)},
+		defaultAuthenticateStub(t),
+		getUserStub{getUser: func(context.Context, int64) (*domain.User, error) { return user, nil }},
+		&verifierStub{principal: coreauth.Principal{UserID: 42, Role: domain.RoleUser, TokenVersion: 3}},
+		readinessStub{},
+		slog.New(slog.NewTextHandler(io.Discard, nil)),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response, err := handler.GetCurrentUser(
+		coreauth.WithAccessToken(context.Background(), "signed-token"),
+		&identityv1.CurrentUserRequest{},
+	)
+	if err != nil || response.Id != 42 || response.Status != domain.StatusPending || response.EmailVerifiedAt != nil {
+		t.Fatalf("GetCurrentUser() = %#v, %v", response, err)
+	}
+	user.EmailVerifiedAt = &verifiedAt
+	user.Status = domain.StatusActive
+	response, err = handler.GetCurrentUser(
+		coreauth.WithAccessToken(context.Background(), "signed-token"),
+		&identityv1.CurrentUserRequest{},
+	)
+	if err != nil || response.EmailVerifiedAt == nil || *response.EmailVerifiedAt != verifiedAt.UTC().Format(time.RFC3339Nano) {
+		t.Fatalf("GetCurrentUser() verified = %#v, %v", response, err)
+	}
+}
+
 func TestHandlerResolveUserReturnsOnlyPublicProfile(t *testing.T) {
 	current := &domain.User{ID: 42, Username: "owner", Role: domain.RoleUser, Status: domain.StatusActive, TokenVersion: 4}
 	target := &domain.User{ID: 7, Username: "alice", Email: "private@example.com", Avatar: "avatar", Status: domain.StatusActive}

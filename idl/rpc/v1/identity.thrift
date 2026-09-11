@@ -13,6 +13,7 @@ const i32 CodeForbidden = 20008
 const i32 CodeEmailNotVerified = 20010
 const i32 CodeActionExpired = 20011
 const i32 CodeActionAlreadyUsed = 20012
+const i32 CodeVerificationCooldown = 20013
 const i32 CodeInternal = 20999
 
 struct User {
@@ -27,6 +28,7 @@ struct User {
   9: required string created_at
   10: required string updated_at
   11: optional string avatar_attachment_id
+  12: optional string email_verified_at
 }
 
 struct PublicUser {
@@ -62,6 +64,11 @@ struct RefreshSessionRequest {
 
 struct EmailTokenRequest { 1: required string token }
 struct EmailRequest { 1: required string email }
+struct EmailVerificationStatus {
+  1: required string state
+  2: optional string expires_at
+  3: optional i32 retry_after_seconds
+}
 struct PasswordResetRequest {
   1: required string token
   2: required string password
@@ -91,7 +98,8 @@ service IdentityService {
   User Register(1: RegisterRequest request)
   Authentication Authenticate(1: AuthenticateRequest request)
   Authentication RefreshSession(1: RefreshSessionRequest request)
-  common.EmptyResponse RequestEmailVerification(1: EmailRequest request)
+  EmailVerificationStatus GetEmailVerificationStatus(1: CurrentUserRequest request)
+  EmailVerificationStatus RequestEmailVerification(1: CurrentUserRequest request)
   common.EmptyResponse VerifyEmail(1: EmailTokenRequest request)
   common.EmptyResponse RequestPasswordReset(1: PasswordResetRequestRequest request)
   common.EmptyResponse ResetPassword(1: PasswordResetRequest request)

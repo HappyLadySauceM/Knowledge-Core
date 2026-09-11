@@ -32,6 +32,7 @@ const (
 	ExtraErrorKind  = "error_kind"
 	ExtraRequestID  = "request_id"
 	ExtraTraceID    = "trace_id"
+	ExtraRetryAfter = "retry_after"
 	unknownCode     = int32(20999)
 	maxSafeMsgBytes = 256
 )
@@ -99,11 +100,18 @@ func (d Definition) Wrap(cause error) error {
 	return &Error{definition: d, cause: cause}
 }
 
+// NewWithExtra attaches allowlisted extras such as retry_after.
+// 只附加白名单 extras，例如 retry_after。
+func (d Definition) NewWithExtra(extra map[string]string) error {
+	return &Error{definition: d, extra: copySafeExtra(extra)}
+}
+
 // Error binds a safe definition to an optional internal cause. Error returns
 // only the catalog message, preventing accidental transport leakage.
 type Error struct {
 	definition Definition
 	cause      error
+	extra      map[string]string
 }
 
 func (e *Error) Error() string {
@@ -191,6 +199,30 @@ func Cause(err error) error {
 		return appError.cause
 	}
 	return nil
+}
+
+// Extra returns an allowlisted extra from an application error.
+// 从应用错误读取白名单 extra。
+func Extra(err error, key string) string {
+	var appError *Error
+	if !errors.As(err, &appError) || appError == nil {
+		return ""
+	}
+	return appError.extra[key]
+}
+
+func copySafeExtra(src map[string]string) map[string]string {
+	if src == nil {
+		return nil
+	}
+	dst := make(map[string]string)
+	if value := strings.TrimSpace(src[ExtraRetryAfter]); value != "" {
+		dst[ExtraRetryAfter] = value
+	}
+	if len(dst) == 0 {
+		return nil
+	}
+	return dst
 }
 
 func (d Definition) valid() bool {

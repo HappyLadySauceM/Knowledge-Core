@@ -97,3 +97,10 @@ func ValidatePassword(password string) error {
 func (u *User) IsLocked(now time.Time) bool {
 	return u != nil && u.LockedUntil != nil && u.LockedUntil.After(now.UTC())
 }
+
+// CanEstablishSession reports whether the account may receive a session.
+// Pending verification users can sign in; disabled accounts cannot.
+// 判断账号是否可以建立会话：待验证可以登录，停用账号不行。
+func (u *User) CanEstablishSession() bool {
+	return u != nil && (u.Status == StatusActive || u.Status == StatusPending)
+}

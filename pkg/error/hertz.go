@@ -15,14 +15,15 @@ const ProblemContentType = "application/problem+json; charset=utf-8"
 // HTTPProblem is an RFC 9457 problem detail document. Code, key, request_id,
 // and trace_id are stable extension members used by Knowledge Core clients.
 type HTTPProblem struct {
-	Type      string `json:"type"`
-	Title     string `json:"title"`
-	Status    int    `json:"status"`
-	Detail    string `json:"detail"`
-	Code      int32  `json:"code"`
-	Key       string `json:"key"`
-	RequestID string `json:"request_id,omitempty"`
-	TraceID   string `json:"trace_id,omitempty"`
+	Type       string `json:"type"`
+	Title      string `json:"title"`
+	Status     int    `json:"status"`
+	Detail     string `json:"detail"`
+	Code       int32  `json:"code"`
+	Key        string `json:"key"`
+	RequestID  string `json:"request_id,omitempty"`
+	TraceID    string `json:"trace_id,omitempty"`
+	RetryAfter string `json:"retry_after,omitempty"`
 }
 
 // ToHTTPError converts an application error into a safe response payload and
@@ -33,7 +34,11 @@ func ToHTTPError(ctx context.Context, err error) (int, HTTPProblem) {
 		definition = Internal
 	}
 	status := httpStatus(definition.Kind)
-	return status, problem(ctx, status, definition)
+	payload := problem(ctx, status, definition)
+	if retryAfter := Extra(err, ExtraRetryAfter); retryAfter != "" {
+		payload.RetryAfter = retryAfter
+	}
+	return status, payload
 }
 
 // ToHTTPProblem converts an application error to a safe RFC 9457 document
@@ -45,7 +50,11 @@ func ToHTTPProblem(ctx context.Context, status int, err error) HTTPProblem {
 		definition = Internal
 		status = http.StatusInternalServerError
 	}
-	return problem(ctx, status, definition)
+	payload := problem(ctx, status, definition)
+	if retryAfter := Extra(err, ExtraRetryAfter); retryAfter != "" {
+		payload.RetryAfter = retryAfter
+	}
+	return payload
 }
 
 func problem(ctx context.Context, status int, definition Definition) HTTPProblem {

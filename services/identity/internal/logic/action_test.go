@@ -56,6 +56,9 @@ func (s consumeActionsStub) ConsumeAndVerifyEmail(context.Context, []byte, time.
 func (s consumeActionsStub) ConsumeAndResetPassword(context.Context, []byte, string, time.Time) error {
 	return s.err
 }
+func (s consumeActionsStub) LatestUnusedByKind(context.Context, int64, string) (*domain.ActionToken, error) {
+	return nil, repository.ErrActionNotFound
+}
 
 type actionSessionsStub struct{}
 
@@ -145,5 +148,127 @@ func TestResetPasswordMapsAlreadyUsedToken(t *testing.T) {
 func TestResetPasswordSucceedsForValidToken(t *testing.T) {
 	if err := newActionLogic(t, nil).ResetPassword(context.Background(), "ka1.valid", "password1"); err != nil {
 		t.Fatalf("ResetPassword() error = %v", err)
+	}
+}
+
+type verificationActionsStub struct {
+	unused  *domain.ActionToken
+	created int
+}
+
+func (s *verificationActionsStub) Create(_ context.Context, token *domain.ActionToken) error {
+	s.created++
+	s.unused = token
+	return nil
+}
+func (s *verificationActionsStub) Consume(context.Context, string, []byte, time.Time) (*domain.ActionToken, error) {
+	return nil, errors.New("unused")
+}
+func (s *verificationActionsStub) LatestUnusedByKind(_ context.Context, _ int64, _ string) (*domain.ActionToken, error) {
+	if s.unused == nil {
+		return nil, repository.ErrActionNotFound
+	}
+	clone := *s.unused
+	return &clone, nil
+}
+
+func newVerificationLogic(t *testing.T, actions *verificationActionsStub) *ActionLogic {
+	t.Helper()
+	logic, err := NewActionLogic(actionUsersStub{}, actions, actionSessionsStub{}, passwordVerifierStub{}, "0123456789abcdef", 30*time.Minute, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	logic.now = func() time.Time { return time.Date(2026, 9, 11, 3, 0, 0, 0, time.UTC) }
+	return logic
+}
+
+func pendingVerificationUser() *domain.User {
+	return &domain.User{
+		ID: 7, Username: "alice", Email: "alice@example.com", Role: domain.RoleUser, Status: domain.StatusPending,
+	}
+}
+
+func TestEmailVerificationStatusReturnsVerified(t *testing.T) {
+	verifiedAt := time.Date(2026, 9, 11, 2, 0, 0, 0, time.UTC)
+	user := pendingVerificationUser()
+	user.Status = domain.StatusActive
+	user.EmailVerifiedAt = &verifiedAt
+	status, err := newVerificationLogic(t, &verificationActionsStub{}).EmailVerificationStatus(context.Background(), user)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status.State != EmailVerificationVerified || status.ExpiresAt != nil || status.RetryAfterSeconds != 0 {
+		t.Fatalf("status = %#v", status)
+	}
+}
+
+func TestEmailVerificationStatusReturnsPendingForUnexpiredToken(t *testing.T) {
+	now := time.Date(2026, 9, 11, 3, 0, 0, 0, time.UTC)
+	expires := now.Add(12 * time.Minute)
+	status, err := newVerificationLogic(t, &verificationActionsStub{unused: &domain.ActionToken{
+		UserID: 7, Kind: domain.ActionEmailVerification, ExpiresAt: expires,
+	}}).EmailVerificationStatus(context.Background(), pendingVerificationUser())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status.State != EmailVerificationPending || status.RetryAfterSeconds != 12*60 || status.ExpiresAt == nil || !status.ExpiresAt.Equal(expires) {
+		t.Fatalf("status = %#v", status)
+	}
+}
+
+func TestEmailVerificationStatusReturnsIdleWhenTokenExpired(t *testing.T) {
+	now := time.Date(2026, 9, 11, 3, 0, 0, 0, time.UTC)
+	status, err := newVerificationLogic(t, &verificationActionsStub{unused: &domain.ActionToken{
+		UserID: 7, Kind: domain.ActionEmailVerification, ExpiresAt: now,
+	}}).EmailVerificationStatus(context.Background(), pendingVerificationUser())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status.State != EmailVerificationIdle || status.ExpiresAt != nil {
+		t.Fatalf("status = %#v", status)
+	}
+}
+
+func TestRequestEmailVerificationIsIdempotentWhenVerified(t *testing.T) {
+	verifiedAt := time.Date(2026, 9, 11, 2, 0, 0, 0, time.UTC)
+	user := pendingVerificationUser()
+	user.Status = domain.StatusActive
+	user.EmailVerifiedAt = &verifiedAt
+	actions := &verificationActionsStub{}
+	status, err := newVerificationLogic(t, actions).RequestEmailVerification(context.Background(), user)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status.State != EmailVerificationVerified || actions.created != 0 {
+		t.Fatalf("status = %#v, created = %d", status, actions.created)
+	}
+}
+
+func TestRequestEmailVerificationRejectsUnexpiredToken(t *testing.T) {
+	now := time.Date(2026, 9, 11, 3, 0, 0, 0, time.UTC)
+	actions := &verificationActionsStub{unused: &domain.ActionToken{
+		UserID: 7, Kind: domain.ActionEmailVerification, ExpiresAt: now.Add(5 * time.Minute),
+	}}
+	_, err := newVerificationLogic(t, actions).RequestEmailVerification(context.Background(), pendingVerificationUser())
+	requireActionError(t, err, identityerrors.VerificationCooldown, "identity.verification_cooldown")
+	if apperror.Extra(err, apperror.ExtraRetryAfter) != "300" {
+		t.Fatalf("retry_after = %q", apperror.Extra(err, apperror.ExtraRetryAfter))
+	}
+	if actions.created != 0 {
+		t.Fatalf("created = %d", actions.created)
+	}
+}
+
+func TestRequestEmailVerificationIssuesAfterExpiry(t *testing.T) {
+	now := time.Date(2026, 9, 11, 3, 0, 0, 0, time.UTC)
+	actions := &verificationActionsStub{unused: &domain.ActionToken{
+		UserID: 7, Kind: domain.ActionEmailVerification, ExpiresAt: now,
+	}}
+	status, err := newVerificationLogic(t, actions).RequestEmailVerification(context.Background(), pendingVerificationUser())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if actions.created != 1 || status.State != EmailVerificationPending || status.RetryAfterSeconds != int32((30 * time.Minute).Seconds()) {
+		t.Fatalf("status = %#v, created = %d", status, actions.created)
 	}
 }

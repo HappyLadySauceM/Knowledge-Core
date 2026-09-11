@@ -42,6 +42,13 @@ var serviceMethods = map[string]kitex.MethodInfo{
 		false,
 		kitex.WithStreamingMode(kitex.StreamingNone),
 	),
+	"GetEmailVerificationStatus": kitex.NewMethodInfo(
+		getEmailVerificationStatusHandler,
+		newIdentityServiceGetEmailVerificationStatusArgs,
+		newIdentityServiceGetEmailVerificationStatusResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
 	"RequestEmailVerification": kitex.NewMethodInfo(
 		requestEmailVerificationHandler,
 		newIdentityServiceRequestEmailVerificationArgs,
@@ -248,6 +255,24 @@ func newIdentityServiceRefreshSessionArgs() interface{} {
 
 func newIdentityServiceRefreshSessionResult() interface{} {
 	return identity.NewIdentityServiceRefreshSessionResult()
+}
+
+func getEmailVerificationStatusHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*identity.IdentityServiceGetEmailVerificationStatusArgs)
+	realResult := result.(*identity.IdentityServiceGetEmailVerificationStatusResult)
+	success, err := handler.(identity.IdentityService).GetEmailVerificationStatus(ctx, realArg.Request)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newIdentityServiceGetEmailVerificationStatusArgs() interface{} {
+	return identity.NewIdentityServiceGetEmailVerificationStatusArgs()
+}
+
+func newIdentityServiceGetEmailVerificationStatusResult() interface{} {
+	return identity.NewIdentityServiceGetEmailVerificationStatusResult()
 }
 
 func requestEmailVerificationHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
@@ -480,7 +505,17 @@ func (p *kClient) RefreshSession(ctx context.Context, request *identity.RefreshS
 	return _result.GetSuccess(), nil
 }
 
-func (p *kClient) RequestEmailVerification(ctx context.Context, request *identity.EmailRequest) (r *common.EmptyResponse, err error) {
+func (p *kClient) GetEmailVerificationStatus(ctx context.Context, request *identity.CurrentUserRequest) (r *identity.EmailVerificationStatus, err error) {
+	var _args identity.IdentityServiceGetEmailVerificationStatusArgs
+	_args.Request = request
+	var _result identity.IdentityServiceGetEmailVerificationStatusResult
+	if err = p.c.Call(ctx, "GetEmailVerificationStatus", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) RequestEmailVerification(ctx context.Context, request *identity.CurrentUserRequest) (r *identity.EmailVerificationStatus, err error) {
 	var _args identity.IdentityServiceRequestEmailVerificationArgs
 	_args.Request = request
 	var _result identity.IdentityServiceRequestEmailVerificationResult

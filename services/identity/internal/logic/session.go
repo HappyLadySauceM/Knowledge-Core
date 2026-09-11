@@ -45,7 +45,7 @@ func NewSessionLogic(users interface {
 }
 
 func (l *SessionLogic) Create(ctx context.Context, user *domain.User, deviceLabel string) (*SessionAuthentication, error) {
-	if user == nil || user.ID <= 0 || user.Status != domain.StatusActive {
+	if user == nil || user.ID <= 0 || !user.CanEstablishSession() {
 		return nil, identityerrors.UserDisabled.New()
 	}
 	now := l.now().UTC()
@@ -89,7 +89,7 @@ func (l *SessionLogic) Refresh(ctx context.Context, encoded string) (*SessionAut
 	if err != nil {
 		return nil, identityerrors.Unauthenticated.Wrap(err)
 	}
-	if user == nil || user.Status != domain.StatusActive {
+	if user == nil || !user.CanEstablishSession() {
 		return nil, identityerrors.UserDisabled.New()
 	}
 	next, err := security.NewRefreshToken(nil)

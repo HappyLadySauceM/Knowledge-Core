@@ -57,6 +57,56 @@ func (s *identityStub) GetCurrentUser(context.Context, *identityv1.CurrentUserRe
 	return s.currentUser, s.currentUserErr
 }
 
+type emailVerificationStub struct {
+	identityStub
+	status    *identityv1.EmailVerificationStatus
+	statusErr error
+	resend    *identityv1.EmailVerificationStatus
+	resendErr error
+}
+
+func (s *emailVerificationStub) GetEmailVerificationStatus(context.Context, *identityv1.CurrentUserRequest, ...callopt.Option) (*identityv1.EmailVerificationStatus, error) {
+	return s.status, s.statusErr
+}
+
+func (s *emailVerificationStub) RequestEmailVerification(context.Context, *identityv1.CurrentUserRequest, ...callopt.Option) (*identityv1.EmailVerificationStatus, error) {
+	return s.resend, s.resendErr
+}
+
+func TestGetEmailVerificationStatusAcceptsFractionalExpiry(t *testing.T) {
+	expiresAt := "2026-09-11T04:00:00.123456789Z"
+	retryAfter := int32(1800)
+	identity := &emailVerificationStub{status: &identityv1.EmailVerificationStatus{
+		State: "pending", ExpiresAt: &expiresAt, RetryAfterSeconds: &retryAfter,
+	}}
+	request := handlerRequest(identity, "")
+	GetEmailVerificationStatus(context.Background(), request)
+	if request.Response.StatusCode() != consts.StatusOK {
+		t.Fatalf("status = %d, body = %s", request.Response.StatusCode(), request.Response.Body())
+	}
+	var response gatewaymodel.EmailVerificationStatusData
+	if err := jsoncodec.Unmarshal(request.Response.Body(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if response.State != "pending" || response.ExpiresAt == nil || *response.ExpiresAt != expiresAt || response.GetRetryAfterSeconds() != 1800 {
+		t.Fatalf("response = %#v", response)
+	}
+}
+
+func TestRequestEmailVerificationMapsCooldown(t *testing.T) {
+	identity := &emailVerificationStub{resendErr: apperror.ToKitexBizStatus(context.Background(), apperror.MustDefine(
+		identityv1.CodeVerificationCooldown, "identity.verification_cooldown", apperror.KindRateLimited, "verification email was recently sent",
+	).NewWithExtra(map[string]string{apperror.ExtraRetryAfter: "1800"}))}
+	request := handlerRequest(identity, "")
+	RequestEmailVerification(context.Background(), request)
+	if request.Response.StatusCode() != consts.StatusTooManyRequests {
+		t.Fatalf("status = %d, body = %s", request.Response.StatusCode(), request.Response.Body())
+	}
+	if got := string(request.Response.Header.Peek("Retry-After")); got != "1800" {
+		t.Fatalf("Retry-After = %q", got)
+	}
+}
+
 func TestLoginReturnsBearerAccessToken(t *testing.T) {
 	identity := &identityStub{authentication: &identityv1.Authentication{
 		User: completeUser(), AccessToken: "signed-token", ExpiresAt: "2026-08-02T12:15:00Z",

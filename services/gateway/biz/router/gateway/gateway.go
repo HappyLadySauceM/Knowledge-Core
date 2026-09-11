@@ -24,6 +24,7 @@ func Register(r *server.Hertz) {
 			_v1.GET("/attachments", append(_listmediaattachmentsMw(), gateway.ListMediaAttachments)...)
 			_v1.POST("/attachments", append(_createmediaattachmentMw(), gateway.CreateMediaAttachment)...)
 			_v1.GET("/documents", append(_listpublisheddocumentsMw(), gateway.ListPublishedDocuments)...)
+			_v1.GET("/email-verification-requests", append(_getemailverificationstatusMw(), gateway.GetEmailVerificationStatus)...)
 			_v1.POST("/email-verification-requests", append(_requestemailverificationMw(), gateway.RequestEmailVerification)...)
 			_v1.POST("/email-verifications", append(_verifyemailMw(), gateway.VerifyEmail)...)
 			_v1.POST("/password-reset-requests", append(_requestpasswordresetMw(), gateway.RequestPasswordReset)...)

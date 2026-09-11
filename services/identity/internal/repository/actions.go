@@ -66,6 +66,7 @@ func consumeLockedAction(tx *gorm.DB, action *model.ActionToken, now time.Time) 
 type ActionRepository interface {
 	Create(context.Context, *domain.ActionToken) error
 	Consume(context.Context, string, []byte, time.Time) (*domain.ActionToken, error)
+	LatestUnusedByKind(context.Context, int64, string) (*domain.ActionToken, error)
 }
 
 type postgresActionRepository struct {
@@ -198,6 +199,26 @@ func (r *postgresActionRepository) Create(ctx context.Context, token *domain.Act
 		return fmt.Errorf("create identity action token: %w", err)
 	}
 	return nil
+}
+
+func (r *postgresActionRepository) LatestUnusedByKind(ctx context.Context, userID int64, kind string) (*domain.ActionToken, error) {
+	if userID <= 0 || kind == "" {
+		return nil, ErrActionNotFound
+	}
+	var record model.ActionToken
+	// Look up unused tokens without expires_at so callers can classify expiry separately.
+	// 查找未使用令牌时不把 expires_at 写进 WHERE，由调用方再分类过期。
+	err := r.db.WithContext(ctx).Where("user_id = ? AND kind = ? AND used_at IS NULL", userID, kind).Order("created_at DESC").First(&record).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrActionNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("find latest unused identity action token: %w", err)
+	}
+	return &domain.ActionToken{
+		ID: record.ID, UserID: record.UserID, Kind: record.Kind, Digest: record.Digest,
+		ExpiresAt: record.ExpiresAt, UsedAt: record.UsedAt, CreatedAt: record.CreatedAt,
+	}, nil
 }
 
 func (r *postgresActionRepository) Consume(ctx context.Context, kind string, digest []byte, now time.Time) (*domain.ActionToken, error) {

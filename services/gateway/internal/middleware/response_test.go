@@ -170,6 +170,22 @@ func TestWriteRPCErrorPreservesCatalogKeysAndProtocolStatus(t *testing.T) {
 	}
 }
 
+func TestWriteIdentityErrorSetsRetryAfter(t *testing.T) {
+	catalog := apperror.MustDefine(identityv1.CodeVerificationCooldown, "identity.verification_cooldown", apperror.KindRateLimited, "verification email was recently sent")
+	request := app.NewContext(0)
+	WriteIdentityError(context.Background(), request, apperror.ToKitexBizStatus(context.Background(), catalog.NewWithExtra(map[string]string{apperror.ExtraRetryAfter: "1800"})))
+	problem := decodeProblem(t, request)
+	if request.Response.StatusCode() != consts.StatusTooManyRequests {
+		t.Fatalf("status = %d, body = %s", request.Response.StatusCode(), request.Response.Body())
+	}
+	if problem.Key != catalog.Key || problem.RetryAfter != "1800" {
+		t.Fatalf("problem = %#v", problem)
+	}
+	if got := string(request.Response.Header.Peek("Retry-After")); got != "1800" {
+		t.Fatalf("Retry-After = %q", got)
+	}
+}
+
 func TestInvalidBizStatusMapsToInvalidUpstreamResponse(t *testing.T) {
 	request := app.NewContext(0)
 	WriteIdentityError(context.Background(), request, kerrors.NewBizStatusError(identityv1.CodeInternal, "identity service unavailable"))

@@ -163,14 +163,20 @@ func toUserData(user *identityv1.User) (*gatewaymodel.UserData, error) {
 		user.TokenVersion <= 0 || !validRFC3339(user.CreatedAt) || !validRFC3339(user.UpdatedAt) {
 		return nil, errors.New("identity user is incomplete")
 	}
+	if user.EmailVerifiedAt != nil && *user.EmailVerifiedAt != "" && !validRFC3339(*user.EmailVerifiedAt) {
+		return nil, errors.New("identity user is incomplete")
+	}
 	return &gatewaymodel.UserData{
 		ID: strconv.FormatInt(user.Id, 10), Username: user.Username, Email: user.Email, Role: user.Role, Status: user.Status,
 		Avatar: user.Avatar, AvatarAttachmentID: copyString(user.AvatarAttachmentId), Bio: user.Bio, CreatedAt: user.CreatedAt, UpdatedAt: user.UpdatedAt,
+		EmailVerifiedAt: copyString(user.EmailVerifiedAt),
 	}, nil
 }
 
+// validRFC3339 accepts RFC 3339 timestamps, including fractional seconds from upstream services.
+// validRFC3339 接受 RFC 3339 时间戳，包含上游带小数秒的值。
 func validRFC3339(value string) bool {
-	_, err := time.Parse(time.RFC3339, value)
+	_, err := time.Parse(time.RFC3339Nano, value)
 	return err == nil
 }
 
@@ -418,28 +424,63 @@ func RevokeAllSessions(ctx context.Context, request *app.RequestContext) {
 }
 
 func RequestEmailVerification(ctx context.Context, request *app.RequestContext) {
-	var input gatewaymodel.EmailRequest
-	if err := decodeJSONBody(request, &input); err != nil || input.Email == "" {
-		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidRequest)
-		return
-	}
+	writeEmailVerification(ctx, request, true)
+}
+
+func GetEmailVerificationStatus(ctx context.Context, request *app.RequestContext) {
+	writeEmailVerification(ctx, request, false)
+}
+
+func writeEmailVerification(ctx context.Context, request *app.RequestContext, resend bool) {
 	dependencies, ok := gatewaymiddleware.FromRequest(request)
 	if !ok {
 		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInternal)
 		return
 	}
 	client, ok := dependencies.Identity.(interface {
-		RequestEmailVerification(context.Context, *identityv1.EmailRequest, ...callopt.Option) (*commonv1.EmptyResponse, error)
+		GetEmailVerificationStatus(context.Context, *identityv1.CurrentUserRequest, ...callopt.Option) (*identityv1.EmailVerificationStatus, error)
+		RequestEmailVerification(context.Context, *identityv1.CurrentUserRequest, ...callopt.Option) (*identityv1.EmailVerificationStatus, error)
 	})
 	if !ok {
 		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInternal)
 		return
 	}
-	if _, err := client.RequestEmailVerification(ctx, &identityv1.EmailRequest{Email: input.Email}); err != nil {
+	identityCtx := authenticatedIdentityContext(ctx, request)
+	var status *identityv1.EmailVerificationStatus
+	var err error
+	if resend {
+		status, err = client.RequestEmailVerification(identityCtx, &identityv1.CurrentUserRequest{})
+	} else {
+		status, err = client.GetEmailVerificationStatus(identityCtx, &identityv1.CurrentUserRequest{})
+	}
+	if err != nil {
 		gatewaymiddleware.WriteIdentityError(ctx, request, err)
 		return
 	}
-	writeEmpty(ctx, request)
+	data, convertErr := toEmailVerificationStatusData(status)
+	if convertErr != nil {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidUpstreamResponse)
+		return
+	}
+	gatewaymiddleware.ResponseMetadata(ctx, request)
+	gatewaymiddleware.WriteJSON(request, consts.StatusOK, data)
+}
+
+func toEmailVerificationStatusData(status *identityv1.EmailVerificationStatus) (*gatewaymodel.EmailVerificationStatusData, error) {
+	if status == nil || status.State == "" {
+		return nil, errors.New("identity email verification status is incomplete")
+	}
+	data := &gatewaymodel.EmailVerificationStatusData{State: status.State}
+	if status.ExpiresAt != nil {
+		if !validRFC3339(*status.ExpiresAt) {
+			return nil, errors.New("identity email verification expiry is invalid")
+		}
+		data.ExpiresAt = status.ExpiresAt
+	}
+	if status.RetryAfterSeconds != nil {
+		data.RetryAfterSeconds = status.RetryAfterSeconds
+	}
+	return data, nil
 }
 
 func VerifyEmail(ctx context.Context, request *app.RequestContext) {

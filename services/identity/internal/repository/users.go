@@ -207,8 +207,8 @@ func (r *postgresUserRepository) CompleteLoginSuccess(
 		if err != nil {
 			return fmt.Errorf("lock identity user for login: %w", err)
 		}
-		if record.Status != domain.StatusActive || (record.LockedUntil != nil && record.LockedUntil.After(completedAt.UTC())) {
-			user = fromModel(&record)
+		user = fromModel(&record)
+		if !user.CanEstablishSession() || (record.LockedUntil != nil && record.LockedUntil.After(completedAt.UTC())) {
 			return nil
 		}
 		if err := tx.Model(&record).Updates(map[string]any{

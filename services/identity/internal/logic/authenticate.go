@@ -137,7 +137,7 @@ func (l *AuthenticateLogic) Authenticate(ctx context.Context, input Authenticate
 		return nil, identityerrors.AccountLocked.New()
 	}
 	if !matched {
-		if user.Status != domain.StatusActive {
+		if !user.CanEstablishSession() {
 			return nil, identityerrors.InvalidCredentials.New()
 		}
 		policy := l.policy.Load()
@@ -160,10 +160,7 @@ func (l *AuthenticateLogic) Authenticate(ctx context.Context, input Authenticate
 	if user == nil {
 		return nil, errors.New("complete identity login returned no user")
 	}
-	if user.Status != domain.StatusActive {
-		if user.Status == domain.StatusPending || user.EmailVerifiedAt == nil {
-			return nil, identityerrors.EmailNotVerified.New()
-		}
+	if !user.CanEstablishSession() {
 		return nil, identityerrors.UserDisabled.New()
 	}
 	if user.IsLocked(now) {

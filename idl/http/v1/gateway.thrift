@@ -85,6 +85,7 @@ struct UserData {
   8: required string created_at (api.body="created_at")
   9: required string updated_at (api.body="updated_at")
   10: optional string avatar_attachment_id (api.body="avatar_attachment_id")
+  11: optional string email_verified_at (api.body="email_verified_at")
 }
 
 struct PublicUserData {
@@ -120,6 +121,11 @@ struct RefreshSessionRequest {
 
 struct EmailTokenRequest { 1: required string token (api.body="token") }
 struct EmailRequest { 1: required string email (api.body="email") }
+struct EmailVerificationStatusData {
+  1: required string state (api.body="state")
+  2: optional string expires_at (api.body="expires_at")
+  3: optional i32 retry_after_seconds (api.body="retry_after_seconds")
+}
 struct PasswordResetRequest {
   1: required string token (api.body="token")
   2: required string password (api.body="password")
@@ -428,7 +434,8 @@ service GatewayService {
   SessionListData ListSessions(1: EmptyRequest request) (api.get="/api/v1/sessions")
   EmptyResponse RevokeSession(1: SessionRequest request) (api.delete="/api/v1/sessions/:session_id")
   EmptyResponse RevokeAllSessions(1: EmptyRequest request) (api.delete="/api/v1/sessions")
-  EmptyResponse RequestEmailVerification(1: EmailRequest request) (api.post="/api/v1/email-verification-requests")
+  EmailVerificationStatusData GetEmailVerificationStatus(1: EmptyRequest request) (api.get="/api/v1/email-verification-requests")
+  EmailVerificationStatusData RequestEmailVerification(1: EmptyRequest request) (api.post="/api/v1/email-verification-requests")
   EmptyResponse VerifyEmail(1: EmailTokenRequest request) (api.post="/api/v1/email-verifications")
   EmptyResponse RequestPasswordReset(1: PasswordResetRequestRequest request) (api.post="/api/v1/password-reset-requests")
   EmptyResponse ResetPassword(1: PasswordResetRequest request) (api.post="/api/v1/password-resets")

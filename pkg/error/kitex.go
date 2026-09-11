@@ -2,6 +2,7 @@ package apperror
 
 import (
 	"context"
+	"errors"
 
 	"github.com/HappyLadySauce/Knowledge-Core/pkg/metadata"
 	"github.com/cloudwego/kitex/pkg/kerrors"
@@ -28,6 +29,12 @@ func ToBizStatus(ctx context.Context, err error) kerrors.BizStatusErrorIface {
 	}
 	if traceID := traceIDFromContext(ctx); traceID != "" {
 		extra[ExtraTraceID] = traceID
+	}
+	var appError *Error
+	if errors.As(err, &appError) && appError != nil {
+		for key, value := range appError.extra {
+			extra[key] = value
+		}
 	}
 
 	biz := kerrors.NewBizStatusErrorWithExtra(definition.Code, definition.Message, extra)

@@ -507,6 +507,26 @@
         ],
         "type": "object"
       },
+      "EmailVerificationStatusData": {
+        "additionalProperties": false,
+        "properties": {
+          "expires_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "retry_after_seconds": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "state": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "state"
+        ],
+        "type": "object"
+      },
       "EmptyRequest": {
         "additionalProperties": false,
         "properties": {},
@@ -1534,6 +1554,10 @@
           },
           "email": {
             "format": "email",
+            "type": "string"
+          },
+          "email_verified_at": {
+            "format": "date-time",
             "type": "string"
           },
           "id": {
@@ -6623,39 +6647,20 @@
       }
     },
     "/api/v1/email-verification-requests": {
-      "post": {
-        "description": "向指定邮箱发送一次性验证邮件。",
-        "operationId": "RequestEmailVerification",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "example": {
-                "email": "user@example.com"
-              },
-              "schema": {
-                "additionalProperties": false,
-                "properties": {
-                  "email": {
-                    "format": "email",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "email"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
+      "get": {
+        "description": "返回当前登录用户的邮箱验证状态，包含过期时间和可重试间隔。",
+        "operationId": "GetEmailVerificationStatus",
         "responses": {
           "200": {
             "content": {
               "application/json": {
-                "example": {},
+                "example": {
+                  "expires_at": "2026-01-01T00:00:00Z",
+                  "retry_after_seconds": 1,
+                  "state": "string"
+                },
                 "schema": {
-                  "$ref": "#/components/schemas/EmptyResponse"
+                  "$ref": "#/components/schemas/EmailVerificationStatusData"
                 }
               }
             },
@@ -6675,7 +6680,7 @@
               }
             }
           },
-          "400": {
+          "401": {
             "content": {
               "application/problem+json": {
                 "example": {
@@ -6683,8 +6688,8 @@
                   "detail": "string",
                   "key": "string",
                   "request_id": "string",
-                  "status": 400,
-                  "title": "请求格式或参数无效。",
+                  "status": 401,
+                  "title": "需要认证或认证已失效。",
                   "trace_id": "string",
                   "type": "https://example.com/resource"
                 },
@@ -6693,8 +6698,234 @@
                 }
               }
             },
-            "description": "请求格式或参数无效。",
+            "description": "需要认证或认证已失效。",
             "headers": {
+              "WWW-Authenticate": {
+                "description": "Bearer 认证挑战。",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-Request-ID": {
+                "description": "响应关联的请求标识。",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-Trace-ID": {
+                "description": "响应关联的请求标识。",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "example": {
+                  "code": 1,
+                  "detail": "string",
+                  "key": "string",
+                  "request_id": "string",
+                  "status": 500,
+                  "title": "Gateway 内部错误。",
+                  "trace_id": "string",
+                  "type": "https://example.com/resource"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPProblem"
+                }
+              }
+            },
+            "description": "Gateway 内部错误。",
+            "headers": {
+              "X-Request-ID": {
+                "description": "响应关联的请求标识。",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-Trace-ID": {
+                "description": "响应关联的请求标识。",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "502": {
+            "content": {
+              "application/problem+json": {
+                "example": {
+                  "code": 1,
+                  "detail": "string",
+                  "key": "string",
+                  "request_id": "string",
+                  "status": 502,
+                  "title": "上游响应无效或不可用。",
+                  "trace_id": "string",
+                  "type": "https://example.com/resource"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPProblem"
+                }
+              }
+            },
+            "description": "上游响应无效或不可用。",
+            "headers": {
+              "X-Request-ID": {
+                "description": "响应关联的请求标识。",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-Trace-ID": {
+                "description": "响应关联的请求标识。",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "example": {
+                  "code": 1,
+                  "detail": "string",
+                  "key": "string",
+                  "request_id": "string",
+                  "status": 503,
+                  "title": "依赖或 Gateway 暂不可用。",
+                  "trace_id": "string",
+                  "type": "https://example.com/resource"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPProblem"
+                }
+              }
+            },
+            "description": "依赖或 Gateway 暂不可用。",
+            "headers": {
+              "X-Request-ID": {
+                "description": "响应关联的请求标识。",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-Trace-ID": {
+                "description": "响应关联的请求标识。",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "504": {
+            "content": {
+              "application/problem+json": {
+                "example": {
+                  "code": 1,
+                  "detail": "string",
+                  "key": "string",
+                  "request_id": "string",
+                  "status": 504,
+                  "title": "上游请求超时。",
+                  "trace_id": "string",
+                  "type": "https://example.com/resource"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPProblem"
+                }
+              }
+            },
+            "description": "上游请求超时。",
+            "headers": {
+              "X-Request-ID": {
+                "description": "响应关联的请求标识。",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-Trace-ID": {
+                "description": "响应关联的请求标识。",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "获取邮箱验证状态",
+        "tags": [
+          "身份与会话"
+        ]
+      },
+      "post": {
+        "description": "为当前登录用户发送一次性验证邮件。未过期令牌窗口内最多重发一次。",
+        "operationId": "RequestEmailVerification",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "expires_at": "2026-01-01T00:00:00Z",
+                  "retry_after_seconds": 1,
+                  "state": "string"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/EmailVerificationStatusData"
+                }
+              }
+            },
+            "description": "请求成功。",
+            "headers": {
+              "X-Request-ID": {
+                "description": "响应关联的请求标识。",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-Trace-ID": {
+                "description": "响应关联的请求标识。",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "example": {
+                  "code": 1,
+                  "detail": "string",
+                  "key": "string",
+                  "request_id": "string",
+                  "status": 401,
+                  "title": "需要认证或认证已失效。",
+                  "trace_id": "string",
+                  "type": "https://example.com/resource"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPProblem"
+                }
+              }
+            },
+            "description": "需要认证或认证已失效。",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Bearer 认证挑战。",
+                "schema": {
+                  "type": "string"
+                }
+              },
               "X-Request-ID": {
                 "description": "响应关联的请求标识。",
                 "schema": {
@@ -6889,7 +7120,9 @@
           }
         },
         "security": [
-          {}
+          {
+            "bearerAuth": []
+          }
         ],
         "summary": "请求邮箱验证",
         "tags": [
@@ -8350,6 +8583,7 @@
                     "bio": "string",
                     "created_at": "2026-01-01T00:00:00Z",
                     "email": "user@example.com",
+                    "email_verified_at": "2026-01-01T00:00:00Z",
                     "id": "018f0c20-7b8a-7cc3-8f89-2f6f6d5f7a11",
                     "role": "string",
                     "status": "string",
@@ -8934,6 +9168,7 @@
                     "bio": "string",
                     "created_at": "2026-01-01T00:00:00Z",
                     "email": "user@example.com",
+                    "email_verified_at": "2026-01-01T00:00:00Z",
                     "id": "018f0c20-7b8a-7cc3-8f89-2f6f6d5f7a11",
                     "role": "string",
                     "status": "string",
@@ -19401,6 +19636,7 @@
                   "bio": "string",
                   "created_at": "2026-01-01T00:00:00Z",
                   "email": "user@example.com",
+                  "email_verified_at": "2026-01-01T00:00:00Z",
                   "id": "018f0c20-7b8a-7cc3-8f89-2f6f6d5f7a11",
                   "role": "string",
                   "status": "string",
@@ -19664,6 +19900,7 @@
                   "bio": "string",
                   "created_at": "2026-01-01T00:00:00Z",
                   "email": "user@example.com",
+                  "email_verified_at": "2026-01-01T00:00:00Z",
                   "id": "018f0c20-7b8a-7cc3-8f89-2f6f6d5f7a11",
                   "role": "string",
                   "status": "string",

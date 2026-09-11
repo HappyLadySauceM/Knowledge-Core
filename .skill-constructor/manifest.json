@@ -1105,7 +1105,7 @@
   ],
   "generator": {
     "name": "skill-constructor",
-    "version": "0.8.0"
+    "version": "0.9.0"
   },
   "project": {
     "language": "en",
@@ -1113,11 +1113,11 @@
     "profile": "generic",
     "slug": "knowledge-core"
   },
-  "revision": 179,
+  "revision": 180,
   "scan": {
-    "fingerprint": "750f73439b85d6f24b368064b52a5b7703afd48fa737d13f53af3c414f9f8392",
-    "inventoryCount": 459
+    "fingerprint": "167324466721b94c821bcf71c74c5dfdce63c1f78bfc2e2a4fdcc362dc24ee81",
+    "inventoryCount": 463
   },
   "schemaVersion": 3,
-  "updatedAt": "2026-09-10T09:14:25Z"
+  "updatedAt": "2026-09-11T04:51:07Z"
 }

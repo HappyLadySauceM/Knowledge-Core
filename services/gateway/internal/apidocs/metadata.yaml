@@ -68,10 +68,17 @@ operations:
   RequestEmailVerification:
     tag: 身份与会话
     summary: 请求邮箱验证
-    description: 向指定邮箱发送一次性验证邮件。
-    security: none
+    description: 为当前登录用户发送一次性验证邮件。未过期令牌窗口内最多重发一次。
+    security: bearer
     success_status: 200
-    errors: [400, 429, 500, 502, 503, 504]
+    errors: [401, 429, 500, 502, 503, 504]
+  GetEmailVerificationStatus:
+    tag: 身份与会话
+    summary: 获取邮箱验证状态
+    description: 返回当前登录用户的邮箱验证状态，包含过期时间和可重试间隔。
+    security: bearer
+    success_status: 200
+    errors: [401, 500, 502, 503, 504]
   VerifyEmail:
     tag: 身份与会话
     summary: 验证邮箱

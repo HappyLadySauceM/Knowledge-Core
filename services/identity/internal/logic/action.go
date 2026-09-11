@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
+	apperror "github.com/HappyLadySauce/Knowledge-Core/pkg/error"
 	"github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/domain"
 	identityerrors "github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/errors"
 	"github.com/HappyLadySauce/Knowledge-Core/services/identity/internal/repository"
@@ -62,15 +64,75 @@ func (l *ActionLogic) issue(ctx context.Context, user *domain.User, kind, subjec
 	return nil
 }
 
-func (l *ActionLogic) RequestEmailVerification(ctx context.Context, email string) error {
-	user, err := l.users.FindByLogin(ctx, strings.TrimSpace(email))
-	if errors.Is(err, repository.ErrUserNotFound) || user == nil || user.EmailVerifiedAt != nil || user.Status == domain.StatusDisabled {
-		return nil
+const (
+	EmailVerificationVerified = "verified"
+	EmailVerificationPending  = "pending"
+	EmailVerificationIdle     = "idle"
+)
+
+type EmailVerificationStatus struct {
+	State             string
+	ExpiresAt         *time.Time
+	RetryAfterSeconds int32
+}
+
+func (l *ActionLogic) EmailVerificationStatus(ctx context.Context, user *domain.User) (*EmailVerificationStatus, error) {
+	if user == nil || user.ID <= 0 {
+		return nil, identityerrors.InvalidInput.New()
+	}
+	if user.EmailVerifiedAt != nil {
+		return &EmailVerificationStatus{State: EmailVerificationVerified}, nil
+	}
+	token, err := l.latestUnusedVerification(ctx, user.ID)
+	if err != nil {
+		return nil, err
+	}
+	now := l.now().UTC()
+	if token == nil || !token.ExpiresAt.After(now) {
+		return &EmailVerificationStatus{State: EmailVerificationIdle}, nil
+	}
+	seconds := int32(token.ExpiresAt.Sub(now).Round(time.Second) / time.Second)
+	if seconds < 1 {
+		seconds = 1
+	}
+	expires := token.ExpiresAt.UTC()
+	return &EmailVerificationStatus{State: EmailVerificationPending, ExpiresAt: &expires, RetryAfterSeconds: seconds}, nil
+}
+
+func (l *ActionLogic) RequestEmailVerification(ctx context.Context, user *domain.User) (*EmailVerificationStatus, error) {
+	if user == nil || user.ID <= 0 {
+		return nil, identityerrors.Unauthenticated.New()
+	}
+	if user.Status == domain.StatusDisabled {
+		return nil, identityerrors.UserDisabled.New()
+	}
+	status, err := l.EmailVerificationStatus(ctx, user)
+	if err != nil {
+		return nil, err
+	}
+	if status.State == EmailVerificationVerified {
+		return status, nil
+	}
+	if status.State == EmailVerificationPending {
+		return nil, identityerrors.VerificationCooldown.NewWithExtra(map[string]string{
+			apperror.ExtraRetryAfter: strconv.Itoa(int(status.RetryAfterSeconds)),
+		})
+	}
+	if err := l.issue(ctx, user, domain.ActionEmailVerification, "Verify your email"); err != nil {
+		return nil, err
+	}
+	return l.EmailVerificationStatus(ctx, user)
+}
+
+func (l *ActionLogic) latestUnusedVerification(ctx context.Context, userID int64) (*domain.ActionToken, error) {
+	token, err := l.actions.LatestUnusedByKind(ctx, userID, domain.ActionEmailVerification)
+	if errors.Is(err, repository.ErrActionNotFound) {
+		return nil, nil
 	}
 	if err != nil {
-		return fmt.Errorf("find identity verification user: %w", err)
+		return nil, fmt.Errorf("find identity verification token: %w", err)
 	}
-	return l.issue(ctx, user, domain.ActionEmailVerification, "Verify your email")
+	return token, nil
 }
 
 func (l *ActionLogic) VerifyEmail(ctx context.Context, token string) error {
