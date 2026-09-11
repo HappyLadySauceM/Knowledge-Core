@@ -112,3 +112,36 @@ func TestAuthenticateUnknownUserUsesSafeError(t *testing.T) {
 		t.Fatalf("Authenticate() error = %v", err)
 	}
 }
+
+func TestAuthenticatePendingUserRequiresEmailVerification(t *testing.T) {
+	users := &authenticateUsersStub{user: &domain.User{
+		ID: 1, Username: "alice", Email: "alice@example.com", PasswordHash: "hash:correct",
+		Role: domain.RoleUser, Status: domain.StatusPending, TokenVersion: 1,
+	}}
+	logic, err := NewAuthenticateLogic(users, passwordVerifierStub{}, tokenIssuerStub{}, 5, time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = logic.Authenticate(context.Background(), AuthenticateInput{Identifier: "alice", Password: "correct"})
+	if !errors.Is(err, identityerrors.EmailNotVerified) {
+		t.Fatalf("Authenticate() error = %v", err)
+	}
+	if details, ok := apperror.Details(err); !ok || details.Key != "identity.email_not_verified" {
+		t.Fatalf("Authenticate() details = %#v", details)
+	}
+}
+
+func TestAuthenticatePendingUserKeepsInvalidCredentialsOnWrongPassword(t *testing.T) {
+	users := &authenticateUsersStub{user: &domain.User{
+		ID: 1, Username: "alice", Email: "alice@example.com", PasswordHash: "hash:correct",
+		Role: domain.RoleUser, Status: domain.StatusPending, TokenVersion: 1,
+	}}
+	logic, err := NewAuthenticateLogic(users, passwordVerifierStub{}, tokenIssuerStub{}, 5, time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = logic.Authenticate(context.Background(), AuthenticateInput{Identifier: "alice", Password: "wrong"})
+	if !errors.Is(err, identityerrors.InvalidCredentials) {
+		t.Fatalf("Authenticate() error = %v", err)
+	}
+}
