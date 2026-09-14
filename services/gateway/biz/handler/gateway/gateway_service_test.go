@@ -93,6 +93,26 @@ func TestGetEmailVerificationStatusAcceptsFractionalExpiry(t *testing.T) {
 	}
 }
 
+func TestRequestEmailVerificationAcceptsEmptyJSON(t *testing.T) {
+	expiresAt := "2026-09-11T04:00:00Z"
+	retryAfter := int32(1800)
+	identity := &emailVerificationStub{resend: &identityv1.EmailVerificationStatus{
+		State: "pending", ExpiresAt: &expiresAt, RetryAfterSeconds: &retryAfter,
+	}}
+	request := handlerRequest(identity, `{}`)
+	RequestEmailVerification(context.Background(), request)
+	if request.Response.StatusCode() != consts.StatusOK {
+		t.Fatalf("status = %d, body = %s", request.Response.StatusCode(), request.Response.Body())
+	}
+	var response gatewaymodel.EmailVerificationStatusData
+	if err := jsoncodec.Unmarshal(request.Response.Body(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if response.State != "pending" || response.GetRetryAfterSeconds() != 1800 {
+		t.Fatalf("response = %#v", response)
+	}
+}
+
 func TestRequestEmailVerificationMapsCooldown(t *testing.T) {
 	identity := &emailVerificationStub{resendErr: apperror.ToKitexBizStatus(context.Background(), apperror.MustDefine(
 		identityv1.CodeVerificationCooldown, "identity.verification_cooldown", apperror.KindRateLimited, "verification email was recently sent",

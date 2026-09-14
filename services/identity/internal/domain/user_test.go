@@ -4,9 +4,9 @@ import "testing"
 
 func TestUserCanEstablishSession(t *testing.T) {
 	cases := []struct {
-		name   string
-		user   *User
-		want   bool
+		name string
+		user *User
+		want bool
 	}{
 		{name: "nil", want: false},
 		{name: "active", user: &User{Status: StatusActive}, want: true},

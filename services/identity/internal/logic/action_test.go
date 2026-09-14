@@ -268,7 +268,7 @@ func TestRequestEmailVerificationIssuesAfterExpiry(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if actions.created != 1 || status.State != EmailVerificationPending || status.RetryAfterSeconds != int32((30 * time.Minute).Seconds()) {
+	if actions.created != 1 || status.State != EmailVerificationPending || status.RetryAfterSeconds != int32((30*time.Minute).Seconds()) {
 		t.Fatalf("status = %#v, created = %d", status, actions.created)
 	}
 }
