@@ -303,6 +303,35 @@ func TestCreateDocumentUsesTrustedLocationAndStrongETag(t *testing.T) {
 	}
 }
 
+func TestListPublishedDocumentsAcceptsAnonymousNoneAccess(t *testing.T) {
+	document := completeDocument()
+	document.Access = "none"
+	document.Published = true
+	document.PublicationStatus = "published"
+	knowledge := &knowledgeStub{listPublishedDocuments: func(context.Context, *knowledgev1.ListDocumentsRequest) (*knowledgev1.DocumentPage, error) {
+		return &knowledgev1.DocumentPage{
+			Items: []*knowledgev1.Document{document},
+			Page:  &knowledgev1.PageInfo{HasMore: false},
+		}, nil
+	}}
+	request := handlerRequest(&identityStub{}, "")
+	dependencies, _ := gatewaymiddleware.FromRequest(request)
+	dependencies.Knowledge = knowledge
+
+	ListPublishedDocuments(context.Background(), request)
+
+	if request.Response.StatusCode() != consts.StatusOK {
+		t.Fatalf("status = %d, body = %s", request.Response.StatusCode(), request.Response.Body())
+	}
+	var page gatewaymodel.DocumentPageData
+	if err := jsoncodec.Unmarshal(request.Response.Body(), &page); err != nil {
+		t.Fatalf("decode page: %v", err)
+	}
+	if len(page.Items) != 1 || page.Items[0].Access != "none" || !page.Items[0].Published {
+		t.Fatalf("page = %#v", page)
+	}
+}
+
 func TestGatewayRejectsAmbiguousDocumentInputs(t *testing.T) {
 	t.Run("unknown query", func(t *testing.T) {
 		request := app.NewContext(0)
@@ -339,7 +368,8 @@ func TestGatewayRejectsAmbiguousDocumentInputs(t *testing.T) {
 
 type knowledgeStub struct {
 	knowledgeservice.Client
-	createDocument func(context.Context, *knowledgev1.CreateDocumentRequest) (*knowledgev1.Document, error)
+	createDocument         func(context.Context, *knowledgev1.CreateDocumentRequest) (*knowledgev1.Document, error)
+	listPublishedDocuments func(context.Context, *knowledgev1.ListDocumentsRequest) (*knowledgev1.DocumentPage, error)
 }
 
 type collaborationStub struct {
@@ -484,6 +514,13 @@ func TestCreateCollaborationSessionMapsCollaborationBusinessError(t *testing.T) 
 
 func (s *knowledgeStub) CreateDocument(ctx context.Context, input *knowledgev1.CreateDocumentRequest, _ ...callopt.Option) (*knowledgev1.Document, error) {
 	return s.createDocument(ctx, input)
+}
+
+func (s *knowledgeStub) ListPublishedDocuments(ctx context.Context, input *knowledgev1.ListDocumentsRequest, _ ...callopt.Option) (*knowledgev1.DocumentPage, error) {
+	if s.listPublishedDocuments == nil {
+		return nil, errors.New("unexpected ListPublishedDocuments")
+	}
+	return s.listPublishedDocuments(ctx, input)
 }
 
 func handlerRequest(identity gatewaymiddleware.IdentityClient, body string) *app.RequestContext {

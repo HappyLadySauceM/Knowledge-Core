@@ -117,7 +117,7 @@ operations:
   ListPublishedDocuments:
     tag: 公开内容
     summary: 列出公开文档
-    description: 按游标分页列出当前可见的已发布文档；有效 token 可提供访问上下文。
+    description: 按游标分页列出当前可见的已发布文档。文档 access 为 none、viewer、editor 或 owner；匿名或无成员关系时为 none，有效 token 可提供访问上下文。
     security: optional
     success_status: 200
     errors: [400, 401, 403, 429, 500, 502, 503, 504]

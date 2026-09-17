@@ -191,8 +191,15 @@ func validOptionalTime(value *string) bool {
 	return value == nil || validRFC3339(*value)
 }
 
+// validDocumentAccess accepts membership plus "none" for callers with no document role.
+// validDocumentAccess 接受成员身份，以及调用方没有文档角色时的 "none"。
 func validDocumentAccess(value string) bool {
-	return value == "viewer" || value == "editor" || value == "owner"
+	switch value {
+	case "none", "viewer", "editor", "owner":
+		return true
+	default:
+		return false
+	}
 }
 
 func copyString(value *string) *string {

@@ -4104,7 +4104,7 @@ paths:
                 - 附件
     /api/v1/documents:
         get:
-            description: 按游标分页列出当前可见的已发布文档；有效 token 可提供访问上下文。
+            description: 按游标分页列出当前可见的已发布文档。文档 access 为 none、viewer、editor 或 owner；匿名或无成员关系时为 none，有效 token 可提供访问上下文。
             operationId: ListPublishedDocuments
             parameters:
                 - in: query

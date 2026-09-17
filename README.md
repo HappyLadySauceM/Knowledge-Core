@@ -21,7 +21,7 @@ Knowledge Core 是一个支持文档元数据、权限、通用附件、实时�
 | 用户 | `POST /api/v1/users` | 注册用户 |
 | 会话 | `POST /api/v1/sessions` | 用户名或邮箱登录，返回 Bearer token |
 | 当前用户 | `GET /api/v1/users/me` | 验签后向 Identity 复核 active 状态与 token version |
-| 公开文档 | `GET /api/v1/documents`、`GET /api/v1/documents/:slug` | 发布列表、投影内容和附件元数据 |
+| 公开文档 | `GET /api/v1/documents`、`GET /api/v1/documents/:slug` | 发布列表、投影内容和附件元数据；`access` 为 `none\|viewer\|editor\|owner` |
 | 附件下载 | `GET /api/v1/attachments/:attachment_id/content` | 返回 `303 See Other` 到短期预签名地址 |
 | 通用附件 | `/api/v1/attachments` | Attachment façade、稳定游标分页、16MiB 分片上传、幂等重试、扫描状态和回收 |
 | 站点配置 | `GET /api/v1/site-profile` | 站点标题、双语标语、首图和焦点位置 |
