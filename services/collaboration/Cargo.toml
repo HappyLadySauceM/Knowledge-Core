@@ -58,7 +58,7 @@ pilota = "=0.13.1"
 prometheus = { version = "=0.14.0", default-features = false }
 rand = { version = "=0.9.5", default-features = false, features = ["os_rng"] }
 redis = { version = "=1.5.0", default-features = false, features = ["aio", "connection-manager", "tokio-rustls-comp"] }
-rustls = "=0.23.37"
+rustls = "=0.23.45"
 serde = { version = "=1.0.229", features = ["derive"] }
 serde_json = "=1.0.151"
 serde_yaml = "=0.9.34"
