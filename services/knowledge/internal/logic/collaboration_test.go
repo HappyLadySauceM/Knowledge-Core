@@ -74,3 +74,27 @@ func TestCollaborationProjectValidatesAndForwardsProjection(t *testing.T) {
 		t.Fatal("Project() accepted a negative sequence")
 	}
 }
+
+func TestCollaborationProjectAcceptsParagraphOnlyTextWithEmptyContent(t *testing.T) {
+	repository := &collaborationRepositoryStub{}
+	logic, err := NewCollaborationLogic(repository, &directoryStub{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := "hello"
+	content := paragraphOnlyDocument(text)
+	if err := logic.Project(context.Background(), "0198a3c0-0000-7000-8000-000000000001", 3, content, "hello"); err != nil {
+		t.Fatalf("Project(paragraph-only) error = %v", err)
+	}
+	if repository.projected.Sequence != 3 || len(repository.projected.Content) == 0 {
+		t.Fatalf("projection = %#v", repository.projected)
+	}
+}
+
+func paragraphOnlyDocument(text string) domain.RichTextDocument {
+	return domain.RichTextDocument{Type: "doc", Content: []*domain.RichTextNode{{
+		Type: "paragraph", Content: []*domain.RichTextNode{{
+			Type: "text", Text: &text, Content: []*domain.RichTextNode{},
+		}},
+	}}}
+}

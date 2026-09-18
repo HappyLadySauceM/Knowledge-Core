@@ -228,7 +228,7 @@ func (h *Handler) PublishSnapshot(ctx context.Context, request *knowledgev1.Publ
 	}
 	content, parseErr := fromTransportRichText(request.Content)
 	if parseErr != nil {
-		return nil, h.transportError(ctx, "publish_snapshot_failed", parseErr)
+		return nil, h.transportInvalidInput(ctx, "publish_snapshot_failed", parseErr)
 	}
 	document, serviceErr := h.documents.PublishSnapshot(ctx, request.DocumentId, actorID, request.ExpectedMetadataRevision, knowledgelogic.PublishSnapshotInput{
 		VersionID: request.VersionId, VersionSequence: request.VersionSequence, Title: request.Title, Summary: request.Summary,
@@ -456,11 +456,13 @@ func (h *Handler) AuthorizeCollaboration(
 func (h *Handler) ProjectCollaboration(ctx context.Context, request *knowledgev1.ProjectCollaborationRequest) error {
 	ctx = metadata.EnsureRequestID(ctx)
 	if request == nil || request.Content == nil {
-		return h.invalidInput(ctx)
+		return h.transportInvalidInput(ctx, "project_collaboration_failed", &domain.ValidationError{
+			Field: "content", Reason: "is required",
+		})
 	}
 	content, err := fromTransportRichText(request.Content)
 	if err != nil {
-		return h.invalidInput(ctx)
+		return h.transportInvalidInput(ctx, "project_collaboration_failed", err)
 	}
 	if err := h.collaboration.Project(
 		ctx, request.DocumentId, request.Sequence, content, request.PlainText,
@@ -516,22 +518,54 @@ func (h *Handler) invalidInput(ctx context.Context) error {
 	return apperror.ToKitexBizStatus(ctx, knowledgeerrors.InvalidInput.New())
 }
 
+func (h *Handler) transportInvalidInput(ctx context.Context, event string, err error) error {
+	mapped := err
+	if _, ok := apperror.Details(mapped); !ok {
+		mapped = knowledgeerrors.InvalidInput.Wrap(err)
+	}
+	return h.finishTransportError(ctx, event, err, mapped)
+}
+
 func (h *Handler) transportError(ctx context.Context, event string, err error) error {
 	mapped := err
 	if _, ok := apperror.Details(mapped); !ok {
 		mapped = knowledgeerrors.Internal.Wrap(err)
 	}
+	return h.finishTransportError(ctx, event, err, mapped)
+}
+
+func (h *Handler) finishTransportError(ctx context.Context, event string, cause, mapped error) error {
 	level := slog.LevelWarn
 	if apperror.KindOf(mapped) == apperror.KindInternal {
 		level = slog.LevelError
 	}
-	h.logger.Log(ctx, level, "knowledge RPC operation failed",
+	attrs := []any{
 		slog.String("component", "knowledge.rpc"),
 		slog.String("event", event),
 		slog.String("error_key", apperror.Key(mapped)),
-		slog.String("error.type", fmt.Sprintf("%T", err)),
-	)
+		slog.String("error.type", fmt.Sprintf("%T", cause)),
+	}
+	if field, reason, ok := validationLogFields(cause); ok {
+		attrs = append(attrs,
+			slog.String("validation.field", field),
+			slog.String("validation.reason", reason),
+		)
+	}
+	h.logger.Log(ctx, level, "knowledge RPC operation failed", attrs...)
 	return apperror.ToKitexBizStatus(ctx, mapped)
+}
+
+func validationLogFields(err error) (string, string, bool) {
+	var validation *domain.ValidationError
+	if !errors.As(err, &validation) || validation == nil {
+		return "", "", false
+	}
+	field := strings.TrimSpace(validation.Field)
+	reason := strings.TrimSpace(validation.Reason)
+	if field == "" || reason == "" {
+		return "", "", false
+	}
+	return field, reason, true
 }
 
 func listInput(request *knowledgev1.ListDocumentsRequest, actorID int64) knowledgelogic.ListDocumentsInput {
@@ -635,7 +669,7 @@ func toTransportRichTextAttrs(value *domain.RichTextAttrs) *knowledgev1.RichText
 
 func fromTransportRichText(value *knowledgev1.RichTextDocument) (domain.RichTextDocument, error) {
 	if value == nil {
-		return domain.RichTextDocument{}, errors.New("rich-text document is required")
+		return domain.RichTextDocument{}, &domain.ValidationError{Field: "content", Reason: "is required"}
 	}
 	count := 0
 	content := make([]*domain.RichTextNode, 0, len(value.Content))
@@ -651,19 +685,27 @@ func fromTransportRichText(value *knowledgev1.RichTextDocument) (domain.RichText
 
 func fromTransportRichTextNode(value *knowledgev1.RichTextNode, depth int, count *int) (*domain.RichTextNode, error) {
 	if value == nil || depth > 64 || count == nil {
-		return nil, errors.New("rich-text node structure is invalid")
+		return nil, &domain.ValidationError{Field: "content", Reason: "structure is invalid"}
 	}
 	*count++
 	if *count > 100000 {
-		return nil, errors.New("rich-text document contains too many nodes")
+		return nil, &domain.ValidationError{Field: "content", Reason: "contains too many nodes"}
 	}
-	content := make([]*domain.RichTextNode, 0, len(value.Content))
-	for _, child := range value.Content {
-		converted, err := fromTransportRichTextNode(child, depth+1, count)
-		if err != nil {
-			return nil, err
+	var content []*domain.RichTextNode
+	if len(value.Content) > 0 {
+		content = make([]*domain.RichTextNode, 0, len(value.Content))
+		for _, child := range value.Content {
+			converted, err := fromTransportRichTextNode(child, depth+1, count)
+			if err != nil {
+				return nil, err
+			}
+			content = append(content, converted)
 		}
-		content = append(content, converted)
+	}
+	// Text nodes treat nil and empty Thrift content as absent, not illegal children.
+	// 文本节点把 Thrift 的 nil/空 content 当成缺省，而不是非法子节点。
+	if value.Type == "text" && len(content) == 0 {
+		content = nil
 	}
 	marks := make([]domain.RichTextMark, 0, len(value.Marks))
 	for _, mark := range value.Marks {

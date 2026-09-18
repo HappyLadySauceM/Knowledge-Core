@@ -18,11 +18,12 @@ import (
 )
 
 type documentServiceStub struct {
-	page     knowledgelogic.DocumentPage
-	document *domain.Document
-	err      error
-	actorID  int64
-	getCalls int
+	page        knowledgelogic.DocumentPage
+	document    *domain.Document
+	err         error
+	actorID     int64
+	getCalls    int
+	lastPublish knowledgelogic.PublishSnapshotInput
 }
 
 func (s *documentServiceStub) ListPublished(context.Context, knowledgelogic.ListDocumentsInput) (knowledgelogic.DocumentPage, error) {
@@ -51,7 +52,8 @@ func (s *documentServiceStub) Update(context.Context, knowledgelogic.UpdateDocum
 func (s *documentServiceStub) SetPublication(context.Context, string, int64, int64, bool) (*domain.Document, error) {
 	return s.document, s.err
 }
-func (s *documentServiceStub) PublishSnapshot(context.Context, string, int64, int64, knowledgelogic.PublishSnapshotInput) (*domain.Document, error) {
+func (s *documentServiceStub) PublishSnapshot(_ context.Context, _ string, _, _ int64, input knowledgelogic.PublishSnapshotInput) (*domain.Document, error) {
+	s.lastPublish = input
 	return s.document, s.err
 }
 func (s *documentServiceStub) Delete(context.Context, string, int64, int64) (*domain.Document, error) {
@@ -256,6 +258,9 @@ func TestProjectCollaborationValidatesAndConvertsRichText(t *testing.T) {
 	if err != nil || service.sequence != 7 || service.plainText != "hello" || len(service.projected.Content) != 1 {
 		t.Fatalf("ProjectCollaboration() error = %v, service = %#v", err, service)
 	}
+	if err := service.projected.Validate(); err != nil {
+		t.Fatalf("projected content.Validate() error = %v", err)
+	}
 	deep := &knowledgev1.RichTextNode{Type: "paragraph"}
 	for range 65 {
 		deep = &knowledgev1.RichTextNode{Type: "paragraph", Content: []*knowledgev1.RichTextNode{deep}}
@@ -266,8 +271,104 @@ func TestProjectCollaborationValidatesAndConvertsRichText(t *testing.T) {
 	assertBusinessCode(t, err, knowledgev1.CodeInvalidInput)
 }
 
+func TestParagraphOnlyRichTextPassesPublishSnapshotAndProjectCollaboration(t *testing.T) {
+	documents := &documentServiceStub{document: completeDocument()}
+	collaboration := &collaborationServiceStub{}
+	handler := newTestHandlerWithCollaboration(t, documents, collaboration, authenticatedVerifier())
+	content := paragraphOnlyTransportDocument("hello")
+
+	if err := handler.ProjectCollaboration(context.Background(), &knowledgev1.ProjectCollaborationRequest{
+		DocumentId: completeDocument().ID, Sequence: 4, PlainText: "hello", Content: content,
+	}); err != nil {
+		t.Fatalf("ProjectCollaboration(paragraph-only) error = %v", err)
+	}
+	if err := collaboration.projected.Validate(); err != nil {
+		t.Fatalf("ProjectCollaboration projected.Validate() error = %v", err)
+	}
+	if collaboration.projected.Content[0].Content[0].Content != nil {
+		t.Fatalf("text node content = %#v, want nil", collaboration.projected.Content[0].Content[0].Content)
+	}
+
+	published, err := handler.PublishSnapshot(
+		coreauth.WithAccessToken(context.Background(), "signed-token"),
+		&knowledgev1.PublishSnapshotRequest{
+			DocumentId: completeDocument().ID, ExpectedMetadataRevision: 1,
+			VersionId: completeDocument().ID, VersionSequence: 4, Title: "Document",
+			Slug: "document", Language: "en", Tags: []string{}, Content: content, PlainText: "hello",
+		},
+	)
+	if err != nil || published == nil {
+		t.Fatalf("PublishSnapshot(paragraph-only) = %#v, %v", published, err)
+	}
+	if err := documents.lastPublish.Content.Validate(); err != nil {
+		t.Fatalf("PublishSnapshot converted content.Validate() error = %v", err)
+	}
+}
+
+func TestPublishSnapshotMapsRichTextParseFailureToInvalidInput(t *testing.T) {
+	documents := &documentServiceStub{document: completeDocument()}
+	handler := newTestHandler(t, documents, authenticatedVerifier())
+	_, err := handler.PublishSnapshot(
+		coreauth.WithAccessToken(context.Background(), "signed-token"),
+		&knowledgev1.PublishSnapshotRequest{
+			DocumentId: completeDocument().ID, ExpectedMetadataRevision: 1,
+			VersionId: completeDocument().ID, Title: "Document", Slug: "document", Language: "en",
+			Tags: []string{},
+		},
+	)
+	assertBusinessCode(t, err, knowledgev1.CodeInvalidInput)
+	assertBusinessMessage(t, err, "invalid knowledge input")
+}
+
+func TestKnowledgeValidationFailureLogsFieldAndReasonWithoutLeakingThem(t *testing.T) {
+	capture := &captureHandler{}
+	documents := &documentServiceStub{
+		document: completeDocument(),
+		err: knowledgeerrors.InvalidInput.Wrap(&domain.ValidationError{
+			Field: "content", Reason: "contains an invalid text node",
+		}),
+	}
+	handler := newTestHandlerWithLogger(t, documents, &collaborationServiceStub{}, authenticatedVerifier(), slog.New(capture))
+	_, err := handler.PublishSnapshot(
+		coreauth.WithAccessToken(context.Background(), "signed-token"),
+		&knowledgev1.PublishSnapshotRequest{
+			DocumentId: completeDocument().ID, ExpectedMetadataRevision: 1,
+			VersionId: completeDocument().ID, Title: "Document", Slug: "document", Language: "en",
+			Tags: []string{}, Content: paragraphOnlyTransportDocument("hello"), PlainText: "hello",
+		},
+	)
+	assertBusinessCode(t, err, knowledgev1.CodeInvalidInput)
+	assertBusinessMessage(t, err, "invalid knowledge input")
+	if len(capture.records) != 1 {
+		t.Fatalf("log records = %d, want 1", len(capture.records))
+	}
+	if got := slogAttr(capture.records[0], "validation.field"); got != "content" {
+		t.Fatalf("validation.field = %q", got)
+	}
+	if got := slogAttr(capture.records[0], "validation.reason"); got != "contains an invalid text node" {
+		t.Fatalf("validation.reason = %q", got)
+	}
+}
+
 func newTestHandler(t *testing.T, documents DocumentService, verifier TokenVerifier) *Handler {
 	return newTestHandlerWithCollaboration(t, documents, &collaborationServiceStub{}, verifier)
+}
+
+func newTestHandlerWithLogger(
+	t *testing.T,
+	documents DocumentService,
+	collaboration CollaborationService,
+	verifier TokenVerifier,
+	logger *slog.Logger,
+) *Handler {
+	t.Helper()
+	handler, err := NewHandler(
+		documents, &memberServiceStub{}, collaboration, verifier, readinessStub{}, logger,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return handler
 }
 
 func newTestHandlerWithCollaboration(
@@ -309,6 +410,55 @@ func assertBusinessCode(t *testing.T, err error, code int32) {
 	if !ok || businessError.BizStatusCode() != code {
 		t.Fatalf("business error = %#v, %v", businessError, err)
 	}
+}
+
+func assertBusinessMessage(t *testing.T, err error, message string) {
+	t.Helper()
+	businessError, ok := kerrors.FromBizStatusError(err)
+	if !ok || businessError.BizMessage() != message {
+		t.Fatalf("business message = %#v, %v", businessError, err)
+	}
+}
+
+func authenticatedVerifier() tokenVerifierStub {
+	return tokenVerifierStub{principal: coreauth.Principal{
+		UserID: 42, ExpiresAt: time.Date(2026, time.August, 3, 12, 15, 0, 0, time.UTC),
+	}}
+}
+
+func paragraphOnlyTransportDocument(text string) *knowledgev1.RichTextDocument {
+	return &knowledgev1.RichTextDocument{Type: "doc", Content: []*knowledgev1.RichTextNode{{
+		Type: "paragraph", Content: []*knowledgev1.RichTextNode{{
+			Type: "text", Text: &text, Content: []*knowledgev1.RichTextNode{},
+		}},
+	}}}
+}
+
+type captureHandler struct {
+	records []slog.Record
+}
+
+func (h *captureHandler) Enabled(context.Context, slog.Level) bool { return true }
+
+func (h *captureHandler) Handle(_ context.Context, record slog.Record) error {
+	h.records = append(h.records, record.Clone())
+	return nil
+}
+
+func (h *captureHandler) WithAttrs([]slog.Attr) slog.Handler { return h }
+
+func (h *captureHandler) WithGroup(string) slog.Handler { return h }
+
+func slogAttr(record slog.Record, key string) string {
+	var value string
+	record.Attrs(func(attr slog.Attr) bool {
+		if attr.Key == key {
+			value = attr.Value.String()
+			return false
+		}
+		return true
+	})
+	return value
 }
 
 func completeDocument() *domain.Document {

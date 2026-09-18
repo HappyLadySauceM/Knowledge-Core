@@ -1,4 +1,7 @@
-use std::sync::Arc;
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use pilota::FastStr;
@@ -25,6 +28,8 @@ use super::{RpcReadiness, current_request_context, knowledge::projection_to_wire
 const DEFAULT_VERSION_LIMIT: i32 = 20;
 const MAXIMUM_VERSION_LIMIT: i32 = 100;
 const MAXIMUM_CURSOR_LENGTH: usize = 1_024;
+const CREATE_VERSION_STATE_VECTOR_WAIT: Duration = Duration::from_secs(1);
+const CREATE_VERSION_STATE_VECTOR_POLL: Duration = Duration::from_millis(25);
 
 #[derive(Clone)]
 pub struct CollaborationHandler {
@@ -36,6 +41,8 @@ pub struct CollaborationHandler {
     subprotocol: Arc<str>,
     fragment: Arc<str>,
     readiness: Arc<dyn RpcReadiness>,
+    state_vector_wait: Duration,
+    state_vector_poll: Duration,
 }
 
 pub struct CollaborationHandlerDependencies {
@@ -71,7 +78,45 @@ impl CollaborationHandler {
             subprotocol: Arc::from(dependencies.ticket.subprotocol.as_str()),
             fragment: Arc::from(dependencies.ticket.fragment.as_str()),
             readiness: dependencies.readiness,
+            state_vector_wait: CREATE_VERSION_STATE_VECTOR_WAIT,
+            state_vector_poll: CREATE_VERSION_STATE_VECTOR_POLL,
         })
+    }
+
+    /// Reloads the persisted document until its Yrs state vector equals the client bytes.
+    /// 有界重试读取已持久化文档，直到存储的 Yrs state vector 与客户端字节完全相等。
+    ///
+    /// Equality stays exact; a client-ahead snapshot is not accepted as a subset.
+    /// 比较保持精确相等，不把客户端超前的快照当成 subset 放行。
+    async fn wait_for_matching_state_vector(
+        &self,
+        context: &RequestContext,
+        document_id: DocumentId,
+        expected: &[u8],
+    ) -> Result<()> {
+        let wait_until = Instant::now() + self.state_vector_wait;
+        let deadline = match context.deadline {
+            Some(request_deadline) => request_deadline.min(wait_until),
+            None => wait_until,
+        };
+        loop {
+            let loaded = self.documents.load_document(context, document_id).await?;
+            let current = crate::richtext::document_from_state(&loaded.state)?;
+            let current_vector = current.transact().state_vector().encode_v1();
+            if current_vector.as_slice() == expected {
+                return Ok(());
+            }
+            let now = Instant::now();
+            if now >= deadline {
+                return Err(ServiceError::precondition_failed());
+            }
+            tokio::time::sleep(
+                deadline
+                    .saturating_duration_since(now)
+                    .min(self.state_vector_poll),
+            )
+            .await;
+        }
     }
 
     async fn authorization(
@@ -218,12 +263,8 @@ impl collaboration::CollaborationService for CollaborationHandler {
                         "state vector exceeds the configured size boundary",
                     ));
                 }
-                let loaded = self.documents.load_document(&context, document_id).await?;
-                let current = crate::richtext::document_from_state(&loaded.state)?;
-                let current_vector = current.transact().state_vector().encode_v1();
-                if current_vector != state_vector {
-                    return Err(ServiceError::precondition_failed());
-                }
+                self.wait_for_matching_state_vector(&context, document_id, state_vector)
+                    .await?;
             }
             let version = self
                 .versions
@@ -454,7 +495,7 @@ fn rpc_error(error: &ServiceError) -> ServerError {
 mod tests {
     use std::{
         sync::{
-            Arc,
+            Arc, Mutex,
             atomic::{AtomicBool, AtomicUsize, Ordering},
         },
         time::Duration,
@@ -466,6 +507,7 @@ mod tests {
     use time::OffsetDateTime;
     use tokio_util::sync::CancellationToken;
     use volo_thrift::ServerError;
+    use yrs::{ReadTxn, Transact, XmlFragment, updates::encoder::Encode};
 
     use super::{
         CollaborationHandler, CollaborationHandlerDependencies, decode_cursor, encode_cursor,
@@ -777,6 +819,53 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn create_version_retries_until_stored_state_vector_matches() {
+        let (handler, store, _, _, document_id) = handler(Access::Owner);
+        let lagging = richtext::initial_state();
+        let matching = state_with_extra_paragraph();
+        let expected = state_vector_of(&matching);
+        *store.load_states.lock().expect("load_states") = vec![lagging, matching];
+
+        let created = scope_request_context_for_test(
+            authenticated_context(),
+            handler.create_version(collaboration::CreateVersionRequest {
+                document_id: document_id.to_string().into(),
+                label: Some("publication".into()),
+                idempotency_key: Some("publish-catch-up".into()),
+                state_vector: Some(Bytes::copy_from_slice(&expected)),
+            }),
+        )
+        .await
+        .expect("CreateVersion succeeds after stored SV catches up");
+        assert_eq!(created.document_id.as_str(), document_id.to_string());
+        assert!(store.load_calls.load(Ordering::Relaxed) >= 2);
+        assert_eq!(store.create_calls.load(Ordering::Relaxed), 1);
+    }
+
+    #[tokio::test]
+    async fn create_version_still_preconditions_when_stored_state_vector_never_matches() {
+        let (mut handler, store, _, _, document_id) = handler(Access::Owner);
+        handler.state_vector_wait = Duration::from_millis(40);
+        handler.state_vector_poll = Duration::from_millis(5);
+        let expected = state_vector_of(&state_with_extra_paragraph());
+
+        let error = scope_request_context_for_test(
+            authenticated_context(),
+            handler.create_version(collaboration::CreateVersionRequest {
+                document_id: document_id.to_string().into(),
+                label: Some("publication".into()),
+                idempotency_key: Some("publish-never-matches".into()),
+                state_vector: Some(Bytes::copy_from_slice(&expected)),
+            }),
+        )
+        .await
+        .expect_err("CreateVersion must keep 412 when stored SV never equals the client");
+        assert_biz_code(error, 40_006);
+        assert!(store.load_calls.load(Ordering::Relaxed) >= 2);
+        assert_eq!(store.create_calls.load(Ordering::Relaxed), 0);
+    }
+
+    #[tokio::test]
     async fn restore_loads_the_target_before_committing_through_the_actor() {
         let (handler, store, _, _, document_id) = handler(Access::Owner);
         let restored = scope_request_context_for_test(
@@ -842,6 +931,8 @@ mod tests {
         };
         let store = Arc::new(StoreStub {
             version,
+            load_states: Mutex::new(Vec::new()),
+            load_calls: AtomicUsize::new(0),
             list_calls: AtomicUsize::new(0),
             create_calls: AtomicUsize::new(0),
             get_calls: AtomicUsize::new(0),
@@ -961,11 +1052,31 @@ mod tests {
 
     struct StoreStub {
         version: DocumentVersion,
+        load_states: Mutex<Vec<Vec<u8>>>,
+        load_calls: AtomicUsize,
         list_calls: AtomicUsize,
         create_calls: AtomicUsize,
         get_calls: AtomicUsize,
         restore_calls: AtomicUsize,
         purge_calls: AtomicUsize,
+    }
+
+    fn state_with_extra_paragraph() -> Vec<u8> {
+        let document = richtext::document_from_state(&richtext::initial_state()).expect("initial");
+        let fragment = document.get_or_insert_xml_fragment(richtext::FRAGMENT_NAME);
+        fragment.push_back(
+            &mut document.transact_mut(),
+            yrs::XmlElementPrelim::empty("paragraph"),
+        );
+        richtext::full_state(&document)
+    }
+
+    fn state_vector_of(state: &[u8]) -> Vec<u8> {
+        richtext::document_from_state(state)
+            .expect("document")
+            .transact()
+            .state_vector()
+            .encode_v1()
     }
 
     #[async_trait]
@@ -1031,10 +1142,19 @@ mod tests {
             _context: &RequestContext,
             _document_id: DocumentId,
         ) -> Result<LoadedDocument> {
+            let index = self.load_calls.fetch_add(1, Ordering::Relaxed);
+            let state = {
+                let states = self.load_states.lock().expect("load_states");
+                states
+                    .get(index)
+                    .cloned()
+                    .or_else(|| states.last().cloned())
+                    .unwrap_or_else(|| self.version.state.clone())
+            };
             Ok(LoadedDocument {
                 generation: 1,
                 sequence: self.version.sequence,
-                state: self.version.state.clone(),
+                state,
             })
         }
 

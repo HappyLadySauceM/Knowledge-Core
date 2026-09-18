@@ -79,7 +79,9 @@ func validateRichTextNode(node *RichTextNode, depth int, count *int) error {
 		return &ValidationError{Field: "content", Reason: fmt.Sprintf("contains unsupported node type %q", node.Type)}
 	}
 	if node.Type == "text" {
-		if node.Text == nil || node.Content != nil || node.Attrs != nil {
+		// Thrift optional lists decode as nil or empty slices; both mean "no content".
+		// Thrift 可选 list 会解码成 nil 或空切片，二者都视为没有 content。
+		if node.Text == nil || len(node.Content) > 0 || node.Attrs != nil {
 			return &ValidationError{Field: "content", Reason: "contains an invalid text node"}
 		}
 	} else if node.Text != nil {

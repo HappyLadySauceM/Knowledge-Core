@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"errors"
 	"testing"
 )
 
@@ -43,5 +44,27 @@ func TestRichTextValidationRejectsUnsafeLinksAndInvalidTrees(t *testing.T) {
 	document.Content[0].Content[0].Marks = nil
 	if err := document.Validate(); err != nil {
 		t.Fatalf("Validate() rejected a valid document: %v", err)
+	}
+}
+
+func TestRichTextValidationTreatsEmptyTextContentAsAbsent(t *testing.T) {
+	text := "hello"
+	document := RichTextDocument{Type: "doc", Content: []*RichTextNode{{
+		Type: "paragraph", Content: []*RichTextNode{{
+			Type: "text", Text: &text, Content: []*RichTextNode{},
+		}},
+	}}}
+	if err := document.Validate(); err != nil {
+		t.Fatalf("Validate() rejected a paragraph-only document with empty text content: %v", err)
+	}
+	document.Content[0].Content[0].Content = nil
+	if err := document.Validate(); err != nil {
+		t.Fatalf("Validate() rejected a paragraph-only document with nil text content: %v", err)
+	}
+	document.Content[0].Content[0].Content = []*RichTextNode{{Type: "text", Text: &text}}
+	err := document.Validate()
+	var validation *ValidationError
+	if err == nil || !errors.As(err, &validation) || validation.Field != "content" || validation.Reason != "contains an invalid text node" {
+		t.Fatalf("Validate() = %v, want invalid text node", err)
 	}
 }
