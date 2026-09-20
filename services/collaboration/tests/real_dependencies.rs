@@ -132,7 +132,7 @@ async fn postgres_contract(url: &str) -> TestResult {
             .fetch_all(&migration_inspection)
             .await?;
     migration_inspection.close().await;
-    assert_eq!(migration_versions, vec![1_i64, 2_i64, 3_i64, 4_i64]);
+    assert_eq!(migration_versions, vec![1_i64, 2_i64, 3_i64, 4_i64, 5_i64]);
     let context = postgres_request_context("real-postgres-contract");
     store.initialize_document(&context, document_id).await?;
     let initial = store.load_document(&context, document_id).await?;
