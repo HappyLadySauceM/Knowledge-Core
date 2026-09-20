@@ -537,23 +537,23 @@ fn validate_mark(value: &Value) -> Result<&str> {
     Ok(mark_type)
 }
 
+#[allow(clippy::too_many_lines)]
 fn validate_content_shape(
     node_type: &str,
     parent_type: Option<&str>,
     content: Option<&Vec<Value>>,
 ) -> Result<()> {
     let allowed_here = match parent_type {
-        None => is_block_node(node_type),
-        Some("paragraph" | "heading") => is_inline_node(node_type),
-        Some("codeBlock") => node_type == "text",
-        Some("bulletList" | "orderedList") => node_type == "listItem",
-        Some("taskList") => node_type == "taskItem",
-        Some(
+        None
+        | Some(
             "listItem" | "taskItem" | "blockquote" | "callout" | "column" | "tableHeader"
             | "tableCell",
         ) => is_block_node(node_type),
+        Some("paragraph" | "heading") => is_inline_node(node_type),
+        Some("codeBlock" | "formula") => node_type == "text",
+        Some("bulletList" | "orderedList") => node_type == "listItem",
+        Some("taskList") => node_type == "taskItem",
         Some("columns") => node_type == "column",
-        Some("formula") => node_type == "text",
         Some("table") => node_type == "tableRow",
         Some("tableRow") => matches!(node_type, "tableHeader" | "tableCell"),
         Some(_) => false,

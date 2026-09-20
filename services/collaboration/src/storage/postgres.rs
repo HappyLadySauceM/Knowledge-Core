@@ -41,7 +41,7 @@ struct Migration {
     sql: &'static str,
 }
 
-const MIGRATIONS: [Migration; 4] = [
+const MIGRATIONS: [Migration; 5] = [
     Migration {
         version: 1,
         name: "001_initial",
@@ -61,6 +61,11 @@ const MIGRATIONS: [Migration; 4] = [
         version: 4,
         name: "004_maintenance_audit",
         sql: include_str!("../../migrations/004_maintenance_audit.sql"),
+    },
+    Migration {
+        version: 5,
+        name: "005_single_document_version",
+        sql: include_str!("../../migrations/005_single_document_version.sql"),
     },
 ];
 
@@ -658,15 +663,14 @@ impl PostgresStore {
             .await
             .map_err(|error| storage_error(error, "insert restoration update"))?;
         }
-        let label = format!("Restored from {}", candidate.target.id);
         let version = insert_version(
             &mut transaction,
             NewVersion {
                 document_id,
                 generation,
                 sequence,
-                kind: VersionKind::Restoration,
-                label: Some(&label),
+                kind: VersionKind::Automatic,
+                label: None,
                 state: state.clone(),
                 actor: candidate.actor,
                 now,
@@ -713,7 +717,7 @@ impl PostgresStore {
             &operation,
             candidate.idempotency_key,
             &request_hash,
-            version.id,
+            &version,
         )
         .await?;
         transaction
@@ -883,7 +887,9 @@ impl VersionStore for PostgresStore {
         idempotency_key: Option<&str>,
     ) -> Result<DocumentVersion> {
         actor.validate()?;
-        let label = validate_label(label)?;
+        // Manual checkpoints are retained only as the single rolling recovery point.
+        // Keep the public row indistinguishable from automatic recovery history.
+        let _ = validate_label(label)?;
         validate_idempotency_key(idempotency_key)?;
         self.timed_request(context, "create manual version", async {
             let mut transaction =
@@ -925,8 +931,8 @@ impl VersionStore for PostgresStore {
                     document_id,
                     generation: head.generation,
                     sequence: head.current_sequence,
-                    kind: VersionKind::Manual,
-                    label: label.as_deref(),
+                    kind: VersionKind::Automatic,
+                    label: None,
                     state,
                     actor,
                     now: OffsetDateTime::now_utc(),
@@ -951,7 +957,7 @@ impl VersionStore for PostgresStore {
                 &operation,
                 idempotency_key,
                 &request_hash,
-                version.id,
+                &version,
             )
             .await?;
             transaction.commit().await.map_err(|error| {
@@ -1798,11 +1804,22 @@ async fn insert_version(
     version: NewVersion<'_>,
 ) -> Result<DocumentVersion> {
     let id = VersionId::new();
-    sqlx::query(
+    let row = sqlx::query(
         "INSERT INTO collaboration.versions(
            id, document_id, generation, sequence, kind, label, state,
            created_by_id, created_by_username, created_by_avatar, created_at
-         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+         ON CONFLICT (document_id) DO UPDATE SET
+           generation = EXCLUDED.generation,
+           sequence = EXCLUDED.sequence,
+           kind = EXCLUDED.kind,
+           label = EXCLUDED.label,
+           state = EXCLUDED.state,
+           created_by_id = EXCLUDED.created_by_id,
+           created_by_username = EXCLUDED.created_by_username,
+           created_by_avatar = EXCLUDED.created_by_avatar,
+           created_at = EXCLUDED.created_at
+         RETURNING id",
     )
     .bind(id.as_uuid())
     .bind(version.document_id.as_uuid())
@@ -1815,11 +1832,14 @@ async fn insert_version(
     .bind(&version.actor.username)
     .bind(&version.actor.avatar)
     .bind(version.now)
-    .execute(&mut *connection)
+    .fetch_one(&mut *connection)
     .await
-    .map_err(|error| storage_error(error, "insert document version"))?;
+    .map_err(|error| storage_error(error, "upsert document version"))?;
+    let id: Uuid = row
+        .try_get("id")
+        .map_err(|error| storage_error(error, "decode document version id"))?;
     Ok(DocumentVersion {
-        id,
+        id: VersionId::parse(&id.to_string())?,
         document_id: version.document_id,
         sequence: version.sequence,
         kind: version.kind,
@@ -1920,7 +1940,8 @@ async fn idempotent_version(
     .await
     .map_err(|error| storage_error(error, "replace expired idempotency key"))?;
     let row = sqlx::query(
-        "SELECT request_hash, resource_id FROM collaboration.idempotency_keys
+        "SELECT request_hash, resource_id, version_sequence, version_state
+         FROM collaboration.idempotency_keys
          WHERE actor_id = $1 AND operation = $2 AND key = $3",
     )
     .bind(actor_id)
@@ -1943,13 +1964,23 @@ async fn idempotent_version(
     let resource_id: Uuid = row
         .try_get("resource_id")
         .map_err(|error| storage_error(error, "decode idempotency resource id"))?;
-    get_version(
+    let snapshot_sequence: Option<i64> = row
+        .try_get("version_sequence")
+        .map_err(|error| storage_error(error, "decode idempotency version sequence"))?;
+    let snapshot_state: Option<Vec<u8>> = row
+        .try_get("version_state")
+        .map_err(|error| storage_error(error, "decode idempotency version state"))?;
+    let mut version = get_version(
         connection,
         document_id,
         VersionId::parse(&resource_id.to_string())?,
     )
-    .await
-    .map(Some)
+    .await?;
+    if let (Some(sequence), Some(state)) = (snapshot_sequence, snapshot_state) {
+        version.sequence = sequence;
+        version.state = state;
+    }
+    Ok(Some(version))
 }
 
 async fn save_idempotency(
@@ -1958,7 +1989,7 @@ async fn save_idempotency(
     operation: &str,
     key: Option<&str>,
     request_hash: &str,
-    version_id: VersionId,
+    version: &DocumentVersion,
 ) -> Result<()> {
     let Some(key) = key else {
         return Ok(());
@@ -1967,18 +1998,21 @@ async fn save_idempotency(
         + time::Duration::try_from(IDEMPOTENCY_TTL).map_err(|error| {
             ServiceError::internal(anyhow!(error).context("convert idempotency TTL"))
         })?;
-    let response = json!({ "version_id": version_id });
+    let response = json!({ "version_id": version.id });
     sqlx::query(
         "INSERT INTO collaboration.idempotency_keys(
-           actor_id, operation, key, request_hash, resource_id, response, expires_at
-         ) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+           actor_id, operation, key, request_hash, resource_id, response,
+           version_sequence, version_state, expires_at
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
     )
     .bind(actor_id)
     .bind(operation)
     .bind(key)
     .bind(request_hash)
-    .bind(version_id.as_uuid())
+    .bind(version.id.as_uuid())
     .bind(response)
+    .bind(version.sequence)
+    .bind(&version.state)
     .bind(expires_at)
     .execute(&mut *connection)
     .await

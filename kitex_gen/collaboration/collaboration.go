@@ -149,13 +149,15 @@ var fieldIDToName_CollaborationSession = map[int16]string{
 }
 
 type Version struct {
-	Id         string                `thrift:"id,1,required" frugal:"1,required,string" json:"id"`
-	DocumentId string                `thrift:"document_id,2,required" frugal:"2,required,string" json:"document_id"`
-	Sequence   int64                 `thrift:"sequence,3,required" frugal:"3,required,i64" json:"sequence"`
-	Kind       string                `thrift:"kind,4,required" frugal:"4,required,string" json:"kind"`
-	Label      *string               `thrift:"label,5,optional" frugal:"5,optional,string" json:"label,omitempty"`
-	CreatedBy  *knowledge.PublicUser `thrift:"created_by,6,required" frugal:"6,required,knowledge.PublicUser" json:"created_by"`
-	CreatedAt  string                `thrift:"created_at,7,required" frugal:"7,required,string" json:"created_at"`
+	Id         string                      `thrift:"id,1,required" frugal:"1,required,string" json:"id"`
+	DocumentId string                      `thrift:"document_id,2,required" frugal:"2,required,string" json:"document_id"`
+	Sequence   int64                       `thrift:"sequence,3,required" frugal:"3,required,i64" json:"sequence"`
+	Kind       string                      `thrift:"kind,4,required" frugal:"4,required,string" json:"kind"`
+	Label      *string                     `thrift:"label,5,optional" frugal:"5,optional,string" json:"label,omitempty"`
+	CreatedBy  *knowledge.PublicUser       `thrift:"created_by,6,required" frugal:"6,required,knowledge.PublicUser" json:"created_by"`
+	CreatedAt  string                      `thrift:"created_at,7,required" frugal:"7,required,string" json:"created_at"`
+	Content    *knowledge.RichTextDocument `thrift:"content,8,optional" frugal:"8,optional,knowledge.RichTextDocument" json:"content,omitempty"`
+	PlainText  *string                     `thrift:"plain_text,9,optional" frugal:"9,optional,string" json:"plain_text,omitempty"`
 }
 
 func NewVersion() *Version {
@@ -202,6 +204,24 @@ func (p *Version) GetCreatedBy() (v *knowledge.PublicUser) {
 func (p *Version) GetCreatedAt() (v string) {
 	return p.CreatedAt
 }
+
+var Version_Content_DEFAULT *knowledge.RichTextDocument
+
+func (p *Version) GetContent() (v *knowledge.RichTextDocument) {
+	if !p.IsSetContent() {
+		return Version_Content_DEFAULT
+	}
+	return p.Content
+}
+
+var Version_PlainText_DEFAULT string
+
+func (p *Version) GetPlainText() (v string) {
+	if !p.IsSetPlainText() {
+		return Version_PlainText_DEFAULT
+	}
+	return *p.PlainText
+}
 func (p *Version) SetId(val string) {
 	p.Id = val
 }
@@ -223,6 +243,12 @@ func (p *Version) SetCreatedBy(val *knowledge.PublicUser) {
 func (p *Version) SetCreatedAt(val string) {
 	p.CreatedAt = val
 }
+func (p *Version) SetContent(val *knowledge.RichTextDocument) {
+	p.Content = val
+}
+func (p *Version) SetPlainText(val *string) {
+	p.PlainText = val
+}
 
 func (p *Version) IsSetLabel() bool {
 	return p.Label != nil
@@ -230,6 +256,14 @@ func (p *Version) IsSetLabel() bool {
 
 func (p *Version) IsSetCreatedBy() bool {
 	return p.CreatedBy != nil
+}
+
+func (p *Version) IsSetContent() bool {
+	return p.Content != nil
+}
+
+func (p *Version) IsSetPlainText() bool {
+	return p.PlainText != nil
 }
 
 func (p *Version) String() string {
@@ -247,6 +281,8 @@ var fieldIDToName_Version = map[int16]string{
 	5: "label",
 	6: "created_by",
 	7: "created_at",
+	8: "content",
+	9: "plain_text",
 }
 
 type PageInfo struct {

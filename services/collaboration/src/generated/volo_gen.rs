@@ -5997,6 +5997,10 @@ pub mod volo_gen {
             pub created_by: super::knowledge::PublicUser,
 
             pub created_at: ::pilota::FastStr,
+
+            pub content: ::std::option::Option<super::knowledge::RichTextDocument>,
+
+            pub plain_text: ::std::option::Option<::pilota::FastStr>,
         }
         impl ::pilota::thrift::Message for Version {
             fn encode<T: ::pilota::thrift::TOutputProtocol>(
@@ -6021,6 +6025,12 @@ pub mod volo_gen {
                     ::pilota::thrift::TType::Struct,
                 )?;
                 __protocol.write_faststr_field(7, (&self.created_at).clone())?;
+                if let Some(value) = self.content.as_ref() {
+                    __protocol.write_struct_field(8, value, ::pilota::thrift::TType::Struct)?;
+                }
+                if let Some(value) = self.plain_text.as_ref() {
+                    __protocol.write_faststr_field(9, (value).clone())?;
+                }
                 __protocol.write_field_stop()?;
                 __protocol.write_struct_end()?;
                 ::std::result::Result::Ok(())
@@ -6039,6 +6049,8 @@ pub mod volo_gen {
                 let mut var_5 = None;
                 let mut var_6 = None;
                 let mut var_7 = None;
+                let mut var_8 = None;
+                let mut var_9 = None;
 
                 let mut __pilota_decoding_field_id = None;
 
@@ -6086,6 +6098,16 @@ pub mod volo_gen {
                                 if field_ident.field_type == ::pilota::thrift::TType::Binary =>
                             {
                                 var_7 = Some(__protocol.read_faststr()?);
+                            }
+                            Some(8)
+                                if field_ident.field_type == ::pilota::thrift::TType::Struct =>
+                            {
+                                var_8 = Some(::pilota::thrift::Message::decode(__protocol)?);
+                            }
+                            Some(9)
+                                if field_ident.field_type == ::pilota::thrift::TType::Binary =>
+                            {
+                                var_9 = Some(__protocol.read_faststr()?);
                             }
                             _ => {
                                 __protocol.skip(field_ident.field_type)?;
@@ -6152,6 +6174,8 @@ pub mod volo_gen {
                     label: var_5,
                     created_by: var_6,
                     created_at: var_7,
+                    content: var_8,
+                    plain_text: var_9,
                 };
                 ::std::result::Result::Ok(data)
             }
@@ -6174,6 +6198,8 @@ pub mod volo_gen {
                     let mut var_5 = None;
                     let mut var_6 = None;
                     let mut var_7 = None;
+                    let mut var_8 = None;
+                    let mut var_9 = None;
 
                     let mut __pilota_decoding_field_id = None;
 
@@ -6211,6 +6237,12 @@ pub mod volo_gen {
 
                 },Some(7) if field_ident.field_type == ::pilota::thrift::TType::Binary  => {
                     var_7 = Some(__protocol.read_faststr().await?);
+
+                },Some(8) if field_ident.field_type == ::pilota::thrift::TType::Struct  => {
+                    var_8 = Some(<super::knowledge::RichTextDocument as ::pilota::thrift::Message>::decode_async(__protocol).await?);
+
+                },Some(9) if field_ident.field_type == ::pilota::thrift::TType::Binary  => {
+                    var_9 = Some(__protocol.read_faststr().await?);
 
                 },
                     _ => {
@@ -6289,6 +6321,8 @@ pub mod volo_gen {
                         label: var_5,
                         created_by: var_6,
                         created_at: var_7,
+                        content: var_8,
+                        plain_text: var_9,
                     };
                     ::std::result::Result::Ok(data)
                 })
@@ -6309,6 +6343,14 @@ pub mod volo_gen {
                         .map_or(0, |value| __protocol.faststr_field_len(Some(5), value))
                     + __protocol.struct_field_len(Some(6), &self.created_by)
                     + __protocol.faststr_field_len(Some(7), &self.created_at)
+                    + self
+                        .content
+                        .as_ref()
+                        .map_or(0, |value| __protocol.struct_field_len(Some(8), value))
+                    + self
+                        .plain_text
+                        .as_ref()
+                        .map_or(0, |value| __protocol.faststr_field_len(Some(9), value))
                     + __protocol.field_stop_len()
                     + __protocol.struct_end_len()
             }

@@ -36,6 +36,7 @@ struct MetricSet {
     active_connections: IntGauge,
     websocket_handshakes: IntCounterVec,
     websocket_closes: IntCounterVec,
+    protocol_rejections: IntCounterVec,
     update_duration: HistogramVec,
     worker_operations: IntCounterVec,
     application_ready: IntGauge,
@@ -84,6 +85,14 @@ impl Metrics {
                 "Collaboration WebSocket close outcomes.",
             ),
             &["reason"],
+        )
+        .map_err(metric_error)?;
+        let protocol_rejections = IntCounterVec::new(
+            Opts::new(
+                "websocket_protocol_rejections_total",
+                "Inbound collaboration protocol frames rejected by bounded cause.",
+            ),
+            &["cause"],
         )
         .map_err(metric_error)?;
         let update_duration = HistogramVec::new(
@@ -164,6 +173,7 @@ impl Metrics {
             Box::new(active_connections.clone()),
             Box::new(websocket_handshakes.clone()),
             Box::new(websocket_closes.clone()),
+            Box::new(protocol_rejections.clone()),
             Box::new(update_duration.clone()),
             Box::new(worker_operations.clone()),
             Box::new(application_ready.clone()),
@@ -187,6 +197,7 @@ impl Metrics {
                 active_connections,
                 websocket_handshakes,
                 websocket_closes,
+                protocol_rejections,
                 update_duration,
                 worker_operations,
                 application_ready,
@@ -233,6 +244,13 @@ impl Metrics {
         self.inner
             .websocket_handshakes
             .with_label_values(&[status])
+            .inc();
+    }
+
+    pub fn protocol_rejection(&self, cause: &'static str) {
+        self.inner
+            .protocol_rejections
+            .with_label_values(&[cause])
             .inc();
     }
 

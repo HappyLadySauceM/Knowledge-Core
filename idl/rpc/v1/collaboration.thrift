@@ -37,6 +37,10 @@ struct Version {
   5: optional string label
   6: required knowledge.PublicUser created_by
   7: required string created_at
+  // CreateVersion may include the exact projection captured by the write.
+  // ListVersions and compatibility responses leave these fields unset.
+  8: optional knowledge.RichTextDocument content
+  9: optional string plain_text
 }
 
 struct PageInfo {

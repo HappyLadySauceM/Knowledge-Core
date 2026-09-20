@@ -468,6 +468,7 @@ async fn handshake_upgrade(
                 maximum_frame_bytes,
                 write_timeout,
                 cancellation,
+                state.metrics.clone(),
             ))
         })
 }
@@ -511,6 +512,7 @@ async fn run_connection(
     maximum_frame_bytes: usize,
     write_timeout: Duration,
     cancellation: CancellationToken,
+    metrics: Metrics,
 ) {
     loop {
         tokio::select! {
@@ -540,6 +542,7 @@ async fn run_connection(
                 match incoming {
                     Some(Ok(ws::Message::Binary(payload))) => {
                         if payload.len() > maximum_frame_bytes {
+                            metrics.protocol_rejection("frame-too-large");
                             send_close(&mut socket, CLOSE_INVALID_PROTOCOL, write_timeout).await;
                             break;
                         }
@@ -549,6 +552,7 @@ async fn run_connection(
                         }
                     }
                     Some(Ok(ws::Message::Text(_))) => {
+                        metrics.protocol_rejection("text-frame");
                         send_close(&mut socket, CLOSE_INVALID_PROTOCOL, write_timeout).await;
                         break;
                     }

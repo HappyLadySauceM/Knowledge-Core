@@ -285,7 +285,15 @@ impl collaboration::CollaborationService for CollaborationHandler {
                     idempotency_key,
                 )
                 .await?;
-            version_to_wire(&version, document_id)
+            let projection = projection_from_state(&version.state).map_err(|error| {
+                ServiceError::internal(
+                    anyhow::Error::new(error).context("project created collaboration version"),
+                )
+            })?;
+            let mut wire = version_to_wire(&version, document_id)?;
+            wire.content = Some(projection_to_wire(&projection)?);
+            wire.plain_text = Some(FastStr::from_string(projection.plain_text));
+            Ok(wire)
         }
         .await;
         result.map_err(|error| rpc_error(&error))
@@ -449,6 +457,8 @@ fn version_to_wire(
             avatar: FastStr::from_string(version.created_by.avatar.clone()),
         },
         created_at: format_time(version.created_at)?,
+        content: None,
+        plain_text: None,
     })
 }
 

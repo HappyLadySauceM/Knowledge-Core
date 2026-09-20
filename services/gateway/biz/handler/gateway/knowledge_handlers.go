@@ -304,9 +304,26 @@ func handlePublishDocument(ctx context.Context, request *app.RequestContext) {
 		gatewaymiddleware.WriteCollaborationError(ctx, request, err)
 		return
 	}
-	detail, err := dependencies.Collaboration.GetVersion(upstreamContext(ctx, request), &collaborationv1.GetVersionRequest{DocumentId: documentID, VersionId: version.Id})
-	if err != nil {
-		gatewaymiddleware.WriteCollaborationError(ctx, request, err)
+	// CreateVersion returns the projection captured in the same Collaboration
+	// transaction. Prefer it so an automatic checkpoint cannot overwrite the
+	// publication candidate between two RPCs. Older Collaboration deployments
+	// omit the optional fields, so retain the read fallback during rollout.
+	content := version.Content
+	plainText := ""
+	if version.PlainText != nil {
+		plainText = *version.PlainText
+	}
+	if content == nil || version.PlainText == nil {
+		detail, getErr := dependencies.Collaboration.GetVersion(upstreamContext(ctx, request), &collaborationv1.GetVersionRequest{DocumentId: documentID, VersionId: version.Id})
+		if getErr != nil {
+			gatewaymiddleware.WriteCollaborationError(ctx, request, getErr)
+			return
+		}
+		content = detail.Content
+		plainText = detail.PlainText
+	}
+	if content == nil {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidUpstreamResponse)
 		return
 	}
 	language := "zh-CN"
@@ -316,7 +333,7 @@ func handlePublishDocument(ctx context.Context, request *app.RequestContext) {
 	snapshot, err := dependencies.Knowledge.PublishSnapshot(upstreamContext(ctx, request), &knowledgev1.PublishSnapshotRequest{
 		DocumentId: documentID, ExpectedMetadataRevision: revision, VersionId: version.Id, VersionSequence: version.Sequence,
 		Title: draft.Title, Summary: draft.Summary, Slug: draft.Slug, Language: language, Tags: append([]string(nil), draft.Tags...),
-		Content: detail.Content, PlainText: detail.PlainText, IdempotencyKey: optionalString(idempotency),
+		Content: content, PlainText: plainText, IdempotencyKey: optionalString(idempotency),
 	})
 	if err != nil {
 		gatewaymiddleware.WriteKnowledgeError(ctx, request, err)

@@ -1100,7 +1100,11 @@ impl DocumentActor {
         payload: &[u8],
         context: &RequestContext,
     ) -> std::result::Result<(), CloseSignal> {
-        let messages = decode_messages(payload)?;
+        let messages = decode_messages(payload).inspect_err(|&close| {
+            if close == CLOSE_INVALID_PROTOCOL {
+                self.metrics.protocol_rejection("decode-failed");
+            }
+        })?;
         for message in messages {
             if self.session_expired(connection_id) {
                 return Err(CLOSE_SESSION_EXPIRED);
@@ -1128,12 +1132,19 @@ impl DocumentActor {
                     self.check_rate(connection_id, RateKind::Awareness)?;
                     let encoded = update.encode_v1();
                     if encoded.len() > self.limits.maximum_awareness_bytes {
+                        self.metrics.protocol_rejection("awareness-too-large");
                         return Err(CLOSE_INVALID_PROTOCOL);
                     }
-                    self.validate_awareness_ownership(connection_id, &update)?;
-                    self.awareness
-                        .apply_update(update.clone())
-                        .map_err(|_| CLOSE_INVALID_PROTOCOL)?;
+                    if let Err(close) = self.validate_awareness_ownership(connection_id, &update) {
+                        if close == CLOSE_INVALID_PROTOCOL {
+                            self.metrics.protocol_rejection("awareness-ownership");
+                        }
+                        return Err(close);
+                    }
+                    self.awareness.apply_update(update.clone()).map_err(|_| {
+                        self.metrics.protocol_rejection("awareness-apply");
+                        CLOSE_INVALID_PROTOCOL
+                    })?;
                     self.record_awareness_ownership(connection_id, &update);
                     self.broadcast(
                         &encode_message(&SyncProtocolMessage::Awareness(update)),
@@ -1151,6 +1162,7 @@ impl DocumentActor {
                     )?;
                 }
                 SyncProtocolMessage::Auth(_) | SyncProtocolMessage::Custom(_, _) => {
+                    self.metrics.protocol_rejection("unsupported-message");
                     return Err(CLOSE_INVALID_PROTOCOL);
                 }
             }
@@ -1184,8 +1196,14 @@ impl DocumentActor {
                 &actor,
                 self.limits.update,
             )
-            .await
-            .map_err(|error| close_for_service_error(&error));
+            .await;
+        if committed
+            .as_ref()
+            .is_err_and(|error| error.code() == ErrorCode::InvalidInput)
+        {
+            self.metrics.protocol_rejection("richtext-invalid");
+        }
+        let committed = committed.map_err(|error| close_for_service_error(&error));
         self.metrics
             .observe_update(started.elapsed(), committed.as_ref().err().copied());
         let committed = committed?;
