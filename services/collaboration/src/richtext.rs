@@ -34,6 +34,10 @@ const ALLOWED_NODES: &[&str] = &[
     "tableRow",
     "tableHeader",
     "tableCell",
+    "callout",
+    "columns",
+    "column",
+    "formula",
 ];
 
 const ALLOWED_MARKS: &[&str] = &["bold", "italic", "strike", "underline", "code", "link"];
@@ -46,6 +50,8 @@ const BLOCK_NODES: &[&str] = &[
     "blockquote",
     "codeBlock",
     "tableRow",
+    "callout",
+    "formula",
 ];
 
 pub fn initial_state() -> Vec<u8> {
@@ -542,9 +548,12 @@ fn validate_content_shape(
         Some("codeBlock") => node_type == "text",
         Some("bulletList" | "orderedList") => node_type == "listItem",
         Some("taskList") => node_type == "taskItem",
-        Some("listItem" | "taskItem" | "blockquote" | "tableHeader" | "tableCell") => {
-            is_block_node(node_type)
-        }
+        Some(
+            "listItem" | "taskItem" | "blockquote" | "callout" | "column" | "tableHeader"
+            | "tableCell",
+        ) => is_block_node(node_type),
+        Some("columns") => node_type == "column",
+        Some("formula") => node_type == "text",
         Some("table") => node_type == "tableRow",
         Some("tableRow") => matches!(node_type, "tableHeader" | "tableCell"),
         Some(_) => false,
@@ -597,9 +606,24 @@ fn validate_content_shape(
             }
             require_child_types(children, is_block_node)?;
         }
-        "blockquote" => {
+        "blockquote" | "callout" => {
             require_non_empty_children(children, "blockquotes")?;
             require_child_types(children, is_block_node)?;
+        }
+        "columns" => {
+            if !(2..=4).contains(&children.len()) {
+                return Err(ServiceError::invalid_input(
+                    "columns must contain between two and four columns",
+                ));
+            }
+            require_child_types(children, |child| child == "column")?;
+        }
+        "column" => {
+            require_non_empty_children(children, "columns")?;
+            require_child_types(children, is_block_node)?;
+        }
+        "formula" => {
+            require_child_types(children, |child| child == "text")?;
         }
         "table" => {
             require_non_empty_children(children, "tables")?;
@@ -651,6 +675,10 @@ fn is_block_node(node_type: &str) -> bool {
             | "image"
             | "attachment"
             | "table"
+            | "callout"
+            | "columns"
+            | "column"
+            | "formula"
     )
 }
 
@@ -773,6 +801,15 @@ fn validate_text_attributes(attributes: &Map<String, Value>) -> Result<()> {
             "content contains an invalid text alignment",
         ));
     }
+    if let Some(variant) = attributes.get("variant")
+        && variant
+            .as_str()
+            .is_none_or(|value| !["info", "success", "warning", "danger"].contains(&value))
+    {
+        return Err(ServiceError::invalid_input(
+            "content contains an invalid callout variant",
+        ));
+    }
     Ok(())
 }
 
@@ -840,6 +877,7 @@ fn allowed_attributes(node_type: &str) -> &'static [&'static str] {
         "image" => &["attachmentId", "alt", "title"],
         "attachment" => &["attachmentId", "title"],
         "tableHeader" | "tableCell" => &["colspan", "rowspan", "colwidth"],
+        "callout" => &["variant"],
         "link" => &["href", "title"],
         _ => &[],
     }
@@ -992,6 +1030,14 @@ mod tests {
                 {"type":"blockquote","content":[
                     {"type":"paragraph","content":[{"type":"text","text":"Quote"}]}
                 ]},
+                {"type":"callout","attrs":{"variant":"warning"},"content":[
+                    {"type":"paragraph","content":[{"type":"text","text":"Notice"}]}
+                ]},
+                {"type":"columns","content":[
+                    {"type":"column","content":[{"type":"paragraph","content":[{"type":"text","text":"Left"}]}]},
+                    {"type":"column","content":[{"type":"paragraph","content":[{"type":"text","text":"Right"}]}]}
+                ]},
+                {"type":"formula","content":[{"type":"text","text":"x^2 + y^2"}]},
                 {"type":"codeBlock","attrs":{"language":"rust"},"content":[
                     {"type":"text","text":"fn main() {}"}
                 ]},

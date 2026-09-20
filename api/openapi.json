@@ -287,6 +287,11 @@
           },
           "label": {
             "type": "string"
+          },
+          "state_vector": {
+            "description": "Base64url 编码的当前 Yjs state vector。",
+            "format": "byte",
+            "type": "string"
           }
         },
         "required": [
@@ -1653,6 +1658,10 @@
       "VersionPageData": {
         "additionalProperties": false,
         "properties": {
+          "head_sequence": {
+            "format": "int64",
+            "type": "integer"
+          },
           "items": {
             "items": {
               "$ref": "#/components/schemas/VersionData"
@@ -15352,6 +15361,7 @@
             "content": {
               "application/json": {
                 "example": {
+                  "head_sequence": 1,
                   "items": [
                     {
                       "created_at": "2026-01-01T00:00:00Z",
@@ -15746,12 +15756,18 @@
           "content": {
             "application/json": {
               "example": {
-                "label": "string"
+                "label": "string",
+                "state_vector": "AA=="
               },
               "schema": {
                 "additionalProperties": false,
                 "properties": {
                   "label": {
+                    "type": "string"
+                  },
+                  "state_vector": {
+                    "description": "Base64url 编码的当前 Yjs state vector。",
+                    "format": "byte",
                     "type": "string"
                   }
                 },

@@ -68,6 +68,7 @@ pub struct VersionCursor {
 pub struct VersionPage {
     pub items: Vec<DocumentVersion>,
     pub has_more: bool,
+    pub head_sequence: i64,
 }
 
 #[derive(Clone, Debug)]

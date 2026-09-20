@@ -1011,7 +1011,19 @@ impl VersionStore for PostgresStore {
                 })?)
                 .map(|row| version_from_row(&row))
                 .collect::<Result<Vec<_>>>()?;
-            Ok(VersionPage { items, has_more })
+            let head_sequence = sqlx::query_scalar::<_, i64>(
+                "SELECT current_sequence FROM collaboration.documents WHERE document_id = $1",
+            )
+            .bind(document_id.as_uuid())
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(|error| storage_error(error, "load document head sequence"))?
+            .ok_or_else(|| ServiceError::not_found("collaborative document not found"))?;
+            Ok(VersionPage {
+                items,
+                has_more,
+                head_sequence,
+            })
         })
         .await
     }

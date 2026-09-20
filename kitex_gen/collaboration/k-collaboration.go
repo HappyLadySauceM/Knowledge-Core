@@ -1157,6 +1157,20 @@ func (p *VersionPage) FastRead(buf []byte) (int, error) {
 					goto SkipFieldError
 				}
 			}
+		case 3:
+			if fieldTypeId == thrift.I64 {
+				l, err = p.FastReadField3(buf[offset:])
+				offset += l
+				if err != nil {
+					goto ReadFieldError
+				}
+			} else {
+				l, err = thrift.Binary.Skip(buf[offset:], fieldTypeId)
+				offset += l
+				if err != nil {
+					goto SkipFieldError
+				}
+			}
 		default:
 			l, err = thrift.Binary.Skip(buf[offset:], fieldTypeId)
 			offset += l
@@ -1223,6 +1237,20 @@ func (p *VersionPage) FastReadField2(buf []byte) (int, error) {
 	return offset, nil
 }
 
+func (p *VersionPage) FastReadField3(buf []byte) (int, error) {
+	offset := 0
+
+	var _field *int64
+	if v, l, err := thrift.Binary.ReadI64(buf[offset:]); err != nil {
+		return offset, err
+	} else {
+		offset += l
+		_field = &v
+	}
+	p.HeadSequence = _field
+	return offset, nil
+}
+
 func (p *VersionPage) FastWrite(buf []byte) int {
 	return p.FastWriteNocopy(buf, nil)
 }
@@ -1230,6 +1258,7 @@ func (p *VersionPage) FastWrite(buf []byte) int {
 func (p *VersionPage) FastWriteNocopy(buf []byte, w thrift.NocopyWriter) int {
 	offset := 0
 	if p != nil {
+		offset += p.fastWriteField3(buf[offset:], w)
 		offset += p.fastWriteField1(buf[offset:], w)
 		offset += p.fastWriteField2(buf[offset:], w)
 	}
@@ -1242,6 +1271,7 @@ func (p *VersionPage) BLength() int {
 	if p != nil {
 		l += p.field1Length()
 		l += p.field2Length()
+		l += p.field3Length()
 	}
 	l += thrift.Binary.FieldStopLength()
 	return l
@@ -1268,6 +1298,15 @@ func (p *VersionPage) fastWriteField2(buf []byte, w thrift.NocopyWriter) int {
 	return offset
 }
 
+func (p *VersionPage) fastWriteField3(buf []byte, w thrift.NocopyWriter) int {
+	offset := 0
+	if p.IsSetHeadSequence() {
+		offset += thrift.Binary.WriteFieldBegin(buf[offset:], thrift.I64, 3)
+		offset += thrift.Binary.WriteI64(buf[offset:], *p.HeadSequence)
+	}
+	return offset
+}
+
 func (p *VersionPage) field1Length() int {
 	l := 0
 	l += thrift.Binary.FieldBeginLength()
@@ -1283,6 +1322,15 @@ func (p *VersionPage) field2Length() int {
 	l := 0
 	l += thrift.Binary.FieldBeginLength()
 	l += p.Page.BLength()
+	return l
+}
+
+func (p *VersionPage) field3Length() int {
+	l := 0
+	if p.IsSetHeadSequence() {
+		l += thrift.Binary.FieldBeginLength()
+		l += thrift.Binary.I64Length()
+	}
 	return l
 }
 

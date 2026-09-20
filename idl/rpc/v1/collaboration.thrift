@@ -47,6 +47,7 @@ struct PageInfo {
 struct VersionPage {
   1: required list<Version> items
   2: required PageInfo page
+  3: optional i64 head_sequence
 }
 
 struct VersionDetail {

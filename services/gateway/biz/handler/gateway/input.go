@@ -58,7 +58,8 @@ type updateMemberBody struct {
 }
 
 type createVersionBody struct {
-	Label *string `json:"label,omitempty"`
+	Label       *string `json:"label,omitempty"`
+	StateVector *string `json:"state_vector,omitempty"`
 }
 
 type restoreVersionBody struct {

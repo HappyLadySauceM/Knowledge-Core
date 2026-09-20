@@ -7634,6 +7634,8 @@ pub mod volo_gen {
             pub items: ::std::vec::Vec<Version>,
 
             pub page: PageInfo,
+
+            pub head_sequence: ::std::option::Option<i64>,
         }
         impl ::pilota::thrift::Message for VersionPage {
             fn encode<T: ::pilota::thrift::TOutputProtocol>(
@@ -7657,6 +7659,9 @@ pub mod volo_gen {
                     },
                 )?;
                 __protocol.write_struct_field(2, &self.page, ::pilota::thrift::TType::Struct)?;
+                if let Some(value) = self.head_sequence.as_ref() {
+                    __protocol.write_i64_field(3, *value)?;
+                }
                 __protocol.write_field_stop()?;
                 __protocol.write_struct_end()?;
                 ::std::result::Result::Ok(())
@@ -7670,6 +7675,7 @@ pub mod volo_gen {
 
                 let mut var_1 = None;
                 let mut var_2 = None;
+                let mut var_3 = None;
 
                 let mut __pilota_decoding_field_id = None;
 
@@ -7704,6 +7710,9 @@ pub mod volo_gen {
                                 if field_ident.field_type == ::pilota::thrift::TType::Struct =>
                             {
                                 var_2 = Some(::pilota::thrift::Message::decode(__protocol)?);
+                            }
+                            Some(3) if field_ident.field_type == ::pilota::thrift::TType::I64 => {
+                                var_3 = Some(__protocol.read_i64()?);
                             }
                             _ => {
                                 __protocol.skip(field_ident.field_type)?;
@@ -7741,6 +7750,7 @@ pub mod volo_gen {
                 let data = Self {
                     items: var_1,
                     page: var_2,
+                    head_sequence: var_3,
                 };
                 ::std::result::Result::Ok(data)
             }
@@ -7758,6 +7768,7 @@ pub mod volo_gen {
                 ::std::boxed::Box::pin(async move {
                     let mut var_1 = None;
                     let mut var_2 = None;
+                    let mut var_3 = None;
 
                     let mut __pilota_decoding_field_id = None;
 
@@ -7788,6 +7799,9 @@ pub mod volo_gen {
 
                 },Some(2) if field_ident.field_type == ::pilota::thrift::TType::Struct  => {
                     var_2 = Some(<PageInfo as ::pilota::thrift::Message>::decode_async(__protocol).await?);
+
+                },Some(3) if field_ident.field_type == ::pilota::thrift::TType::I64  => {
+                    var_3 = Some(__protocol.read_i64().await?);
 
                 },
                     _ => {
@@ -7829,6 +7843,7 @@ pub mod volo_gen {
                     let data = Self {
                         items: var_1,
                         page: var_2,
+                        head_sequence: var_3,
                     };
                     ::std::result::Result::Ok(data)
                 })
@@ -7845,6 +7860,10 @@ pub mod volo_gen {
                     &self.items,
                     |__protocol, el| __protocol.struct_len(el),
                 ) + __protocol.struct_field_len(Some(2), &self.page)
+                    + self
+                        .head_sequence
+                        .as_ref()
+                        .map_or(0, |value| __protocol.i64_field_len(Some(3), *value))
                     + __protocol.field_stop_len()
                     + __protocol.struct_end_len()
             }

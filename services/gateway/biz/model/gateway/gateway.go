@@ -16430,8 +16430,9 @@ func (p *VersionDetailData) String() string {
 }
 
 type VersionPageData struct {
-	Items []*VersionData `thrift:"items,1,required,list<VersionData>" form:"items,required" json:"items,required"`
-	Page  *PageInfoData  `thrift:"page,2,required" form:"page,required" json:"page,required"`
+	Items        []*VersionData `thrift:"items,1,required,list<VersionData>" form:"items,required" json:"items,required"`
+	Page         *PageInfoData  `thrift:"page,2,required" form:"page,required" json:"page,required"`
+	HeadSequence *int64         `thrift:"head_sequence,3,optional" form:"head_sequence" json:"head_sequence,omitempty"`
 }
 
 func NewVersionPageData() *VersionPageData {
@@ -16454,13 +16455,27 @@ func (p *VersionPageData) GetPage() (v *PageInfoData) {
 	return p.Page
 }
 
+var VersionPageData_HeadSequence_DEFAULT int64
+
+func (p *VersionPageData) GetHeadSequence() (v int64) {
+	if !p.IsSetHeadSequence() {
+		return VersionPageData_HeadSequence_DEFAULT
+	}
+	return *p.HeadSequence
+}
+
 var fieldIDToName_VersionPageData = map[int16]string{
 	1: "items",
 	2: "page",
+	3: "head_sequence",
 }
 
 func (p *VersionPageData) IsSetPage() bool {
 	return p.Page != nil
+}
+
+func (p *VersionPageData) IsSetHeadSequence() bool {
+	return p.HeadSequence != nil
 }
 
 func (p *VersionPageData) Read(iprot thrift.TProtocol) (err error) {
@@ -16499,6 +16514,14 @@ func (p *VersionPageData) Read(iprot thrift.TProtocol) (err error) {
 					goto ReadFieldError
 				}
 				issetPage = true
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		case 3:
+			if fieldTypeId == thrift.I64 {
+				if err = p.ReadField3(iprot); err != nil {
+					goto ReadFieldError
+				}
 			} else if err = iprot.Skip(fieldTypeId); err != nil {
 				goto SkipFieldError
 			}
@@ -16573,6 +16596,17 @@ func (p *VersionPageData) ReadField2(iprot thrift.TProtocol) error {
 	p.Page = _field
 	return nil
 }
+func (p *VersionPageData) ReadField3(iprot thrift.TProtocol) error {
+
+	var _field *int64
+	if v, err := iprot.ReadI64(); err != nil {
+		return err
+	} else {
+		_field = &v
+	}
+	p.HeadSequence = _field
+	return nil
+}
 
 func (p *VersionPageData) Write(oprot thrift.TProtocol) (err error) {
 	var fieldId int16
@@ -16586,6 +16620,10 @@ func (p *VersionPageData) Write(oprot thrift.TProtocol) (err error) {
 		}
 		if err = p.writeField2(oprot); err != nil {
 			fieldId = 2
+			goto WriteFieldError
+		}
+		if err = p.writeField3(oprot); err != nil {
+			fieldId = 3
 			goto WriteFieldError
 		}
 	}
@@ -16646,6 +16684,25 @@ WriteFieldBeginError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 2 begin error: ", p), err)
 WriteFieldEndError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 2 end error: ", p), err)
+}
+
+func (p *VersionPageData) writeField3(oprot thrift.TProtocol) (err error) {
+	if p.IsSetHeadSequence() {
+		if err = oprot.WriteFieldBegin("head_sequence", thrift.I64, 3); err != nil {
+			goto WriteFieldBeginError
+		}
+		if err := oprot.WriteI64(*p.HeadSequence); err != nil {
+			return err
+		}
+		if err = oprot.WriteFieldEnd(); err != nil {
+			goto WriteFieldEndError
+		}
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 3 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 3 end error: ", p), err)
 }
 
 func (p *VersionPageData) String() string {
@@ -16922,6 +16979,7 @@ type CreateVersionRequest struct {
 	DocumentID     string  `thrift:"document_id,1,required" json:"document_id,required" path:"document_id,required"`
 	Label          *string `thrift:"label,2,optional" form:"label" json:"label,omitempty"`
 	IdempotencyKey *string `thrift:"idempotency_key,3,optional" header:"Idempotency-Key" json:"idempotency_key,omitempty"`
+	StateVector    *string `thrift:"state_vector,4,optional" form:"state_vector" json:"state_vector,omitempty"`
 }
 
 func NewCreateVersionRequest() *CreateVersionRequest {
@@ -16953,10 +17011,20 @@ func (p *CreateVersionRequest) GetIdempotencyKey() (v string) {
 	return *p.IdempotencyKey
 }
 
+var CreateVersionRequest_StateVector_DEFAULT string
+
+func (p *CreateVersionRequest) GetStateVector() (v string) {
+	if !p.IsSetStateVector() {
+		return CreateVersionRequest_StateVector_DEFAULT
+	}
+	return *p.StateVector
+}
+
 var fieldIDToName_CreateVersionRequest = map[int16]string{
 	1: "document_id",
 	2: "label",
 	3: "idempotency_key",
+	4: "state_vector",
 }
 
 func (p *CreateVersionRequest) IsSetLabel() bool {
@@ -16965,6 +17033,10 @@ func (p *CreateVersionRequest) IsSetLabel() bool {
 
 func (p *CreateVersionRequest) IsSetIdempotencyKey() bool {
 	return p.IdempotencyKey != nil
+}
+
+func (p *CreateVersionRequest) IsSetStateVector() bool {
+	return p.StateVector != nil
 }
 
 func (p *CreateVersionRequest) Read(iprot thrift.TProtocol) (err error) {
@@ -17007,6 +17079,14 @@ func (p *CreateVersionRequest) Read(iprot thrift.TProtocol) (err error) {
 		case 3:
 			if fieldTypeId == thrift.STRING {
 				if err = p.ReadField3(iprot); err != nil {
+					goto ReadFieldError
+				}
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		case 4:
+			if fieldTypeId == thrift.STRING {
+				if err = p.ReadField4(iprot); err != nil {
 					goto ReadFieldError
 				}
 			} else if err = iprot.Skip(fieldTypeId); err != nil {
@@ -17080,6 +17160,17 @@ func (p *CreateVersionRequest) ReadField3(iprot thrift.TProtocol) error {
 	p.IdempotencyKey = _field
 	return nil
 }
+func (p *CreateVersionRequest) ReadField4(iprot thrift.TProtocol) error {
+
+	var _field *string
+	if v, err := iprot.ReadString(); err != nil {
+		return err
+	} else {
+		_field = &v
+	}
+	p.StateVector = _field
+	return nil
+}
 
 func (p *CreateVersionRequest) Write(oprot thrift.TProtocol) (err error) {
 	var fieldId int16
@@ -17097,6 +17188,10 @@ func (p *CreateVersionRequest) Write(oprot thrift.TProtocol) (err error) {
 		}
 		if err = p.writeField3(oprot); err != nil {
 			fieldId = 3
+			goto WriteFieldError
+		}
+		if err = p.writeField4(oprot); err != nil {
+			fieldId = 4
 			goto WriteFieldError
 		}
 	}
@@ -17170,6 +17265,25 @@ WriteFieldBeginError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 3 begin error: ", p), err)
 WriteFieldEndError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 3 end error: ", p), err)
+}
+
+func (p *CreateVersionRequest) writeField4(oprot thrift.TProtocol) (err error) {
+	if p.IsSetStateVector() {
+		if err = oprot.WriteFieldBegin("state_vector", thrift.STRING, 4); err != nil {
+			goto WriteFieldBeginError
+		}
+		if err := oprot.WriteString(*p.StateVector); err != nil {
+			return err
+		}
+		if err = oprot.WriteFieldEnd(); err != nil {
+			goto WriteFieldEndError
+		}
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 4 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 4 end error: ", p), err)
 }
 
 func (p *CreateVersionRequest) String() string {

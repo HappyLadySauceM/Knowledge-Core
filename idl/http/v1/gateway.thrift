@@ -342,6 +342,7 @@ struct VersionDetailData {
 struct VersionPageData {
   1: required list<VersionData> items (api.body="items")
   2: required PageInfoData page (api.body="page")
+  3: optional i64 head_sequence (api.body="head_sequence")
 }
 
 struct ListVersionsRequest {
@@ -354,6 +355,7 @@ struct CreateVersionRequest {
   1: required string document_id (api.path="document_id")
   2: optional string label (api.body="label")
   3: optional string idempotency_key (api.header="Idempotency-Key")
+  4: optional string state_vector (api.body="state_vector")
 }
 
 struct VersionPathRequest {

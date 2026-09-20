@@ -207,6 +207,10 @@ components:
                     type: string
                 label:
                     type: string
+                state_vector:
+                    description: Base64url 编码的当前 Yjs state vector。
+                    format: byte
+                    type: string
             required:
                 - document_id
             type: object
@@ -1183,6 +1187,9 @@ components:
         VersionPageData:
             additionalProperties: false
             properties:
+                head_sequence:
+                    format: int64
+                    type: integer
                 items:
                     items:
                         $ref: '#/components/schemas/VersionData'
@@ -10747,6 +10754,7 @@ paths:
                     content:
                         application/json:
                             example:
+                                head_sequence: 1
                                 items:
                                     - created_at: "2026-01-01T00:00:00Z"
                                       document_id: 018f0c20-7b8a-7cc3-8f89-2f6f6d5f7a11
@@ -11021,10 +11029,15 @@ paths:
                     application/json:
                         example:
                             label: string
+                            state_vector: AA==
                         schema:
                             additionalProperties: false
                             properties:
                                 label:
+                                    type: string
+                                state_vector:
+                                    description: Base64url 编码的当前 Yjs state vector。
+                                    format: byte
                                     type: string
                             type: object
                 required: true

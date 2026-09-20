@@ -17,6 +17,7 @@ type RichTextAttrs struct {
 	Alt          *string `json:"alt,omitempty"`
 	Title        *string `json:"title,omitempty"`
 	TextAlign    *string `json:"textAlign,omitempty"`
+	Variant      *string `json:"variant,omitempty"`
 	Colspan      *int32  `json:"colspan,omitempty"`
 	Rowspan      *int32  `json:"rowspan,omitempty"`
 	Colwidth     []int32 `json:"colwidth,omitempty"`
@@ -44,7 +45,7 @@ var allowedNodeTypes = map[string]struct{}{
 	"paragraph": {}, "heading": {}, "bulletList": {}, "orderedList": {}, "listItem": {},
 	"taskList": {}, "taskItem": {}, "blockquote": {}, "codeBlock": {}, "horizontalRule": {},
 	"hardBreak": {}, "text": {}, "image": {}, "attachment": {}, "table": {}, "tableRow": {},
-	"tableHeader": {}, "tableCell": {},
+	"tableHeader": {}, "tableCell": {}, "callout": {}, "columns": {}, "column": {}, "formula": {},
 }
 
 var allowedMarkTypes = map[string]struct{}{
@@ -129,6 +130,13 @@ func validateRichTextAttrs(nodeType string, attrs *RichTextAttrs) error {
 		case "left", "center", "right", "justify":
 		default:
 			joined = errors.Join(joined, &ValidationError{Field: "content", Reason: "contains an invalid text alignment"})
+		}
+	}
+	if attrs.Variant != nil {
+		switch *attrs.Variant {
+		case "info", "success", "warning", "danger":
+		default:
+			joined = errors.Join(joined, &ValidationError{Field: "content", Reason: "contains an invalid callout variant"})
 		}
 	}
 	if attrs.Colspan != nil && (*attrs.Colspan < 1 || *attrs.Colspan > 100) {

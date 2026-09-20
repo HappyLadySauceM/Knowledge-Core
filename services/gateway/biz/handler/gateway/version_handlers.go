@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"net/url"
 	"strconv"
@@ -59,8 +60,17 @@ func handleCreateVersion(ctx context.Context, request *app.RequestContext) {
 		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInternal)
 		return
 	}
+	var stateVector []byte
+	if body.StateVector != nil {
+		var decodeErr error
+		stateVector, decodeErr = base64.RawURLEncoding.DecodeString(strings.TrimSpace(*body.StateVector))
+		if decodeErr != nil || len(stateVector) == 0 || len(stateVector) > 64*1024 {
+			gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidRequest)
+			return
+		}
+	}
 	version, err := dependencies.Collaboration.CreateVersion(upstreamContext(ctx, request), &collaborationv1.CreateVersionRequest{
-		DocumentId: documentID, Label: copyString(body.Label), IdempotencyKey: optionalString(idempotency),
+		DocumentId: documentID, Label: copyString(body.Label), IdempotencyKey: optionalString(idempotency), StateVector: stateVector,
 	})
 	if err != nil {
 		gatewaymiddleware.WriteCollaborationError(ctx, request, err)
@@ -173,8 +183,9 @@ func toVersionPageData(value *collaborationv1.VersionPage) (*gatewaymodel.Versio
 		items = append(items, converted)
 	}
 	return &gatewaymodel.VersionPageData{
-		Items: items,
-		Page:  &gatewaymodel.PageInfoData{NextCursor: copyString(value.Page.NextCursor), HasMore: value.Page.HasMore},
+		Items:        items,
+		Page:         &gatewaymodel.PageInfoData{NextCursor: copyString(value.Page.NextCursor), HasMore: value.Page.HasMore},
+		HeadSequence: value.HeadSequence,
 	}, nil
 }
 

@@ -297,8 +297,9 @@ var fieldIDToName_PageInfo = map[int16]string{
 }
 
 type VersionPage struct {
-	Items []*Version `thrift:"items,1,required" frugal:"1,required,list<Version>" json:"items"`
-	Page  *PageInfo  `thrift:"page,2,required" frugal:"2,required,PageInfo" json:"page"`
+	Items        []*Version `thrift:"items,1,required" frugal:"1,required,list<Version>" json:"items"`
+	Page         *PageInfo  `thrift:"page,2,required" frugal:"2,required,PageInfo" json:"page"`
+	HeadSequence *int64     `thrift:"head_sequence,3,optional" frugal:"3,optional,i64" json:"head_sequence,omitempty"`
 }
 
 func NewVersionPage() *VersionPage {
@@ -320,15 +321,31 @@ func (p *VersionPage) GetPage() (v *PageInfo) {
 	}
 	return p.Page
 }
+
+var VersionPage_HeadSequence_DEFAULT int64
+
+func (p *VersionPage) GetHeadSequence() (v int64) {
+	if !p.IsSetHeadSequence() {
+		return VersionPage_HeadSequence_DEFAULT
+	}
+	return *p.HeadSequence
+}
 func (p *VersionPage) SetItems(val []*Version) {
 	p.Items = val
 }
 func (p *VersionPage) SetPage(val *PageInfo) {
 	p.Page = val
 }
+func (p *VersionPage) SetHeadSequence(val *int64) {
+	p.HeadSequence = val
+}
 
 func (p *VersionPage) IsSetPage() bool {
 	return p.Page != nil
+}
+
+func (p *VersionPage) IsSetHeadSequence() bool {
+	return p.HeadSequence != nil
 }
 
 func (p *VersionPage) String() string {
@@ -341,6 +358,7 @@ func (p *VersionPage) String() string {
 var fieldIDToName_VersionPage = map[int16]string{
 	1: "items",
 	2: "page",
+	3: "head_sequence",
 }
 
 type VersionDetail struct {

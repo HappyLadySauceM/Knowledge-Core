@@ -8,8 +8,8 @@ use pilota::FastStr;
 use serde::{Deserialize, Serialize};
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 use volo_thrift::ServerError;
-use yrs::updates::encoder::Encode;
-use yrs::{ReadTxn, Transact};
+use yrs::updates::decoder::Decode;
+use yrs::{ReadTxn, StateVector, Transact};
 
 use crate::{
     actor::{ActorRegistry, CLOSE_DOCUMENT_INVALIDATED},
@@ -83,17 +83,22 @@ impl CollaborationHandler {
         })
     }
 
-    /// Reloads the persisted document until its Yrs state vector equals the client bytes.
-    /// 有界重试读取已持久化文档，直到存储的 Yrs state vector 与客户端字节完全相等。
+    /// Reloads the persisted document until it contains every clock known by the client.
+    /// 有界重试读取已持久化文档，直到存储的 state vector 覆盖客户端已知的全部时钟。
     ///
-    /// Equality stays exact; a client-ahead snapshot is not accepted as a subset.
-    /// 比较保持精确相等，不把客户端超前的快照当成 subset 放行。
+    /// The server may contain concurrent edits from another collaborator. Requiring exact
+    /// equality would reject a valid publication forever whenever another client commits
+    /// between the WebSocket barrier and this RPC.
+    /// 服务端可以包含其他协作者的并发编辑；要求完全相等会把合法发布误判为冲突。
     async fn wait_for_matching_state_vector(
         &self,
         context: &RequestContext,
         document_id: DocumentId,
         expected: &[u8],
     ) -> Result<()> {
+        let expected = StateVector::decode_v1(expected).map_err(|error| {
+            ServiceError::invalid_input("state vector is invalid").with_source(error)
+        })?;
         let wait_until = Instant::now() + self.state_vector_wait;
         let deadline = match context.deadline {
             Some(request_deadline) => request_deadline.min(wait_until),
@@ -102,8 +107,11 @@ impl CollaborationHandler {
         loop {
             let loaded = self.documents.load_document(context, document_id).await?;
             let current = crate::richtext::document_from_state(&loaded.state)?;
-            let current_vector = current.transact().state_vector().encode_v1();
-            if current_vector.as_slice() == expected {
+            let current_vector = current.transact().state_vector();
+            if expected
+                .iter()
+                .all(|(client, clock)| current_vector.get(client) >= *clock)
+            {
                 return Ok(());
             }
             let now = Instant::now();
@@ -237,6 +245,7 @@ impl collaboration::CollaborationService for CollaborationHandler {
                     next_cursor,
                     has_more: page.has_more,
                 },
+                head_sequence: Some(page.head_sequence),
             })
         }
         .await;
@@ -843,6 +852,29 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn create_version_accepts_server_state_with_concurrent_extra_clocks() {
+        let (handler, store, _, _, document_id) = handler(Access::Owner);
+        let client_state = richtext::initial_state();
+        let server_state = state_with_extra_paragraph_from(&client_state);
+        let expected = state_vector_of(&client_state);
+        *store.load_states.lock().expect("load_states") = vec![server_state];
+
+        let created = scope_request_context_for_test(
+            authenticated_context(),
+            handler.create_version(collaboration::CreateVersionRequest {
+                document_id: document_id.to_string().into(),
+                label: Some("publication".into()),
+                idempotency_key: Some("publish-server-superset".into()),
+                state_vector: Some(Bytes::copy_from_slice(&expected)),
+            }),
+        )
+        .await
+        .expect("CreateVersion accepts a server state that includes concurrent edits");
+        assert_eq!(created.document_id.as_str(), document_id.to_string());
+        assert_eq!(store.create_calls.load(Ordering::Relaxed), 1);
+    }
+
+    #[tokio::test]
     async fn create_version_still_preconditions_when_stored_state_vector_never_matches() {
         let (mut handler, store, _, _, document_id) = handler(Access::Owner);
         handler.state_vector_wait = Duration::from_millis(40);
@@ -1062,7 +1094,11 @@ mod tests {
     }
 
     fn state_with_extra_paragraph() -> Vec<u8> {
-        let document = richtext::document_from_state(&richtext::initial_state()).expect("initial");
+        state_with_extra_paragraph_from(&richtext::initial_state())
+    }
+
+    fn state_with_extra_paragraph_from(state: &[u8]) -> Vec<u8> {
+        let document = richtext::document_from_state(state).expect("state");
         let fragment = document.get_or_insert_xml_fragment(richtext::FRAGMENT_NAME);
         fragment.push_back(
             &mut document.transact_mut(),
@@ -1104,6 +1140,7 @@ mod tests {
             Ok(VersionPage {
                 items: vec![self.version.clone()],
                 has_more: false,
+                head_sequence: self.version.sequence,
             })
         }
 
