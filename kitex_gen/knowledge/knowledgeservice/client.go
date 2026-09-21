@@ -37,6 +37,11 @@ type Client interface {
 	IsMediaPublished(ctx context.Context, request *knowledge.PublishedMediaRequest, callOptions ...callopt.Option) (r *knowledge.PublishedMediaAuthorization, err error)
 	AuthorizeCollaboration(ctx context.Context, request *knowledge.AuthorizeCollaborationRequest, callOptions ...callopt.Option) (r *knowledge.CollaborationAuthorization, err error)
 	ProjectCollaboration(ctx context.Context, request *knowledge.ProjectCollaborationRequest, callOptions ...callopt.Option) (err error)
+	CreateCommit(ctx context.Context, request *knowledge.CreateCommitRequest, callOptions ...callopt.Option) (r *knowledge.Commit, err error)
+	ListCommits(ctx context.Context, request *knowledge.ListCommitsRequest, callOptions ...callopt.Option) (r *knowledge.CommitPage, err error)
+	GetCommit(ctx context.Context, request *knowledge.CommitIDRequest, callOptions ...callopt.Option) (r *knowledge.Commit, err error)
+	RenameCommit(ctx context.Context, request *knowledge.RenameCommitRequest, callOptions ...callopt.Option) (r *knowledge.Commit, err error)
+	RestoreCommit(ctx context.Context, request *knowledge.RestoreCommitRequest, callOptions ...callopt.Option) (r *knowledge.Document, err error)
 }
 
 // NewClient creates a client for the service defined in IDL.
@@ -191,4 +196,29 @@ func (p *kKnowledgeServiceClient) AuthorizeCollaboration(ctx context.Context, re
 func (p *kKnowledgeServiceClient) ProjectCollaboration(ctx context.Context, request *knowledge.ProjectCollaborationRequest, callOptions ...callopt.Option) (err error) {
 	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
 	return p.kClient.ProjectCollaboration(ctx, request)
+}
+
+func (p *kKnowledgeServiceClient) CreateCommit(ctx context.Context, request *knowledge.CreateCommitRequest, callOptions ...callopt.Option) (r *knowledge.Commit, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.CreateCommit(ctx, request)
+}
+
+func (p *kKnowledgeServiceClient) ListCommits(ctx context.Context, request *knowledge.ListCommitsRequest, callOptions ...callopt.Option) (r *knowledge.CommitPage, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.ListCommits(ctx, request)
+}
+
+func (p *kKnowledgeServiceClient) GetCommit(ctx context.Context, request *knowledge.CommitIDRequest, callOptions ...callopt.Option) (r *knowledge.Commit, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.GetCommit(ctx, request)
+}
+
+func (p *kKnowledgeServiceClient) RenameCommit(ctx context.Context, request *knowledge.RenameCommitRequest, callOptions ...callopt.Option) (r *knowledge.Commit, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.RenameCommit(ctx, request)
+}
+
+func (p *kKnowledgeServiceClient) RestoreCommit(ctx context.Context, request *knowledge.RestoreCommitRequest, callOptions ...callopt.Option) (r *knowledge.Document, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.RestoreCommit(ctx, request)
 }

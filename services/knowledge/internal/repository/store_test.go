@@ -38,6 +38,8 @@ func TestBuildListDocumentsQueryUsesPublicationSnapshotAndDeletionGuards(t *test
 		"pub.document_id IS NOT NULL",
 		"d.publication_status = 'published'",
 		"d.deleted_at IS NULL",
+		"pub.publication_hash AS publication_hash",
+		"pub.cover_attachment_id AS publication_cover_attachment_id",
 	} {
 		if !strings.Contains(query, fragment) {
 			t.Fatalf("public query missing %q:\n%s", fragment, query)

@@ -28,7 +28,7 @@ func (s *documentRepositoryStub) GetPublishedDocument(context.Context, string, i
 func (s *documentRepositoryStub) ListDocuments(context.Context, repository.ListOptions) ([]*domain.Document, error) {
 	return nil, errUnusedDocumentRepository
 }
-func (s *documentRepositoryStub) UpdateDocument(context.Context, string, int64, int64, *string, *string, *string, *string, []string, *string) (*domain.Document, error) {
+func (s *documentRepositoryStub) UpdateDocument(context.Context, string, int64, int64, *string, *string, *string, *string, []string, *string, *string, *string, *float64, *float64) (*domain.Document, error) {
 	return nil, errUnusedDocumentRepository
 }
 func (s *documentRepositoryStub) SetPublication(context.Context, string, int64, int64, bool, repository.Idempotency) (*domain.Document, error) {
@@ -61,6 +61,21 @@ func (s *documentRepositoryStub) UpdateFolder(context.Context, int64, string, in
 }
 func (s *documentRepositoryStub) DeleteFolder(context.Context, int64, string, int64) error {
 	return errUnusedDocumentRepository
+}
+func (s *documentRepositoryStub) CreateCommit(context.Context, string, int64, repository.CommitInput) (*domain.Commit, error) {
+	return nil, errUnusedDocumentRepository
+}
+func (s *documentRepositoryStub) ListCommits(context.Context, string, int64, int) ([]*domain.Commit, error) {
+	return nil, errUnusedDocumentRepository
+}
+func (s *documentRepositoryStub) GetCommit(context.Context, string, int64) (*domain.Commit, error) {
+	return nil, errUnusedDocumentRepository
+}
+func (s *documentRepositoryStub) RenameCommit(context.Context, string, int64, string, string) (*domain.Commit, error) {
+	return nil, errUnusedDocumentRepository
+}
+func (s *documentRepositoryStub) RestoreCommit(context.Context, string, int64, repository.Idempotency) (*domain.Document, error) {
+	return nil, errUnusedDocumentRepository
 }
 
 func TestPublishSnapshotAcceptsParagraphOnlyTextWithEmptyContent(t *testing.T) {

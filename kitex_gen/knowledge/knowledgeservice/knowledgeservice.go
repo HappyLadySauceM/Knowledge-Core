@@ -189,6 +189,41 @@ var serviceMethods = map[string]kitex.MethodInfo{
 		false,
 		kitex.WithStreamingMode(kitex.StreamingNone),
 	),
+	"CreateCommit": kitex.NewMethodInfo(
+		createCommitHandler,
+		newKnowledgeServiceCreateCommitArgs,
+		newKnowledgeServiceCreateCommitResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
+	"ListCommits": kitex.NewMethodInfo(
+		listCommitsHandler,
+		newKnowledgeServiceListCommitsArgs,
+		newKnowledgeServiceListCommitsResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
+	"GetCommit": kitex.NewMethodInfo(
+		getCommitHandler,
+		newKnowledgeServiceGetCommitArgs,
+		newKnowledgeServiceGetCommitResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
+	"RenameCommit": kitex.NewMethodInfo(
+		renameCommitHandler,
+		newKnowledgeServiceRenameCommitArgs,
+		newKnowledgeServiceRenameCommitResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
+	"RestoreCommit": kitex.NewMethodInfo(
+		restoreCommitHandler,
+		newKnowledgeServiceRestoreCommitArgs,
+		newKnowledgeServiceRestoreCommitResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
 }
 
 var (
@@ -705,6 +740,96 @@ func newKnowledgeServiceProjectCollaborationResult() interface{} {
 	return knowledge.NewKnowledgeServiceProjectCollaborationResult()
 }
 
+func createCommitHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*knowledge.KnowledgeServiceCreateCommitArgs)
+	realResult := result.(*knowledge.KnowledgeServiceCreateCommitResult)
+	success, err := handler.(knowledge.KnowledgeService).CreateCommit(ctx, realArg.Request)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newKnowledgeServiceCreateCommitArgs() interface{} {
+	return knowledge.NewKnowledgeServiceCreateCommitArgs()
+}
+
+func newKnowledgeServiceCreateCommitResult() interface{} {
+	return knowledge.NewKnowledgeServiceCreateCommitResult()
+}
+
+func listCommitsHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*knowledge.KnowledgeServiceListCommitsArgs)
+	realResult := result.(*knowledge.KnowledgeServiceListCommitsResult)
+	success, err := handler.(knowledge.KnowledgeService).ListCommits(ctx, realArg.Request)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newKnowledgeServiceListCommitsArgs() interface{} {
+	return knowledge.NewKnowledgeServiceListCommitsArgs()
+}
+
+func newKnowledgeServiceListCommitsResult() interface{} {
+	return knowledge.NewKnowledgeServiceListCommitsResult()
+}
+
+func getCommitHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*knowledge.KnowledgeServiceGetCommitArgs)
+	realResult := result.(*knowledge.KnowledgeServiceGetCommitResult)
+	success, err := handler.(knowledge.KnowledgeService).GetCommit(ctx, realArg.Request)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newKnowledgeServiceGetCommitArgs() interface{} {
+	return knowledge.NewKnowledgeServiceGetCommitArgs()
+}
+
+func newKnowledgeServiceGetCommitResult() interface{} {
+	return knowledge.NewKnowledgeServiceGetCommitResult()
+}
+
+func renameCommitHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*knowledge.KnowledgeServiceRenameCommitArgs)
+	realResult := result.(*knowledge.KnowledgeServiceRenameCommitResult)
+	success, err := handler.(knowledge.KnowledgeService).RenameCommit(ctx, realArg.Request)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newKnowledgeServiceRenameCommitArgs() interface{} {
+	return knowledge.NewKnowledgeServiceRenameCommitArgs()
+}
+
+func newKnowledgeServiceRenameCommitResult() interface{} {
+	return knowledge.NewKnowledgeServiceRenameCommitResult()
+}
+
+func restoreCommitHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*knowledge.KnowledgeServiceRestoreCommitArgs)
+	realResult := result.(*knowledge.KnowledgeServiceRestoreCommitResult)
+	success, err := handler.(knowledge.KnowledgeService).RestoreCommit(ctx, realArg.Request)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newKnowledgeServiceRestoreCommitArgs() interface{} {
+	return knowledge.NewKnowledgeServiceRestoreCommitArgs()
+}
+
+func newKnowledgeServiceRestoreCommitResult() interface{} {
+	return knowledge.NewKnowledgeServiceRestoreCommitResult()
+}
+
 type kClient struct {
 	c client.Client
 }
@@ -963,4 +1088,54 @@ func (p *kClient) ProjectCollaboration(ctx context.Context, request *knowledge.P
 		return
 	}
 	return nil
+}
+
+func (p *kClient) CreateCommit(ctx context.Context, request *knowledge.CreateCommitRequest) (r *knowledge.Commit, err error) {
+	var _args knowledge.KnowledgeServiceCreateCommitArgs
+	_args.Request = request
+	var _result knowledge.KnowledgeServiceCreateCommitResult
+	if err = p.c.Call(ctx, "CreateCommit", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) ListCommits(ctx context.Context, request *knowledge.ListCommitsRequest) (r *knowledge.CommitPage, err error) {
+	var _args knowledge.KnowledgeServiceListCommitsArgs
+	_args.Request = request
+	var _result knowledge.KnowledgeServiceListCommitsResult
+	if err = p.c.Call(ctx, "ListCommits", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) GetCommit(ctx context.Context, request *knowledge.CommitIDRequest) (r *knowledge.Commit, err error) {
+	var _args knowledge.KnowledgeServiceGetCommitArgs
+	_args.Request = request
+	var _result knowledge.KnowledgeServiceGetCommitResult
+	if err = p.c.Call(ctx, "GetCommit", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) RenameCommit(ctx context.Context, request *knowledge.RenameCommitRequest) (r *knowledge.Commit, err error) {
+	var _args knowledge.KnowledgeServiceRenameCommitArgs
+	_args.Request = request
+	var _result knowledge.KnowledgeServiceRenameCommitResult
+	if err = p.c.Call(ctx, "RenameCommit", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) RestoreCommit(ctx context.Context, request *knowledge.RestoreCommitRequest) (r *knowledge.Document, err error) {
+	var _args knowledge.KnowledgeServiceRestoreCommitArgs
+	_args.Request = request
+	var _result knowledge.KnowledgeServiceRestoreCommitResult
+	if err = p.c.Call(ctx, "RestoreCommit", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
 }

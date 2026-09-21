@@ -20,13 +20,18 @@ import (
 )
 
 const (
-	IssuerName     = "knowledge-core.identity"
-	AudienceName   = "knowledge-core.api"
-	MaxTokenLength = 4096
+	IssuerName       = "knowledge-core.identity"
+	AudienceName     = "knowledge-core.api"
+	MaxTokenLength   = 4096
+	SubjectTypeUser  = "user"
+	SubjectTypeAgent = "agent"
 )
 
 type Principal struct {
-	UserID       int64
+	UserID int64
+	// SubjectType identifies the actor represented by the token. Tokens issued
+	// before this claim existed are treated as user tokens during verification.
+	SubjectType  string
 	Role         string
 	TokenVersion int64
 	SessionID    string
@@ -72,6 +77,7 @@ func ValidateKeyPair(encodedPrivateKey, encodedPublicKey string) error {
 
 type Claims struct {
 	Role         string `json:"role"`
+	SubjectType  string `json:"subject_type,omitempty"`
 	TokenVersion int64  `json:"token_version"`
 	SessionID    string `json:"session_id,omitempty"`
 	jwt.RegisteredClaims
@@ -84,6 +90,8 @@ func (c Claims) Validate() error {
 		return errors.New("access token subject is invalid")
 	case c.Role == "" || len(c.Role) > 32:
 		return errors.New("access token role is invalid")
+	case c.SubjectType != "" && c.SubjectType != SubjectTypeUser && c.SubjectType != SubjectTypeAgent:
+		return errors.New("access token subject type is invalid")
 	case c.TokenVersion <= 0:
 		return errors.New("access token version is invalid")
 	case c.ExpiresAt == nil || c.NotBefore == nil || c.IssuedAt == nil:
@@ -122,6 +130,12 @@ func (i *Issuer) Issue(principal Principal) (IssuedToken, error) {
 	if principal.UserID <= 0 || principal.Role == "" || len(principal.Role) > 32 || principal.TokenVersion <= 0 {
 		return IssuedToken{}, errors.New("issue access token: principal is invalid")
 	}
+	if principal.SubjectType == "" {
+		principal.SubjectType = SubjectTypeUser
+	}
+	if principal.SubjectType != SubjectTypeUser && principal.SubjectType != SubjectTypeAgent {
+		return IssuedToken{}, errors.New("issue access token: subject type is invalid")
+	}
 	tokenID, err := randomID(i.random)
 	if err != nil {
 		return IssuedToken{}, fmt.Errorf("issue access token ID: %w", err)
@@ -130,6 +144,7 @@ func (i *Issuer) Issue(principal Principal) (IssuedToken, error) {
 	expiresAt := now.Add(time.Duration(i.ttl.Load()))
 	claims := Claims{
 		Role:         principal.Role,
+		SubjectType:  principal.SubjectType,
 		TokenVersion: principal.TokenVersion,
 		SessionID:    principal.SessionID,
 		RegisteredClaims: jwt.RegisteredClaims{
@@ -205,9 +220,18 @@ func (v *Verifier) Verify(value string) (Principal, error) {
 		return Principal{}, errors.New("verify access token: subject is invalid")
 	}
 	return Principal{
-		UserID: userID, Role: claims.Role, TokenVersion: claims.TokenVersion, SessionID: claims.SessionID,
+		UserID: userID, SubjectType: claims.SubjectTypeOrUser(), Role: claims.Role, TokenVersion: claims.TokenVersion, SessionID: claims.SessionID,
 		ExpiresAt: claims.ExpiresAt.UTC(),
 	}, nil
+}
+
+// SubjectTypeOrUser keeps verification backward compatible with tokens that
+// predate the agent subject claim.
+func (c Claims) SubjectTypeOrUser() string {
+	if c.SubjectType == "" {
+		return SubjectTypeUser
+	}
+	return c.SubjectType
 }
 
 func parsePrivateKey(encoded string) (ed25519.PrivateKey, error) {

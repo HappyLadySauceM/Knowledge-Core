@@ -18,7 +18,7 @@ type DocumentRepository interface {
 	GetDocument(context.Context, string, int64, bool) (*domain.Document, error)
 	GetPublishedDocument(context.Context, string, int64) (*domain.Document, *domain.Projection, bool, error)
 	ListDocuments(context.Context, repository.ListOptions) ([]*domain.Document, error)
-	UpdateDocument(context.Context, string, int64, int64, *string, *string, *string, *string, []string, *string) (*domain.Document, error)
+	UpdateDocument(context.Context, string, int64, int64, *string, *string, *string, *string, []string, *string, *string, *string, *float64, *float64) (*domain.Document, error)
 	SetPublication(context.Context, string, int64, int64, bool, repository.Idempotency) (*domain.Document, error)
 	PublishSnapshot(context.Context, string, int64, int64, repository.PublicationSnapshotInput) (*domain.Document, error)
 	SoftDeleteDocument(context.Context, string, int64, int64) (*domain.Document, error)
@@ -29,6 +29,11 @@ type DocumentRepository interface {
 	CreateFolder(context.Context, int64, string, *string, repository.Idempotency) (*domain.Folder, error)
 	UpdateFolder(context.Context, int64, string, int64, *string, *string) (*domain.Folder, error)
 	DeleteFolder(context.Context, int64, string, int64) error
+	CreateCommit(context.Context, string, int64, repository.CommitInput) (*domain.Commit, error)
+	ListCommits(context.Context, string, int64, int) ([]*domain.Commit, error)
+	GetCommit(context.Context, string, int64) (*domain.Commit, error)
+	RenameCommit(context.Context, string, int64, string, string) (*domain.Commit, error)
+	RestoreCommit(context.Context, string, int64, repository.Idempotency) (*domain.Document, error)
 }
 
 func (l *DocumentLogic) ListFolders(ctx context.Context, actorID int64, parentID *string) ([]*domain.Folder, error) {
@@ -161,25 +166,46 @@ type CreateDocumentInput struct {
 }
 
 type UpdateDocumentInput struct {
-	DocumentID       string
-	ActorID          int64
-	ExpectedRevision int64
-	Title            *string
-	Summary          *string
-	Slug             *string
-	Language         *string
-	Tags             []string
-	FolderID         *string
+	DocumentID        string
+	ActorID           int64
+	ExpectedRevision  int64
+	Title             *string
+	Summary           *string
+	Slug              *string
+	Language          *string
+	Tags              []string
+	FolderID          *string
+	Icon              *string
+	CoverAttachmentID *string
+	CoverFocalX       *float64
+	CoverFocalY       *float64
 }
 
 type PublishSnapshotInput struct {
-	Title          string
-	Summary        string
-	Slug           string
-	Language       string
-	Tags           []string
-	Content        domain.RichTextDocument
+	Title             string
+	Summary           string
+	Slug              string
+	Language          string
+	Tags              []string
+	Content           domain.RichTextDocument
+	PlainText         string
+	PublicationHash   string
+	Icon              string
+	CoverAttachmentID *string
+	CoverFocalX       float64
+	CoverFocalY       float64
+	IdempotencyKey    string
+}
+
+type CommitInput struct {
+	DocumentID     string
+	ActorID        int64
+	Kind           string
+	Label          string
+	Description    string
+	Content        *domain.RichTextDocument
 	PlainText      string
+	ContentHash    string
 	IdempotencyKey string
 }
 
@@ -395,11 +421,28 @@ func (l *DocumentLogic) Update(ctx context.Context, input UpdateDocumentInput) (
 		}
 		input.Tags = tags
 	}
-	if input.Title == nil && input.Summary == nil && input.Slug == nil && input.Language == nil && input.Tags == nil && input.FolderID == nil {
+	if input.Icon != nil {
+		value := strings.TrimSpace(*input.Icon)
+		if len([]rune(value)) > 8 {
+			return nil, mapError(&domain.ValidationError{Field: "icon", Reason: "must contain at most 8 characters"})
+		}
+		input.Icon = &value
+	}
+	if input.CoverAttachmentID != nil && *input.CoverAttachmentID != "" {
+		if err := domain.ValidateID("cover_attachment_id", *input.CoverAttachmentID); err != nil {
+			return nil, mapError(err)
+		}
+	}
+	for field, value := range map[string]*float64{"cover_focal_x": input.CoverFocalX, "cover_focal_y": input.CoverFocalY} {
+		if value != nil && (*value < 0 || *value > 100) {
+			return nil, mapError(&domain.ValidationError{Field: field, Reason: "must be between 0 and 100"})
+		}
+	}
+	if input.Title == nil && input.Summary == nil && input.Slug == nil && input.Language == nil && input.Tags == nil && input.FolderID == nil && input.Icon == nil && input.CoverAttachmentID == nil && input.CoverFocalX == nil && input.CoverFocalY == nil {
 		return nil, mapError(&domain.ValidationError{Field: "document", Reason: "at least one field must be provided"})
 	}
 	result, err := l.repository.UpdateDocument(
-		ctx, input.DocumentID, input.ActorID, input.ExpectedRevision, input.Title, input.Summary, input.Slug, input.Language, input.Tags, input.FolderID,
+		ctx, input.DocumentID, input.ActorID, input.ExpectedRevision, input.Title, input.Summary, input.Slug, input.Language, input.Tags, input.FolderID, input.Icon, input.CoverAttachmentID, input.CoverFocalX, input.CoverFocalY,
 	)
 	if err != nil {
 		return nil, mapError(err)
@@ -484,7 +527,97 @@ func (l *DocumentLogic) PublishSnapshot(ctx context.Context, documentID string, 
 		Title: input.Title, Summary: input.Summary,
 		Slug: input.Slug, Language: input.Language, Tags: append([]string(nil), input.Tags...), Content: input.Content,
 		PlainText: input.PlainText, MediaIDs: publicationMediaIDs(input.Content), Idempotency: idempotencyValue,
+		PublicationHash: input.PublicationHash, Icon: input.Icon, CoverAttachmentID: input.CoverAttachmentID,
+		CoverFocalX: input.CoverFocalX, CoverFocalY: input.CoverFocalY,
 	})
+	if err != nil {
+		return nil, mapError(err)
+	}
+	return result, nil
+}
+
+func (l *DocumentLogic) CreateCommit(ctx context.Context, input CommitInput) (*domain.Commit, error) {
+	if err := domain.ValidateID("document_id", input.DocumentID); err != nil {
+		return nil, mapError(err)
+	}
+	if input.ActorID <= 0 {
+		return nil, mapError(repository.ErrForbidden)
+	}
+	if strings.TrimSpace(input.Kind) == "" {
+		input.Kind = "manual"
+	}
+	if strings.TrimSpace(input.Label) == "" {
+		input.Label = input.Kind
+	}
+	if len([]rune(input.Label)) > 160 || len([]rune(input.Description)) > 2000 {
+		return nil, mapError(&domain.ValidationError{Field: "commit", Reason: "label and description are invalid"})
+	}
+	value, err := idempotency(input.ActorID, "create_commit", input.IdempotencyKey, struct {
+		DocumentID  string `json:"document_id"`
+		Kind        string `json:"kind"`
+		Label       string `json:"label"`
+		ContentHash string `json:"content_hash"`
+	}{input.DocumentID, input.Kind, input.Label, input.ContentHash})
+	if err != nil {
+		return nil, mapError(err)
+	}
+	result, err := l.repository.CreateCommit(ctx, input.DocumentID, input.ActorID, repository.CommitInput{
+		Kind: input.Kind, Label: input.Label, Description: input.Description, Content: input.Content,
+		PlainText: input.PlainText, ContentHash: input.ContentHash, Idempotency: value,
+	})
+	if err != nil {
+		return nil, mapError(err)
+	}
+	return result, nil
+}
+
+func (l *DocumentLogic) ListCommits(ctx context.Context, documentID string, actorID int64, limit int) ([]*domain.Commit, error) {
+	if err := domain.ValidateID("document_id", documentID); err != nil {
+		return nil, mapError(err)
+	}
+	if actorID <= 0 {
+		return nil, mapError(repository.ErrForbidden)
+	}
+	result, err := l.repository.ListCommits(ctx, documentID, actorID, limit)
+	if err != nil {
+		return nil, mapError(err)
+	}
+	return result, nil
+}
+
+func (l *DocumentLogic) GetCommit(ctx context.Context, commitID string, actorID int64) (*domain.Commit, error) {
+	if err := domain.ValidateID("commit_id", commitID); err != nil {
+		return nil, mapError(err)
+	}
+	result, err := l.repository.GetCommit(ctx, commitID, actorID)
+	if err != nil {
+		return nil, mapError(err)
+	}
+	return result, nil
+}
+
+func (l *DocumentLogic) RenameCommit(ctx context.Context, commitID string, actorID int64, label, description string) (*domain.Commit, error) {
+	if err := domain.ValidateID("commit_id", commitID); err != nil {
+		return nil, mapError(err)
+	}
+	result, err := l.repository.RenameCommit(ctx, commitID, actorID, label, description)
+	if err != nil {
+		return nil, mapError(err)
+	}
+	return result, nil
+}
+
+func (l *DocumentLogic) RestoreCommit(ctx context.Context, commitID string, actorID int64, key string) (*domain.Document, error) {
+	if err := domain.ValidateID("commit_id", commitID); err != nil {
+		return nil, mapError(err)
+	}
+	value, err := idempotency(actorID, "restore_commit", key, struct {
+		CommitID string `json:"commit_id"`
+	}{commitID})
+	if err != nil {
+		return nil, mapError(err)
+	}
+	result, err := l.repository.RestoreCommit(ctx, commitID, actorID, value)
 	if err != nil {
 		return nil, mapError(err)
 	}

@@ -73,6 +73,11 @@ struct Document {
   17: optional string folder_id
   18: required string publication_status
   19: optional string publication_error
+  20: optional string publication_hash
+  21: optional string icon
+  22: optional string cover_attachment_id
+  23: optional double cover_focal_x
+  24: optional double cover_focal_y
 }
 
 struct DocumentDetail {
@@ -132,6 +137,10 @@ struct UpdateDocumentRequest {
   6: optional string language
   7: optional list<string> tags
   8: optional string folder_id
+  9: optional string icon
+  10: optional string cover_attachment_id
+  11: optional double cover_focal_x
+  12: optional double cover_focal_y
 }
 
 struct PublishSnapshotRequest {
@@ -145,6 +154,71 @@ struct PublishSnapshotRequest {
   8: required RichTextDocument content
   9: required string plain_text
   10: optional string idempotency_key
+  11: optional string publication_hash
+  12: optional string icon
+  13: optional string cover_attachment_id
+  14: optional double cover_focal_x
+  15: optional double cover_focal_y
+}
+
+enum CommitKind {
+  MANUAL = 1,
+  LEAVE = 2,
+  SAFETY = 3,
+  PUBLISH = 4,
+  REVISION_MERGE = 5,
+  AGENT_EDIT = 6,
+  RESTORE = 7,
+}
+
+struct Commit {
+  1: required string id
+  2: required string document_id
+  3: required CommitKind kind
+  4: required string label
+  5: optional string description
+  6: required string contributor
+  7: required i64 sequence
+  8: required string content_hash
+  9: required RichTextDocument content
+  10: required string plain_text
+  11: required string created_at
+  12: required string updated_at
+}
+
+struct CommitPage {
+  1: required list<Commit> items
+  2: required PageInfo page
+}
+
+struct CreateCommitRequest {
+  1: required string document_id
+  2: required CommitKind kind
+  3: optional string label
+  4: optional string description
+  5: optional string content_hash
+  6: optional RichTextDocument content
+  7: optional string plain_text
+  8: optional string idempotency_key
+}
+
+struct ListCommitsRequest {
+  1: required string document_id
+  2: optional i32 limit
+  3: optional string cursor
+}
+
+struct CommitIDRequest { 1: required string commit_id }
+
+struct RenameCommitRequest {
+  1: required string commit_id
+  2: required string label
+  3: optional string description
+}
+
+struct RestoreCommitRequest {
+  1: required string commit_id
+  2: optional string idempotency_key
 }
 
 struct ListFoldersRequest { 1: optional string parent_id }
@@ -260,4 +334,9 @@ service KnowledgeService {
   PublishedMediaAuthorization IsMediaPublished(1: PublishedMediaRequest request)
   CollaborationAuthorization AuthorizeCollaboration(1: AuthorizeCollaborationRequest request)
   void ProjectCollaboration(1: ProjectCollaborationRequest request)
+  Commit CreateCommit(1: CreateCommitRequest request)
+  CommitPage ListCommits(1: ListCommitsRequest request)
+  Commit GetCommit(1: CommitIDRequest request)
+  Commit RenameCommit(1: RenameCommitRequest request)
+  Document RestoreCommit(1: RestoreCommitRequest request)
 }

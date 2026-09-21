@@ -715,6 +715,7 @@ func (p *PublicationSnapshot) FastRead(buf []byte) (int, error) {
 	var issetSequence bool = false
 	var issetContent bool = false
 	var issetPlainText bool = false
+	var issetContentHash bool = false
 	for {
 		fieldTypeId, fieldId, l, err = thrift.Binary.ReadFieldBegin(buf[offset:])
 		offset += l
@@ -785,6 +786,21 @@ func (p *PublicationSnapshot) FastRead(buf []byte) (int, error) {
 					goto SkipFieldError
 				}
 			}
+		case 5:
+			if fieldTypeId == thrift.STRING {
+				l, err = p.FastReadField5(buf[offset:])
+				offset += l
+				if err != nil {
+					goto ReadFieldError
+				}
+				issetContentHash = true
+			} else {
+				l, err = thrift.Binary.Skip(buf[offset:], fieldTypeId)
+				offset += l
+				if err != nil {
+					goto SkipFieldError
+				}
+			}
 		default:
 			l, err = thrift.Binary.Skip(buf[offset:], fieldTypeId)
 			offset += l
@@ -811,6 +827,11 @@ func (p *PublicationSnapshot) FastRead(buf []byte) (int, error) {
 
 	if !issetPlainText {
 		fieldId = 4
+		goto RequiredFieldNotSetError
+	}
+
+	if !issetContentHash {
+		fieldId = 5
 		goto RequiredFieldNotSetError
 	}
 	return offset, nil
@@ -878,6 +899,20 @@ func (p *PublicationSnapshot) FastReadField4(buf []byte) (int, error) {
 	return offset, nil
 }
 
+func (p *PublicationSnapshot) FastReadField5(buf []byte) (int, error) {
+	offset := 0
+
+	var _field string
+	if v, l, err := thrift.Binary.ReadString(buf[offset:]); err != nil {
+		return offset, err
+	} else {
+		offset += l
+		_field = v
+	}
+	p.ContentHash = _field
+	return offset, nil
+}
+
 func (p *PublicationSnapshot) FastWrite(buf []byte) int {
 	return p.FastWriteNocopy(buf, nil)
 }
@@ -889,6 +924,7 @@ func (p *PublicationSnapshot) FastWriteNocopy(buf []byte, w thrift.NocopyWriter)
 		offset += p.fastWriteField1(buf[offset:], w)
 		offset += p.fastWriteField3(buf[offset:], w)
 		offset += p.fastWriteField4(buf[offset:], w)
+		offset += p.fastWriteField5(buf[offset:], w)
 	}
 	offset += thrift.Binary.WriteFieldStop(buf[offset:])
 	return offset
@@ -901,6 +937,7 @@ func (p *PublicationSnapshot) BLength() int {
 		l += p.field2Length()
 		l += p.field3Length()
 		l += p.field4Length()
+		l += p.field5Length()
 	}
 	l += thrift.Binary.FieldStopLength()
 	return l
@@ -934,6 +971,13 @@ func (p *PublicationSnapshot) fastWriteField4(buf []byte, w thrift.NocopyWriter)
 	return offset
 }
 
+func (p *PublicationSnapshot) fastWriteField5(buf []byte, w thrift.NocopyWriter) int {
+	offset := 0
+	offset += thrift.Binary.WriteFieldBegin(buf[offset:], thrift.STRING, 5)
+	offset += thrift.Binary.WriteStringNocopy(buf[offset:], w, p.ContentHash)
+	return offset
+}
+
 func (p *PublicationSnapshot) field1Length() int {
 	l := 0
 	l += thrift.Binary.FieldBeginLength()
@@ -959,6 +1003,13 @@ func (p *PublicationSnapshot) field4Length() int {
 	l := 0
 	l += thrift.Binary.FieldBeginLength()
 	l += thrift.Binary.StringLengthNocopy(p.PlainText)
+	return l
+}
+
+func (p *PublicationSnapshot) field5Length() int {
+	l := 0
+	l += thrift.Binary.FieldBeginLength()
+	l += thrift.Binary.StringLengthNocopy(p.ContentHash)
 	return l
 }
 

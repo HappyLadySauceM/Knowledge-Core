@@ -654,3 +654,33 @@ func GetConfigurationDelivery(ctx context.Context, c *app.RequestContext) {
 func PermanentlyDeleteDocument(ctx context.Context, c *app.RequestContext) {
 	handlePermanentlyDeleteDocument(ctx, c)
 }
+
+// ListCommits .
+// @router /api/v1/studio/documents/:document_id/commits [GET]
+func ListCommits(ctx context.Context, c *app.RequestContext) {
+	handleListCommits(ctx, c)
+}
+
+// CreateCommit .
+// @router /api/v1/studio/documents/:document_id/commits [POST]
+func CreateCommit(ctx context.Context, c *app.RequestContext) {
+	handleCreateCommit(ctx, c)
+}
+
+// GetCommit .
+// @router /api/v1/studio/documents/:document_id/commits/:commit_id [GET]
+func GetCommit(ctx context.Context, c *app.RequestContext) {
+	handleGetCommit(ctx, c)
+}
+
+// RenameCommit .
+// @router /api/v1/studio/documents/:document_id/commits/:commit_id [PATCH]
+func RenameCommit(ctx context.Context, c *app.RequestContext) {
+	handleRenameCommit(ctx, c)
+}
+
+// RestoreCommit .
+// @router /api/v1/studio/documents/:document_id/commits/:commit_id/restore [POST]
+func RestoreCommit(ctx context.Context, c *app.RequestContext) {
+	handleRestoreCommit(ctx, c)
+}

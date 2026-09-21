@@ -42,6 +42,7 @@ struct PublicationSnapshot {
   2: required i64 sequence
   3: required knowledge.RichTextDocument content
   4: required string plain_text
+  5: required string content_hash
 }
 
 struct PurgeDocumentRequest {

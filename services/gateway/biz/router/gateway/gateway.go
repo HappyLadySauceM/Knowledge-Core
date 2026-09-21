@@ -85,10 +85,21 @@ func Register(r *server.Hertz) {
 					{
 						_document_id := _documents0.Group("/:document_id", _document_idMw()...)
 						_document_id.POST("/collaboration-sessions", append(_createcollaborationsessionMw(), gateway.CreateCollaborationSession)...)
+						_document_id.GET("/commits", append(_listcommitsMw(), gateway.ListCommits)...)
+						_document_id.POST("/commits", append(_createcommitMw(), gateway.CreateCommit)...)
 						_document_id.GET("/members", append(_listmembersMw(), gateway.ListMembers)...)
 						_document_id.POST("/members", append(_addmemberMw(), gateway.AddMember)...)
 						_document_id.DELETE("/publication", append(_unpublishdocumentMw(), gateway.UnpublishDocument)...)
 						_document_id.PUT("/publication", append(_publishdocumentMw(), gateway.PublishDocument)...)
+						{
+							_commits := _document_id.Group("/commits", _commitsMw()...)
+							_commits.GET("/:commit_id", append(_getcommitMw(), gateway.GetCommit)...)
+							_commits.PATCH("/:commit_id", append(_renamecommitMw(), gateway.RenameCommit)...)
+							{
+								_commit_id := _commits.Group("/:commit_id", _commit_idMw()...)
+								_commit_id.POST("/restore", append(_restorecommitMw(), gateway.RestoreCommit)...)
+							}
+						}
 						{
 							_members := _document_id.Group("/members", _membersMw()...)
 							_members.DELETE("/:user_id", append(_deletememberMw(), gateway.DeleteMember)...)

@@ -187,10 +187,11 @@ var fieldIDToName_CapturePublicationSnapshotRequest = map[int16]string{
 }
 
 type PublicationSnapshot struct {
-	DocumentId string                      `thrift:"document_id,1,required" frugal:"1,required,string" json:"document_id"`
-	Sequence   int64                       `thrift:"sequence,2,required" frugal:"2,required,i64" json:"sequence"`
-	Content    *knowledge.RichTextDocument `thrift:"content,3,required" frugal:"3,required,knowledge.RichTextDocument" json:"content"`
-	PlainText  string                      `thrift:"plain_text,4,required" frugal:"4,required,string" json:"plain_text"`
+	DocumentId  string                      `thrift:"document_id,1,required" frugal:"1,required,string" json:"document_id"`
+	Sequence    int64                       `thrift:"sequence,2,required" frugal:"2,required,i64" json:"sequence"`
+	Content     *knowledge.RichTextDocument `thrift:"content,3,required" frugal:"3,required,knowledge.RichTextDocument" json:"content"`
+	PlainText   string                      `thrift:"plain_text,4,required" frugal:"4,required,string" json:"plain_text"`
+	ContentHash string                      `thrift:"content_hash,5,required" frugal:"5,required,string" json:"content_hash"`
 }
 
 func NewPublicationSnapshot() *PublicationSnapshot {
@@ -220,6 +221,10 @@ func (p *PublicationSnapshot) GetContent() (v *knowledge.RichTextDocument) {
 func (p *PublicationSnapshot) GetPlainText() (v string) {
 	return p.PlainText
 }
+
+func (p *PublicationSnapshot) GetContentHash() (v string) {
+	return p.ContentHash
+}
 func (p *PublicationSnapshot) SetDocumentId(val string) {
 	p.DocumentId = val
 }
@@ -231,6 +236,9 @@ func (p *PublicationSnapshot) SetContent(val *knowledge.RichTextDocument) {
 }
 func (p *PublicationSnapshot) SetPlainText(val string) {
 	p.PlainText = val
+}
+func (p *PublicationSnapshot) SetContentHash(val string) {
+	p.ContentHash = val
 }
 
 func (p *PublicationSnapshot) IsSetContent() bool {
@@ -249,6 +257,7 @@ var fieldIDToName_PublicationSnapshot = map[int16]string{
 	2: "sequence",
 	3: "content",
 	4: "plain_text",
+	5: "content_hash",
 }
 
 type PurgeDocumentRequest struct {

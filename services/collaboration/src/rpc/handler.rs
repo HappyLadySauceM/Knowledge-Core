@@ -4,6 +4,7 @@ use std::{
 };
 
 use pilota::FastStr;
+use sha2::{Digest, Sha256};
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 use volo_thrift::ServerError;
 use yrs::updates::decoder::Decode;
@@ -225,11 +226,13 @@ impl collaboration::CollaborationService for CollaborationHandler {
                     anyhow::Error::new(error).context("project captured collaboration snapshot"),
                 )
             })?;
+            let content_hash = projection_hash(&projection);
             Ok(collaboration::PublicationSnapshot {
                 document_id: FastStr::from_string(document_id.to_string()),
                 sequence: loaded.sequence,
                 content: projection_to_wire(&projection)?,
                 plain_text: FastStr::from_string(projection.plain_text),
+                content_hash: FastStr::from_string(content_hash),
             })
         }
         .await;
@@ -252,6 +255,19 @@ impl collaboration::CollaborationService for CollaborationHandler {
         .await;
         result.map_err(|error| rpc_error(&error))
     }
+}
+
+fn projection_hash(projection: &crate::domain::Projection) -> String {
+    let mut hasher = Sha256::new();
+    if let Ok(value) = serde_json::to_vec(&(&projection.content, &projection.plain_text)) {
+        hasher.update(value);
+    }
+    let mut result = String::with_capacity(64);
+    for byte in hasher.finalize() {
+        use std::fmt::Write as _;
+        let _ = write!(result, "{byte:02x}");
+    }
+    result
 }
 
 fn valid_contract_token(value: &str) -> bool {

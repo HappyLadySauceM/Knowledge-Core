@@ -52,15 +52,20 @@ type Idempotency struct {
 }
 
 type PublicationSnapshotInput struct {
-	Title       string
-	Summary     string
-	Slug        string
-	Language    string
-	Tags        []string
-	Content     domain.RichTextDocument
-	PlainText   string
-	MediaIDs    []string
-	Idempotency Idempotency
+	Title             string
+	Summary           string
+	Slug              string
+	Language          string
+	Tags              []string
+	Content           domain.RichTextDocument
+	PlainText         string
+	PublicationHash   string
+	Icon              string
+	CoverAttachmentID *string
+	CoverFocalX       float64
+	CoverFocalY       float64
+	MediaIDs          []string
+	Idempotency       Idempotency
 }
 
 func EncodeCursor(value Cursor) (string, error) {
@@ -152,6 +157,14 @@ func (s *Store) getDocument(db *gorm.DB, id string, actorID int64, includeDelete
 	if err != nil {
 		return nil, err
 	}
+	if record.PublicationStatus == domain.PublicationPublished && record.PublicationHash == "" {
+		var publication model.DocumentPublication
+		if err := db.Where("document_id = ?", record.ID).First(&publication).Error; err == nil {
+			if hash, hashErr := publicationHashForSnapshot(&publication); hashErr == nil {
+				record.PublicationHash = hash
+			}
+		}
+	}
 	projection, err := getProjection(db, record.ID)
 	if err != nil {
 		return nil, err
@@ -213,6 +226,16 @@ func (s *Store) publishedSnapshot(ctx context.Context, publication *model.Docume
 	document.PublishedAt = &publication.PublishedAt
 	document.Published = true
 	document.Tags = publicationTags(publication.Tags)
+	document.PublicationHash = publication.PublicationHash
+	if document.PublicationHash == "" {
+		if hash, hashErr := publicationHashForSnapshot(publication); hashErr == nil {
+			document.PublicationHash = hash
+		}
+	}
+	document.Icon = publication.Icon
+	document.CoverAttachmentID = publication.CoverAttachmentID
+	document.CoverFocalX = publication.CoverFocalX
+	document.CoverFocalY = publication.CoverFocalY
 	return document, projectionFromModel(projection), !strings.EqualFold(publication.Slug, requestedSlug), nil
 }
 
@@ -287,13 +310,20 @@ func (s *Store) ListDocuments(ctx context.Context, options ListOptions) ([]*doma
 	}
 	type row struct {
 		model.Document
-		Access              string     `gorm:"column:access"`
-		ProjectedAt         *time.Time `gorm:"column:projected_at"`
-		PublicationTitle    *string    `gorm:"column:publication_title"`
-		PublicationSummary  *string    `gorm:"column:publication_summary"`
-		PublicationSlug     *string    `gorm:"column:publication_slug"`
-		PublicationLanguage *string    `gorm:"column:publication_language"`
-		PublicationTags     []byte     `gorm:"column:publication_tags"`
+		Access               string     `gorm:"column:access"`
+		ProjectedAt          *time.Time `gorm:"column:projected_at"`
+		PublicationTitle     *string    `gorm:"column:publication_title"`
+		PublicationSummary   *string    `gorm:"column:publication_summary"`
+		PublicationSlug      *string    `gorm:"column:publication_slug"`
+		PublicationLanguage  *string    `gorm:"column:publication_language"`
+		PublicationTags      []byte     `gorm:"column:publication_tags"`
+		PublicationHash      *string    `gorm:"column:publication_hash"`
+		PublicationIcon      *string    `gorm:"column:publication_icon"`
+		PublicationCoverID   *string    `gorm:"column:publication_cover_attachment_id"`
+		PublicationFocalX    *float64   `gorm:"column:publication_cover_focal_x"`
+		PublicationFocalY    *float64   `gorm:"column:publication_cover_focal_y"`
+		PublicationContent   []byte     `gorm:"column:publication_content"`
+		PublicationPlainText string     `gorm:"column:publication_plain_text"`
 	}
 	selectSQL, args := buildListDocumentsQuery(options, limit)
 	var rows []row
@@ -321,6 +351,31 @@ func (s *Store) ListDocuments(ctx context.Context, options ListOptions) ([]*doma
 				document.Language = *rows[index].PublicationLanguage
 			}
 			document.Tags = publicationTags(rows[index].PublicationTags)
+			if rows[index].PublicationHash != nil {
+				document.PublicationHash = *rows[index].PublicationHash
+			}
+			if rows[index].PublicationIcon != nil {
+				document.Icon = *rows[index].PublicationIcon
+			}
+			document.CoverAttachmentID = rows[index].PublicationCoverID
+			if rows[index].PublicationFocalX != nil {
+				document.CoverFocalX = *rows[index].PublicationFocalX
+			}
+			if rows[index].PublicationFocalY != nil {
+				document.CoverFocalY = *rows[index].PublicationFocalY
+			}
+			if document.PublicationHash == "" && len(rows[index].PublicationContent) > 0 {
+				legacy := &model.DocumentPublication{
+					DocumentID: rows[index].ID, Title: document.Title, Summary: document.Summary,
+					Slug: document.Slug, Language: document.Language, Tags: rows[index].PublicationTags,
+					Content: rows[index].PublicationContent, PlainText: rows[index].PublicationPlainText,
+					Icon: document.Icon, CoverAttachmentID: document.CoverAttachmentID,
+					CoverFocalX: document.CoverFocalX, CoverFocalY: document.CoverFocalY,
+				}
+				if hash, hashErr := publicationHashForSnapshot(legacy); hashErr == nil {
+					document.PublicationHash = hash
+				}
+			}
 		}
 		result = append(result, document)
 	}
@@ -328,7 +383,7 @@ func (s *Store) ListDocuments(ctx context.Context, options ListOptions) ([]*doma
 }
 
 func buildListDocumentsQuery(options ListOptions, limit int) (string, []any) {
-	selectSQL := `SELECT d.*, p.projected_at, pub.title AS publication_title, pub.summary AS publication_summary, pub.slug AS publication_slug, pub.language AS publication_language, pub.tags AS publication_tags, CASE WHEN d.owner_id = ? THEN 'owner' ELSE COALESCE(m.role, 'none') END AS access
+	selectSQL := `SELECT d.*, p.projected_at, pub.title AS publication_title, pub.summary AS publication_summary, pub.slug AS publication_slug, pub.language AS publication_language, pub.tags AS publication_tags, pub.publication_hash AS publication_hash, pub.icon AS publication_icon, pub.cover_attachment_id AS publication_cover_attachment_id, pub.cover_focal_x AS publication_cover_focal_x, pub.cover_focal_y AS publication_cover_focal_y, pub.content AS publication_content, pub.plain_text AS publication_plain_text, CASE WHEN d.owner_id = ? THEN 'owner' ELSE COALESCE(m.role, 'none') END AS access
 FROM knowledge.documents d
 LEFT JOIN knowledge.document_members m ON m.document_id = d.id AND m.user_id = ?
 LEFT JOIN knowledge.document_projections p ON p.document_id = d.id
@@ -392,7 +447,7 @@ JOIN (
 	return selectSQL, args
 }
 
-func (s *Store) UpdateDocument(ctx context.Context, id string, actorID, expected int64, title, summary, slug, language *string, tags []string, folderID *string) (*domain.Document, error) {
+func (s *Store) UpdateDocument(ctx context.Context, id string, actorID, expected int64, title, summary, slug, language *string, tags []string, folderID, icon, coverAttachmentID *string, coverFocalX, coverFocalY *float64) (*domain.Document, error) {
 	var result *domain.Document
 	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		record, access, err := lockDocument(tx, id, actorID, false)
@@ -415,6 +470,22 @@ func (s *Store) UpdateDocument(ctx context.Context, id string, actorID, expected
 		}
 		if language != nil {
 			updates["language"] = *language
+		}
+		if icon != nil {
+			updates["icon"] = *icon
+		}
+		if coverAttachmentID != nil {
+			if *coverAttachmentID == "" {
+				updates["cover_attachment_id"] = nil
+			} else {
+				updates["cover_attachment_id"] = *coverAttachmentID
+			}
+		}
+		if coverFocalX != nil {
+			updates["cover_focal_x"] = *coverFocalX
+		}
+		if coverFocalY != nil {
+			updates["cover_focal_y"] = *coverFocalY
 		}
 		if slug != nil && *slug != record.Slug {
 			var alias model.SlugAlias

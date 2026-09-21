@@ -14,6 +14,11 @@ type Document struct {
 	PublicationStatus     string     `gorm:"size:32;not null;default:'draft'"`
 	PublicationError      *string    `gorm:"size:64"`
 	PublicationGeneration int64      `gorm:"not null;default:0"`
+	PublicationHash       string     `gorm:"size:64;not null;default:''"`
+	Icon                  string     `gorm:"size:16;not null;default:''"`
+	CoverAttachmentID     *string    `gorm:"type:uuid"`
+	CoverFocalX           float64    `gorm:"not null;default:50"`
+	CoverFocalY           float64    `gorm:"not null;default:50"`
 	MetadataRevision      int64      `gorm:"not null;default:1"`
 	ContentRevision       int64      `gorm:"not null;default:0"`
 	PermissionRevision    int64      `gorm:"not null;default:1"`
@@ -103,42 +108,71 @@ type DocumentTag struct {
 func (DocumentTag) TableName() string { return "knowledge.document_tags" }
 
 type DocumentPublication struct {
-	DocumentID    string    `gorm:"type:uuid;primaryKey"`
-	Title         string    `gorm:"size:200;not null"`
-	Summary       string    `gorm:"size:1000;not null;default:''"`
-	Slug          string    `gorm:"size:80;not null"`
-	Language      string    `gorm:"size:16;not null;default:'zh-CN'"`
-	Tags          []byte    `gorm:"type:jsonb;not null"`
-	OwnerID       int64     `gorm:"not null"`
-	OwnerUsername string    `gorm:"size:32;not null"`
-	OwnerAvatar   string    `gorm:"type:text;not null;default:''"`
-	Content       []byte    `gorm:"type:jsonb;not null"`
-	PlainText     string    `gorm:"type:text;not null;default:''"`
-	PublishedAt   time.Time `gorm:"type:timestamptz;not null"`
-	UpdatedAt     time.Time `gorm:"type:timestamptz;not null"`
+	DocumentID        string    `gorm:"type:uuid;primaryKey"`
+	Title             string    `gorm:"size:200;not null"`
+	Summary           string    `gorm:"size:1000;not null;default:''"`
+	Slug              string    `gorm:"size:80;not null"`
+	Language          string    `gorm:"size:16;not null;default:'zh-CN'"`
+	Tags              []byte    `gorm:"type:jsonb;not null"`
+	OwnerID           int64     `gorm:"not null"`
+	OwnerUsername     string    `gorm:"size:32;not null"`
+	OwnerAvatar       string    `gorm:"type:text;not null;default:''"`
+	Content           []byte    `gorm:"type:jsonb;not null"`
+	PlainText         string    `gorm:"type:text;not null;default:''"`
+	PublishedAt       time.Time `gorm:"type:timestamptz;not null"`
+	UpdatedAt         time.Time `gorm:"type:timestamptz;not null"`
+	PublicationHash   string    `gorm:"size:64;not null;default:''"`
+	Icon              string    `gorm:"size:16;not null;default:''"`
+	CoverAttachmentID *string   `gorm:"type:uuid"`
+	CoverFocalX       float64   `gorm:"not null;default:50"`
+	CoverFocalY       float64   `gorm:"not null;default:50"`
 }
 
 func (DocumentPublication) TableName() string { return "knowledge.document_publications" }
 
 type PublicationCandidate struct {
-	DocumentID    string    `gorm:"type:uuid;primaryKey"`
-	Generation    int64     `gorm:"not null"`
-	Title         string    `gorm:"size:200;not null"`
-	Summary       string    `gorm:"size:1000;not null"`
-	Slug          string    `gorm:"size:80;not null"`
-	Language      string    `gorm:"size:16;not null"`
-	Tags          []byte    `gorm:"type:jsonb;not null"`
-	OwnerID       int64     `gorm:"not null"`
-	OwnerUsername string    `gorm:"size:32;not null"`
-	OwnerAvatar   string    `gorm:"type:text;not null"`
-	Content       []byte    `gorm:"type:jsonb;not null"`
-	PlainText     string    `gorm:"type:text;not null"`
-	MediaIDs      []byte    `gorm:"type:jsonb;not null"`
-	CreatedAt     time.Time `gorm:"type:timestamptz;not null"`
-	UpdatedAt     time.Time `gorm:"type:timestamptz;not null"`
+	DocumentID        string    `gorm:"type:uuid;primaryKey"`
+	Generation        int64     `gorm:"not null"`
+	Title             string    `gorm:"size:200;not null"`
+	Summary           string    `gorm:"size:1000;not null"`
+	Slug              string    `gorm:"size:80;not null"`
+	Language          string    `gorm:"size:16;not null"`
+	Tags              []byte    `gorm:"type:jsonb;not null"`
+	OwnerID           int64     `gorm:"not null"`
+	OwnerUsername     string    `gorm:"size:32;not null"`
+	OwnerAvatar       string    `gorm:"type:text;not null"`
+	Content           []byte    `gorm:"type:jsonb;not null"`
+	PlainText         string    `gorm:"type:text;not null"`
+	MediaIDs          []byte    `gorm:"type:jsonb;not null"`
+	PublicationHash   string    `gorm:"size:64;not null;default:''"`
+	Icon              string    `gorm:"size:16;not null;default:''"`
+	CoverAttachmentID *string   `gorm:"type:uuid"`
+	CoverFocalX       float64   `gorm:"not null;default:50"`
+	CoverFocalY       float64   `gorm:"not null;default:50"`
+	CreatedAt         time.Time `gorm:"type:timestamptz;not null"`
+	UpdatedAt         time.Time `gorm:"type:timestamptz;not null"`
 }
 
 func (PublicationCandidate) TableName() string { return "knowledge.publication_candidates" }
+
+type DocumentCommit struct {
+	ID              string    `gorm:"type:uuid;primaryKey"`
+	DocumentID      string    `gorm:"type:uuid;not null;index"`
+	Kind            string    `gorm:"size:32;not null"`
+	Label           string    `gorm:"size:160;not null"`
+	Description     string    `gorm:"size:2000;not null;default:''"`
+	ContributorID   int64     `gorm:"not null"`
+	ContributorName string    `gorm:"size:128;not null"`
+	Sequence        int64     `gorm:"not null"`
+	ContentHash     string    `gorm:"size:64;not null"`
+	Content         []byte    `gorm:"type:jsonb;not null"`
+	PlainText       string    `gorm:"type:text;not null;default:''"`
+	IsAnchor        bool      `gorm:"not null;default:false"`
+	CreatedAt       time.Time `gorm:"type:timestamptz;not null"`
+	UpdatedAt       time.Time `gorm:"type:timestamptz;not null"`
+}
+
+func (DocumentCommit) TableName() string { return "knowledge.document_commits" }
 
 type PublishedMediaReference struct {
 	DocumentID   string    `gorm:"type:uuid;primaryKey"`

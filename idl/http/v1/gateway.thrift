@@ -196,6 +196,11 @@ struct DocumentData {
   17: optional string folder_id (api.body="folder_id")
   18: required string publication_status (api.body="publication_status")
   19: optional string publication_error (api.body="publication_error")
+  20: optional string publication_hash (api.body="publication_hash")
+  21: optional string icon (api.body="icon")
+  22: optional string cover_attachment_id (api.body="cover_attachment_id")
+  23: optional double cover_focal_x (api.body="cover_focal_x")
+  24: optional double cover_focal_y (api.body="cover_focal_y")
 }
 
 struct DocumentDetailData {
@@ -222,6 +227,53 @@ struct PageInfoData {
 struct DocumentPageData {
   1: required list<DocumentData> items (api.body="items")
   2: required PageInfoData page (api.body="page")
+}
+
+struct CommitData {
+  1: required string id (api.body="id")
+  2: required string document_id (api.body="document_id")
+  3: required string kind (api.body="kind")
+  4: required string label (api.body="label")
+  5: optional string description (api.body="description")
+  6: required string contributor (api.body="contributor")
+  7: required i64 sequence (api.body="sequence")
+  8: required string content_hash (api.body="content_hash")
+  9: required RichTextDocumentData content (api.body="content")
+  10: required string plain_text (api.body="plain_text")
+  11: required string created_at (api.body="created_at")
+  12: required string updated_at (api.body="updated_at")
+}
+struct CommitPageData {
+  1: required list<CommitData> items (api.body="items")
+  2: required PageInfoData page (api.body="page")
+}
+struct CreateCommitRequest {
+  1: required string document_id (api.path="document_id")
+  2: required string kind (api.body="kind")
+  3: optional string label (api.body="label")
+  4: optional string description (api.body="description")
+  5: optional string content_hash (api.body="content_hash")
+  6: optional RichTextDocumentData content (api.body="content")
+  7: optional string plain_text (api.body="plain_text")
+  8: required string idempotency_key (api.header="Idempotency-Key")
+}
+struct ListCommitsRequest {
+  1: required string document_id (api.path="document_id")
+  2: optional i32 limit (api.query="limit")
+  3: optional string cursor (api.query="cursor")
+}
+struct CommitIDRequest { 1: required string document_id (api.path="document_id") 2: required string commit_id (api.path="commit_id") }
+struct RenameCommitRequest {
+  1: required string document_id (api.path="document_id")
+  2: required string commit_id (api.path="commit_id")
+  3: required string if_match (api.header="If-Match")
+  4: required string label (api.body="label")
+  5: optional string description (api.body="description")
+}
+struct RestoreCommitRequest {
+  1: required string document_id (api.path="document_id")
+  2: required string commit_id (api.path="commit_id")
+  3: required string idempotency_key (api.header="Idempotency-Key")
 }
 
 struct FolderData {
@@ -279,6 +331,10 @@ struct UpdateDocumentRequest {
   6: optional string language (api.body="language")
   7: optional list<string> tags (api.body="tags")
   8: optional string folder_id (api.body="folder_id")
+  9: optional string icon (api.body="icon")
+  10: optional string cover_attachment_id (api.body="cover_attachment_id")
+  11: optional double cover_focal_x (api.body="cover_focal_x")
+  12: optional double cover_focal_y (api.body="cover_focal_y")
 }
 
 struct PublicationRequest {
@@ -435,4 +491,9 @@ service GatewayService {
   DocumentPageData ListDeletedDocuments(1: ListDocumentsRequest request) (api.get="/api/v1/studio/trash")
   DocumentData RestoreDeletedDocument(1: DocumentIDRequest request) (api.post="/api/v1/studio/trash/:document_id/restore")
   EmptyResponse PermanentlyDeleteDocument(1: PermanentDeleteDocumentRequest request) (api.delete="/api/v1/studio/trash/:document_id")
+  CommitPageData ListCommits(1: ListCommitsRequest request) (api.get="/api/v1/studio/documents/:document_id/commits")
+  CommitData CreateCommit(1: CreateCommitRequest request) (api.post="/api/v1/studio/documents/:document_id/commits")
+  CommitData GetCommit(1: CommitIDRequest request) (api.get="/api/v1/studio/documents/:document_id/commits/:commit_id")
+  CommitData RenameCommit(1: RenameCommitRequest request) (api.patch="/api/v1/studio/documents/:document_id/commits/:commit_id")
+  DocumentData RestoreCommit(1: RestoreCommitRequest request) (api.post="/api/v1/studio/documents/:document_id/commits/:commit_id/restore")
 }

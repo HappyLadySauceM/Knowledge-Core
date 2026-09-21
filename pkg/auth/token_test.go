@@ -36,7 +36,7 @@ func TestIssuerAndVerifierRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Verify() error = %v", err)
 	}
-	if principal != (Principal{UserID: 42, Role: "user", TokenVersion: 3, ExpiresAt: issued.ExpiresAt}) {
+	if principal != (Principal{UserID: 42, SubjectType: SubjectTypeUser, Role: "user", TokenVersion: 3, ExpiresAt: issued.ExpiresAt}) {
 		t.Fatalf("principal = %#v", principal)
 	}
 
@@ -69,5 +69,31 @@ func TestVerifierRejectsWrongKeyAndOversizedToken(t *testing.T) {
 	}
 	if _, err := verifier.Verify(string(make([]byte, MaxTokenLength+1))); err == nil {
 		t.Fatal("Verify() accepted an oversized token")
+	}
+}
+
+func TestAgentSubjectTypeRoundTrip(t *testing.T) {
+	keys, err := GenerateKeyPair()
+	if err != nil {
+		t.Fatal(err)
+	}
+	issuer, err := NewIssuer(keys.PrivateKey, time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	verifier, err := NewVerifier(keys.PublicKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	issued, err := issuer.Issue(Principal{UserID: 9001, SubjectType: SubjectTypeAgent, Role: "agent", TokenVersion: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	principal, err := verifier.Verify(issued.Value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if principal.SubjectType != SubjectTypeAgent {
+		t.Fatalf("SubjectType = %q, want %q", principal.SubjectType, SubjectTypeAgent)
 	}
 }

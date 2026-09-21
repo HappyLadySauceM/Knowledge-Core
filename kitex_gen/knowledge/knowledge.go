@@ -4,6 +4,8 @@ package knowledge
 
 import (
 	"context"
+	"database/sql"
+	"database/sql/driver"
 	"fmt"
 	"github.com/HappyLadySauce/Knowledge-Core/kitex_gen/common"
 )
@@ -29,6 +31,73 @@ const (
 
 	CodeInternal = 30999
 )
+
+type CommitKind int64
+
+const (
+	CommitKind_MANUAL         CommitKind = 1
+	CommitKind_LEAVE          CommitKind = 2
+	CommitKind_SAFETY         CommitKind = 3
+	CommitKind_PUBLISH        CommitKind = 4
+	CommitKind_REVISION_MERGE CommitKind = 5
+	CommitKind_AGENT_EDIT     CommitKind = 6
+	CommitKind_RESTORE        CommitKind = 7
+)
+
+func (p CommitKind) String() string {
+	switch p {
+	case CommitKind_MANUAL:
+		return "MANUAL"
+	case CommitKind_LEAVE:
+		return "LEAVE"
+	case CommitKind_SAFETY:
+		return "SAFETY"
+	case CommitKind_PUBLISH:
+		return "PUBLISH"
+	case CommitKind_REVISION_MERGE:
+		return "REVISION_MERGE"
+	case CommitKind_AGENT_EDIT:
+		return "AGENT_EDIT"
+	case CommitKind_RESTORE:
+		return "RESTORE"
+	}
+	return "<UNSET>"
+}
+
+func CommitKindFromString(s string) (CommitKind, error) {
+	switch s {
+	case "MANUAL":
+		return CommitKind_MANUAL, nil
+	case "LEAVE":
+		return CommitKind_LEAVE, nil
+	case "SAFETY":
+		return CommitKind_SAFETY, nil
+	case "PUBLISH":
+		return CommitKind_PUBLISH, nil
+	case "REVISION_MERGE":
+		return CommitKind_REVISION_MERGE, nil
+	case "AGENT_EDIT":
+		return CommitKind_AGENT_EDIT, nil
+	case "RESTORE":
+		return CommitKind_RESTORE, nil
+	}
+	return CommitKind(0), fmt.Errorf("not a valid CommitKind string")
+}
+
+func CommitKindPtr(v CommitKind) *CommitKind { return &v }
+func (p *CommitKind) Scan(value interface{}) (err error) {
+	var result sql.NullInt64
+	err = result.Scan(value)
+	*p = CommitKind(result.Int64)
+	return
+}
+
+func (p *CommitKind) Value() (driver.Value, error) {
+	if p == nil {
+		return nil, nil
+	}
+	return int64(*p), nil
+}
 
 type PublicUser struct {
 	Id       int64  `thrift:"id,1,required" frugal:"1,required,i64" json:"id"`
@@ -519,6 +588,11 @@ type Document struct {
 	FolderId          *string     `thrift:"folder_id,17,optional" frugal:"17,optional,string" json:"folder_id,omitempty"`
 	PublicationStatus string      `thrift:"publication_status,18,required" frugal:"18,required,string" json:"publication_status"`
 	PublicationError  *string     `thrift:"publication_error,19,optional" frugal:"19,optional,string" json:"publication_error,omitempty"`
+	PublicationHash   *string     `thrift:"publication_hash,20,optional" frugal:"20,optional,string" json:"publication_hash,omitempty"`
+	Icon              *string     `thrift:"icon,21,optional" frugal:"21,optional,string" json:"icon,omitempty"`
+	CoverAttachmentId *string     `thrift:"cover_attachment_id,22,optional" frugal:"22,optional,string" json:"cover_attachment_id,omitempty"`
+	CoverFocalX       *float64    `thrift:"cover_focal_x,23,optional" frugal:"23,optional,double" json:"cover_focal_x,omitempty"`
+	CoverFocalY       *float64    `thrift:"cover_focal_y,24,optional" frugal:"24,optional,double" json:"cover_focal_y,omitempty"`
 }
 
 func NewDocument() *Document {
@@ -643,6 +717,51 @@ func (p *Document) GetPublicationError() (v string) {
 	}
 	return *p.PublicationError
 }
+
+var Document_PublicationHash_DEFAULT string
+
+func (p *Document) GetPublicationHash() (v string) {
+	if !p.IsSetPublicationHash() {
+		return Document_PublicationHash_DEFAULT
+	}
+	return *p.PublicationHash
+}
+
+var Document_Icon_DEFAULT string
+
+func (p *Document) GetIcon() (v string) {
+	if !p.IsSetIcon() {
+		return Document_Icon_DEFAULT
+	}
+	return *p.Icon
+}
+
+var Document_CoverAttachmentId_DEFAULT string
+
+func (p *Document) GetCoverAttachmentId() (v string) {
+	if !p.IsSetCoverAttachmentId() {
+		return Document_CoverAttachmentId_DEFAULT
+	}
+	return *p.CoverAttachmentId
+}
+
+var Document_CoverFocalX_DEFAULT float64
+
+func (p *Document) GetCoverFocalX() (v float64) {
+	if !p.IsSetCoverFocalX() {
+		return Document_CoverFocalX_DEFAULT
+	}
+	return *p.CoverFocalX
+}
+
+var Document_CoverFocalY_DEFAULT float64
+
+func (p *Document) GetCoverFocalY() (v float64) {
+	if !p.IsSetCoverFocalY() {
+		return Document_CoverFocalY_DEFAULT
+	}
+	return *p.CoverFocalY
+}
 func (p *Document) SetId(val string) {
 	p.Id = val
 }
@@ -700,6 +819,21 @@ func (p *Document) SetPublicationStatus(val string) {
 func (p *Document) SetPublicationError(val *string) {
 	p.PublicationError = val
 }
+func (p *Document) SetPublicationHash(val *string) {
+	p.PublicationHash = val
+}
+func (p *Document) SetIcon(val *string) {
+	p.Icon = val
+}
+func (p *Document) SetCoverAttachmentId(val *string) {
+	p.CoverAttachmentId = val
+}
+func (p *Document) SetCoverFocalX(val *float64) {
+	p.CoverFocalX = val
+}
+func (p *Document) SetCoverFocalY(val *float64) {
+	p.CoverFocalY = val
+}
 
 func (p *Document) IsSetOwner() bool {
 	return p.Owner != nil
@@ -733,6 +867,26 @@ func (p *Document) IsSetPublicationError() bool {
 	return p.PublicationError != nil
 }
 
+func (p *Document) IsSetPublicationHash() bool {
+	return p.PublicationHash != nil
+}
+
+func (p *Document) IsSetIcon() bool {
+	return p.Icon != nil
+}
+
+func (p *Document) IsSetCoverAttachmentId() bool {
+	return p.CoverAttachmentId != nil
+}
+
+func (p *Document) IsSetCoverFocalX() bool {
+	return p.CoverFocalX != nil
+}
+
+func (p *Document) IsSetCoverFocalY() bool {
+	return p.CoverFocalY != nil
+}
+
 func (p *Document) String() string {
 	if p == nil {
 		return "<nil>"
@@ -760,6 +914,11 @@ var fieldIDToName_Document = map[int16]string{
 	17: "folder_id",
 	18: "publication_status",
 	19: "publication_error",
+	20: "publication_hash",
+	21: "icon",
+	22: "cover_attachment_id",
+	23: "cover_focal_x",
+	24: "cover_focal_y",
 }
 
 type DocumentDetail struct {
@@ -1313,14 +1472,18 @@ var fieldIDToName_CreateDocumentRequest = map[int16]string{
 }
 
 type UpdateDocumentRequest struct {
-	DocumentId       string   `thrift:"document_id,1,required" frugal:"1,required,string" json:"document_id"`
-	ExpectedRevision int64    `thrift:"expected_revision,2,required" frugal:"2,required,i64" json:"expected_revision"`
-	Title            *string  `thrift:"title,3,optional" frugal:"3,optional,string" json:"title,omitempty"`
-	Summary          *string  `thrift:"summary,4,optional" frugal:"4,optional,string" json:"summary,omitempty"`
-	Slug             *string  `thrift:"slug,5,optional" frugal:"5,optional,string" json:"slug,omitempty"`
-	Language         *string  `thrift:"language,6,optional" frugal:"6,optional,string" json:"language,omitempty"`
-	Tags             []string `thrift:"tags,7,optional" frugal:"7,optional,list<string>" json:"tags,omitempty"`
-	FolderId         *string  `thrift:"folder_id,8,optional" frugal:"8,optional,string" json:"folder_id,omitempty"`
+	DocumentId        string   `thrift:"document_id,1,required" frugal:"1,required,string" json:"document_id"`
+	ExpectedRevision  int64    `thrift:"expected_revision,2,required" frugal:"2,required,i64" json:"expected_revision"`
+	Title             *string  `thrift:"title,3,optional" frugal:"3,optional,string" json:"title,omitempty"`
+	Summary           *string  `thrift:"summary,4,optional" frugal:"4,optional,string" json:"summary,omitempty"`
+	Slug              *string  `thrift:"slug,5,optional" frugal:"5,optional,string" json:"slug,omitempty"`
+	Language          *string  `thrift:"language,6,optional" frugal:"6,optional,string" json:"language,omitempty"`
+	Tags              []string `thrift:"tags,7,optional" frugal:"7,optional,list<string>" json:"tags,omitempty"`
+	FolderId          *string  `thrift:"folder_id,8,optional" frugal:"8,optional,string" json:"folder_id,omitempty"`
+	Icon              *string  `thrift:"icon,9,optional" frugal:"9,optional,string" json:"icon,omitempty"`
+	CoverAttachmentId *string  `thrift:"cover_attachment_id,10,optional" frugal:"10,optional,string" json:"cover_attachment_id,omitempty"`
+	CoverFocalX       *float64 `thrift:"cover_focal_x,11,optional" frugal:"11,optional,double" json:"cover_focal_x,omitempty"`
+	CoverFocalY       *float64 `thrift:"cover_focal_y,12,optional" frugal:"12,optional,double" json:"cover_focal_y,omitempty"`
 }
 
 func NewUpdateDocumentRequest() *UpdateDocumentRequest {
@@ -1391,6 +1554,42 @@ func (p *UpdateDocumentRequest) GetFolderId() (v string) {
 	}
 	return *p.FolderId
 }
+
+var UpdateDocumentRequest_Icon_DEFAULT string
+
+func (p *UpdateDocumentRequest) GetIcon() (v string) {
+	if !p.IsSetIcon() {
+		return UpdateDocumentRequest_Icon_DEFAULT
+	}
+	return *p.Icon
+}
+
+var UpdateDocumentRequest_CoverAttachmentId_DEFAULT string
+
+func (p *UpdateDocumentRequest) GetCoverAttachmentId() (v string) {
+	if !p.IsSetCoverAttachmentId() {
+		return UpdateDocumentRequest_CoverAttachmentId_DEFAULT
+	}
+	return *p.CoverAttachmentId
+}
+
+var UpdateDocumentRequest_CoverFocalX_DEFAULT float64
+
+func (p *UpdateDocumentRequest) GetCoverFocalX() (v float64) {
+	if !p.IsSetCoverFocalX() {
+		return UpdateDocumentRequest_CoverFocalX_DEFAULT
+	}
+	return *p.CoverFocalX
+}
+
+var UpdateDocumentRequest_CoverFocalY_DEFAULT float64
+
+func (p *UpdateDocumentRequest) GetCoverFocalY() (v float64) {
+	if !p.IsSetCoverFocalY() {
+		return UpdateDocumentRequest_CoverFocalY_DEFAULT
+	}
+	return *p.CoverFocalY
+}
 func (p *UpdateDocumentRequest) SetDocumentId(val string) {
 	p.DocumentId = val
 }
@@ -1414,6 +1613,18 @@ func (p *UpdateDocumentRequest) SetTags(val []string) {
 }
 func (p *UpdateDocumentRequest) SetFolderId(val *string) {
 	p.FolderId = val
+}
+func (p *UpdateDocumentRequest) SetIcon(val *string) {
+	p.Icon = val
+}
+func (p *UpdateDocumentRequest) SetCoverAttachmentId(val *string) {
+	p.CoverAttachmentId = val
+}
+func (p *UpdateDocumentRequest) SetCoverFocalX(val *float64) {
+	p.CoverFocalX = val
+}
+func (p *UpdateDocumentRequest) SetCoverFocalY(val *float64) {
+	p.CoverFocalY = val
 }
 
 func (p *UpdateDocumentRequest) IsSetTitle() bool {
@@ -1440,6 +1651,22 @@ func (p *UpdateDocumentRequest) IsSetFolderId() bool {
 	return p.FolderId != nil
 }
 
+func (p *UpdateDocumentRequest) IsSetIcon() bool {
+	return p.Icon != nil
+}
+
+func (p *UpdateDocumentRequest) IsSetCoverAttachmentId() bool {
+	return p.CoverAttachmentId != nil
+}
+
+func (p *UpdateDocumentRequest) IsSetCoverFocalX() bool {
+	return p.CoverFocalX != nil
+}
+
+func (p *UpdateDocumentRequest) IsSetCoverFocalY() bool {
+	return p.CoverFocalY != nil
+}
+
 func (p *UpdateDocumentRequest) String() string {
 	if p == nil {
 		return "<nil>"
@@ -1448,14 +1675,18 @@ func (p *UpdateDocumentRequest) String() string {
 }
 
 var fieldIDToName_UpdateDocumentRequest = map[int16]string{
-	1: "document_id",
-	2: "expected_revision",
-	3: "title",
-	4: "summary",
-	5: "slug",
-	6: "language",
-	7: "tags",
-	8: "folder_id",
+	1:  "document_id",
+	2:  "expected_revision",
+	3:  "title",
+	4:  "summary",
+	5:  "slug",
+	6:  "language",
+	7:  "tags",
+	8:  "folder_id",
+	9:  "icon",
+	10: "cover_attachment_id",
+	11: "cover_focal_x",
+	12: "cover_focal_y",
 }
 
 type PublishSnapshotRequest struct {
@@ -1469,6 +1700,11 @@ type PublishSnapshotRequest struct {
 	Content                  *RichTextDocument `thrift:"content,8,required" frugal:"8,required,RichTextDocument" json:"content"`
 	PlainText                string            `thrift:"plain_text,9,required" frugal:"9,required,string" json:"plain_text"`
 	IdempotencyKey           *string           `thrift:"idempotency_key,10,optional" frugal:"10,optional,string" json:"idempotency_key,omitempty"`
+	PublicationHash          *string           `thrift:"publication_hash,11,optional" frugal:"11,optional,string" json:"publication_hash,omitempty"`
+	Icon                     *string           `thrift:"icon,12,optional" frugal:"12,optional,string" json:"icon,omitempty"`
+	CoverAttachmentId        *string           `thrift:"cover_attachment_id,13,optional" frugal:"13,optional,string" json:"cover_attachment_id,omitempty"`
+	CoverFocalX              *float64          `thrift:"cover_focal_x,14,optional" frugal:"14,optional,double" json:"cover_focal_x,omitempty"`
+	CoverFocalY              *float64          `thrift:"cover_focal_y,15,optional" frugal:"15,optional,double" json:"cover_focal_y,omitempty"`
 }
 
 func NewPublishSnapshotRequest() *PublishSnapshotRequest {
@@ -1527,6 +1763,51 @@ func (p *PublishSnapshotRequest) GetIdempotencyKey() (v string) {
 	}
 	return *p.IdempotencyKey
 }
+
+var PublishSnapshotRequest_PublicationHash_DEFAULT string
+
+func (p *PublishSnapshotRequest) GetPublicationHash() (v string) {
+	if !p.IsSetPublicationHash() {
+		return PublishSnapshotRequest_PublicationHash_DEFAULT
+	}
+	return *p.PublicationHash
+}
+
+var PublishSnapshotRequest_Icon_DEFAULT string
+
+func (p *PublishSnapshotRequest) GetIcon() (v string) {
+	if !p.IsSetIcon() {
+		return PublishSnapshotRequest_Icon_DEFAULT
+	}
+	return *p.Icon
+}
+
+var PublishSnapshotRequest_CoverAttachmentId_DEFAULT string
+
+func (p *PublishSnapshotRequest) GetCoverAttachmentId() (v string) {
+	if !p.IsSetCoverAttachmentId() {
+		return PublishSnapshotRequest_CoverAttachmentId_DEFAULT
+	}
+	return *p.CoverAttachmentId
+}
+
+var PublishSnapshotRequest_CoverFocalX_DEFAULT float64
+
+func (p *PublishSnapshotRequest) GetCoverFocalX() (v float64) {
+	if !p.IsSetCoverFocalX() {
+		return PublishSnapshotRequest_CoverFocalX_DEFAULT
+	}
+	return *p.CoverFocalX
+}
+
+var PublishSnapshotRequest_CoverFocalY_DEFAULT float64
+
+func (p *PublishSnapshotRequest) GetCoverFocalY() (v float64) {
+	if !p.IsSetCoverFocalY() {
+		return PublishSnapshotRequest_CoverFocalY_DEFAULT
+	}
+	return *p.CoverFocalY
+}
 func (p *PublishSnapshotRequest) SetDocumentId(val string) {
 	p.DocumentId = val
 }
@@ -1557,6 +1838,21 @@ func (p *PublishSnapshotRequest) SetPlainText(val string) {
 func (p *PublishSnapshotRequest) SetIdempotencyKey(val *string) {
 	p.IdempotencyKey = val
 }
+func (p *PublishSnapshotRequest) SetPublicationHash(val *string) {
+	p.PublicationHash = val
+}
+func (p *PublishSnapshotRequest) SetIcon(val *string) {
+	p.Icon = val
+}
+func (p *PublishSnapshotRequest) SetCoverAttachmentId(val *string) {
+	p.CoverAttachmentId = val
+}
+func (p *PublishSnapshotRequest) SetCoverFocalX(val *float64) {
+	p.CoverFocalX = val
+}
+func (p *PublishSnapshotRequest) SetCoverFocalY(val *float64) {
+	p.CoverFocalY = val
+}
 
 func (p *PublishSnapshotRequest) IsSetContent() bool {
 	return p.Content != nil
@@ -1564,6 +1860,26 @@ func (p *PublishSnapshotRequest) IsSetContent() bool {
 
 func (p *PublishSnapshotRequest) IsSetIdempotencyKey() bool {
 	return p.IdempotencyKey != nil
+}
+
+func (p *PublishSnapshotRequest) IsSetPublicationHash() bool {
+	return p.PublicationHash != nil
+}
+
+func (p *PublishSnapshotRequest) IsSetIcon() bool {
+	return p.Icon != nil
+}
+
+func (p *PublishSnapshotRequest) IsSetCoverAttachmentId() bool {
+	return p.CoverAttachmentId != nil
+}
+
+func (p *PublishSnapshotRequest) IsSetCoverFocalX() bool {
+	return p.CoverFocalX != nil
+}
+
+func (p *PublishSnapshotRequest) IsSetCoverFocalY() bool {
+	return p.CoverFocalY != nil
 }
 
 func (p *PublishSnapshotRequest) String() string {
@@ -1584,6 +1900,547 @@ var fieldIDToName_PublishSnapshotRequest = map[int16]string{
 	8:  "content",
 	9:  "plain_text",
 	10: "idempotency_key",
+	11: "publication_hash",
+	12: "icon",
+	13: "cover_attachment_id",
+	14: "cover_focal_x",
+	15: "cover_focal_y",
+}
+
+type Commit struct {
+	Id          string            `thrift:"id,1,required" frugal:"1,required,string" json:"id"`
+	DocumentId  string            `thrift:"document_id,2,required" frugal:"2,required,string" json:"document_id"`
+	Kind        CommitKind        `thrift:"kind,3,required" frugal:"3,required,CommitKind" json:"kind"`
+	Label       string            `thrift:"label,4,required" frugal:"4,required,string" json:"label"`
+	Description *string           `thrift:"description,5,optional" frugal:"5,optional,string" json:"description,omitempty"`
+	Contributor string            `thrift:"contributor,6,required" frugal:"6,required,string" json:"contributor"`
+	Sequence    int64             `thrift:"sequence,7,required" frugal:"7,required,i64" json:"sequence"`
+	ContentHash string            `thrift:"content_hash,8,required" frugal:"8,required,string" json:"content_hash"`
+	Content     *RichTextDocument `thrift:"content,9,required" frugal:"9,required,RichTextDocument" json:"content"`
+	PlainText   string            `thrift:"plain_text,10,required" frugal:"10,required,string" json:"plain_text"`
+	CreatedAt   string            `thrift:"created_at,11,required" frugal:"11,required,string" json:"created_at"`
+	UpdatedAt   string            `thrift:"updated_at,12,required" frugal:"12,required,string" json:"updated_at"`
+}
+
+func NewCommit() *Commit {
+	return &Commit{}
+}
+
+func (p *Commit) InitDefault() {
+}
+
+func (p *Commit) GetId() (v string) {
+	return p.Id
+}
+
+func (p *Commit) GetDocumentId() (v string) {
+	return p.DocumentId
+}
+
+func (p *Commit) GetKind() (v CommitKind) {
+	return p.Kind
+}
+
+func (p *Commit) GetLabel() (v string) {
+	return p.Label
+}
+
+var Commit_Description_DEFAULT string
+
+func (p *Commit) GetDescription() (v string) {
+	if !p.IsSetDescription() {
+		return Commit_Description_DEFAULT
+	}
+	return *p.Description
+}
+
+func (p *Commit) GetContributor() (v string) {
+	return p.Contributor
+}
+
+func (p *Commit) GetSequence() (v int64) {
+	return p.Sequence
+}
+
+func (p *Commit) GetContentHash() (v string) {
+	return p.ContentHash
+}
+
+var Commit_Content_DEFAULT *RichTextDocument
+
+func (p *Commit) GetContent() (v *RichTextDocument) {
+	if !p.IsSetContent() {
+		return Commit_Content_DEFAULT
+	}
+	return p.Content
+}
+
+func (p *Commit) GetPlainText() (v string) {
+	return p.PlainText
+}
+
+func (p *Commit) GetCreatedAt() (v string) {
+	return p.CreatedAt
+}
+
+func (p *Commit) GetUpdatedAt() (v string) {
+	return p.UpdatedAt
+}
+func (p *Commit) SetId(val string) {
+	p.Id = val
+}
+func (p *Commit) SetDocumentId(val string) {
+	p.DocumentId = val
+}
+func (p *Commit) SetKind(val CommitKind) {
+	p.Kind = val
+}
+func (p *Commit) SetLabel(val string) {
+	p.Label = val
+}
+func (p *Commit) SetDescription(val *string) {
+	p.Description = val
+}
+func (p *Commit) SetContributor(val string) {
+	p.Contributor = val
+}
+func (p *Commit) SetSequence(val int64) {
+	p.Sequence = val
+}
+func (p *Commit) SetContentHash(val string) {
+	p.ContentHash = val
+}
+func (p *Commit) SetContent(val *RichTextDocument) {
+	p.Content = val
+}
+func (p *Commit) SetPlainText(val string) {
+	p.PlainText = val
+}
+func (p *Commit) SetCreatedAt(val string) {
+	p.CreatedAt = val
+}
+func (p *Commit) SetUpdatedAt(val string) {
+	p.UpdatedAt = val
+}
+
+func (p *Commit) IsSetDescription() bool {
+	return p.Description != nil
+}
+
+func (p *Commit) IsSetContent() bool {
+	return p.Content != nil
+}
+
+func (p *Commit) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("Commit(%+v)", *p)
+}
+
+var fieldIDToName_Commit = map[int16]string{
+	1:  "id",
+	2:  "document_id",
+	3:  "kind",
+	4:  "label",
+	5:  "description",
+	6:  "contributor",
+	7:  "sequence",
+	8:  "content_hash",
+	9:  "content",
+	10: "plain_text",
+	11: "created_at",
+	12: "updated_at",
+}
+
+type CommitPage struct {
+	Items []*Commit `thrift:"items,1,required" frugal:"1,required,list<Commit>" json:"items"`
+	Page  *PageInfo `thrift:"page,2,required" frugal:"2,required,PageInfo" json:"page"`
+}
+
+func NewCommitPage() *CommitPage {
+	return &CommitPage{}
+}
+
+func (p *CommitPage) InitDefault() {
+}
+
+func (p *CommitPage) GetItems() (v []*Commit) {
+	return p.Items
+}
+
+var CommitPage_Page_DEFAULT *PageInfo
+
+func (p *CommitPage) GetPage() (v *PageInfo) {
+	if !p.IsSetPage() {
+		return CommitPage_Page_DEFAULT
+	}
+	return p.Page
+}
+func (p *CommitPage) SetItems(val []*Commit) {
+	p.Items = val
+}
+func (p *CommitPage) SetPage(val *PageInfo) {
+	p.Page = val
+}
+
+func (p *CommitPage) IsSetPage() bool {
+	return p.Page != nil
+}
+
+func (p *CommitPage) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("CommitPage(%+v)", *p)
+}
+
+var fieldIDToName_CommitPage = map[int16]string{
+	1: "items",
+	2: "page",
+}
+
+type CreateCommitRequest struct {
+	DocumentId     string            `thrift:"document_id,1,required" frugal:"1,required,string" json:"document_id"`
+	Kind           CommitKind        `thrift:"kind,2,required" frugal:"2,required,CommitKind" json:"kind"`
+	Label          *string           `thrift:"label,3,optional" frugal:"3,optional,string" json:"label,omitempty"`
+	Description    *string           `thrift:"description,4,optional" frugal:"4,optional,string" json:"description,omitempty"`
+	ContentHash    *string           `thrift:"content_hash,5,optional" frugal:"5,optional,string" json:"content_hash,omitempty"`
+	Content        *RichTextDocument `thrift:"content,6,optional" frugal:"6,optional,RichTextDocument" json:"content,omitempty"`
+	PlainText      *string           `thrift:"plain_text,7,optional" frugal:"7,optional,string" json:"plain_text,omitempty"`
+	IdempotencyKey *string           `thrift:"idempotency_key,8,optional" frugal:"8,optional,string" json:"idempotency_key,omitempty"`
+}
+
+func NewCreateCommitRequest() *CreateCommitRequest {
+	return &CreateCommitRequest{}
+}
+
+func (p *CreateCommitRequest) InitDefault() {
+}
+
+func (p *CreateCommitRequest) GetDocumentId() (v string) {
+	return p.DocumentId
+}
+
+func (p *CreateCommitRequest) GetKind() (v CommitKind) {
+	return p.Kind
+}
+
+var CreateCommitRequest_Label_DEFAULT string
+
+func (p *CreateCommitRequest) GetLabel() (v string) {
+	if !p.IsSetLabel() {
+		return CreateCommitRequest_Label_DEFAULT
+	}
+	return *p.Label
+}
+
+var CreateCommitRequest_Description_DEFAULT string
+
+func (p *CreateCommitRequest) GetDescription() (v string) {
+	if !p.IsSetDescription() {
+		return CreateCommitRequest_Description_DEFAULT
+	}
+	return *p.Description
+}
+
+var CreateCommitRequest_ContentHash_DEFAULT string
+
+func (p *CreateCommitRequest) GetContentHash() (v string) {
+	if !p.IsSetContentHash() {
+		return CreateCommitRequest_ContentHash_DEFAULT
+	}
+	return *p.ContentHash
+}
+
+var CreateCommitRequest_Content_DEFAULT *RichTextDocument
+
+func (p *CreateCommitRequest) GetContent() (v *RichTextDocument) {
+	if !p.IsSetContent() {
+		return CreateCommitRequest_Content_DEFAULT
+	}
+	return p.Content
+}
+
+var CreateCommitRequest_PlainText_DEFAULT string
+
+func (p *CreateCommitRequest) GetPlainText() (v string) {
+	if !p.IsSetPlainText() {
+		return CreateCommitRequest_PlainText_DEFAULT
+	}
+	return *p.PlainText
+}
+
+var CreateCommitRequest_IdempotencyKey_DEFAULT string
+
+func (p *CreateCommitRequest) GetIdempotencyKey() (v string) {
+	if !p.IsSetIdempotencyKey() {
+		return CreateCommitRequest_IdempotencyKey_DEFAULT
+	}
+	return *p.IdempotencyKey
+}
+func (p *CreateCommitRequest) SetDocumentId(val string) {
+	p.DocumentId = val
+}
+func (p *CreateCommitRequest) SetKind(val CommitKind) {
+	p.Kind = val
+}
+func (p *CreateCommitRequest) SetLabel(val *string) {
+	p.Label = val
+}
+func (p *CreateCommitRequest) SetDescription(val *string) {
+	p.Description = val
+}
+func (p *CreateCommitRequest) SetContentHash(val *string) {
+	p.ContentHash = val
+}
+func (p *CreateCommitRequest) SetContent(val *RichTextDocument) {
+	p.Content = val
+}
+func (p *CreateCommitRequest) SetPlainText(val *string) {
+	p.PlainText = val
+}
+func (p *CreateCommitRequest) SetIdempotencyKey(val *string) {
+	p.IdempotencyKey = val
+}
+
+func (p *CreateCommitRequest) IsSetLabel() bool {
+	return p.Label != nil
+}
+
+func (p *CreateCommitRequest) IsSetDescription() bool {
+	return p.Description != nil
+}
+
+func (p *CreateCommitRequest) IsSetContentHash() bool {
+	return p.ContentHash != nil
+}
+
+func (p *CreateCommitRequest) IsSetContent() bool {
+	return p.Content != nil
+}
+
+func (p *CreateCommitRequest) IsSetPlainText() bool {
+	return p.PlainText != nil
+}
+
+func (p *CreateCommitRequest) IsSetIdempotencyKey() bool {
+	return p.IdempotencyKey != nil
+}
+
+func (p *CreateCommitRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("CreateCommitRequest(%+v)", *p)
+}
+
+var fieldIDToName_CreateCommitRequest = map[int16]string{
+	1: "document_id",
+	2: "kind",
+	3: "label",
+	4: "description",
+	5: "content_hash",
+	6: "content",
+	7: "plain_text",
+	8: "idempotency_key",
+}
+
+type ListCommitsRequest struct {
+	DocumentId string  `thrift:"document_id,1,required" frugal:"1,required,string" json:"document_id"`
+	Limit      *int32  `thrift:"limit,2,optional" frugal:"2,optional,i32" json:"limit,omitempty"`
+	Cursor     *string `thrift:"cursor,3,optional" frugal:"3,optional,string" json:"cursor,omitempty"`
+}
+
+func NewListCommitsRequest() *ListCommitsRequest {
+	return &ListCommitsRequest{}
+}
+
+func (p *ListCommitsRequest) InitDefault() {
+}
+
+func (p *ListCommitsRequest) GetDocumentId() (v string) {
+	return p.DocumentId
+}
+
+var ListCommitsRequest_Limit_DEFAULT int32
+
+func (p *ListCommitsRequest) GetLimit() (v int32) {
+	if !p.IsSetLimit() {
+		return ListCommitsRequest_Limit_DEFAULT
+	}
+	return *p.Limit
+}
+
+var ListCommitsRequest_Cursor_DEFAULT string
+
+func (p *ListCommitsRequest) GetCursor() (v string) {
+	if !p.IsSetCursor() {
+		return ListCommitsRequest_Cursor_DEFAULT
+	}
+	return *p.Cursor
+}
+func (p *ListCommitsRequest) SetDocumentId(val string) {
+	p.DocumentId = val
+}
+func (p *ListCommitsRequest) SetLimit(val *int32) {
+	p.Limit = val
+}
+func (p *ListCommitsRequest) SetCursor(val *string) {
+	p.Cursor = val
+}
+
+func (p *ListCommitsRequest) IsSetLimit() bool {
+	return p.Limit != nil
+}
+
+func (p *ListCommitsRequest) IsSetCursor() bool {
+	return p.Cursor != nil
+}
+
+func (p *ListCommitsRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("ListCommitsRequest(%+v)", *p)
+}
+
+var fieldIDToName_ListCommitsRequest = map[int16]string{
+	1: "document_id",
+	2: "limit",
+	3: "cursor",
+}
+
+type CommitIDRequest struct {
+	CommitId string `thrift:"commit_id,1,required" frugal:"1,required,string" json:"commit_id"`
+}
+
+func NewCommitIDRequest() *CommitIDRequest {
+	return &CommitIDRequest{}
+}
+
+func (p *CommitIDRequest) InitDefault() {
+}
+
+func (p *CommitIDRequest) GetCommitId() (v string) {
+	return p.CommitId
+}
+func (p *CommitIDRequest) SetCommitId(val string) {
+	p.CommitId = val
+}
+
+func (p *CommitIDRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("CommitIDRequest(%+v)", *p)
+}
+
+var fieldIDToName_CommitIDRequest = map[int16]string{
+	1: "commit_id",
+}
+
+type RenameCommitRequest struct {
+	CommitId    string  `thrift:"commit_id,1,required" frugal:"1,required,string" json:"commit_id"`
+	Label       string  `thrift:"label,2,required" frugal:"2,required,string" json:"label"`
+	Description *string `thrift:"description,3,optional" frugal:"3,optional,string" json:"description,omitempty"`
+}
+
+func NewRenameCommitRequest() *RenameCommitRequest {
+	return &RenameCommitRequest{}
+}
+
+func (p *RenameCommitRequest) InitDefault() {
+}
+
+func (p *RenameCommitRequest) GetCommitId() (v string) {
+	return p.CommitId
+}
+
+func (p *RenameCommitRequest) GetLabel() (v string) {
+	return p.Label
+}
+
+var RenameCommitRequest_Description_DEFAULT string
+
+func (p *RenameCommitRequest) GetDescription() (v string) {
+	if !p.IsSetDescription() {
+		return RenameCommitRequest_Description_DEFAULT
+	}
+	return *p.Description
+}
+func (p *RenameCommitRequest) SetCommitId(val string) {
+	p.CommitId = val
+}
+func (p *RenameCommitRequest) SetLabel(val string) {
+	p.Label = val
+}
+func (p *RenameCommitRequest) SetDescription(val *string) {
+	p.Description = val
+}
+
+func (p *RenameCommitRequest) IsSetDescription() bool {
+	return p.Description != nil
+}
+
+func (p *RenameCommitRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("RenameCommitRequest(%+v)", *p)
+}
+
+var fieldIDToName_RenameCommitRequest = map[int16]string{
+	1: "commit_id",
+	2: "label",
+	3: "description",
+}
+
+type RestoreCommitRequest struct {
+	CommitId       string  `thrift:"commit_id,1,required" frugal:"1,required,string" json:"commit_id"`
+	IdempotencyKey *string `thrift:"idempotency_key,2,optional" frugal:"2,optional,string" json:"idempotency_key,omitempty"`
+}
+
+func NewRestoreCommitRequest() *RestoreCommitRequest {
+	return &RestoreCommitRequest{}
+}
+
+func (p *RestoreCommitRequest) InitDefault() {
+}
+
+func (p *RestoreCommitRequest) GetCommitId() (v string) {
+	return p.CommitId
+}
+
+var RestoreCommitRequest_IdempotencyKey_DEFAULT string
+
+func (p *RestoreCommitRequest) GetIdempotencyKey() (v string) {
+	if !p.IsSetIdempotencyKey() {
+		return RestoreCommitRequest_IdempotencyKey_DEFAULT
+	}
+	return *p.IdempotencyKey
+}
+func (p *RestoreCommitRequest) SetCommitId(val string) {
+	p.CommitId = val
+}
+func (p *RestoreCommitRequest) SetIdempotencyKey(val *string) {
+	p.IdempotencyKey = val
+}
+
+func (p *RestoreCommitRequest) IsSetIdempotencyKey() bool {
+	return p.IdempotencyKey != nil
+}
+
+func (p *RestoreCommitRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("RestoreCommitRequest(%+v)", *p)
+}
+
+var fieldIDToName_RestoreCommitRequest = map[int16]string{
+	1: "commit_id",
+	2: "idempotency_key",
 }
 
 type ListFoldersRequest struct {
@@ -2507,6 +3364,16 @@ type KnowledgeService interface {
 	AuthorizeCollaboration(ctx context.Context, request *AuthorizeCollaborationRequest) (r *CollaborationAuthorization, err error)
 
 	ProjectCollaboration(ctx context.Context, request *ProjectCollaborationRequest) (err error)
+
+	CreateCommit(ctx context.Context, request *CreateCommitRequest) (r *Commit, err error)
+
+	ListCommits(ctx context.Context, request *ListCommitsRequest) (r *CommitPage, err error)
+
+	GetCommit(ctx context.Context, request *CommitIDRequest) (r *Commit, err error)
+
+	RenameCommit(ctx context.Context, request *RenameCommitRequest) (r *Commit, err error)
+
+	RestoreCommit(ctx context.Context, request *RestoreCommitRequest) (r *Document, err error)
 }
 
 type KnowledgeServicePingArgs struct {
@@ -4332,3 +5199,383 @@ func (p *KnowledgeServiceProjectCollaborationResult) String() string {
 }
 
 var fieldIDToName_KnowledgeServiceProjectCollaborationResult = map[int16]string{}
+
+type KnowledgeServiceCreateCommitArgs struct {
+	Request *CreateCommitRequest `thrift:"request,1" frugal:"1,default,CreateCommitRequest" json:"request"`
+}
+
+func NewKnowledgeServiceCreateCommitArgs() *KnowledgeServiceCreateCommitArgs {
+	return &KnowledgeServiceCreateCommitArgs{}
+}
+
+func (p *KnowledgeServiceCreateCommitArgs) InitDefault() {
+}
+
+var KnowledgeServiceCreateCommitArgs_Request_DEFAULT *CreateCommitRequest
+
+func (p *KnowledgeServiceCreateCommitArgs) GetRequest() (v *CreateCommitRequest) {
+	if !p.IsSetRequest() {
+		return KnowledgeServiceCreateCommitArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+func (p *KnowledgeServiceCreateCommitArgs) SetRequest(val *CreateCommitRequest) {
+	p.Request = val
+}
+
+func (p *KnowledgeServiceCreateCommitArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *KnowledgeServiceCreateCommitArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("KnowledgeServiceCreateCommitArgs(%+v)", *p)
+}
+
+var fieldIDToName_KnowledgeServiceCreateCommitArgs = map[int16]string{
+	1: "request",
+}
+
+type KnowledgeServiceCreateCommitResult struct {
+	Success *Commit `thrift:"success,0,optional" frugal:"0,optional,Commit" json:"success,omitempty"`
+}
+
+func NewKnowledgeServiceCreateCommitResult() *KnowledgeServiceCreateCommitResult {
+	return &KnowledgeServiceCreateCommitResult{}
+}
+
+func (p *KnowledgeServiceCreateCommitResult) InitDefault() {
+}
+
+var KnowledgeServiceCreateCommitResult_Success_DEFAULT *Commit
+
+func (p *KnowledgeServiceCreateCommitResult) GetSuccess() (v *Commit) {
+	if !p.IsSetSuccess() {
+		return KnowledgeServiceCreateCommitResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *KnowledgeServiceCreateCommitResult) SetSuccess(x interface{}) {
+	p.Success = x.(*Commit)
+}
+
+func (p *KnowledgeServiceCreateCommitResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *KnowledgeServiceCreateCommitResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("KnowledgeServiceCreateCommitResult(%+v)", *p)
+}
+
+var fieldIDToName_KnowledgeServiceCreateCommitResult = map[int16]string{
+	0: "success",
+}
+
+type KnowledgeServiceListCommitsArgs struct {
+	Request *ListCommitsRequest `thrift:"request,1" frugal:"1,default,ListCommitsRequest" json:"request"`
+}
+
+func NewKnowledgeServiceListCommitsArgs() *KnowledgeServiceListCommitsArgs {
+	return &KnowledgeServiceListCommitsArgs{}
+}
+
+func (p *KnowledgeServiceListCommitsArgs) InitDefault() {
+}
+
+var KnowledgeServiceListCommitsArgs_Request_DEFAULT *ListCommitsRequest
+
+func (p *KnowledgeServiceListCommitsArgs) GetRequest() (v *ListCommitsRequest) {
+	if !p.IsSetRequest() {
+		return KnowledgeServiceListCommitsArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+func (p *KnowledgeServiceListCommitsArgs) SetRequest(val *ListCommitsRequest) {
+	p.Request = val
+}
+
+func (p *KnowledgeServiceListCommitsArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *KnowledgeServiceListCommitsArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("KnowledgeServiceListCommitsArgs(%+v)", *p)
+}
+
+var fieldIDToName_KnowledgeServiceListCommitsArgs = map[int16]string{
+	1: "request",
+}
+
+type KnowledgeServiceListCommitsResult struct {
+	Success *CommitPage `thrift:"success,0,optional" frugal:"0,optional,CommitPage" json:"success,omitempty"`
+}
+
+func NewKnowledgeServiceListCommitsResult() *KnowledgeServiceListCommitsResult {
+	return &KnowledgeServiceListCommitsResult{}
+}
+
+func (p *KnowledgeServiceListCommitsResult) InitDefault() {
+}
+
+var KnowledgeServiceListCommitsResult_Success_DEFAULT *CommitPage
+
+func (p *KnowledgeServiceListCommitsResult) GetSuccess() (v *CommitPage) {
+	if !p.IsSetSuccess() {
+		return KnowledgeServiceListCommitsResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *KnowledgeServiceListCommitsResult) SetSuccess(x interface{}) {
+	p.Success = x.(*CommitPage)
+}
+
+func (p *KnowledgeServiceListCommitsResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *KnowledgeServiceListCommitsResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("KnowledgeServiceListCommitsResult(%+v)", *p)
+}
+
+var fieldIDToName_KnowledgeServiceListCommitsResult = map[int16]string{
+	0: "success",
+}
+
+type KnowledgeServiceGetCommitArgs struct {
+	Request *CommitIDRequest `thrift:"request,1" frugal:"1,default,CommitIDRequest" json:"request"`
+}
+
+func NewKnowledgeServiceGetCommitArgs() *KnowledgeServiceGetCommitArgs {
+	return &KnowledgeServiceGetCommitArgs{}
+}
+
+func (p *KnowledgeServiceGetCommitArgs) InitDefault() {
+}
+
+var KnowledgeServiceGetCommitArgs_Request_DEFAULT *CommitIDRequest
+
+func (p *KnowledgeServiceGetCommitArgs) GetRequest() (v *CommitIDRequest) {
+	if !p.IsSetRequest() {
+		return KnowledgeServiceGetCommitArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+func (p *KnowledgeServiceGetCommitArgs) SetRequest(val *CommitIDRequest) {
+	p.Request = val
+}
+
+func (p *KnowledgeServiceGetCommitArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *KnowledgeServiceGetCommitArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("KnowledgeServiceGetCommitArgs(%+v)", *p)
+}
+
+var fieldIDToName_KnowledgeServiceGetCommitArgs = map[int16]string{
+	1: "request",
+}
+
+type KnowledgeServiceGetCommitResult struct {
+	Success *Commit `thrift:"success,0,optional" frugal:"0,optional,Commit" json:"success,omitempty"`
+}
+
+func NewKnowledgeServiceGetCommitResult() *KnowledgeServiceGetCommitResult {
+	return &KnowledgeServiceGetCommitResult{}
+}
+
+func (p *KnowledgeServiceGetCommitResult) InitDefault() {
+}
+
+var KnowledgeServiceGetCommitResult_Success_DEFAULT *Commit
+
+func (p *KnowledgeServiceGetCommitResult) GetSuccess() (v *Commit) {
+	if !p.IsSetSuccess() {
+		return KnowledgeServiceGetCommitResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *KnowledgeServiceGetCommitResult) SetSuccess(x interface{}) {
+	p.Success = x.(*Commit)
+}
+
+func (p *KnowledgeServiceGetCommitResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *KnowledgeServiceGetCommitResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("KnowledgeServiceGetCommitResult(%+v)", *p)
+}
+
+var fieldIDToName_KnowledgeServiceGetCommitResult = map[int16]string{
+	0: "success",
+}
+
+type KnowledgeServiceRenameCommitArgs struct {
+	Request *RenameCommitRequest `thrift:"request,1" frugal:"1,default,RenameCommitRequest" json:"request"`
+}
+
+func NewKnowledgeServiceRenameCommitArgs() *KnowledgeServiceRenameCommitArgs {
+	return &KnowledgeServiceRenameCommitArgs{}
+}
+
+func (p *KnowledgeServiceRenameCommitArgs) InitDefault() {
+}
+
+var KnowledgeServiceRenameCommitArgs_Request_DEFAULT *RenameCommitRequest
+
+func (p *KnowledgeServiceRenameCommitArgs) GetRequest() (v *RenameCommitRequest) {
+	if !p.IsSetRequest() {
+		return KnowledgeServiceRenameCommitArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+func (p *KnowledgeServiceRenameCommitArgs) SetRequest(val *RenameCommitRequest) {
+	p.Request = val
+}
+
+func (p *KnowledgeServiceRenameCommitArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *KnowledgeServiceRenameCommitArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("KnowledgeServiceRenameCommitArgs(%+v)", *p)
+}
+
+var fieldIDToName_KnowledgeServiceRenameCommitArgs = map[int16]string{
+	1: "request",
+}
+
+type KnowledgeServiceRenameCommitResult struct {
+	Success *Commit `thrift:"success,0,optional" frugal:"0,optional,Commit" json:"success,omitempty"`
+}
+
+func NewKnowledgeServiceRenameCommitResult() *KnowledgeServiceRenameCommitResult {
+	return &KnowledgeServiceRenameCommitResult{}
+}
+
+func (p *KnowledgeServiceRenameCommitResult) InitDefault() {
+}
+
+var KnowledgeServiceRenameCommitResult_Success_DEFAULT *Commit
+
+func (p *KnowledgeServiceRenameCommitResult) GetSuccess() (v *Commit) {
+	if !p.IsSetSuccess() {
+		return KnowledgeServiceRenameCommitResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *KnowledgeServiceRenameCommitResult) SetSuccess(x interface{}) {
+	p.Success = x.(*Commit)
+}
+
+func (p *KnowledgeServiceRenameCommitResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *KnowledgeServiceRenameCommitResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("KnowledgeServiceRenameCommitResult(%+v)", *p)
+}
+
+var fieldIDToName_KnowledgeServiceRenameCommitResult = map[int16]string{
+	0: "success",
+}
+
+type KnowledgeServiceRestoreCommitArgs struct {
+	Request *RestoreCommitRequest `thrift:"request,1" frugal:"1,default,RestoreCommitRequest" json:"request"`
+}
+
+func NewKnowledgeServiceRestoreCommitArgs() *KnowledgeServiceRestoreCommitArgs {
+	return &KnowledgeServiceRestoreCommitArgs{}
+}
+
+func (p *KnowledgeServiceRestoreCommitArgs) InitDefault() {
+}
+
+var KnowledgeServiceRestoreCommitArgs_Request_DEFAULT *RestoreCommitRequest
+
+func (p *KnowledgeServiceRestoreCommitArgs) GetRequest() (v *RestoreCommitRequest) {
+	if !p.IsSetRequest() {
+		return KnowledgeServiceRestoreCommitArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+func (p *KnowledgeServiceRestoreCommitArgs) SetRequest(val *RestoreCommitRequest) {
+	p.Request = val
+}
+
+func (p *KnowledgeServiceRestoreCommitArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *KnowledgeServiceRestoreCommitArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("KnowledgeServiceRestoreCommitArgs(%+v)", *p)
+}
+
+var fieldIDToName_KnowledgeServiceRestoreCommitArgs = map[int16]string{
+	1: "request",
+}
+
+type KnowledgeServiceRestoreCommitResult struct {
+	Success *Document `thrift:"success,0,optional" frugal:"0,optional,Document" json:"success,omitempty"`
+}
+
+func NewKnowledgeServiceRestoreCommitResult() *KnowledgeServiceRestoreCommitResult {
+	return &KnowledgeServiceRestoreCommitResult{}
+}
+
+func (p *KnowledgeServiceRestoreCommitResult) InitDefault() {
+}
+
+var KnowledgeServiceRestoreCommitResult_Success_DEFAULT *Document
+
+func (p *KnowledgeServiceRestoreCommitResult) GetSuccess() (v *Document) {
+	if !p.IsSetSuccess() {
+		return KnowledgeServiceRestoreCommitResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *KnowledgeServiceRestoreCommitResult) SetSuccess(x interface{}) {
+	p.Success = x.(*Document)
+}
+
+func (p *KnowledgeServiceRestoreCommitResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *KnowledgeServiceRestoreCommitResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("KnowledgeServiceRestoreCommitResult(%+v)", *p)
+}
+
+var fieldIDToName_KnowledgeServiceRestoreCommitResult = map[int16]string{
+	0: "success",
+}

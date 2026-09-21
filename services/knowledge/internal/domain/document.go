@@ -60,6 +60,11 @@ type Document struct {
 	PublicationStatus     string
 	PublicationError      *string
 	PublicationGeneration int64
+	PublicationHash       string
+	Icon                  string
+	CoverAttachmentID     *string
+	CoverFocalX           float64
+	CoverFocalY           float64
 	MetadataRevision      int64
 	ContentRevision       int64
 	PermissionRevision    int64
@@ -69,6 +74,21 @@ type Document struct {
 	ProjectedAt           *time.Time
 	CreatedAt             time.Time
 	UpdatedAt             time.Time
+}
+
+type Commit struct {
+	ID          string
+	DocumentID  string
+	Kind        string
+	Label       string
+	Description string
+	Contributor string
+	Sequence    int64
+	ContentHash string
+	Content     RichTextDocument
+	PlainText   string
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
 }
 
 type PublicationSnapshot struct {

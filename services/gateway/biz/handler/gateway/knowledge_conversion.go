@@ -56,6 +56,8 @@ func toDocumentData(value *knowledgev1.Document) (*gatewaymodel.DocumentData, er
 		ProjectedAt: copyString(value.ProjectedAt), CreatedAt: value.CreatedAt, UpdatedAt: value.UpdatedAt,
 		Language: copyString(value.Language), Tags: append([]string(nil), value.Tags...), FolderID: copyString(value.FolderId),
 		PublicationStatus: value.PublicationStatus, PublicationError: copyString(value.PublicationError),
+		PublicationHash: copyString(value.PublicationHash), Icon: copyString(value.Icon), CoverAttachmentID: copyString(value.CoverAttachmentId),
+		CoverFocalX: copyFloat(value.CoverFocalX), CoverFocalY: copyFloat(value.CoverFocalY),
 	}, nil
 }
 
@@ -83,6 +85,124 @@ func toDocumentDetailData(value *knowledgev1.DocumentDetail, _ config.EndpointOp
 	return &gatewaymodel.DocumentDetailData{
 		Document: document, Content: content, PlainText: value.PlainText,
 	}, nil
+}
+
+func toCommitPageData(value *knowledgev1.CommitPage) (*gatewaymodel.CommitPageData, error) {
+	if value == nil || value.Page == nil {
+		return nil, errors.New("knowledge commit page is incomplete")
+	}
+	items := make([]*gatewaymodel.CommitData, 0, len(value.Items))
+	for _, commit := range value.Items {
+		converted, err := toCommitData(commit)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, converted)
+	}
+	return &gatewaymodel.CommitPageData{
+		Items: items,
+		Page:  &gatewaymodel.PageInfoData{NextCursor: copyString(value.Page.NextCursor), HasMore: value.Page.HasMore},
+	}, nil
+}
+
+func toCommitData(value *knowledgev1.Commit) (*gatewaymodel.CommitData, error) {
+	if value == nil || !validUUIDv7(value.Id) || !validUUIDv7(value.DocumentId) || strings.TrimSpace(commitKindText(value.Kind)) == "" ||
+		strings.TrimSpace(value.Label) == "" || strings.TrimSpace(value.Contributor) == "" || value.Sequence < 0 ||
+		strings.TrimSpace(value.ContentHash) == "" || !validRFC3339(value.CreatedAt) || !validRFC3339(value.UpdatedAt) {
+		return nil, errors.New("knowledge commit is incomplete")
+	}
+	content, err := toRichTextDocumentData(value.Content)
+	if err != nil {
+		return nil, err
+	}
+	return &gatewaymodel.CommitData{
+		ID: value.Id, DocumentID: value.DocumentId, Kind: commitKindText(value.Kind), Label: value.Label,
+		Description: copyString(value.Description), Contributor: value.Contributor, Sequence: value.Sequence,
+		ContentHash: value.ContentHash, Content: content, PlainText: value.PlainText,
+		CreatedAt: value.CreatedAt, UpdatedAt: value.UpdatedAt,
+	}, nil
+}
+
+func commitKindText(value knowledgev1.CommitKind) string {
+	switch value {
+	case knowledgev1.CommitKind_LEAVE:
+		return "leave"
+	case knowledgev1.CommitKind_SAFETY:
+		return "safety"
+	case knowledgev1.CommitKind_PUBLISH:
+		return "publish"
+	case knowledgev1.CommitKind_REVISION_MERGE:
+		return "revision_merge"
+	case knowledgev1.CommitKind_AGENT_EDIT:
+		return "agent_edit"
+	case knowledgev1.CommitKind_RESTORE:
+		return "restore"
+	case knowledgev1.CommitKind_MANUAL:
+		return "manual"
+	default:
+		return ""
+	}
+}
+
+func fromRichTextDocumentData(value *gatewaymodel.RichTextDocumentData) (*knowledgev1.RichTextDocument, error) {
+	if value == nil || value.Type != "doc" {
+		return nil, errors.New("rich-text document is invalid")
+	}
+	content := make([]*knowledgev1.RichTextNode, 0, len(value.Content))
+	for _, node := range value.Content {
+		converted, err := fromRichTextNodeData(node, 1)
+		if err != nil {
+			return nil, err
+		}
+		content = append(content, converted)
+	}
+	return &knowledgev1.RichTextDocument{Type: value.Type, Content: content}, nil
+}
+
+func fromRichTextNodeData(value *gatewaymodel.RichTextNodeData, depth int) (*knowledgev1.RichTextNode, error) {
+	if value == nil || strings.TrimSpace(value.Type) == "" || depth > maximumRichTextDepth {
+		return nil, errors.New("rich-text node is invalid")
+	}
+	result := &knowledgev1.RichTextNode{Type: value.Type, Text: copyString(value.Text)}
+	if value.Attrs != nil {
+		result.Attrs = fromRichTextAttrsData(value.Attrs)
+	}
+	if value.Content != nil {
+		result.Content = make([]*knowledgev1.RichTextNode, 0, len(value.Content))
+		for _, child := range value.Content {
+			converted, err := fromRichTextNodeData(child, depth+1)
+			if err != nil {
+				return nil, err
+			}
+			result.Content = append(result.Content, converted)
+		}
+	}
+	if value.Marks != nil {
+		result.Marks = make([]*knowledgev1.RichTextMark, 0, len(value.Marks))
+		for _, mark := range value.Marks {
+			if mark == nil || strings.TrimSpace(mark.Type) == "" {
+				return nil, errors.New("rich-text mark is invalid")
+			}
+			converted := &knowledgev1.RichTextMark{Type: mark.Type}
+			if mark.Attrs != nil {
+				converted.Attrs = fromRichTextAttrsData(mark.Attrs)
+			}
+			result.Marks = append(result.Marks, converted)
+		}
+	}
+	return result, nil
+}
+
+func fromRichTextAttrsData(value *gatewaymodel.RichTextAttrsData) *knowledgev1.RichTextAttrs {
+	if value == nil {
+		return nil
+	}
+	return &knowledgev1.RichTextAttrs{
+		Level: copyInt32(value.Level), Start: copyInt32(value.Start), Checked: copyBool(value.Checked),
+		Language: copyString(value.Language), Href: copyString(value.Href), AttachmentId: copyString(value.AttachmentID),
+		Alt: copyString(value.Alt), Title: copyString(value.Title), TextAlign: copyString(value.TextAlign),
+		Colspan: copyInt32(value.Colspan), Rowspan: copyInt32(value.Rowspan), Colwidth: append([]int32(nil), value.Colwidth...),
+	}
 }
 
 func toMemberListData(value *knowledgev1.MemberList) (*gatewaymodel.MemberListData, error) {
@@ -119,6 +239,14 @@ func toPublicUserData(value *knowledgev1.PublicUser) (*gatewaymodel.PublicUserDa
 		return nil, errors.New("knowledge public user is incomplete")
 	}
 	return &gatewaymodel.PublicUserData{ID: strconv.FormatInt(value.Id, 10), Username: value.Username, Avatar: value.Avatar}, nil
+}
+
+func copyFloat(value *float64) *float64 {
+	if value == nil {
+		return nil
+	}
+	copy := *value
+	return &copy
 }
 
 func toRichTextDocumentData(value *knowledgev1.RichTextDocument) (*gatewaymodel.RichTextDocumentData, error) {

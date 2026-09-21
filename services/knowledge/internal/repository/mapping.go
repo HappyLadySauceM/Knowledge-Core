@@ -17,6 +17,8 @@ func documentToModel(value *domain.Document) *model.Document {
 		OwnerID:  value.Owner.ID, OwnerUsername: value.Owner.Username, OwnerAvatar: value.Owner.Avatar,
 		MetadataRevision: value.MetadataRevision, ContentRevision: value.ContentRevision,
 		PublicationStatus: value.PublicationStatus, PublicationError: value.PublicationError, PublicationGeneration: value.PublicationGeneration,
+		PublicationHash: value.PublicationHash, Icon: value.Icon, CoverAttachmentID: value.CoverAttachmentID,
+		CoverFocalX: value.CoverFocalX, CoverFocalY: value.CoverFocalY,
 		PermissionRevision: value.PermissionRevision, PublishedAt: value.PublishedAt,
 		DeletedAt: value.DeletedAt, PurgeAfter: value.PurgeAfter, CreatedAt: value.CreatedAt.UTC(), UpdatedAt: value.UpdatedAt.UTC(),
 	}
@@ -31,8 +33,10 @@ func documentFromModel(value *model.Document, access string, projection *model.P
 		Language: value.Language,
 		Owner:    domain.PublicUser{ID: value.OwnerID, Username: value.OwnerUsername, Avatar: value.OwnerAvatar},
 		Access:   access, Published: value.PublicationStatus == domain.PublicationPublished, PublicationStatus: value.PublicationStatus,
-		PublicationError: value.PublicationError, PublicationGeneration: value.PublicationGeneration, MetadataRevision: value.MetadataRevision,
-		ContentRevision: value.ContentRevision, PermissionRevision: value.PermissionRevision,
+		PublicationError: value.PublicationError, PublicationGeneration: value.PublicationGeneration, PublicationHash: value.PublicationHash,
+		Icon: value.Icon, CoverAttachmentID: value.CoverAttachmentID, CoverFocalX: value.CoverFocalX, CoverFocalY: value.CoverFocalY,
+		MetadataRevision: value.MetadataRevision,
+		ContentRevision:  value.ContentRevision, PermissionRevision: value.PermissionRevision,
 		PublishedAt: value.PublishedAt, DeletedAt: value.DeletedAt, PurgeAfter: value.PurgeAfter,
 		CreatedAt: value.CreatedAt, UpdatedAt: value.UpdatedAt,
 	}

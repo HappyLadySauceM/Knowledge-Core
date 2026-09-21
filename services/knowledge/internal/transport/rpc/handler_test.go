@@ -68,6 +68,21 @@ func (s *documentServiceStub) PurgeDeleted(context.Context, string, int64, int64
 func (s *documentServiceStub) IsMediaPublished(context.Context, string) (bool, error) {
 	return false, s.err
 }
+func (s *documentServiceStub) CreateCommit(context.Context, knowledgelogic.CommitInput) (*domain.Commit, error) {
+	return nil, s.err
+}
+func (s *documentServiceStub) ListCommits(context.Context, string, int64, int) ([]*domain.Commit, error) {
+	return nil, s.err
+}
+func (s *documentServiceStub) GetCommit(context.Context, string, int64) (*domain.Commit, error) {
+	return nil, s.err
+}
+func (s *documentServiceStub) RenameCommit(context.Context, string, int64, string, string) (*domain.Commit, error) {
+	return nil, s.err
+}
+func (s *documentServiceStub) RestoreCommit(context.Context, string, int64, string) (*domain.Document, error) {
+	return s.document, s.err
+}
 
 type memberServiceStub struct{}
 

@@ -326,3 +326,38 @@ func _permanentlydeletedocumentMw() []app.HandlerFunc {
 	// your code...
 	return nil
 }
+
+func _listcommitsMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _createcommitMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _commitsMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _getcommitMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _renamecommitMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _commit_idMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _restorecommitMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}

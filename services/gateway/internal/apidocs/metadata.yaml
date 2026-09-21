@@ -353,3 +353,38 @@ operations:
     success_status: 202
     response_headers: [X-Request-ID, X-Trace-ID]
     errors: [400, 401, 403, 404, 409, 412, 429, 500, 502, 503, 504]
+  ListCommits:
+    tag: 文档历史
+    summary: 列出文档提交
+    description: 按时间倒序返回可查看和恢复的文档历史提交。
+    security: bearer
+    success_status: 200
+    errors: [400, 401, 403, 404, 429, 500, 502, 503, 504]
+  CreateCommit:
+    tag: 文档历史
+    summary: 创建文档提交
+    description: 将当前编辑稿保存为一条可审阅、可恢复的历史提交。
+    security: bearer
+    success_status: 201
+    errors: [400, 401, 403, 404, 409, 412, 429, 500, 502, 503, 504]
+  GetCommit:
+    tag: 文档历史
+    summary: 获取文档提交
+    description: 获取指定历史提交的正文和元数据。
+    security: bearer
+    success_status: 200
+    errors: [400, 401, 403, 404, 429, 500, 502, 503, 504]
+  RenameCommit:
+    tag: 文档历史
+    summary: 重命名文档提交
+    description: 更新历史提交的标题或说明，不改变正文状态。
+    security: bearer
+    success_status: 200
+    errors: [400, 401, 403, 404, 409, 412, 429, 500, 502, 503, 504]
+  RestoreCommit:
+    tag: 文档历史
+    summary: 恢复文档提交
+    description: 将历史提交恢复为当前编辑稿，并生成新的恢复提交。
+    security: bearer
+    success_status: 202
+    errors: [400, 401, 403, 404, 409, 412, 429, 500, 502, 503, 504]

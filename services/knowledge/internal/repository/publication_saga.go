@@ -74,6 +74,8 @@ func (s *Store) PublishSnapshot(ctx context.Context, id string, actorID, expecte
 			Title: input.Title, Summary: input.Summary, Slug: input.Slug, Language: input.Language, Tags: tags,
 			OwnerID: record.OwnerID, OwnerUsername: record.OwnerUsername, OwnerAvatar: record.OwnerAvatar,
 			Content: content, PlainText: input.PlainText, MediaIDs: mediaIDs, CreatedAt: now, UpdatedAt: now,
+			PublicationHash: input.PublicationHash, Icon: input.Icon, CoverAttachmentID: input.CoverAttachmentID,
+			CoverFocalX: input.CoverFocalX, CoverFocalY: input.CoverFocalY,
 		}
 		if err := tx.Save(candidate).Error; err != nil {
 			return mapWriteError("save publication candidate", err)
@@ -86,7 +88,9 @@ func (s *Store) PublishSnapshot(ctx context.Context, id string, actorID, expecte
 		}
 		if err := tx.Model(record).Updates(map[string]any{
 			"publication_status": domain.PublicationPublishing, "publication_error": nil,
-			"publication_generation": generation, "metadata_revision": gorm.Expr("metadata_revision + 1"), "updated_at": now,
+			"publication_generation": generation, "publication_hash": input.PublicationHash, "icon": input.Icon,
+			"cover_attachment_id": input.CoverAttachmentID, "cover_focal_x": input.CoverFocalX, "cover_focal_y": input.CoverFocalY,
+			"metadata_revision": gorm.Expr("metadata_revision + 1"), "updated_at": now,
 		}).Error; err != nil {
 			return fmt.Errorf("mark publication pending: %w", err)
 		}
@@ -277,6 +281,8 @@ func (s *Store) PromotePublication(ctx context.Context, job domain.PublicationRe
 			Title:      candidate.Title, Summary: candidate.Summary, Slug: candidate.Slug, Language: candidate.Language,
 			Tags: candidate.Tags, OwnerID: candidate.OwnerID, OwnerUsername: candidate.OwnerUsername, OwnerAvatar: candidate.OwnerAvatar,
 			Content: candidate.Content, PlainText: candidate.PlainText, PublishedAt: now, UpdatedAt: now,
+			PublicationHash: candidate.PublicationHash, Icon: candidate.Icon, CoverAttachmentID: candidate.CoverAttachmentID,
+			CoverFocalX: candidate.CoverFocalX, CoverFocalY: candidate.CoverFocalY,
 		}
 		if err := tx.Save(publication).Error; err != nil {
 			return mapWriteError("promote publication candidate", err)

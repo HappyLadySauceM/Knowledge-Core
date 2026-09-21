@@ -33,6 +33,11 @@ type DocumentService interface {
 	Delete(context.Context, string, int64, int64) (*domain.Document, error)
 	Restore(context.Context, string, int64) (*domain.Document, error)
 	PurgeDeleted(context.Context, string, int64, int64, string) error
+	CreateCommit(context.Context, knowledgelogic.CommitInput) (*domain.Commit, error)
+	ListCommits(context.Context, string, int64, int) ([]*domain.Commit, error)
+	GetCommit(context.Context, string, int64) (*domain.Commit, error)
+	RenameCommit(context.Context, string, int64, string, string) (*domain.Commit, error)
+	RestoreCommit(context.Context, string, int64, string) (*domain.Document, error)
 	IsMediaPublished(context.Context, string) (bool, error)
 }
 
@@ -200,7 +205,8 @@ func (h *Handler) UpdateDocument(ctx context.Context, request *knowledgev1.Updat
 	document, serviceErr := h.documents.Update(ctx, knowledgelogic.UpdateDocumentInput{
 		DocumentID: request.DocumentId, ActorID: actorID, ExpectedRevision: request.ExpectedRevision,
 		Title: request.Title, Summary: request.Summary, Slug: request.Slug, Language: request.Language,
-		Tags: append([]string(nil), request.Tags...), FolderID: request.FolderId,
+		Tags: append([]string(nil), request.Tags...), FolderID: request.FolderId, Icon: request.Icon,
+		CoverAttachmentID: request.CoverAttachmentId, CoverFocalX: request.CoverFocalX, CoverFocalY: request.CoverFocalY,
 	})
 	if serviceErr != nil {
 		return nil, h.transportError(ctx, "update_document_failed", serviceErr)
@@ -234,12 +240,95 @@ func (h *Handler) PublishSnapshot(ctx context.Context, request *knowledgev1.Publ
 	document, serviceErr := h.documents.PublishSnapshot(ctx, request.DocumentId, actorID, request.ExpectedMetadataRevision, knowledgelogic.PublishSnapshotInput{
 		Title: request.Title, Summary: request.Summary,
 		Slug: request.Slug, Language: request.Language, Tags: append([]string(nil), request.Tags...), Content: content,
-		PlainText: request.PlainText, IdempotencyKey: stringValue(request.IdempotencyKey),
+		PlainText: request.PlainText, PublicationHash: stringValue(request.PublicationHash), Icon: stringValue(request.Icon),
+		CoverAttachmentID: request.CoverAttachmentId, CoverFocalX: floatValue(request.CoverFocalX), CoverFocalY: floatValue(request.CoverFocalY),
+		IdempotencyKey: stringValue(request.IdempotencyKey),
 	})
 	if serviceErr != nil {
 		return nil, h.transportError(ctx, "publish_snapshot_failed", serviceErr)
 	}
 	return h.documentResult(ctx, "publish_snapshot_failed", document)
+}
+
+func (h *Handler) CreateCommit(ctx context.Context, request *knowledgev1.CreateCommitRequest) (*knowledgev1.Commit, error) {
+	ctx = metadata.EnsureRequestID(ctx)
+	actorID, err := h.requireActor(ctx, request != nil)
+	if err != nil {
+		return nil, err
+	}
+	var content *domain.RichTextDocument
+	if request.Content != nil {
+		value, parseErr := fromTransportRichText(request.Content)
+		if parseErr != nil {
+			return nil, h.transportInvalidInput(ctx, "create_commit_failed", parseErr)
+		}
+		content = &value
+	}
+	commit, serviceErr := h.documents.CreateCommit(ctx, knowledgelogic.CommitInput{
+		DocumentID: request.DocumentId, ActorID: actorID, Kind: commitKindName(request.Kind), Label: stringValue(request.Label),
+		Description: stringValue(request.Description), Content: content, PlainText: stringValue(request.PlainText),
+		ContentHash: stringValue(request.ContentHash), IdempotencyKey: stringValue(request.IdempotencyKey),
+	})
+	if serviceErr != nil {
+		return nil, h.transportError(ctx, "create_commit_failed", serviceErr)
+	}
+	return toTransportCommit(commit), nil
+}
+
+func (h *Handler) ListCommits(ctx context.Context, request *knowledgev1.ListCommitsRequest) (*knowledgev1.CommitPage, error) {
+	ctx = metadata.EnsureRequestID(ctx)
+	actorID, err := h.requireActor(ctx, request != nil)
+	if err != nil {
+		return nil, err
+	}
+	items, serviceErr := h.documents.ListCommits(ctx, request.DocumentId, actorID, int(int32Value(request.Limit)))
+	if serviceErr != nil {
+		return nil, h.transportError(ctx, "list_commits_failed", serviceErr)
+	}
+	result := make([]*knowledgev1.Commit, 0, len(items))
+	for _, item := range items {
+		result = append(result, toTransportCommit(item))
+	}
+	return &knowledgev1.CommitPage{Items: result, Page: &knowledgev1.PageInfo{HasMore: false}}, nil
+}
+
+func (h *Handler) GetCommit(ctx context.Context, request *knowledgev1.CommitIDRequest) (*knowledgev1.Commit, error) {
+	ctx = metadata.EnsureRequestID(ctx)
+	actorID, err := h.requireActor(ctx, request != nil)
+	if err != nil {
+		return nil, err
+	}
+	commit, serviceErr := h.documents.GetCommit(ctx, request.CommitId, actorID)
+	if serviceErr != nil {
+		return nil, h.transportError(ctx, "get_commit_failed", serviceErr)
+	}
+	return toTransportCommit(commit), nil
+}
+
+func (h *Handler) RenameCommit(ctx context.Context, request *knowledgev1.RenameCommitRequest) (*knowledgev1.Commit, error) {
+	ctx = metadata.EnsureRequestID(ctx)
+	actorID, err := h.requireActor(ctx, request != nil)
+	if err != nil {
+		return nil, err
+	}
+	commit, serviceErr := h.documents.RenameCommit(ctx, request.CommitId, actorID, request.Label, stringValue(request.Description))
+	if serviceErr != nil {
+		return nil, h.transportError(ctx, "rename_commit_failed", serviceErr)
+	}
+	return toTransportCommit(commit), nil
+}
+
+func (h *Handler) RestoreCommit(ctx context.Context, request *knowledgev1.RestoreCommitRequest) (*knowledgev1.Document, error) {
+	ctx = metadata.EnsureRequestID(ctx)
+	actorID, err := h.requireActor(ctx, request != nil)
+	if err != nil {
+		return nil, err
+	}
+	document, serviceErr := h.documents.RestoreCommit(ctx, request.CommitId, actorID, stringValue(request.IdempotencyKey))
+	if serviceErr != nil {
+		return nil, h.transportError(ctx, "restore_commit_failed", serviceErr)
+	}
+	return h.documentResult(ctx, "restore_commit_failed", document)
 }
 
 func (h *Handler) ListFolders(ctx context.Context, request *knowledgev1.ListFoldersRequest) (*knowledgev1.FolderList, error) {
@@ -612,6 +701,8 @@ func toTransportDocument(value *domain.Document) *knowledgev1.Document {
 		UpdatedAt: value.UpdatedAt.UTC().Format(time.RFC3339Nano), Language: nonEmptyStringPointer(value.Language),
 		Tags: append([]string(nil), value.Tags...), FolderId: value.FolderID,
 		PublicationStatus: value.PublicationStatus, PublicationError: value.PublicationError,
+		PublicationHash: nonEmptyStringPointer(value.PublicationHash), Icon: nonEmptyStringPointer(value.Icon),
+		CoverAttachmentId: value.CoverAttachmentID, CoverFocalX: optionalFloat(value.CoverFocalX), CoverFocalY: optionalFloat(value.CoverFocalY),
 	}
 }
 
@@ -619,6 +710,56 @@ func toTransportDocumentDetail(value *knowledgelogic.DocumentDetail) *knowledgev
 	return &knowledgev1.DocumentDetail{
 		Document: toTransportDocument(value.Document), Content: toTransportRichText(value.Content),
 		PlainText: value.PlainText,
+	}
+}
+
+func toTransportCommit(value *domain.Commit) *knowledgev1.Commit {
+	if value == nil {
+		return nil
+	}
+	return &knowledgev1.Commit{Id: value.ID, DocumentId: value.DocumentID, Kind: commitKindValue(value.Kind), Label: value.Label,
+		Description: nonEmptyStringPointer(value.Description), Contributor: value.Contributor, Sequence: value.Sequence,
+		ContentHash: value.ContentHash, Content: toTransportRichText(value.Content), PlainText: value.PlainText,
+		CreatedAt: value.CreatedAt.UTC().Format(time.RFC3339Nano), UpdatedAt: value.UpdatedAt.UTC().Format(time.RFC3339Nano)}
+}
+
+func commitKindName(value knowledgev1.CommitKind) string {
+	switch value {
+	case knowledgev1.CommitKind_MANUAL:
+		return "manual"
+	case knowledgev1.CommitKind_LEAVE:
+		return "leave"
+	case knowledgev1.CommitKind_SAFETY:
+		return "safety"
+	case knowledgev1.CommitKind_PUBLISH:
+		return "publish"
+	case knowledgev1.CommitKind_REVISION_MERGE:
+		return "revision_merge"
+	case knowledgev1.CommitKind_AGENT_EDIT:
+		return "agent_edit"
+	case knowledgev1.CommitKind_RESTORE:
+		return "restore"
+	default:
+		return "manual"
+	}
+}
+
+func commitKindValue(value string) knowledgev1.CommitKind {
+	switch value {
+	case "leave":
+		return knowledgev1.CommitKind_LEAVE
+	case "safety":
+		return knowledgev1.CommitKind_SAFETY
+	case "publish":
+		return knowledgev1.CommitKind_PUBLISH
+	case "revision_merge":
+		return knowledgev1.CommitKind_REVISION_MERGE
+	case "agent_edit":
+		return knowledgev1.CommitKind_AGENT_EDIT
+	case "restore":
+		return knowledgev1.CommitKind_RESTORE
+	default:
+		return knowledgev1.CommitKind_MANUAL
 	}
 }
 
@@ -759,6 +900,20 @@ func stringValue(value *string) string {
 		return ""
 	}
 	return *value
+}
+
+func floatValue(value *float64) float64 {
+	if value == nil {
+		return 50
+	}
+	return *value
+}
+
+func optionalFloat(value float64) *float64 {
+	if value == 0 {
+		return nil
+	}
+	return &value
 }
 
 func nonEmptyStringPointer(value string) *string {

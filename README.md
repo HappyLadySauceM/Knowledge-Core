@@ -27,6 +27,7 @@ Knowledge Core 是一个支持文档元数据、权限、通用附件、实时�
 | 站点配置 | `GET /api/v1/site-profile` | 站点标题、双语标语、首图和焦点位置 |
 | 管理员配置 | `/api/v1/admin/configuration/:namespace` | 管理员读取/写入 `site`、`email`、`ai`；使用强 ETag 和幂等键 |
 | Studio 文档 | `/api/v1/studio/documents` | 列表、创建、读取、更新、删除、发布和取消发布 |
+| 文档提交 | `/api/v1/studio/documents/:document_id/commits` | 创建、查看、重命名和恢复显式历史提交；恢复产生新提交 |
 | 成员 | `/api/v1/studio/documents/:document_id/members` | viewer/editor 成员管理 |
 | 协作会话 | `POST /api/v1/studio/documents/:document_id/collaboration-sessions` | 创建短期、单次使用的 WebSocket ticket |
 | 附件 | `/api/v1/studio/documents/:document_id/attachments` | 预签名上传、完成扫描和删除 |
@@ -102,7 +103,11 @@ flowchart LR
     Gateway --> Redis
 ```
 
-Knowledge 保存最近一次公开快照；Collaboration 只保存实时编辑稿、update 与压缩快照。编辑稿自动保存不会改动公开页，发布/更新时 Gateway 先从 Collaboration 捕获已提交 CRDT 状态，再让 Knowledge 替换公开快照。取消发布仅撤下快照，不删除编辑稿；永久删除先立即隐藏，再由可重试 worker 清理两边状态。Collaboration 不直连 Identity 或 Knowledge 数据库，而是通过生成的 Knowledge Thrift RPC 取得文档权限并提交投影。
+Knowledge 保存最近一次公开快照；Collaboration 只保存实时编辑稿、update 与压缩快照。编辑稿自动保存不会改动公开页，发布/更新时 Gateway 先从 Collaboration 捕获已提交 CRDT 状态，再让 Knowledge 替换公开快照。公开快照带有规范化 authoring hash，Gateway 可据此判断草稿是否真的需要更新；公开列表和详情始终以快照字段为准。取消发布仅撤下快照，不删除编辑稿；永久删除先立即隐藏，再由可重试 worker 清理两边状态。Collaboration 不直连 Identity 或 Knowledge 数据库，而是通过生成的 Knowledge Thrift RPC 取得文档权限并提交投影。
+
+文档历史使用 `knowledge.document_commits` 保存显式手动、离开、发布、恢复和安全提交。提交是完整的、可查看的恢复锚点；恢复会创建新的 `restore` 提交，不覆盖既有历史。Studio 的 `commits` HTTP API 只暴露文档成员可见的历史，不再使用已删除的旧版本表。图标、摘要、标签和封面焦点属于文档作者元数据，并参与公开快照 hash；封面附件只有在快照有效时才通过公开附件入口可见。
+
+访问令牌保留数值用户 ID，同时增加向后兼容的 `subject_type`（缺失时按 `user` 处理）。后续 Agent 主体可以使用独立的 subject type 和能力授权，不改变现有用户令牌的解析行为。
 
 ## 环境要求
 

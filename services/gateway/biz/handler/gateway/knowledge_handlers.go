@@ -2,7 +2,11 @@ package gateway
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
 	"net/http"
 	"net/url"
 	"strings"
@@ -225,7 +229,7 @@ func handleUpdateDocument(ctx context.Context, request *app.RequestContext) {
 	revision, revisionErr := expectedRevision(request)
 	var body updateDocumentBody
 	if pathErr != nil || revisionErr != nil || requireNoQuery(request) != nil || decodeJSONBody(request, &body) != nil ||
-		(body.Title == nil && body.Summary == nil && body.Slug == nil && body.Language == nil && body.Tags == nil && body.FolderID == nil) {
+		(body.Title == nil && body.Summary == nil && body.Slug == nil && body.Language == nil && body.Tags == nil && body.FolderID == nil && body.Icon == nil && body.CoverAttachmentID == nil && body.CoverFocalX == nil && body.CoverFocalY == nil) {
 		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidRequest)
 		return
 	}
@@ -236,7 +240,8 @@ func handleUpdateDocument(ctx context.Context, request *app.RequestContext) {
 	}
 	document, err := dependencies.Knowledge.UpdateDocument(upstreamContext(ctx, request), &knowledgev1.UpdateDocumentRequest{
 		DocumentId: documentID, ExpectedRevision: revision, Title: body.Title, Summary: body.Summary, Slug: body.Slug,
-		Language: body.Language, Tags: append([]string(nil), body.Tags...), FolderId: body.FolderID,
+		Language: body.Language, Tags: append([]string(nil), body.Tags...), FolderId: body.FolderID, Icon: body.Icon,
+		CoverAttachmentId: body.CoverAttachmentID, CoverFocalX: body.CoverFocalX, CoverFocalY: body.CoverFocalY,
 	})
 	if err != nil {
 		gatewaymiddleware.WriteKnowledgeError(ctx, request, err)
@@ -276,7 +281,11 @@ func handlePublishDocument(ctx context.Context, request *app.RequestContext) {
 	revision, revisionErr := expectedRevision(request)
 	idempotency, keyErr := idempotencyKey(request)
 	var body struct {
-		StateVector string `json:"state_vector"`
+		StateVector       string   `json:"state_vector"`
+		Icon              string   `json:"icon"`
+		CoverAttachmentID string   `json:"cover_attachment_id"`
+		CoverFocalX       *float64 `json:"cover_focal_x"`
+		CoverFocalY       *float64 `json:"cover_focal_y"`
 	}
 	if pathErr != nil || revisionErr != nil || keyErr != nil || requireNoQuery(request) != nil || decodeJSONBody(request, &body) != nil {
 		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidRequest)
@@ -308,14 +317,13 @@ func handlePublishDocument(ctx context.Context, request *app.RequestContext) {
 		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidUpstreamResponse)
 		return
 	}
-	language := "zh-CN"
-	if draft.Language != nil && strings.TrimSpace(*draft.Language) != "" {
-		language = *draft.Language
-	}
+	language := languageOrDefault(draft.Language)
+	publicationHash := canonicalPublicationHash(draft.Title, draft.Summary, draft.Slug, language, draft.Tags, captured.ContentHash, body.Icon, body.CoverAttachmentID, body.CoverFocalX, body.CoverFocalY)
 	published, err := dependencies.Knowledge.PublishSnapshot(upstreamContext(ctx, request), &knowledgev1.PublishSnapshotRequest{
 		DocumentId: documentID, ExpectedMetadataRevision: revision,
 		Title: draft.Title, Summary: draft.Summary, Slug: draft.Slug, Language: language, Tags: append([]string(nil), draft.Tags...),
-		Content: captured.Content, PlainText: captured.PlainText, IdempotencyKey: optionalString(idempotency),
+		Content: captured.Content, PlainText: captured.PlainText, IdempotencyKey: optionalString(idempotency), PublicationHash: &publicationHash,
+		Icon: optionalString(body.Icon), CoverAttachmentId: optionalString(body.CoverAttachmentID), CoverFocalX: body.CoverFocalX, CoverFocalY: body.CoverFocalY,
 	})
 	if err != nil {
 		gatewaymiddleware.WriteKnowledgeError(ctx, request, err)
@@ -327,6 +335,33 @@ func handlePublishDocument(ctx context.Context, request *app.RequestContext) {
 		return
 	}
 	writeDocument(ctx, request, consts.StatusAccepted, data)
+}
+
+func languageOrDefault(value *string) string {
+	if value == nil || strings.TrimSpace(*value) == "" {
+		return "zh-CN"
+	}
+	return strings.TrimSpace(*value)
+}
+
+func canonicalPublicationHash(title, summary, slug, language string, tags []string, contentHash, icon, cover string, focalX, focalY *float64) string {
+	// encoding/json sorts map keys lexicographically.  Keep the Gateway's
+	// envelope byte-for-byte compatible with the browser's recursive stable
+	// JSON encoder; struct field order is not a portable canonicalization.
+	payload, _ := json.Marshal(map[string]any{
+		"title":               title,
+		"summary":             summary,
+		"slug":                slug,
+		"language":            language,
+		"tags":                tags,
+		"content_hash":        contentHash,
+		"icon":                icon,
+		"cover_attachment_id": cover,
+		"cover_focal_x":       focalX,
+		"cover_focal_y":       focalY,
+	})
+	digest := sha256.Sum256(payload)
+	return hex.EncodeToString(digest[:])
 }
 
 func handleUnpublishDocument(ctx context.Context, request *app.RequestContext) {
@@ -413,6 +448,189 @@ func handlePermanentlyDeleteDocument(ctx context.Context, request *app.RequestCo
 	}
 	gatewaymiddleware.ResponseMetadata(ctx, request)
 	request.Status(consts.StatusAccepted)
+}
+
+func handleListCommits(ctx context.Context, request *app.RequestContext) {
+	documentID, pathErr := pathUUID(request, "document_id")
+	values, queryErr := strictQuery(request, map[string]struct{}{"limit": {}})
+	limit, limitErr := parseVersionLimit(queryPointer(values, "limit"))
+	if pathErr != nil || queryErr != nil || limitErr != nil || requireNoBody(request) != nil {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidRequest)
+		return
+	}
+	dependencies, ok := gatewaymiddleware.FromRequest(request)
+	if !ok {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInternal)
+		return
+	}
+	page, err := dependencies.Knowledge.ListCommits(upstreamContext(ctx, request), &knowledgev1.ListCommitsRequest{
+		DocumentId: documentID, Limit: optionalInt32(limit),
+	})
+	if err != nil {
+		gatewaymiddleware.WriteKnowledgeError(ctx, request, err)
+		return
+	}
+	data, err := toCommitPageData(page)
+	if err != nil {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidUpstreamResponse)
+		return
+	}
+	writeJSON(ctx, request, consts.StatusOK, data)
+}
+
+func handleCreateCommit(ctx context.Context, request *app.RequestContext) {
+	documentID, pathErr := pathUUID(request, "document_id")
+	idempotency, keyErr := idempotencyKey(request)
+	var body struct {
+		Kind        string                             `json:"kind"`
+		Label       *string                            `json:"label,omitempty"`
+		Description *string                            `json:"description,omitempty"`
+		ContentHash *string                            `json:"content_hash,omitempty"`
+		Content     *gatewaymodel.RichTextDocumentData `json:"content,omitempty"`
+		PlainText   *string                            `json:"plain_text,omitempty"`
+	}
+	if pathErr != nil || keyErr != nil || requireNoQuery(request) != nil || decodeJSONBody(request, &body) != nil || strings.TrimSpace(body.Kind) == "" {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidRequest)
+		return
+	}
+	kind, kindErr := commitKindFromHTTP(body.Kind)
+	if kindErr != nil {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidRequest)
+		return
+	}
+	var content *knowledgev1.RichTextDocument
+	if body.Content != nil {
+		var contentErr error
+		content, contentErr = fromRichTextDocumentData(body.Content)
+		if contentErr != nil {
+			gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidRequest)
+			return
+		}
+	}
+	dependencies, ok := gatewaymiddleware.FromRequest(request)
+	if !ok {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInternal)
+		return
+	}
+	commit, err := dependencies.Knowledge.CreateCommit(upstreamContext(ctx, request), &knowledgev1.CreateCommitRequest{
+		DocumentId: documentID, Kind: kind, Label: body.Label, Description: body.Description,
+		ContentHash: body.ContentHash, Content: content, PlainText: body.PlainText, IdempotencyKey: optionalString(idempotency),
+	})
+	if err != nil {
+		gatewaymiddleware.WriteKnowledgeError(ctx, request, err)
+		return
+	}
+	data, err := toCommitData(commit)
+	if err != nil {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidUpstreamResponse)
+		return
+	}
+	writeJSON(ctx, request, consts.StatusCreated, data)
+}
+
+func commitKindFromHTTP(value string) (knowledgev1.CommitKind, error) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "manual":
+		return knowledgev1.CommitKind_MANUAL, nil
+	case "leave":
+		return knowledgev1.CommitKind_LEAVE, nil
+	case "safety":
+		return knowledgev1.CommitKind_SAFETY, nil
+	case "publish":
+		return knowledgev1.CommitKind_PUBLISH, nil
+	case "revision_merge":
+		return knowledgev1.CommitKind_REVISION_MERGE, nil
+	case "agent_edit":
+		return knowledgev1.CommitKind_AGENT_EDIT, nil
+	case "restore":
+		return knowledgev1.CommitKind_RESTORE, nil
+	default:
+		return 0, errors.New("commit kind is invalid")
+	}
+}
+
+func handleGetCommit(ctx context.Context, request *app.RequestContext) {
+	documentID, documentErr := pathUUID(request, "document_id")
+	commitID, commitErr := pathUUID(request, "commit_id")
+	if documentErr != nil || commitErr != nil || requireNoQuery(request) != nil || requireNoBody(request) != nil {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidRequest)
+		return
+	}
+	dependencies, ok := gatewaymiddleware.FromRequest(request)
+	if !ok {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInternal)
+		return
+	}
+	commit, err := dependencies.Knowledge.GetCommit(upstreamContext(ctx, request), &knowledgev1.CommitIDRequest{CommitId: commitID})
+	if err != nil {
+		gatewaymiddleware.WriteKnowledgeError(ctx, request, err)
+		return
+	}
+	data, err := toCommitData(commit)
+	if err != nil || data.DocumentID != documentID {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrResourceNotFound)
+		return
+	}
+	writeJSON(ctx, request, consts.StatusOK, data)
+}
+
+func handleRenameCommit(ctx context.Context, request *app.RequestContext) {
+	documentID, documentErr := pathUUID(request, "document_id")
+	commitID, commitErr := pathUUID(request, "commit_id")
+	var body struct {
+		Label       string  `json:"label"`
+		Description *string `json:"description,omitempty"`
+	}
+	if documentErr != nil || commitErr != nil || requireNoQuery(request) != nil || decodeJSONBody(request, &body) != nil || strings.TrimSpace(body.Label) == "" {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidRequest)
+		return
+	}
+	dependencies, ok := gatewaymiddleware.FromRequest(request)
+	if !ok {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInternal)
+		return
+	}
+	commit, err := dependencies.Knowledge.RenameCommit(upstreamContext(ctx, request), &knowledgev1.RenameCommitRequest{
+		CommitId: commitID, Label: body.Label, Description: body.Description,
+	})
+	if err != nil {
+		gatewaymiddleware.WriteKnowledgeError(ctx, request, err)
+		return
+	}
+	data, err := toCommitData(commit)
+	if err != nil || data.DocumentID != documentID {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrResourceNotFound)
+		return
+	}
+	writeJSON(ctx, request, consts.StatusOK, data)
+}
+
+func handleRestoreCommit(ctx context.Context, request *app.RequestContext) {
+	documentID, documentErr := pathUUID(request, "document_id")
+	commitID, commitErr := pathUUID(request, "commit_id")
+	idempotency, keyErr := idempotencyKey(request)
+	if documentErr != nil || commitErr != nil || keyErr != nil || requireNoQuery(request) != nil || requireNoBody(request) != nil {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidRequest)
+		return
+	}
+	dependencies, ok := gatewaymiddleware.FromRequest(request)
+	if !ok {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInternal)
+		return
+	}
+	document, err := dependencies.Knowledge.RestoreCommit(upstreamContext(ctx, request), &knowledgev1.RestoreCommitRequest{
+		CommitId: commitID, IdempotencyKey: optionalString(idempotency),
+	})
+	if err != nil {
+		gatewaymiddleware.WriteKnowledgeError(ctx, request, err)
+		return
+	}
+	data, err := toDocumentData(document)
+	if err != nil || data.ID != documentID {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrResourceNotFound)
+		return
+	}
+	writeDocument(ctx, request, consts.StatusOK, data)
 }
 
 func handleListMembers(ctx context.Context, request *app.RequestContext) {
