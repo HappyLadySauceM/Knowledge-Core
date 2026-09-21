@@ -1113,11 +1113,11 @@
     "profile": "generic",
     "slug": "knowledge-core"
   },
-  "revision": 185,
+  "revision": 186,
   "scan": {
-    "fingerprint": "13b512e3b7a8da45ea3e2d448dc60c31f86dcabac534807e88273e60bbdb2863",
-    "inventoryCount": 472
+    "fingerprint": "8830fc402ca6a6b2dcf7b18a4ffd2853ef79422e3539b841c8bdf123048e6268",
+    "inventoryCount": 473
   },
   "schemaVersion": 3,
-  "updatedAt": "2026-09-21T05:50:26Z"
+  "updatedAt": "2026-09-21T09:08:57Z"
 }

@@ -335,3 +335,8 @@ ci:
 smoke-ci:
 	@test -n "$(KC_SMOKE_BASE_URL)" || (echo "KC_SMOKE_BASE_URL is required" >&2; exit 1)
 	curl --fail --silent --show-error "$(KC_SMOKE_BASE_URL)/health/ready"
+	@if test -n "$${KUBECONFIG:-}" && command -v kubectl >/dev/null 2>&1; then \
+		./scripts/verify-collaboration-rollout.sh; \
+	else \
+		echo "Skipping Collaboration rollout gate outside a Kubernetes smoke run"; \
+	fi

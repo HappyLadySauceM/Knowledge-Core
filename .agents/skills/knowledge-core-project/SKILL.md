@@ -7,7 +7,7 @@ description: "Project-specific engineering guidance for Knowledge-Core. Use for 
 
 # Knowledge-Core Project Guide
 
-Manifest revision: `185`. Manifest digest: `d140d81334df12ed`.
+Manifest revision: `186`. Manifest digest: `b3d961045f545c96`.
 
 ## Required Workflow
 

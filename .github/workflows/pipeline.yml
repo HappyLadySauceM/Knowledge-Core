@@ -694,6 +694,8 @@ jobs:
           kubectl --kubeconfig "$RUNNER_TEMP/release/kubeconfig" auth can-i update applicationsets.argoproj.io/knowledge-core-services-dev -n argocd | grep -qx yes
           kubectl --kubeconfig "$RUNNER_TEMP/release/kubeconfig" auth can-i update applications.argoproj.io/knowledge-core-gateway-dev -n argocd | grep -qx yes
           kubectl --kubeconfig "$RUNNER_TEMP/release/kubeconfig" auth can-i get services/knowledge-core-gateway -n knowledge-core-dev | grep -qx yes
+          kubectl --kubeconfig "$RUNNER_TEMP/release/kubeconfig" auth can-i get statefulsets.apps/knowledge-core-collaboration -n knowledge-core-dev | grep -qx yes
+          kubectl --kubeconfig "$RUNNER_TEMP/release/kubeconfig" auth can-i get pods -n knowledge-core-dev | grep -qx yes
           if [[ -s /etc/ssl/certs/ca-certificates.crt ]]; then
             cat /etc/ssl/certs/ca-certificates.crt "$RUNNER_TEMP/release/ca.crt" > "$RUNNER_TEMP/release/ca-bundle.crt"
           else
