@@ -318,10 +318,11 @@ func handlePublishDocument(ctx context.Context, request *app.RequestContext) {
 		return
 	}
 	language := languageOrDefault(draft.Language)
-	publicationHash := canonicalPublicationHash(draft.Title, draft.Summary, draft.Slug, language, draft.Tags, captured.ContentHash, body.Icon, body.CoverAttachmentID, body.CoverFocalX, body.CoverFocalY)
+	summary := publicationSummary(draft.Summary, captured.PlainText)
+	publicationHash := canonicalPublicationHash(draft.Title, summary, draft.Slug, language, draft.Tags, captured.ContentHash, body.Icon, body.CoverAttachmentID, body.CoverFocalX, body.CoverFocalY)
 	published, err := dependencies.Knowledge.PublishSnapshot(upstreamContext(ctx, request), &knowledgev1.PublishSnapshotRequest{
 		DocumentId: documentID, ExpectedMetadataRevision: revision,
-		Title: draft.Title, Summary: draft.Summary, Slug: draft.Slug, Language: language, Tags: append([]string(nil), draft.Tags...),
+		Title: draft.Title, Summary: summary, Slug: draft.Slug, Language: language, Tags: append([]string(nil), draft.Tags...),
 		Content: captured.Content, PlainText: captured.PlainText, IdempotencyKey: optionalString(idempotency), PublicationHash: &publicationHash,
 		Icon: optionalString(body.Icon), CoverAttachmentId: optionalString(body.CoverAttachmentID), CoverFocalX: body.CoverFocalX, CoverFocalY: body.CoverFocalY,
 	})
@@ -342,6 +343,22 @@ func languageOrDefault(value *string) string {
 		return "zh-CN"
 	}
 	return strings.TrimSpace(*value)
+}
+
+func publicationSummary(summary, plainText string) string {
+	if value := strings.TrimSpace(summary); value != "" {
+		return value
+	}
+	for _, line := range strings.Split(plainText, "\n") {
+		if value := strings.TrimSpace(line); value != "" {
+			runes := []rune(value)
+			if len(runes) > 1000 {
+				return string(runes[:1000])
+			}
+			return value
+		}
+	}
+	return ""
 }
 
 func canonicalPublicationHash(title, summary, slug, language string, tags []string, contentHash, icon, cover string, focalX, focalY *float64) string {

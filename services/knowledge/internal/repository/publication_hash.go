@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"strings"
 
 	jsoncodec "github.com/HappyLadySauce/Knowledge-Core/pkg/codec/json"
 	"github.com/HappyLadySauce/Knowledge-Core/services/knowledge/internal/model"
@@ -33,7 +34,7 @@ func publicationHashForSnapshot(snapshot *model.DocumentPublication) (string, er
 	}
 	payload, err := jsoncodec.Marshal(map[string]any{
 		"title":               snapshot.Title,
-		"summary":             snapshot.Summary,
+		"summary":             publicationSummary(snapshot.Summary, snapshot.PlainText),
 		"slug":                snapshot.Slug,
 		"language":            snapshot.Language,
 		"tags":                publicationTags(snapshot.Tags),
@@ -48,4 +49,20 @@ func publicationHashForSnapshot(snapshot *model.DocumentPublication) (string, er
 	}
 	digest := sha256.Sum256(payload)
 	return hex.EncodeToString(digest[:]), nil
+}
+
+func publicationSummary(summary, plainText string) string {
+	if value := strings.TrimSpace(summary); value != "" {
+		return value
+	}
+	for _, line := range strings.Split(plainText, "\n") {
+		if value := strings.TrimSpace(line); value != "" {
+			runes := []rune(value)
+			if len(runes) > 1000 {
+				return string(runes[:1000])
+			}
+			return value
+		}
+	}
+	return ""
 }
