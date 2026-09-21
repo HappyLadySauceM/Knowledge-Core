@@ -287,7 +287,7 @@ operations:
   PublishDocument:
     tag: 发布
     summary: 发布文档
-    description: 使用当前 rich-text state vector 创建版本并发布文档公开投影。
+    description: 从当前协作 rich-text state vector 捕获快照并发布文档公开投影。
     security: bearer
     success_status: 202
     required_body: [state_vector]
@@ -330,35 +330,6 @@ operations:
     security: bearer
     success_status: 204
     errors: [400, 401, 403, 404, 409, 412, 429, 500, 502, 503, 504]
-  ListVersions:
-    tag: 版本
-    summary: 列出文档版本
-    description: 按 sequence 游标分页列出文档不可变版本。
-    security: bearer
-    success_status: 200
-    errors: [400, 401, 403, 404, 429, 500, 502, 503, 504]
-  CreateVersion:
-    tag: 版本
-    summary: 创建文档版本
-    description: 保存当前协作状态的不可变版本。
-    security: bearer
-    success_status: 201
-    response_headers: [Location, X-Request-ID, X-Trace-ID]
-    errors: [400, 401, 403, 404, 409, 429, 500, 502, 503, 504]
-  GetVersion:
-    tag: 版本
-    summary: 获取版本详情
-    description: 获取指定版本的 rich-text 内容和纯文本投影。
-    security: bearer
-    success_status: 200
-    errors: [400, 401, 403, 404, 429, 500, 502, 503, 504]
-  RestoreVersion:
-    tag: 版本
-    summary: 恢复文档版本
-    description: 在 expected_sequence 匹配时生成恢复更新并创建新版本。
-    security: bearer
-    success_status: 201
-    errors: [400, 401, 403, 404, 409, 412, 429, 500, 502, 503, 504]
   ListDeletedDocuments:
     tag: 回收站
     summary: 列出已删除文档
@@ -374,3 +345,11 @@ operations:
     success_status: 200
     response_headers: [ETag, X-Request-ID, X-Trace-ID]
     errors: [400, 401, 403, 404, 409, 429, 500, 502, 503, 504]
+  PermanentlyDeleteDocument:
+    tag: 回收站
+    summary: 永久删除文档
+    description: 使用强 If-Match、幂等键和 X-Confirm-Permanent-Delete=true 二次确认，立即隐藏并异步清理已删除文档，操作不可恢复。
+    security: bearer
+    success_status: 202
+    response_headers: [X-Request-ID, X-Trace-ID]
+    errors: [400, 401, 403, 404, 409, 412, 429, 500, 502, 503, 504]

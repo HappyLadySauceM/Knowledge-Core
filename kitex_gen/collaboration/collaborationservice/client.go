@@ -14,10 +14,7 @@ import (
 type Client interface {
 	Ping(ctx context.Context, request *common.PingRequest, callOptions ...callopt.Option) (r *common.PingResponse, err error)
 	CreateSession(ctx context.Context, request *collaboration.CreateSessionRequest, callOptions ...callopt.Option) (r *collaboration.CollaborationSession, err error)
-	ListVersions(ctx context.Context, request *collaboration.ListVersionsRequest, callOptions ...callopt.Option) (r *collaboration.VersionPage, err error)
-	CreateVersion(ctx context.Context, request *collaboration.CreateVersionRequest, callOptions ...callopt.Option) (r *collaboration.Version, err error)
-	GetVersion(ctx context.Context, request *collaboration.GetVersionRequest, callOptions ...callopt.Option) (r *collaboration.VersionDetail, err error)
-	RestoreVersion(ctx context.Context, request *collaboration.RestoreVersionRequest, callOptions ...callopt.Option) (r *collaboration.Version, err error)
+	CapturePublicationSnapshot(ctx context.Context, request *collaboration.CapturePublicationSnapshotRequest, callOptions ...callopt.Option) (r *collaboration.PublicationSnapshot, err error)
 	PurgeDocument(ctx context.Context, request *collaboration.PurgeDocumentRequest, callOptions ...callopt.Option) (err error)
 }
 
@@ -60,24 +57,9 @@ func (p *kCollaborationServiceClient) CreateSession(ctx context.Context, request
 	return p.kClient.CreateSession(ctx, request)
 }
 
-func (p *kCollaborationServiceClient) ListVersions(ctx context.Context, request *collaboration.ListVersionsRequest, callOptions ...callopt.Option) (r *collaboration.VersionPage, err error) {
+func (p *kCollaborationServiceClient) CapturePublicationSnapshot(ctx context.Context, request *collaboration.CapturePublicationSnapshotRequest, callOptions ...callopt.Option) (r *collaboration.PublicationSnapshot, err error) {
 	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
-	return p.kClient.ListVersions(ctx, request)
-}
-
-func (p *kCollaborationServiceClient) CreateVersion(ctx context.Context, request *collaboration.CreateVersionRequest, callOptions ...callopt.Option) (r *collaboration.Version, err error) {
-	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
-	return p.kClient.CreateVersion(ctx, request)
-}
-
-func (p *kCollaborationServiceClient) GetVersion(ctx context.Context, request *collaboration.GetVersionRequest, callOptions ...callopt.Option) (r *collaboration.VersionDetail, err error) {
-	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
-	return p.kClient.GetVersion(ctx, request)
-}
-
-func (p *kCollaborationServiceClient) RestoreVersion(ctx context.Context, request *collaboration.RestoreVersionRequest, callOptions ...callopt.Option) (r *collaboration.Version, err error) {
-	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
-	return p.kClient.RestoreVersion(ctx, request)
+	return p.kClient.CapturePublicationSnapshot(ctx, request)
 }
 
 func (p *kCollaborationServiceClient) PurgeDocument(ctx context.Context, request *collaboration.PurgeDocumentRequest, callOptions ...callopt.Option) (err error) {

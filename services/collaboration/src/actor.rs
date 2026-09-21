@@ -26,13 +26,10 @@ use yrs::{
 
 use crate::{
     config::{ActorConfig, MAX_TICKET_TTL_MS, PublicConfig},
-    domain::{Access, DocumentId, DocumentVersion, PublicUser, RequestContext},
+    domain::{Access, DocumentId, PublicUser, RequestContext},
     error::{ErrorCode, Result, ServiceError},
     richtext,
-    storage::{
-        DocumentStore, LoadedDocument, RestorationCandidate, RestoreVersion, StoredUpdate,
-        UpdateLimits,
-    },
+    storage::{DocumentStore, LoadedDocument, StoredUpdate, UpdateLimits},
     telemetry::Metrics,
     ticket::TicketClaims,
 };
@@ -336,45 +333,6 @@ impl ActorRegistry {
         handle.connect(context, session).await
     }
 
-    /// Serializes a version restoration through the document actor.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the actor is unavailable, the request precondition is stale, or the
-    /// restoration cannot be durably committed.
-    pub async fn restore_version(
-        &self,
-        context: &RequestContext,
-        document_id: DocumentId,
-        target: DocumentVersion,
-        expected_sequence: i64,
-        actor: PublicUser,
-        idempotency_key: Option<String>,
-    ) -> Result<DocumentVersion> {
-        if !self.is_accepting() {
-            return Err(close_as_service_error(CLOSE_DEPENDENCY_UNAVAILABLE));
-        }
-        if target.document_id != document_id || expected_sequence < 0 {
-            return Err(ServiceError::invalid_input(
-                "document restoration request is inconsistent",
-            ));
-        }
-        actor.validate()?;
-        let handle = self
-            .actor(context, document_id, 0)
-            .await
-            .map_err(close_as_service_error)?;
-        handle
-            .restore_version(
-                context.clone(),
-                target,
-                expected_sequence,
-                actor,
-                idempotency_key,
-            )
-            .await
-    }
-
     /// Applies a committed remote sequence notification to an active actor.
     ///
     /// # Errors
@@ -583,36 +541,6 @@ impl ActorHandle {
             })?
     }
 
-    async fn restore_version(
-        &self,
-        context: RequestContext,
-        target: DocumentVersion,
-        expected_sequence: i64,
-        actor: PublicUser,
-        idempotency_key: Option<String>,
-    ) -> Result<DocumentVersion> {
-        let (response, receiver) = oneshot::channel();
-        self.send_command(ActorCommand::Restore {
-            context,
-            target: Box::new(target),
-            expected_sequence,
-            actor,
-            idempotency_key,
-            response,
-        })
-        .map_err(close_as_service_error)?;
-        tokio::time::timeout(self.command_timeout, receiver)
-            .await
-            .map_err(|_| {
-                ServiceError::unavailable(anyhow::anyhow!("document actor restoration timed out"))
-            })?
-            .map_err(|_| {
-                ServiceError::unavailable(anyhow::anyhow!(
-                    "document actor stopped before restoring the version"
-                ))
-            })?
-    }
-
     async fn invalidate(&self, close: CloseSignal) -> Result<()> {
         self.send_invalidation(ActorCommand::Invalidate { close })
             .await
@@ -743,14 +671,6 @@ enum ActorCommand {
         sequence: i64,
         response: oneshot::Sender<Result<()>>,
     },
-    Restore {
-        context: RequestContext,
-        target: Box<DocumentVersion>,
-        expected_sequence: i64,
-        actor: PublicUser,
-        idempotency_key: Option<String>,
-        response: oneshot::Sender<Result<DocumentVersion>>,
-    },
     Invalidate {
         close: CloseSignal,
     },
@@ -820,11 +740,6 @@ struct DocumentActor {
     sequence: i64,
     permission_revision: i64,
     connections: HashMap<Uuid, ConnectionState>,
-}
-
-struct ActorRestoreOutcome {
-    result: Result<RestoreVersion>,
-    invalidate_actor: bool,
 }
 
 #[allow(clippy::too_many_arguments, clippy::too_many_lines)]
@@ -920,37 +835,6 @@ async fn run_actor(
                             break;
                         }
                     }
-                    ActorCommand::Restore {
-                        context,
-                        target,
-                        expected_sequence,
-                        actor: restoring_actor,
-                        idempotency_key,
-                        mut response,
-                    } => {
-                        let result = tokio::select! {
-                            biased;
-                            result = actor.restore_version(
-                                &context,
-                                &target,
-                                expected_sequence,
-                                &restoring_actor,
-                                idempotency_key.as_deref(),
-                            ) => Some(result),
-                            () = response.closed() => None,
-                        };
-                        let Some(result) = result else {
-                            continue;
-                        };
-                        let invalidate_actor = result.invalidate_actor;
-                        if invalidate_actor {
-                            actor.close_all(CLOSE_DOCUMENT_INVALIDATED);
-                        }
-                        let _ = response.send(result.result.map(|restored| restored.version));
-                        if invalidate_actor {
-                            break;
-                        }
-                    }
                     ActorCommand::Invalidate { close } => {
                         actor.close_all(close);
                         break;
@@ -1034,64 +918,6 @@ impl DocumentActor {
             SyncProtocolMessage::Sync(SyncMessage::SyncStep1(state_vector)),
             SyncProtocolMessage::Awareness(awareness),
         ]))
-    }
-
-    async fn restore_version(
-        &mut self,
-        context: &RequestContext,
-        target: &DocumentVersion,
-        expected_sequence: i64,
-        actor: &PublicUser,
-        idempotency_key: Option<&str>,
-    ) -> ActorRestoreOutcome {
-        let loaded = match self.store.load_document(context, self.document_id).await {
-            Ok(loaded) => loaded,
-            Err(error) => {
-                return ActorRestoreOutcome {
-                    result: Err(error),
-                    invalidate_actor: false,
-                };
-            }
-        };
-        let generation_changed = loaded.generation != self.generation;
-        let result = async {
-            if !generation_changed {
-                self.synchronize_loaded_document(&loaded)?;
-            }
-            let document = richtext::document_from_state(&loaded.state)?;
-            let current_projection = richtext::projection_from_document(&document)?;
-            let target_projection = richtext::projection_from_state(&target.state)?;
-            let update = if current_projection == target_projection {
-                vec![0, 0]
-            } else {
-                richtext::restore_state(&document, &target.state)?.0
-            };
-            drop(document);
-            self.store
-                .commit_restoration(
-                    context,
-                    self.document_id,
-                    RestorationCandidate {
-                        target,
-                        baseline_generation: loaded.generation,
-                        baseline_sequence: loaded.sequence,
-                        expected_sequence,
-                        update: &update,
-                        actor,
-                        idempotency_key,
-                        limits: self.limits.update,
-                    },
-                )
-                .await
-        }
-        .await;
-        let committed = result
-            .as_ref()
-            .is_ok_and(|restored| restored.committed.is_some());
-        ActorRestoreOutcome {
-            result,
-            invalidate_actor: generation_changed || committed,
-        }
     }
 
     async fn handle_frame(

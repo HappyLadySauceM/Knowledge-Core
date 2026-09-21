@@ -49,7 +49,7 @@ func (s *documentServiceStub) Get(_ context.Context, _ string, actorID int64) (*
 func (s *documentServiceStub) Update(context.Context, knowledgelogic.UpdateDocumentInput) (*domain.Document, error) {
 	return s.document, s.err
 }
-func (s *documentServiceStub) SetPublication(context.Context, string, int64, int64, bool) (*domain.Document, error) {
+func (s *documentServiceStub) SetPublication(context.Context, string, int64, int64, bool, string) (*domain.Document, error) {
 	return s.document, s.err
 }
 func (s *documentServiceStub) PublishSnapshot(_ context.Context, _ string, _, _ int64, input knowledgelogic.PublishSnapshotInput) (*domain.Document, error) {
@@ -61,6 +61,9 @@ func (s *documentServiceStub) Delete(context.Context, string, int64, int64) (*do
 }
 func (s *documentServiceStub) Restore(context.Context, string, int64) (*domain.Document, error) {
 	return s.document, s.err
+}
+func (s *documentServiceStub) PurgeDeleted(context.Context, string, int64, int64, string) error {
+	return s.err
 }
 func (s *documentServiceStub) IsMediaPublished(context.Context, string) (bool, error) {
 	return false, s.err
@@ -293,8 +296,8 @@ func TestParagraphOnlyRichTextPassesPublishSnapshotAndProjectCollaboration(t *te
 		coreauth.WithAccessToken(context.Background(), "signed-token"),
 		&knowledgev1.PublishSnapshotRequest{
 			DocumentId: completeDocument().ID, ExpectedMetadataRevision: 1,
-			VersionId: completeDocument().ID, VersionSequence: 4, Title: "Document",
-			Slug: "document", Language: "en", Tags: []string{}, Content: content, PlainText: "hello",
+			Title: "Document",
+			Slug:  "document", Language: "en", Tags: []string{}, Content: content, PlainText: "hello",
 		},
 	)
 	if err != nil || published == nil {
@@ -312,7 +315,7 @@ func TestPublishSnapshotMapsRichTextParseFailureToInvalidInput(t *testing.T) {
 		coreauth.WithAccessToken(context.Background(), "signed-token"),
 		&knowledgev1.PublishSnapshotRequest{
 			DocumentId: completeDocument().ID, ExpectedMetadataRevision: 1,
-			VersionId: completeDocument().ID, Title: "Document", Slug: "document", Language: "en",
+			Title: "Document", Slug: "document", Language: "en",
 			Tags: []string{},
 		},
 	)
@@ -333,7 +336,7 @@ func TestKnowledgeValidationFailureLogsFieldAndReasonWithoutLeakingThem(t *testi
 		coreauth.WithAccessToken(context.Background(), "signed-token"),
 		&knowledgev1.PublishSnapshotRequest{
 			DocumentId: completeDocument().ID, ExpectedMetadataRevision: 1,
-			VersionId: completeDocument().ID, Title: "Document", Slug: "document", Language: "en",
+			Title: "Document", Slug: "document", Language: "en",
 			Tags: []string{}, Content: paragraphOnlyTransportDocument("hello"), PlainText: "hello",
 		},
 	)

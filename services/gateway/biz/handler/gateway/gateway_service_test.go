@@ -364,6 +364,21 @@ func TestGatewayRejectsAmbiguousDocumentInputs(t *testing.T) {
 			t.Fatal("expectedRevision() accepted a weak ETag")
 		}
 	})
+
+	t.Run("permanent delete requires explicit confirmation", func(t *testing.T) {
+		request := app.NewContext(0)
+		if err := permanentDeleteConfirmation(request); err == nil {
+			t.Fatal("permanentDeleteConfirmation() accepted a missing header")
+		}
+		request.Request.Header.Set("X-Confirm-Permanent-Delete", "yes")
+		if err := permanentDeleteConfirmation(request); err == nil {
+			t.Fatal("permanentDeleteConfirmation() accepted a non-boolean value")
+		}
+		request.Request.Header.Set("X-Confirm-Permanent-Delete", "true")
+		if err := permanentDeleteConfirmation(request); err != nil {
+			t.Fatalf("permanentDeleteConfirmation() rejected true: %v", err)
+		}
+	})
 }
 
 type knowledgeStub struct {

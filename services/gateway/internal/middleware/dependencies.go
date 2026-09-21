@@ -74,10 +74,7 @@ type dynamicConfig struct {
 type CollaborationClient interface {
 	Ping(context.Context, *commonv1.PingRequest, ...callopt.Option) (*commonv1.PingResponse, error)
 	CreateSession(context.Context, *collaborationv1.CreateSessionRequest, ...callopt.Option) (*collaborationv1.CollaborationSession, error)
-	ListVersions(context.Context, *collaborationv1.ListVersionsRequest, ...callopt.Option) (*collaborationv1.VersionPage, error)
-	CreateVersion(context.Context, *collaborationv1.CreateVersionRequest, ...callopt.Option) (*collaborationv1.Version, error)
-	GetVersion(context.Context, *collaborationv1.GetVersionRequest, ...callopt.Option) (*collaborationv1.VersionDetail, error)
-	RestoreVersion(context.Context, *collaborationv1.RestoreVersionRequest, ...callopt.Option) (*collaborationv1.Version, error)
+	CapturePublicationSnapshot(context.Context, *collaborationv1.CapturePublicationSnapshotRequest, ...callopt.Option) (*collaborationv1.PublicationSnapshot, error)
 }
 
 func NewDependencies(

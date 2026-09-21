@@ -45,7 +45,7 @@
 ### Collaboration
 
 - Rust workspace（`services/collaboration/`）：Volo Thrift RPC（`:8883`）与 WebSocket（`:8091`，y-sync + awareness，Yrs CRDT）；`src/generated/`（mod.rs、volo_gen.rs）完全由生成器拥有，禁止手改。
-- 拥有 PostgreSQL `collaboration` schema（Yjs update、snapshot、version、projection job、outbox）；依赖 Redis、NATS 与 Knowledge RPC。不复制文档权限规则：创建 session 时经 Knowledge RPC 复核访问级别，ticket 短期、单次使用。
+- 拥有 PostgreSQL `collaboration` schema（Yjs update、实时快照、projection job、purge marker、outbox）；依赖 Redis、NATS 与 Knowledge RPC。不复制文档权限规则：创建 session 时经 Knowledge RPC 复核访问级别，ticket 短期、单次使用。只保留实时编辑稿，不创建历史版本。
 - Rust 门禁：rustfmt、clippy 必须 `-D warnings`、`cargo deny`（advisories/bans/licenses/sources）；工具链固定在 `rust-toolchain.toml`（1.97.1）。
 - Node 互操作 fixture 在 `services/collaboration/interop/`（yjs ↔ yrs，`npm run ci` = format:check + `node --test` + audit），不属于 Go 包发现范围（GO_PACKAGES）。
 

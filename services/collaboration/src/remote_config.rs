@@ -171,7 +171,6 @@ pub(crate) struct WorkerOverrides {
     pub(crate) projection_lease_ms: Option<u64>,
     pub(crate) snapshot_update_threshold: Option<i64>,
     pub(crate) snapshot_byte_threshold: Option<i64>,
-    pub(crate) automatic_version_interval_ms: Option<u64>,
     pub(crate) outbox_batch_size: Option<i64>,
 }
 
@@ -696,9 +695,6 @@ fn restart_required(config: &ApplicationOverrides, targets: &RuntimeTargets) -> 
                 || value
                     .snapshot_byte_threshold
                     .is_some_and(|v| v != targets.startup_workers.snapshot_byte_threshold)
-                || value.automatic_version_interval_ms.is_some_and(|v| {
-                    Duration::from_millis(v) != targets.startup_workers.automatic_version_interval
-                })
                 || value
                     .outbox_batch_size
                     .is_some_and(|v| v != targets.startup_workers.outbox_batch_size)
@@ -897,7 +893,6 @@ fn validate_application_overrides(config: &ApplicationOverrides) -> Result<()> {
         && (value.poll_interval_ms == Some(0)
             || value.operation_timeout_ms == Some(0)
             || value.projection_lease_ms == Some(0)
-            || value.automatic_version_interval_ms == Some(0)
             || value.snapshot_update_threshold.is_some_and(|v| v <= 0)
             || value.snapshot_byte_threshold.is_some_and(|v| v <= 0)
             || value.outbox_batch_size.is_some_and(|v| v <= 0))

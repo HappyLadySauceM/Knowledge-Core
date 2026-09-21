@@ -52,17 +52,15 @@ type Idempotency struct {
 }
 
 type PublicationSnapshotInput struct {
-	VersionID       string
-	VersionSequence int64
-	Title           string
-	Summary         string
-	Slug            string
-	Language        string
-	Tags            []string
-	Content         domain.RichTextDocument
-	PlainText       string
-	MediaIDs        []string
-	Idempotency     Idempotency
+	Title       string
+	Summary     string
+	Slug        string
+	Language    string
+	Tags        []string
+	Content     domain.RichTextDocument
+	PlainText   string
+	MediaIDs    []string
+	Idempotency Idempotency
 }
 
 func EncodeCursor(value Cursor) (string, error) {
@@ -179,31 +177,22 @@ func (s *Store) GetPublishedDocument(ctx context.Context, slug string, actorID i
 		return nil, nil, false, mapNotFound("resolve published document slug", err)
 	}
 	if alias.DocumentID == nil {
-		return nil, nil, false, ErrGone
+		return nil, nil, false, ErrNotFound
 	}
 	var record model.Document
 	if err := s.db.WithContext(ctx).Where("id = ?", *alias.DocumentID).First(&record).Error; err != nil {
 		return nil, nil, false, mapNotFound("get published document", err)
 	}
-	if record.DeletedAt != nil {
+	if record.DeletedAt != nil || record.PurgeAfter != nil && !record.PurgeAfter.After(s.now().UTC()) {
 		return nil, nil, false, ErrGone
 	}
-	if !record.Published {
+	if record.PublicationStatus != domain.PublicationPublished {
 		return nil, nil, false, ErrNotFound
 	}
 	if err := s.db.WithContext(ctx).Where("document_id = ?", record.ID).First(&publication).Error; err == nil {
 		return s.publishedSnapshot(ctx, &publication, slug, actorID)
 	}
-	access, err := accessFor(s.db.WithContext(ctx), &record, actorID)
-	if err != nil {
-		return nil, nil, false, err
-	}
-	projection, err := getProjection(s.db.WithContext(ctx), record.ID)
-	if err != nil {
-		return nil, nil, false, err
-	}
-	document := documentFromModel(&record, access, projection)
-	return document, projectionFromModel(projection), !strings.EqualFold(record.Slug, slug), nil
+	return nil, nil, false, ErrNotFound
 }
 
 func (s *Store) publishedSnapshot(ctx context.Context, publication *model.DocumentPublication, requestedSlug string, actorID int64) (*domain.Document, *domain.Projection, bool, error) {
@@ -211,14 +200,14 @@ func (s *Store) publishedSnapshot(ctx context.Context, publication *model.Docume
 	if err := s.db.WithContext(ctx).Where("id = ?", publication.DocumentID).First(&record).Error; err != nil {
 		return nil, nil, false, mapNotFound("get published snapshot document", err)
 	}
-	if record.DeletedAt != nil || !record.Published {
+	if record.DeletedAt != nil || record.PublicationStatus != domain.PublicationPublished {
 		return nil, nil, false, ErrNotFound
 	}
 	access, err := accessFor(s.db.WithContext(ctx), &record, actorID)
 	if err != nil {
 		return nil, nil, false, err
 	}
-	projection := &model.Projection{DocumentID: publication.DocumentID, Sequence: publication.VersionSequence, Content: append([]byte(nil), publication.Content...), PlainText: publication.PlainText, ProjectedAt: publication.UpdatedAt}
+	projection := &model.Projection{DocumentID: publication.DocumentID, Content: append([]byte(nil), publication.Content...), PlainText: publication.PlainText, ProjectedAt: publication.UpdatedAt}
 	document := documentFromModel(&record, access, projection)
 	document.Title, document.Summary, document.Slug, document.Language = publication.Title, publication.Summary, publication.Slug, publication.Language
 	document.PublishedAt = &publication.PublishedAt
@@ -278,85 +267,6 @@ func (s *Store) replaceDocumentTags(tx *gorm.DB, ownerID int64, documentID strin
 		}
 	}
 	return nil
-}
-
-//nolint:unused // Removed after the destructive legacy-publication migration is deployed everywhere.
-func (s *Store) publishSnapshotLegacy(ctx context.Context, id string, actorID, expected int64, input PublicationSnapshotInput) (*domain.Document, error) {
-	var result *domain.Document
-	content, err := jsoncodec.Marshal(input.Content)
-	if err != nil {
-		return nil, fmt.Errorf("encode publication snapshot: %w", err)
-	}
-	tags, err := jsoncodec.Marshal(input.Tags)
-	if err != nil {
-		return nil, fmt.Errorf("encode publication tags: %w", err)
-	}
-	err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		existingID, found, err := s.idempotentResource(tx, input.Idempotency)
-		if err != nil {
-			return err
-		}
-		if found {
-			document, loadErr := s.getDocument(tx, existingID, actorID, false)
-			if loadErr != nil {
-				return loadErr
-			}
-			result = document
-			return nil
-		}
-		record, access, err := lockDocument(tx, id, actorID, false)
-		if err != nil {
-			return err
-		}
-		if !domain.CanEdit(access) {
-			return ErrForbidden
-		}
-		if record.MetadataRevision != expected {
-			return ErrPrecondition
-		}
-		now := s.now().UTC()
-		publication := &model.DocumentPublication{DocumentID: id, VersionID: stringPointer(input.VersionID), VersionSequence: input.VersionSequence, Title: input.Title, Summary: input.Summary, Slug: input.Slug, Language: input.Language, Tags: tags, OwnerID: record.OwnerID, OwnerUsername: record.OwnerUsername, OwnerAvatar: record.OwnerAvatar, Content: content, PlainText: input.PlainText, PublishedAt: now, UpdatedAt: now}
-		if err := tx.Save(publication).Error; err != nil {
-			return mapWriteError("save publication snapshot", err)
-		}
-		if err := s.replaceDocumentTags(tx, record.OwnerID, id, input.Tags, now); err != nil {
-			return err
-		}
-		var alias model.SlugAlias
-		aliasErr := tx.Where("slug = ?", input.Slug).First(&alias).Error
-		if aliasErr == nil && alias.DocumentID != nil && *alias.DocumentID != id {
-			return ErrConflict
-		}
-		if errors.Is(aliasErr, gorm.ErrRecordNotFound) {
-			if err := tx.Create(&model.SlugAlias{Slug: input.Slug, DocumentID: stringPointer(id), CreatedAt: now}).Error; err != nil {
-				return mapWriteError("reserve publication slug", err)
-			}
-		} else if aliasErr != nil {
-			return fmt.Errorf("check publication slug: %w", aliasErr)
-		} else if err := tx.Model(&alias).Updates(map[string]any{"document_id": id, "gone_at": nil}).Error; err != nil {
-			return fmt.Errorf("activate publication slug: %w", err)
-		}
-		if err := tx.Model(record).Updates(map[string]any{"published": true, "published_at": now, "metadata_revision": gorm.Expr("metadata_revision + 1"), "permission_revision": gorm.Expr("permission_revision + 1"), "updated_at": now}).Error; err != nil {
-			return fmt.Errorf("mark document published: %w", err)
-		}
-		if err := tx.Where("id = ?", id).First(record).Error; err != nil {
-			return fmt.Errorf("reload published document: %w", err)
-		}
-		if err := s.enqueuePermissionChanged(tx, record, now); err != nil {
-			return err
-		}
-		if err := s.saveIdempotency(tx, input.Idempotency, id); err != nil {
-			return err
-		}
-		projection, err := getProjection(tx, id)
-		if err != nil {
-			return err
-		}
-		result = documentFromModel(record, access, projection)
-		result.Tags = append([]string(nil), input.Tags...)
-		return nil
-	})
-	return result, err
 }
 
 type ListOptions struct {
@@ -441,9 +351,11 @@ JOIN (
 	conditions := make([]string, 0, 8)
 	switch {
 	case options.Published:
-		conditions = append(conditions, "d.published = true", "d.deleted_at IS NULL")
+		conditions = append(conditions, "pub.document_id IS NOT NULL", "d.publication_status = 'published'", "d.deleted_at IS NULL")
 	case options.Deleted:
-		conditions = append(conditions, "d.deleted_at IS NOT NULL", "d.owner_id = ?")
+		// A permanent-delete request hides the item immediately while the
+		// cross-service worker performs physical cleanup.
+		conditions = append(conditions, "d.deleted_at IS NOT NULL", "d.owner_id = ?", "(d.purge_after IS NULL OR d.purge_after > CURRENT_TIMESTAMP)")
 		args = append(args, options.ActorID)
 	default:
 		conditions = append(conditions, "d.deleted_at IS NULL", "(d.owner_id = ? OR m.user_id IS NOT NULL)")
@@ -458,9 +370,9 @@ JOIN (
 	}
 	switch options.Publication {
 	case "published":
-		conditions = append(conditions, "d.published = true")
+		conditions = append(conditions, "d.publication_status = 'published'")
 	case "draft":
-		conditions = append(conditions, "d.published = false")
+		conditions = append(conditions, "d.publication_status <> 'published'")
 	}
 	orderColumn := "d.updated_at"
 	if options.Published {
@@ -566,49 +478,6 @@ func (s *Store) UpdateDocument(ctx context.Context, id string, actorID, expected
 	return result, err
 }
 
-//nolint:unused // Removed after the destructive legacy-publication migration is deployed everywhere.
-func (s *Store) setPublicationLegacy(ctx context.Context, id string, actorID, expected int64, published bool) (*domain.Document, error) {
-	var result *domain.Document
-	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		record, access, err := lockDocument(tx, id, actorID, false)
-		if err != nil {
-			return err
-		}
-		if !domain.CanEdit(access) {
-			return ErrForbidden
-		}
-		if record.MetadataRevision != expected {
-			return ErrPrecondition
-		}
-		now := s.now().UTC()
-		updates := map[string]any{
-			"published": published, "metadata_revision": gorm.Expr("metadata_revision + 1"),
-			"permission_revision": gorm.Expr("permission_revision + 1"), "updated_at": now,
-		}
-		if published {
-			updates["published_at"] = now
-		} else {
-			updates["published_at"] = nil
-		}
-		if err := tx.Model(record).Updates(updates).Error; err != nil {
-			return fmt.Errorf("set document publication: %w", err)
-		}
-		if err := tx.Where("id = ?", id).First(record).Error; err != nil {
-			return fmt.Errorf("reload document publication: %w", err)
-		}
-		if err := s.enqueuePermissionChanged(tx, record, now); err != nil {
-			return err
-		}
-		projection, err := getProjection(tx, id)
-		if err != nil {
-			return err
-		}
-		result = documentFromModel(record, access, projection)
-		return nil
-	})
-	return result, err
-}
-
 func (s *Store) SoftDeleteDocument(ctx context.Context, id string, actorID, expected int64) (*domain.Document, error) {
 	var result *domain.Document
 	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -637,7 +506,7 @@ func (s *Store) SoftDeleteDocument(ctx context.Context, id string, actorID, expe
 			return err
 		}
 		if err := tx.Model(record).Updates(map[string]any{
-			"published": false, "published_at": nil, "deleted_at": now, "purge_after": now.Add(30 * 24 * time.Hour),
+			"published_at": nil, "deleted_at": now, "purge_after": now.Add(30 * 24 * time.Hour),
 			"publication_status": domain.PublicationUnpublishing, "publication_error": nil, "publication_generation": generation,
 			"metadata_revision": gorm.Expr("metadata_revision + 1"), "permission_revision": gorm.Expr("permission_revision + 1"), "updated_at": now,
 		}).Error; err != nil {
@@ -670,6 +539,9 @@ func (s *Store) RestoreDeletedDocument(ctx context.Context, id string, actorID i
 			return ErrForbidden
 		}
 		now := s.now().UTC()
+		if record.PurgeAfter != nil && !record.PurgeAfter.After(now) {
+			return ErrGone
+		}
 		if err := tx.Model(record).Updates(map[string]any{
 			"deleted_at": nil, "purge_after": nil, "metadata_revision": gorm.Expr("metadata_revision + 1"),
 			"permission_revision": gorm.Expr("permission_revision + 1"), "updated_at": now,

@@ -1135,12 +1135,6 @@ async fn maintenance_loop(
                     ),
                 ).await;
                 metrics.worker_operation("compaction", matches!(compacted, Ok(Ok(_))));
-                let context = operation_context(config.operation_timeout);
-                let versioned = tokio::time::timeout(
-                    config.operation_timeout,
-                    store.create_automatic_version(&context, config.automatic_version_interval),
-                ).await;
-                metrics.worker_operation("automatic_version", matches!(versioned, Ok(Ok(_))));
             }
         }
     }
@@ -1513,8 +1507,7 @@ mod tests {
         },
         domain::{Access, Authorization, Projection, PublicUser},
         storage::{
-            CommittedUpdate, DocumentStore, LoadedDocument, RestorationCandidate, RestoreVersion,
-            StoredUpdate, UpdateLimits, WorkerStore,
+            CommittedUpdate, DocumentStore, LoadedDocument, StoredUpdate, UpdateLimits, WorkerStore,
         },
     };
     use uuid::Uuid;
@@ -1553,15 +1546,6 @@ mod tests {
             _actor: &PublicUser,
             _limits: UpdateLimits,
         ) -> Result<CommittedUpdate> {
-            unused_operation()
-        }
-
-        async fn commit_restoration(
-            &self,
-            _context: &RequestContext,
-            _document_id: DocumentId,
-            _candidate: RestorationCandidate<'_>,
-        ) -> Result<RestoreVersion> {
             unused_operation()
         }
 
@@ -1632,6 +1616,7 @@ mod tests {
             unused_operation()
         }
 
+        #[cfg(any())]
         async fn create_automatic_version(
             &self,
             _context: &RequestContext,
@@ -1738,6 +1723,7 @@ mod tests {
             unused_operation()
         }
 
+        #[cfg(any())]
         async fn create_automatic_version(
             &self,
             _context: &RequestContext,
@@ -1862,7 +1848,6 @@ mod tests {
             projection_lease: Duration::from_secs(5),
             snapshot_update_threshold: 100,
             snapshot_byte_threshold: 1024,
-            automatic_version_interval: Duration::from_mins(1),
             outbox_batch_size: 10,
         };
 
@@ -1915,7 +1900,6 @@ mod tests {
             projection_lease: Duration::from_secs(5),
             snapshot_update_threshold: 100,
             snapshot_byte_threshold: 1024,
-            automatic_version_interval: Duration::from_mins(1),
             outbox_batch_size: 10,
         };
 

@@ -11,7 +11,6 @@ type Document struct {
 	OwnerID               int64      `gorm:"not null"`
 	OwnerUsername         string     `gorm:"size:32;not null"`
 	OwnerAvatar           string     `gorm:"type:text;not null;default:''"`
-	Published             bool       `gorm:"not null;default:false"`
 	PublicationStatus     string     `gorm:"size:32;not null;default:'draft'"`
 	PublicationError      *string    `gorm:"size:64"`
 	PublicationGeneration int64      `gorm:"not null;default:0"`
@@ -104,43 +103,39 @@ type DocumentTag struct {
 func (DocumentTag) TableName() string { return "knowledge.document_tags" }
 
 type DocumentPublication struct {
-	DocumentID      string    `gorm:"type:uuid;primaryKey"`
-	VersionID       *string   `gorm:"type:uuid"`
-	VersionSequence int64     `gorm:"not null"`
-	Title           string    `gorm:"size:200;not null"`
-	Summary         string    `gorm:"size:1000;not null;default:''"`
-	Slug            string    `gorm:"size:80;not null"`
-	Language        string    `gorm:"size:16;not null;default:'zh-CN'"`
-	Tags            []byte    `gorm:"type:jsonb;not null"`
-	OwnerID         int64     `gorm:"not null"`
-	OwnerUsername   string    `gorm:"size:32;not null"`
-	OwnerAvatar     string    `gorm:"type:text;not null;default:''"`
-	Content         []byte    `gorm:"type:jsonb;not null"`
-	PlainText       string    `gorm:"type:text;not null;default:''"`
-	PublishedAt     time.Time `gorm:"type:timestamptz;not null"`
-	UpdatedAt       time.Time `gorm:"type:timestamptz;not null"`
+	DocumentID    string    `gorm:"type:uuid;primaryKey"`
+	Title         string    `gorm:"size:200;not null"`
+	Summary       string    `gorm:"size:1000;not null;default:''"`
+	Slug          string    `gorm:"size:80;not null"`
+	Language      string    `gorm:"size:16;not null;default:'zh-CN'"`
+	Tags          []byte    `gorm:"type:jsonb;not null"`
+	OwnerID       int64     `gorm:"not null"`
+	OwnerUsername string    `gorm:"size:32;not null"`
+	OwnerAvatar   string    `gorm:"type:text;not null;default:''"`
+	Content       []byte    `gorm:"type:jsonb;not null"`
+	PlainText     string    `gorm:"type:text;not null;default:''"`
+	PublishedAt   time.Time `gorm:"type:timestamptz;not null"`
+	UpdatedAt     time.Time `gorm:"type:timestamptz;not null"`
 }
 
 func (DocumentPublication) TableName() string { return "knowledge.document_publications" }
 
 type PublicationCandidate struct {
-	DocumentID      string    `gorm:"type:uuid;primaryKey"`
-	Generation      int64     `gorm:"not null"`
-	VersionID       *string   `gorm:"type:uuid"`
-	VersionSequence int64     `gorm:"not null"`
-	Title           string    `gorm:"size:200;not null"`
-	Summary         string    `gorm:"size:1000;not null"`
-	Slug            string    `gorm:"size:80;not null"`
-	Language        string    `gorm:"size:16;not null"`
-	Tags            []byte    `gorm:"type:jsonb;not null"`
-	OwnerID         int64     `gorm:"not null"`
-	OwnerUsername   string    `gorm:"size:32;not null"`
-	OwnerAvatar     string    `gorm:"type:text;not null"`
-	Content         []byte    `gorm:"type:jsonb;not null"`
-	PlainText       string    `gorm:"type:text;not null"`
-	MediaIDs        []byte    `gorm:"type:jsonb;not null"`
-	CreatedAt       time.Time `gorm:"type:timestamptz;not null"`
-	UpdatedAt       time.Time `gorm:"type:timestamptz;not null"`
+	DocumentID    string    `gorm:"type:uuid;primaryKey"`
+	Generation    int64     `gorm:"not null"`
+	Title         string    `gorm:"size:200;not null"`
+	Summary       string    `gorm:"size:1000;not null"`
+	Slug          string    `gorm:"size:80;not null"`
+	Language      string    `gorm:"size:16;not null"`
+	Tags          []byte    `gorm:"type:jsonb;not null"`
+	OwnerID       int64     `gorm:"not null"`
+	OwnerUsername string    `gorm:"size:32;not null"`
+	OwnerAvatar   string    `gorm:"type:text;not null"`
+	Content       []byte    `gorm:"type:jsonb;not null"`
+	PlainText     string    `gorm:"type:text;not null"`
+	MediaIDs      []byte    `gorm:"type:jsonb;not null"`
+	CreatedAt     time.Time `gorm:"type:timestamptz;not null"`
+	UpdatedAt     time.Time `gorm:"type:timestamptz;not null"`
 }
 
 func (PublicationCandidate) TableName() string { return "knowledge.publication_candidates" }

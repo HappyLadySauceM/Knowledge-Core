@@ -19,10 +19,11 @@ type DocumentRepository interface {
 	GetPublishedDocument(context.Context, string, int64) (*domain.Document, *domain.Projection, bool, error)
 	ListDocuments(context.Context, repository.ListOptions) ([]*domain.Document, error)
 	UpdateDocument(context.Context, string, int64, int64, *string, *string, *string, *string, []string, *string) (*domain.Document, error)
-	SetPublication(context.Context, string, int64, int64, bool) (*domain.Document, error)
+	SetPublication(context.Context, string, int64, int64, bool, repository.Idempotency) (*domain.Document, error)
 	PublishSnapshot(context.Context, string, int64, int64, repository.PublicationSnapshotInput) (*domain.Document, error)
 	SoftDeleteDocument(context.Context, string, int64, int64) (*domain.Document, error)
 	RestoreDeletedDocument(context.Context, string, int64) (*domain.Document, error)
+	PurgeDeletedDocument(context.Context, string, int64, int64, repository.Idempotency) error
 	IsMediaPublished(context.Context, string) (bool, error)
 	ListFolders(context.Context, int64, *string) ([]*domain.Folder, error)
 	CreateFolder(context.Context, int64, string, *string, repository.Idempotency) (*domain.Folder, error)
@@ -172,16 +173,14 @@ type UpdateDocumentInput struct {
 }
 
 type PublishSnapshotInput struct {
-	VersionID       string
-	VersionSequence int64
-	Title           string
-	Summary         string
-	Slug            string
-	Language        string
-	Tags            []string
-	Content         domain.RichTextDocument
-	PlainText       string
-	IdempotencyKey  string
+	Title          string
+	Summary        string
+	Slug           string
+	Language       string
+	Tags           []string
+	Content        domain.RichTextDocument
+	PlainText      string
+	IdempotencyKey string
 }
 
 func NewDocumentLogic(repository DocumentRepository, directory Directory) (*DocumentLogic, error) {
@@ -408,11 +407,19 @@ func (l *DocumentLogic) Update(ctx context.Context, input UpdateDocumentInput) (
 	return result, nil
 }
 
-func (l *DocumentLogic) SetPublication(ctx context.Context, documentID string, actorID, expected int64, published bool) (*domain.Document, error) {
+func (l *DocumentLogic) SetPublication(ctx context.Context, documentID string, actorID, expected int64, published bool, key string) (*domain.Document, error) {
 	if err := validateMutation(documentID, expected); err != nil {
 		return nil, mapError(err)
 	}
-	result, err := l.repository.SetPublication(ctx, documentID, actorID, expected, published)
+	idempotencyValue, err := idempotency(actorID, "set_publication", key, struct {
+		DocumentID       string `json:"document_id"`
+		ExpectedRevision int64  `json:"expected_revision"`
+		Published        bool   `json:"published"`
+	}{documentID, expected, published})
+	if err != nil {
+		return nil, mapError(err)
+	}
+	result, err := l.repository.SetPublication(ctx, documentID, actorID, expected, published, idempotencyValue)
 	if err != nil {
 		return nil, mapError(err)
 	}
@@ -422,12 +429,6 @@ func (l *DocumentLogic) SetPublication(ctx context.Context, documentID string, a
 func (l *DocumentLogic) PublishSnapshot(ctx context.Context, documentID string, actorID, expected int64, input PublishSnapshotInput) (*domain.Document, error) {
 	if err := validateMutation(documentID, expected); err != nil {
 		return nil, mapError(err)
-	}
-	if err := domain.ValidateID("version_id", input.VersionID); err != nil {
-		return nil, mapError(err)
-	}
-	if input.VersionSequence < 0 {
-		return nil, mapError(&domain.ValidationError{Field: "version_sequence", Reason: "must be non-negative"})
 	}
 	input.Title = strings.TrimSpace(input.Title)
 	if err := domain.ValidateTitle(input.Title); err != nil {
@@ -466,15 +467,21 @@ func (l *DocumentLogic) PublishSnapshot(ctx context.Context, documentID string, 
 		return nil, mapError(err)
 	}
 	idempotencyValue, err := idempotency(owner.ID, "publish_snapshot", input.IdempotencyKey, struct {
-		DocumentID string `json:"document_id"`
-		VersionID  string `json:"version_id"`
-		Sequence   int64  `json:"sequence"`
-	}{documentID, input.VersionID, input.VersionSequence})
+		DocumentID       string                  `json:"document_id"`
+		ExpectedRevision int64                   `json:"expected_revision"`
+		Title            string                  `json:"title"`
+		Summary          string                  `json:"summary"`
+		Slug             string                  `json:"slug"`
+		Language         string                  `json:"language"`
+		Tags             []string                `json:"tags"`
+		Content          domain.RichTextDocument `json:"content"`
+		PlainText        string                  `json:"plain_text"`
+	}{documentID, expected, input.Title, input.Summary, input.Slug, input.Language, input.Tags, input.Content, input.PlainText})
 	if err != nil {
 		return nil, mapError(err)
 	}
 	result, err := l.repository.PublishSnapshot(ctx, documentID, actorID, expected, repository.PublicationSnapshotInput{
-		VersionID: input.VersionID, VersionSequence: input.VersionSequence, Title: input.Title, Summary: input.Summary,
+		Title: input.Title, Summary: input.Summary,
 		Slug: input.Slug, Language: input.Language, Tags: append([]string(nil), input.Tags...), Content: input.Content,
 		PlainText: input.PlainText, MediaIDs: publicationMediaIDs(input.Content), Idempotency: idempotencyValue,
 	})
@@ -527,6 +534,26 @@ func (l *DocumentLogic) Restore(ctx context.Context, documentID string, actorID 
 		return nil, mapError(err)
 	}
 	return result, nil
+}
+
+// PurgeDeleted permanently removes a document that has already been moved to
+// the trash. The repository keeps this operation idempotent so an asynchronous
+// cleanup retry can safely repeat the request.
+func (l *DocumentLogic) PurgeDeleted(ctx context.Context, documentID string, actorID, expected int64, key string) error {
+	if actorID <= 0 {
+		return mapError(repository.ErrForbidden)
+	}
+	if err := validateMutation(documentID, expected); err != nil {
+		return mapError(err)
+	}
+	idempotencyValue, err := idempotency(actorID, "purge_deleted_document", key, struct {
+		DocumentID       string `json:"document_id"`
+		ExpectedRevision int64  `json:"expected_revision"`
+	}{documentID, expected})
+	if err != nil {
+		return mapError(err)
+	}
+	return mapError(l.repository.PurgeDeletedDocument(ctx, documentID, actorID, expected, idempotencyValue))
 }
 
 func validateListInput(input ListDocumentsInput, public bool) error {

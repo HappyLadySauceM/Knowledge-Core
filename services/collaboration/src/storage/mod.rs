@@ -4,11 +4,10 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use time::OffsetDateTime;
 use uuid::Uuid;
 
 use crate::{
-    domain::{DocumentId, DocumentVersion, Projection, PublicUser, RequestContext, VersionId},
+    domain::{DocumentId, Projection, PublicUser, RequestContext},
     error::Result,
 };
 
@@ -56,37 +55,6 @@ pub struct StoredUpdate {
     pub generation: i64,
     pub sequence: i64,
     pub update: Vec<u8>,
-}
-
-#[derive(Clone, Debug)]
-pub struct VersionCursor {
-    pub created_at: OffsetDateTime,
-    pub id: VersionId,
-}
-
-#[derive(Clone, Debug)]
-pub struct VersionPage {
-    pub items: Vec<DocumentVersion>,
-    pub has_more: bool,
-    pub head_sequence: i64,
-}
-
-#[derive(Clone, Debug)]
-pub struct RestoreVersion {
-    pub version: DocumentVersion,
-    pub committed: Option<CommittedUpdate>,
-}
-
-#[derive(Clone, Copy, Debug)]
-pub struct RestorationCandidate<'a> {
-    pub target: &'a DocumentVersion,
-    pub baseline_generation: i64,
-    pub baseline_sequence: i64,
-    pub expected_sequence: i64,
-    pub update: &'a [u8],
-    pub actor: &'a PublicUser,
-    pub idempotency_key: Option<&'a str>,
-    pub limits: UpdateLimits,
 }
 
 #[derive(Clone, Debug)]
@@ -148,13 +116,6 @@ pub trait DocumentStore: Send + Sync {
         limits: UpdateLimits,
     ) -> Result<CommittedUpdate>;
 
-    async fn commit_restoration(
-        &self,
-        context: &RequestContext,
-        document_id: DocumentId,
-        candidate: RestorationCandidate<'_>,
-    ) -> Result<RestoreVersion>;
-
     async fn updates_after(
         &self,
         context: &RequestContext,
@@ -171,31 +132,7 @@ pub trait DocumentStore: Send + Sync {
 }
 
 #[async_trait]
-pub trait VersionStore: Send + Sync {
-    async fn create_manual_version(
-        &self,
-        context: &RequestContext,
-        document_id: DocumentId,
-        actor: &PublicUser,
-        label: Option<&str>,
-        idempotency_key: Option<&str>,
-    ) -> Result<DocumentVersion>;
-
-    async fn list_versions(
-        &self,
-        context: &RequestContext,
-        document_id: DocumentId,
-        cursor: Option<&VersionCursor>,
-        limit: i64,
-    ) -> Result<VersionPage>;
-
-    async fn get_version(
-        &self,
-        context: &RequestContext,
-        document_id: DocumentId,
-        version_id: VersionId,
-    ) -> Result<DocumentVersion>;
-
+pub trait PurgeStore: Send + Sync {
     async fn purge_document(&self, context: &RequestContext, document_id: DocumentId)
     -> Result<()>;
 }
@@ -230,12 +167,6 @@ pub trait WorkerStore: Send + Sync {
         context: &RequestContext,
         update_threshold: i64,
         byte_threshold: i64,
-    ) -> Result<bool>;
-
-    async fn create_automatic_version(
-        &self,
-        context: &RequestContext,
-        interval: Duration,
     ) -> Result<bool>;
 
     async fn claim_outbox(

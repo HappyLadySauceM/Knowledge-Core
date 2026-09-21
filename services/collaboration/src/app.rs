@@ -20,7 +20,7 @@ use crate::{
         AlwaysReady, CollaborationHandler, CollaborationHandlerDependencies, KnowledgeClient,
         RpcReadiness, RpcServer, tls::RpcIncoming,
     },
-    storage::{DocumentStore, EventSubjects, PostgresStore, VersionStore, WorkerStore},
+    storage::{DocumentStore, EventSubjects, PostgresStore, PurgeStore, WorkerStore},
     telemetry::{Metrics, Telemetry},
     ticket::{RedisTicketBackend, TicketBackend, TicketService},
     websocket::WebSocketServer,
@@ -331,12 +331,12 @@ impl Application {
         let rpc_readiness: Arc<dyn RpcReadiness> = Arc::new(AlwaysReady);
         let application_readiness: Arc<dyn RpcReadiness> =
             Arc::new(ApplicationReadiness::new(startup.health.clone()));
-        let versions: Arc<dyn VersionStore> = postgres.clone();
+        let purger: Arc<dyn PurgeStore> = postgres.clone();
         let handler = CollaborationHandler::new(CollaborationHandlerDependencies {
             knowledge: Arc::clone(&knowledge),
             documents: Arc::clone(&document_store),
             tickets: tickets.clone(),
-            versions,
+            purger,
             actors: actors.clone(),
             ticket: config.ticket.clone(),
             readiness: application_readiness,

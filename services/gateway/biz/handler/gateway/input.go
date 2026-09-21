@@ -57,15 +57,6 @@ type updateMemberBody struct {
 	Role string `json:"role"`
 }
 
-type createVersionBody struct {
-	Label       *string `json:"label,omitempty"`
-	StateVector *string `json:"state_vector,omitempty"`
-}
-
-type restoreVersionBody struct {
-	ExpectedSequence int64 `json:"expected_sequence"`
-}
-
 type createMediaAttachmentBody struct {
 	Filename  string `json:"filename"`
 	MediaType string `json:"media_type"`
@@ -221,6 +212,14 @@ func idempotencyKey(request *app.RequestContext) (string, error) {
 	return value, nil
 }
 
+func permanentDeleteConfirmation(request *app.RequestContext) error {
+	value, present, err := singleHeader(request, "X-Confirm-Permanent-Delete")
+	if err != nil || !present || value != "true" {
+		return errors.New("X-Confirm-Permanent-Delete must be exactly true")
+	}
+	return nil
+}
+
 func expectedRevision(request *app.RequestContext) (int64, error) {
 	value, present, err := singleHeader(request, "If-Match")
 	if err != nil || !present {
@@ -238,6 +237,27 @@ func expectedRevision(request *app.RequestContext) (int64, error) {
 		return 0, errors.New("If-Match must be a strong numeric ETag")
 	}
 	return revision, nil
+}
+
+func parseVersionLimit(value *string) (int32, error) {
+	if value == nil || *value == "" {
+		return 0, nil
+	}
+	if !positiveDecimalPattern.MatchString(*value) {
+		return 0, errors.New("limit must be an integer between 1 and 100")
+	}
+	parsed, err := strconv.ParseInt(*value, 10, 32)
+	if err != nil || parsed > 100 {
+		return 0, errors.New("limit must be an integer between 1 and 100")
+	}
+	return int32(parsed), nil
+}
+
+func optionalInt32(value int32) *int32 {
+	if value == 0 {
+		return nil
+	}
+	return &value
 }
 
 func expectedConfigurationRevision(request *app.RequestContext) (int64, error) {

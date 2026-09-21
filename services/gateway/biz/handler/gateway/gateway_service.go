@@ -236,22 +236,6 @@ func DeleteMember(ctx context.Context, request *app.RequestContext) {
 	handleDeleteMember(ctx, request)
 }
 
-func ListVersions(ctx context.Context, request *app.RequestContext) {
-	handleListVersions(ctx, request)
-}
-
-func CreateVersion(ctx context.Context, request *app.RequestContext) {
-	handleCreateVersion(ctx, request)
-}
-
-func GetVersion(ctx context.Context, request *app.RequestContext) {
-	handleGetVersion(ctx, request)
-}
-
-func RestoreVersion(ctx context.Context, request *app.RequestContext) {
-	handleRestoreVersion(ctx, request)
-}
-
 func ListDeletedDocuments(ctx context.Context, request *app.RequestContext) {
 	handleListDeletedDocuments(ctx, request)
 }
@@ -663,4 +647,10 @@ func PutConfiguration(ctx context.Context, c *app.RequestContext) {
 // @router /api/v1/admin/configuration/:namespace/deliveries/:revision [GET]
 func GetConfigurationDelivery(ctx context.Context, c *app.RequestContext) {
 	handleGetConfigurationDelivery(ctx, c)
+}
+
+// PermanentlyDeleteDocument .
+// @router /api/v1/studio/trash/:document_id [DELETE]
+func PermanentlyDeleteDocument(ctx context.Context, c *app.RequestContext) {
+	handlePermanentlyDeleteDocument(ctx, c)
 }

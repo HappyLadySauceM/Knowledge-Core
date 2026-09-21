@@ -183,7 +183,6 @@ pub struct WorkerConfig {
     pub projection_lease: Duration,
     pub snapshot_update_threshold: i64,
     pub snapshot_byte_threshold: i64,
-    pub automatic_version_interval: Duration,
     pub outbox_batch_size: i64,
 }
 
@@ -326,11 +325,6 @@ impl Config {
                 projection_lease,
                 projection_lease_ms,
                 "COLLABORATION_PROJECTION_LEASE_MS"
-            );
-            duration!(
-                automatic_version_interval,
-                automatic_version_interval_ms,
-                "COLLABORATION_AUTOMATIC_VERSION_INTERVAL_MS"
             );
             if env::var_os("COLLABORATION_SNAPSHOT_UPDATE_THRESHOLD").is_none()
                 && let Some(v) = value.snapshot_update_threshold
@@ -795,12 +789,6 @@ impl Config {
                     8 << 20,
                     1_024,
                     1 << 30,
-                )?,
-                automatic_version_interval: duration(
-                    "COLLABORATION_AUTOMATIC_VERSION_INTERVAL_MS",
-                    30 * 60_000,
-                    60_000,
-                    30 * 24 * 60 * 60_000,
                 )?,
                 outbox_batch_size: integer_as::<i64>(
                     "COLLABORATION_OUTBOX_BATCH_SIZE",

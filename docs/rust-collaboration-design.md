@@ -18,7 +18,7 @@
 本次重写明确不提供：
 
 - Node internal HTTP、Hocuspocus wire 扩展或旧环境变量的兼容层。
-- 旧 `collaboration` schema、Yjs update、快照、版本和任务数据迁移。
+- 旧 `collaboration` schema、Yjs update、快照和任务数据迁移；历史版本表通过向前迁移删除。
 - Node/Rust 双写、双读、长期并行部署或旧客户端兼容代理。
 - 匿名公开文档的实时 WebSocket；公开阅读继续使用 Knowledge 投影、ETag 和普通 HTTP 刷新。
 - Automerge、自研 CRDT 或正式 TypeScript 客户端 SDK。
@@ -46,7 +46,7 @@ Rust Collaboration 是一个进程，显式持有三类入口：
 | 入口 | 默认地址 | 用途 |
 | --- | --- | --- |
 | Public WebSocket | `:8091` | `/v1/documents/{document_id}` 的 Yjs 协作连接；共享 Service 由 Higress 做 URI hash |
-| Thrift RPC | `:8883` | Gateway/Knowledge 的 session、version 和 purge 调用 |
+| Thrift RPC | `:8883` | Gateway/Knowledge 的 session、公开快照捕获和 purge 调用 |
 | Admin HTTP | `:8084` | `/health/live`、`/health/ready`、`/metrics` |
 
 原 Node internal HTTP `:8092` 被删除。公开 TLS 可由服务直接终止或由明确配置的可信 ingress 终止；RPC 在 production 必须使用验证服务端和客户端身份的 mTLS。
@@ -79,7 +79,7 @@ sequenceDiagram
     Collaboration->>NATS: publish committed update/invalidation
 ```
 
-Gateway 仍是公开 HTTP edge；Knowledge 仍是文档权限与投影的最终所有者；Collaboration 只拥有协作状态、版本和连接。任何服务不得直连其他服务的 schema。
+Gateway 仍是公开 HTTP edge；Knowledge 仍是文档权限与公开快照的最终所有者；Collaboration 只拥有实时协作状态和连接。任何服务不得直连其他服务的 schema。
 
 ## 4. 公开 API 与 WebSocket 协议
 
@@ -154,10 +154,7 @@ Kubernetes 保留无 PVC 的 StatefulSet 和稳定的 `COLLABORATION_INSTANCE_ID
 
 - `Ping(common.PingRequest) -> common.PingResponse`
 - `CreateSession(CreateSessionRequest) -> CollaborationSession`，会话返回一次性 ticket、期限和访问级别；保留的 `instance_ordinal` 字段仅作已生成客户端的 deprecated compatibility field，当前服务不设置它
-- `ListVersions(ListVersionsRequest) -> VersionPage`
-- `CreateVersion(CreateVersionRequest) -> Version`
-- `GetVersion(GetVersionRequest) -> VersionDetail`
-- `RestoreVersion(RestoreVersionRequest) -> Version`
+- `CapturePublicationSnapshot(CapturePublicationSnapshotRequest) -> PublicationSnapshot`，按客户端 state vector 等待已提交 CRDT 状态并返回发布所需富文本/纯文本
 - `PurgeDocument(PurgeDocumentRequest) -> void`
 
 `knowledge.thrift` 增加：
@@ -201,21 +198,21 @@ commit 前禁止更新共享内存状态或广播。commit 失败时关闭来源
 | 表 | 职责 |
 | --- | --- |
 | `schema_migrations` | 版本化 migration 与校验 |
-| `documents` | current sequence、generation、snapshot/version 水位 |
+| `documents` | current sequence、generation、snapshot 水位与 purge 完成标记 |
 | `updates` | 按 document/generation/sequence 保存不可变 update |
 | `snapshots` | 压缩后的完整 Yrs state |
-| `versions` | manual/automatic/restoration 不可变版本与创建者快照 |
+| `versions` | 已由向前迁移删除；不再产生历史版本 |
 | `projection_jobs` | 最新目标 sequence、attempt 和 next-attempt |
-| `idempotency_keys` | 版本/恢复命令的请求 hash 与过期时间 |
+| `idempotency_keys` | 内部幂等命令的请求 hash 与过期时间 |
 | `outbox` | update、失效和投影事件的 at-least-once 发布 |
 
 migration 按 version 递增顺序在 PostgreSQL advisory lock 下执行，每个已应用版本都校验稳定 name 与 SQL checksum；`001_initial` 保持不可变，后续 schema 变化只能追加新文件。首次 migration 仍拒绝接管未受 ledger 管理的旧 schema，任何执行或漂移校验失败都会使进程不 ready。所有 SQL 必须由 SQLx 显式 transaction 和 deadline 执行；禁止无界 query、连接池等待或 retry。
 
-### 6.1 富文本投影与版本
+### 6.1 富文本投影与双状态发布
 
 Rust 实现受限 `XmlFragment("default") -> ProseMirror JSON` codec，覆盖当前允许的 node、mark 和 attribute 集合，并生成 plain text。生产服务不调用 Node；Node/Yjs fixture 仅作为互操作真值。
 
-版本继续保存完整 Yrs state。恢复要求 expected sequence，在 actor 内生成从当前 state 到目标内容的 Yjs update，以普通持久化流程提交，推进 generation/sequence、创建 restoration version、发布失效事件并断开旧连接。恢复不得直接覆盖数据库 head 或绕过 update log。
+Collaboration 只保存实时编辑稿的完整 Yrs state，不再创建自动/手工历史版本，也不提供恢复 RPC。发布和更新通过 `CapturePublicationSnapshot` 读取客户端 state vector 覆盖后的已提交状态；Knowledge 只替换最近一次公开快照。取消发布撤下快照但保留编辑稿。
 
 snapshot worker 用单个 lateral aggregate 同时计算每个 document 自水位后的 update 数量与字节数，避免候选阶段重复扫描同一 update 范围；选中候选后仍必须在锁定 document head 的事务中重新检查阈值，再写 snapshot、推进水位并删除已压缩 update。
 
@@ -281,8 +278,8 @@ Node 24 只运行 `services/collaboration/interop` 的 `npm ci && npm run ci`。
 
 ### 9.1 当前自动化覆盖
 
-- 单元与 runtime：配置边界、UUIDv7、ticket、错误映射、close code、projection codec、plain text、actor queue、update 去重、恢复与 shutdown。
-- PostgreSQL：migration、锁与 sequence、并发 update、snapshot/version、恢复冲突、幂等、projection job、outbox、purge 和 rollback 的真实依赖测试。
+- 单元与 runtime：配置边界、UUIDv7、ticket、错误映射、close code、projection codec、plain text、actor queue、update 去重、公开快照捕获与 shutdown。
+- PostgreSQL：migration、锁与 sequence、并发 update、实时 snapshot/公开快照捕获、幂等、projection job、outbox、purge 和 rollback 的真实依赖测试。
 - Redis：ticket TTL、hash key、原子单次消费、两个独立连接并发重放和不可用时 fail closed。
 - NATS：两个不同 instance durable consumer fanout、稳定 instance 重连后的未 ACK redelivery、actor 回收恢复、重复事件与失效路由。
 - Kitex/Volo：Go client 调 Rust server、Rust client 调 Go Knowledge，覆盖 TTHeader、Binary、BizStatus、deadline、request ID、trace、token metadata、`Live` 与双向 mTLS。
@@ -309,7 +306,7 @@ Rust 在相同负载下必须同时满足：
 | 互操作探针 | 代码与自动化完成 | Kitex/Volo TTHeader、BizStatus、metadata、mTLS 和 `Live` wire 已覆盖；Node 性能基线待补 |
 | Rust 骨架与数据层 | 完成 | pinned workspace、配置、telemetry、runtime、migration、repository、真实依赖测试和 admin health 已落地 |
 | session 与 WebSocket | 完成 | Gateway session API、Redis ticket、单一 document 路径、Higress URI hash、Yrs actor、y-sync/awareness、边界和 commit-before-broadcast 已落地 |
-| 版本、投影与多实例 | 完成 | codec、snapshot/version/restore、outbox、JetStream fanout/redelivery/gap recovery 和失效关闭已落地 |
+| 双状态发布、投影与多实例 | 完成 | codec、实时编辑稿/公开快照捕获、outbox、JetStream fanout/redelivery/gap recovery 和失效关闭已落地 |
 | 调用方与部署代码 | 完成 | IDL/生成物、Gateway/Knowledge Kitex client、Compose、Rust image 已切换，旧 internal HTTP 与 Node production code 已删除 |
 | 发布验收 | 未完成 | 最终本地门禁已通过；远端功能阶段有通过记录，但单次完整流水线受外部网络和 production image 构建阻塞，现已暂停远端操作；性能、完整 Compose、故障、备份和切换/回滚演练待执行 |
 
@@ -322,7 +319,7 @@ Rust 在相同负载下必须同时满足：
 1. 禁止创建新 collaboration session，等待现有 Node 连接和 worker 在上限内排空。
 2. 备份现有 schema 以支持整栈回滚，然后删除并由 Rust migration 重建 `collaboration` schema；不执行数据转换。
 3. 在同一窗口部署 Rust Collaboration、更新后的 Gateway/Knowledge 和新 Web 客户端。
-4. 验证 migration、静态 Service DNS 拨号、Thrift mTLS、session、双客户端编辑、投影、版本、恢复、失效、metrics 和 shutdown。
+4. 验证 migration、静态 Service DNS 拨号、Thrift mTLS、session、双客户端编辑、投影、发布/更新、取消发布、永久删除、失效、metrics 和 shutdown。
 5. smoke 与 readiness 全部通过后重新开放 session route。
 
 回滚必须先关闭 session route，再整体回滚客户端、Gateway、Knowledge 和 Node Collaboration，并恢复备份或重建旧 schema。Rust 切换后产生的数据不保证回迁，发布公告必须明确这一 RPO。

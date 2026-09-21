@@ -34,4 +34,4 @@ config:
   knowledge: {service_name: knowledge-core.knowledge, address: knowledge-core-knowledge.knowledge-core-dev.svc.cluster.local:8882, request_timeout_ms: 5000}
   ticket: {ttl_ms: 30000}
   actor: {command_capacity: 256, outbound_capacity: 128, idle_timeout_ms: 60000, command_timeout_ms: 30000, awareness_messages_per_second: 20, updates_per_second: 50}
-  workers: {poll_interval_ms: 1000, operation_timeout_ms: 30000, projection_lease_ms: 30000, snapshot_update_threshold: 500, snapshot_byte_threshold: 8388608, automatic_version_interval_ms: 1800000, outbox_batch_size: 50}
+  workers: {poll_interval_ms: 1000, operation_timeout_ms: 30000, projection_lease_ms: 30000, snapshot_update_threshold: 500, snapshot_byte_threshold: 8388608, outbox_batch_size: 50}

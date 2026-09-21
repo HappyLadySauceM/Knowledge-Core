@@ -32,6 +32,8 @@ type Repository interface {
 	CompletePublicationReferenceJob(context.Context, string, bool) error
 	RetryPublicationReferenceJob(context.Context, string, string, int) error
 	ParkPublicationReferenceJob(context.Context, string, string, bool) error
+	HasPendingPublicationReferenceClear(context.Context, string) (bool, error)
+	RedrivePublicationReferenceClear(context.Context, string) error
 	ListPurgeCandidates(context.Context, int) ([]repository.PurgeCandidate, error)
 	PurgeDocument(context.Context, string) error
 	PurgeMaintenanceData(context.Context) error
@@ -377,6 +379,22 @@ func (w *Worker) processPurge(ctx context.Context) error {
 		return err
 	}
 	for _, candidate := range candidates {
+		// A soft-deleted document first enqueues an Attachment clear job. Keep the
+		// Knowledge row until that job is gone so a physical purge cannot cascade
+		// away the only durable retry payload for external attachment cleanup.
+		pendingClear, err := w.repository.HasPendingPublicationReferenceClear(probeCtx, candidate.DocumentID)
+		if err != nil {
+			return err
+		}
+		if pendingClear {
+			// A parked clear job cannot be claimed by the normal publication
+			// worker. Redrive it only in the permanent-delete path; ordinary
+			// unpublish failures retain their explicit parked/manual-retry state.
+			if err := w.repository.RedrivePublicationReferenceClear(probeCtx, candidate.DocumentID); err != nil {
+				return err
+			}
+			continue
+		}
 		workCtx, span := otel.Tracer("knowledge-core/knowledge").Start(ctx, "knowledge.worker.purge_document",
 			oteltrace.WithSpanKind(oteltrace.SpanKindInternal),
 		)

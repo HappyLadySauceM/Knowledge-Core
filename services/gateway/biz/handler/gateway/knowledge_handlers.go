@@ -297,32 +297,14 @@ func handlePublishDocument(ctx context.Context, request *app.RequestContext) {
 		gatewaymiddleware.WriteKnowledgeError(ctx, request, err)
 		return
 	}
-	version, err := dependencies.Collaboration.CreateVersion(upstreamContext(ctx, request), &collaborationv1.CreateVersionRequest{
-		DocumentId: documentID, Label: optionalString("publication"), IdempotencyKey: optionalString(idempotency), StateVector: stateVector,
+	captured, err := dependencies.Collaboration.CapturePublicationSnapshot(upstreamContext(ctx, request), &collaborationv1.CapturePublicationSnapshotRequest{
+		DocumentId: documentID, StateVector: stateVector,
 	})
 	if err != nil {
 		gatewaymiddleware.WriteCollaborationError(ctx, request, err)
 		return
 	}
-	// CreateVersion returns the projection captured in the same Collaboration
-	// transaction. Prefer it so an automatic checkpoint cannot overwrite the
-	// publication candidate between two RPCs. Older Collaboration deployments
-	// omit the optional fields, so retain the read fallback during rollout.
-	content := version.Content
-	plainText := ""
-	if version.PlainText != nil {
-		plainText = *version.PlainText
-	}
-	if content == nil || version.PlainText == nil {
-		detail, getErr := dependencies.Collaboration.GetVersion(upstreamContext(ctx, request), &collaborationv1.GetVersionRequest{DocumentId: documentID, VersionId: version.Id})
-		if getErr != nil {
-			gatewaymiddleware.WriteCollaborationError(ctx, request, getErr)
-			return
-		}
-		content = detail.Content
-		plainText = detail.PlainText
-	}
-	if content == nil {
+	if captured == nil || captured.Content == nil {
 		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidUpstreamResponse)
 		return
 	}
@@ -330,16 +312,16 @@ func handlePublishDocument(ctx context.Context, request *app.RequestContext) {
 	if draft.Language != nil && strings.TrimSpace(*draft.Language) != "" {
 		language = *draft.Language
 	}
-	snapshot, err := dependencies.Knowledge.PublishSnapshot(upstreamContext(ctx, request), &knowledgev1.PublishSnapshotRequest{
-		DocumentId: documentID, ExpectedMetadataRevision: revision, VersionId: version.Id, VersionSequence: version.Sequence,
+	published, err := dependencies.Knowledge.PublishSnapshot(upstreamContext(ctx, request), &knowledgev1.PublishSnapshotRequest{
+		DocumentId: documentID, ExpectedMetadataRevision: revision,
 		Title: draft.Title, Summary: draft.Summary, Slug: draft.Slug, Language: language, Tags: append([]string(nil), draft.Tags...),
-		Content: content, PlainText: plainText, IdempotencyKey: optionalString(idempotency),
+		Content: captured.Content, PlainText: captured.PlainText, IdempotencyKey: optionalString(idempotency),
 	})
 	if err != nil {
 		gatewaymiddleware.WriteKnowledgeError(ctx, request, err)
 		return
 	}
-	data, err := toDocumentData(snapshot)
+	data, err := toDocumentData(published)
 	if err != nil {
 		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidUpstreamResponse)
 		return
@@ -354,7 +336,8 @@ func handleUnpublishDocument(ctx context.Context, request *app.RequestContext) {
 func setPublication(ctx context.Context, request *app.RequestContext, published bool) {
 	documentID, pathErr := pathUUID(request, "document_id")
 	revision, revisionErr := expectedRevision(request)
-	if pathErr != nil || revisionErr != nil || requireNoQuery(request) != nil || requireNoBody(request) != nil {
+	idempotency, keyErr := idempotencyKey(request)
+	if pathErr != nil || revisionErr != nil || keyErr != nil || requireNoQuery(request) != nil || requireNoBody(request) != nil {
 		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidRequest)
 		return
 	}
@@ -364,7 +347,7 @@ func setPublication(ctx context.Context, request *app.RequestContext, published 
 		return
 	}
 	document, err := dependencies.Knowledge.SetPublication(upstreamContext(ctx, request), &knowledgev1.SetPublicationRequest{
-		DocumentId: documentID, ExpectedRevision: revision, Published: published,
+		DocumentId: documentID, ExpectedRevision: revision, Published: published, IdempotencyKey: optionalString(idempotency),
 	})
 	if err != nil {
 		gatewaymiddleware.WriteKnowledgeError(ctx, request, err)
@@ -406,6 +389,30 @@ func handleRestoreDeletedDocument(ctx context.Context, request *app.RequestConte
 		return
 	}
 	writeDocument(ctx, request, consts.StatusOK, data)
+}
+
+func handlePermanentlyDeleteDocument(ctx context.Context, request *app.RequestContext) {
+	documentID, pathErr := pathUUID(request, "document_id")
+	revision, revisionErr := expectedRevision(request)
+	idempotency, keyErr := idempotencyKey(request)
+	confirmationErr := permanentDeleteConfirmation(request)
+	if pathErr != nil || revisionErr != nil || keyErr != nil || confirmationErr != nil || requireNoQuery(request) != nil || requireNoBody(request) != nil {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidRequest)
+		return
+	}
+	dependencies, ok := gatewaymiddleware.FromRequest(request)
+	if !ok {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInternal)
+		return
+	}
+	if err := dependencies.Knowledge.PurgeDeletedDocument(upstreamContext(ctx, request), &knowledgev1.PurgeDeletedDocumentRequest{
+		DocumentId: documentID, ExpectedRevision: revision, IdempotencyKey: optionalString(idempotency),
+	}); err != nil {
+		gatewaymiddleware.WriteKnowledgeError(ctx, request, err)
+		return
+	}
+	gatewaymiddleware.ResponseMetadata(ctx, request)
+	request.Status(consts.StatusAccepted)
 }
 
 func handleListMembers(ctx context.Context, request *app.RequestContext) {

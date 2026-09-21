@@ -1461,16 +1461,14 @@ var fieldIDToName_UpdateDocumentRequest = map[int16]string{
 type PublishSnapshotRequest struct {
 	DocumentId               string            `thrift:"document_id,1,required" frugal:"1,required,string" json:"document_id"`
 	ExpectedMetadataRevision int64             `thrift:"expected_metadata_revision,2,required" frugal:"2,required,i64" json:"expected_metadata_revision"`
-	VersionId                string            `thrift:"version_id,3,required" frugal:"3,required,string" json:"version_id"`
-	VersionSequence          int64             `thrift:"version_sequence,4,required" frugal:"4,required,i64" json:"version_sequence"`
-	Title                    string            `thrift:"title,5,required" frugal:"5,required,string" json:"title"`
-	Summary                  string            `thrift:"summary,6,required" frugal:"6,required,string" json:"summary"`
-	Slug                     string            `thrift:"slug,7,required" frugal:"7,required,string" json:"slug"`
-	Language                 string            `thrift:"language,8,required" frugal:"8,required,string" json:"language"`
-	Tags                     []string          `thrift:"tags,9,required" frugal:"9,required,list<string>" json:"tags"`
-	Content                  *RichTextDocument `thrift:"content,10,required" frugal:"10,required,RichTextDocument" json:"content"`
-	PlainText                string            `thrift:"plain_text,11,required" frugal:"11,required,string" json:"plain_text"`
-	IdempotencyKey           *string           `thrift:"idempotency_key,12,optional" frugal:"12,optional,string" json:"idempotency_key,omitempty"`
+	Title                    string            `thrift:"title,3,required" frugal:"3,required,string" json:"title"`
+	Summary                  string            `thrift:"summary,4,required" frugal:"4,required,string" json:"summary"`
+	Slug                     string            `thrift:"slug,5,required" frugal:"5,required,string" json:"slug"`
+	Language                 string            `thrift:"language,6,required" frugal:"6,required,string" json:"language"`
+	Tags                     []string          `thrift:"tags,7,required" frugal:"7,required,list<string>" json:"tags"`
+	Content                  *RichTextDocument `thrift:"content,8,required" frugal:"8,required,RichTextDocument" json:"content"`
+	PlainText                string            `thrift:"plain_text,9,required" frugal:"9,required,string" json:"plain_text"`
+	IdempotencyKey           *string           `thrift:"idempotency_key,10,optional" frugal:"10,optional,string" json:"idempotency_key,omitempty"`
 }
 
 func NewPublishSnapshotRequest() *PublishSnapshotRequest {
@@ -1486,14 +1484,6 @@ func (p *PublishSnapshotRequest) GetDocumentId() (v string) {
 
 func (p *PublishSnapshotRequest) GetExpectedMetadataRevision() (v int64) {
 	return p.ExpectedMetadataRevision
-}
-
-func (p *PublishSnapshotRequest) GetVersionId() (v string) {
-	return p.VersionId
-}
-
-func (p *PublishSnapshotRequest) GetVersionSequence() (v int64) {
-	return p.VersionSequence
 }
 
 func (p *PublishSnapshotRequest) GetTitle() (v string) {
@@ -1543,12 +1533,6 @@ func (p *PublishSnapshotRequest) SetDocumentId(val string) {
 func (p *PublishSnapshotRequest) SetExpectedMetadataRevision(val int64) {
 	p.ExpectedMetadataRevision = val
 }
-func (p *PublishSnapshotRequest) SetVersionId(val string) {
-	p.VersionId = val
-}
-func (p *PublishSnapshotRequest) SetVersionSequence(val int64) {
-	p.VersionSequence = val
-}
 func (p *PublishSnapshotRequest) SetTitle(val string) {
 	p.Title = val
 }
@@ -1592,16 +1576,14 @@ func (p *PublishSnapshotRequest) String() string {
 var fieldIDToName_PublishSnapshotRequest = map[int16]string{
 	1:  "document_id",
 	2:  "expected_metadata_revision",
-	3:  "version_id",
-	4:  "version_sequence",
-	5:  "title",
-	6:  "summary",
-	7:  "slug",
-	8:  "language",
-	9:  "tags",
-	10: "content",
-	11: "plain_text",
-	12: "idempotency_key",
+	3:  "title",
+	4:  "summary",
+	5:  "slug",
+	6:  "language",
+	7:  "tags",
+	8:  "content",
+	9:  "plain_text",
+	10: "idempotency_key",
 }
 
 type ListFoldersRequest struct {
@@ -1820,9 +1802,10 @@ var fieldIDToName_DeleteFolderRequest = map[int16]string{
 }
 
 type SetPublicationRequest struct {
-	DocumentId       string `thrift:"document_id,1,required" frugal:"1,required,string" json:"document_id"`
-	ExpectedRevision int64  `thrift:"expected_revision,2,required" frugal:"2,required,i64" json:"expected_revision"`
-	Published        bool   `thrift:"published,3,required" frugal:"3,required,bool" json:"published"`
+	DocumentId       string  `thrift:"document_id,1,required" frugal:"1,required,string" json:"document_id"`
+	ExpectedRevision int64   `thrift:"expected_revision,2,required" frugal:"2,required,i64" json:"expected_revision"`
+	Published        bool    `thrift:"published,3,required" frugal:"3,required,bool" json:"published"`
+	IdempotencyKey   *string `thrift:"idempotency_key,4,optional" frugal:"4,optional,string" json:"idempotency_key,omitempty"`
 }
 
 func NewSetPublicationRequest() *SetPublicationRequest {
@@ -1843,6 +1826,15 @@ func (p *SetPublicationRequest) GetExpectedRevision() (v int64) {
 func (p *SetPublicationRequest) GetPublished() (v bool) {
 	return p.Published
 }
+
+var SetPublicationRequest_IdempotencyKey_DEFAULT string
+
+func (p *SetPublicationRequest) GetIdempotencyKey() (v string) {
+	if !p.IsSetIdempotencyKey() {
+		return SetPublicationRequest_IdempotencyKey_DEFAULT
+	}
+	return *p.IdempotencyKey
+}
 func (p *SetPublicationRequest) SetDocumentId(val string) {
 	p.DocumentId = val
 }
@@ -1851,6 +1843,13 @@ func (p *SetPublicationRequest) SetExpectedRevision(val int64) {
 }
 func (p *SetPublicationRequest) SetPublished(val bool) {
 	p.Published = val
+}
+func (p *SetPublicationRequest) SetIdempotencyKey(val *string) {
+	p.IdempotencyKey = val
+}
+
+func (p *SetPublicationRequest) IsSetIdempotencyKey() bool {
+	return p.IdempotencyKey != nil
 }
 
 func (p *SetPublicationRequest) String() string {
@@ -1864,6 +1863,7 @@ var fieldIDToName_SetPublicationRequest = map[int16]string{
 	1: "document_id",
 	2: "expected_revision",
 	3: "published",
+	4: "idempotency_key",
 }
 
 type DeleteDocumentRequest struct {
@@ -1902,6 +1902,62 @@ func (p *DeleteDocumentRequest) String() string {
 var fieldIDToName_DeleteDocumentRequest = map[int16]string{
 	1: "document_id",
 	2: "expected_revision",
+}
+
+type PurgeDeletedDocumentRequest struct {
+	DocumentId       string  `thrift:"document_id,1,required" frugal:"1,required,string" json:"document_id"`
+	ExpectedRevision int64   `thrift:"expected_revision,2,required" frugal:"2,required,i64" json:"expected_revision"`
+	IdempotencyKey   *string `thrift:"idempotency_key,3,optional" frugal:"3,optional,string" json:"idempotency_key,omitempty"`
+}
+
+func NewPurgeDeletedDocumentRequest() *PurgeDeletedDocumentRequest {
+	return &PurgeDeletedDocumentRequest{}
+}
+
+func (p *PurgeDeletedDocumentRequest) InitDefault() {
+}
+
+func (p *PurgeDeletedDocumentRequest) GetDocumentId() (v string) {
+	return p.DocumentId
+}
+
+func (p *PurgeDeletedDocumentRequest) GetExpectedRevision() (v int64) {
+	return p.ExpectedRevision
+}
+
+var PurgeDeletedDocumentRequest_IdempotencyKey_DEFAULT string
+
+func (p *PurgeDeletedDocumentRequest) GetIdempotencyKey() (v string) {
+	if !p.IsSetIdempotencyKey() {
+		return PurgeDeletedDocumentRequest_IdempotencyKey_DEFAULT
+	}
+	return *p.IdempotencyKey
+}
+func (p *PurgeDeletedDocumentRequest) SetDocumentId(val string) {
+	p.DocumentId = val
+}
+func (p *PurgeDeletedDocumentRequest) SetExpectedRevision(val int64) {
+	p.ExpectedRevision = val
+}
+func (p *PurgeDeletedDocumentRequest) SetIdempotencyKey(val *string) {
+	p.IdempotencyKey = val
+}
+
+func (p *PurgeDeletedDocumentRequest) IsSetIdempotencyKey() bool {
+	return p.IdempotencyKey != nil
+}
+
+func (p *PurgeDeletedDocumentRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("PurgeDeletedDocumentRequest(%+v)", *p)
+}
+
+var fieldIDToName_PurgeDeletedDocumentRequest = map[int16]string{
+	1: "document_id",
+	2: "expected_revision",
+	3: "idempotency_key",
 }
 
 type Member struct {
@@ -2431,6 +2487,8 @@ type KnowledgeService interface {
 	SetPublication(ctx context.Context, request *SetPublicationRequest) (r *Document, err error)
 
 	DeleteDocument(ctx context.Context, request *DeleteDocumentRequest) (r *Document, err error)
+
+	PurgeDeletedDocument(ctx context.Context, request *PurgeDeletedDocumentRequest) (err error)
 
 	RestoreDeletedDocument(ctx context.Context, request *DocumentIDRequest) (r *Document, err error)
 
@@ -3571,6 +3629,63 @@ func (p *KnowledgeServiceDeleteDocumentResult) String() string {
 var fieldIDToName_KnowledgeServiceDeleteDocumentResult = map[int16]string{
 	0: "success",
 }
+
+type KnowledgeServicePurgeDeletedDocumentArgs struct {
+	Request *PurgeDeletedDocumentRequest `thrift:"request,1" frugal:"1,default,PurgeDeletedDocumentRequest" json:"request"`
+}
+
+func NewKnowledgeServicePurgeDeletedDocumentArgs() *KnowledgeServicePurgeDeletedDocumentArgs {
+	return &KnowledgeServicePurgeDeletedDocumentArgs{}
+}
+
+func (p *KnowledgeServicePurgeDeletedDocumentArgs) InitDefault() {
+}
+
+var KnowledgeServicePurgeDeletedDocumentArgs_Request_DEFAULT *PurgeDeletedDocumentRequest
+
+func (p *KnowledgeServicePurgeDeletedDocumentArgs) GetRequest() (v *PurgeDeletedDocumentRequest) {
+	if !p.IsSetRequest() {
+		return KnowledgeServicePurgeDeletedDocumentArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+func (p *KnowledgeServicePurgeDeletedDocumentArgs) SetRequest(val *PurgeDeletedDocumentRequest) {
+	p.Request = val
+}
+
+func (p *KnowledgeServicePurgeDeletedDocumentArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *KnowledgeServicePurgeDeletedDocumentArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("KnowledgeServicePurgeDeletedDocumentArgs(%+v)", *p)
+}
+
+var fieldIDToName_KnowledgeServicePurgeDeletedDocumentArgs = map[int16]string{
+	1: "request",
+}
+
+type KnowledgeServicePurgeDeletedDocumentResult struct {
+}
+
+func NewKnowledgeServicePurgeDeletedDocumentResult() *KnowledgeServicePurgeDeletedDocumentResult {
+	return &KnowledgeServicePurgeDeletedDocumentResult{}
+}
+
+func (p *KnowledgeServicePurgeDeletedDocumentResult) InitDefault() {
+}
+
+func (p *KnowledgeServicePurgeDeletedDocumentResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("KnowledgeServicePurgeDeletedDocumentResult(%+v)", *p)
+}
+
+var fieldIDToName_KnowledgeServicePurgeDeletedDocumentResult = map[int16]string{}
 
 type KnowledgeServiceRestoreDeletedDocumentArgs struct {
 	Request *DocumentIDRequest `thrift:"request,1" frugal:"1,default,DocumentIDRequest" json:"request"`

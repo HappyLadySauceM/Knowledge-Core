@@ -137,16 +137,14 @@ struct UpdateDocumentRequest {
 struct PublishSnapshotRequest {
   1: required string document_id
   2: required i64 expected_metadata_revision
-  3: required string version_id
-  4: required i64 version_sequence
-  5: required string title
-  6: required string summary
-  7: required string slug
-  8: required string language
-  9: required list<string> tags
-  10: required RichTextDocument content
-  11: required string plain_text
-  12: optional string idempotency_key
+  3: required string title
+  4: required string summary
+  5: required string slug
+  6: required string language
+  7: required list<string> tags
+  8: required RichTextDocument content
+  9: required string plain_text
+  10: optional string idempotency_key
 }
 
 struct ListFoldersRequest { 1: optional string parent_id }
@@ -170,11 +168,18 @@ struct SetPublicationRequest {
   1: required string document_id
   2: required i64 expected_revision
   3: required bool published
+  4: optional string idempotency_key
 }
 
 struct DeleteDocumentRequest {
   1: required string document_id
   2: required i64 expected_revision
+}
+
+struct PurgeDeletedDocumentRequest {
+  1: required string document_id
+  2: required i64 expected_revision
+  3: optional string idempotency_key
 }
 
 struct Member {
@@ -245,6 +250,7 @@ service KnowledgeService {
   void DeleteFolder(1: DeleteFolderRequest request)
   Document SetPublication(1: SetPublicationRequest request)
   Document DeleteDocument(1: DeleteDocumentRequest request)
+  void PurgeDeletedDocument(1: PurgeDeletedDocumentRequest request)
   Document RestoreDeletedDocument(1: DocumentIDRequest request)
   DocumentPage ListDeletedDocuments(1: ListDocumentsRequest request)
   MemberList ListMembers(1: DocumentIDRequest request)

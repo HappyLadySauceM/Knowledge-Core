@@ -197,23 +197,6 @@ components:
                 - media_type
                 - size_bytes
             type: object
-        CreateVersionRequest:
-            additionalProperties: false
-            properties:
-                Idempotency-Key:
-                    type: string
-                document_id:
-                    format: uuid
-                    type: string
-                label:
-                    type: string
-                state_vector:
-                    description: Base64url 编码的当前 Yjs state vector。
-                    format: byte
-                    type: string
-            required:
-                - document_id
-            type: object
         DeactivateAccountRequest:
             additionalProperties: false
             properties:
@@ -525,20 +508,6 @@ components:
                 status:
                     type: string
             type: object
-        ListVersionsRequest:
-            additionalProperties: false
-            properties:
-                cursor:
-                    type: string
-                document_id:
-                    format: uuid
-                    type: string
-                limit:
-                    format: int32
-                    type: integer
-            required:
-                - document_id
-            type: object
         LoginRequest:
             additionalProperties: false
             properties:
@@ -740,6 +709,24 @@ components:
             required:
                 - identifier
             type: object
+        PermanentDeleteDocumentRequest:
+            additionalProperties: false
+            properties:
+                Idempotency-Key:
+                    type: string
+                If-Match:
+                    type: string
+                X-Confirm-Permanent-Delete:
+                    type: string
+                document_id:
+                    format: uuid
+                    type: string
+            required:
+                - Idempotency-Key
+                - If-Match
+                - X-Confirm-Permanent-Delete
+                - document_id
+            type: object
         PublicAttachmentRequest:
             additionalProperties: false
             properties:
@@ -826,25 +813,6 @@ components:
                 - email
                 - password
                 - username
-            type: object
-        RestoreVersionRequest:
-            additionalProperties: false
-            properties:
-                Idempotency-Key:
-                    type: string
-                document_id:
-                    format: uuid
-                    type: string
-                expected_sequence:
-                    format: int64
-                    type: integer
-                version_id:
-                    format: uuid
-                    type: string
-            required:
-                - document_id
-                - expected_sequence
-                - version_id
             type: object
         RichTextAttrsData:
             additionalProperties: false
@@ -1140,78 +1108,6 @@ components:
                 - status
                 - updated_at
                 - username
-            type: object
-        VersionData:
-            additionalProperties: false
-            properties:
-                created_at:
-                    format: date-time
-                    type: string
-                created_by:
-                    $ref: '#/components/schemas/PublicUserData'
-                document_id:
-                    format: uuid
-                    type: string
-                id:
-                    format: uuid
-                    type: string
-                kind:
-                    type: string
-                label:
-                    type: string
-                sequence:
-                    format: int64
-                    type: integer
-            required:
-                - created_at
-                - created_by
-                - document_id
-                - id
-                - kind
-                - sequence
-            type: object
-        VersionDetailData:
-            additionalProperties: false
-            properties:
-                content:
-                    $ref: '#/components/schemas/RichTextDocumentData'
-                plain_text:
-                    type: string
-                version:
-                    $ref: '#/components/schemas/VersionData'
-            required:
-                - content
-                - plain_text
-                - version
-            type: object
-        VersionPageData:
-            additionalProperties: false
-            properties:
-                head_sequence:
-                    format: int64
-                    type: integer
-                items:
-                    items:
-                        $ref: '#/components/schemas/VersionData'
-                    type: array
-                page:
-                    $ref: '#/components/schemas/PageInfoData'
-            required:
-                - items
-                - page
-            type: object
-        VersionPathRequest:
-            additionalProperties: false
-            properties:
-                document_id:
-                    format: uuid
-                    type: string
-                version_id:
-                    format: uuid
-                    type: string
-            required:
-                - document_id
-                - version_id
             type: object
     securitySchemes:
         bearerAuth:
@@ -10366,7 +10262,7 @@ paths:
             tags:
                 - 发布
         put:
-            description: 使用当前 rich-text state vector 创建版本并发布文档公开投影。
+            description: 从当前协作 rich-text state vector 捕获快照并发布文档公开投影。
             operationId: PublishDocument
             parameters:
                 - in: header
@@ -10727,1230 +10623,6 @@ paths:
             summary: 发布文档
             tags:
                 - 发布
-    /api/v1/studio/documents/{document_id}/versions:
-        get:
-            description: 按 sequence 游标分页列出文档不可变版本。
-            operationId: ListVersions
-            parameters:
-                - in: query
-                  name: cursor
-                  required: false
-                  schema:
-                    type: string
-                - in: path
-                  name: document_id
-                  required: true
-                  schema:
-                    format: uuid
-                    type: string
-                - in: query
-                  name: limit
-                  required: false
-                  schema:
-                    format: int32
-                    type: integer
-            responses:
-                "200":
-                    content:
-                        application/json:
-                            example:
-                                head_sequence: 1
-                                items:
-                                    - created_at: "2026-01-01T00:00:00Z"
-                                      document_id: 018f0c20-7b8a-7cc3-8f89-2f6f6d5f7a11
-                                      id: 018f0c20-7b8a-7cc3-8f89-2f6f6d5f7a11
-                                      kind: string
-                                      label: string
-                                      sequence: 1
-                                page:
-                                    has_more: true
-                                    next_cursor: string
-                            schema:
-                                $ref: '#/components/schemas/VersionPageData'
-                    description: 请求成功。
-                    headers:
-                        X-Request-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                        X-Trace-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                "400":
-                    content:
-                        application/problem+json:
-                            example:
-                                code: 1
-                                detail: string
-                                key: string
-                                request_id: string
-                                status: 400
-                                title: 请求格式或参数无效。
-                                trace_id: string
-                                type: https://example.com/resource
-                            schema:
-                                $ref: '#/components/schemas/HTTPProblem'
-                    description: 请求格式或参数无效。
-                    headers:
-                        X-Request-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                        X-Trace-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                "401":
-                    content:
-                        application/problem+json:
-                            example:
-                                code: 1
-                                detail: string
-                                key: string
-                                request_id: string
-                                status: 401
-                                title: 需要认证或认证已失效。
-                                trace_id: string
-                                type: https://example.com/resource
-                            schema:
-                                $ref: '#/components/schemas/HTTPProblem'
-                    description: 需要认证或认证已失效。
-                    headers:
-                        WWW-Authenticate:
-                            description: Bearer 认证挑战。
-                            schema:
-                                type: string
-                        X-Request-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                        X-Trace-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                "403":
-                    content:
-                        application/problem+json:
-                            example:
-                                code: 1
-                                detail: string
-                                key: string
-                                request_id: string
-                                status: 403
-                                title: 没有执行该操作的权限。
-                                trace_id: string
-                                type: https://example.com/resource
-                            schema:
-                                $ref: '#/components/schemas/HTTPProblem'
-                    description: 没有执行该操作的权限。
-                    headers:
-                        X-Request-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                        X-Trace-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                "404":
-                    content:
-                        application/problem+json:
-                            example:
-                                code: 1
-                                detail: string
-                                key: string
-                                request_id: string
-                                status: 404
-                                title: 资源不存在。
-                                trace_id: string
-                                type: https://example.com/resource
-                            schema:
-                                $ref: '#/components/schemas/HTTPProblem'
-                    description: 资源不存在。
-                    headers:
-                        X-Request-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                        X-Trace-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                "429":
-                    content:
-                        application/problem+json:
-                            example:
-                                code: 1
-                                detail: string
-                                key: string
-                                request_id: string
-                                status: 429
-                                title: 请求频率超过限制。
-                                trace_id: string
-                                type: https://example.com/resource
-                            schema:
-                                $ref: '#/components/schemas/HTTPProblem'
-                    description: 请求频率超过限制。
-                    headers:
-                        Retry-After:
-                            description: 响应关联的请求标识。
-                            schema:
-                                format: int32
-                                minimum: 1
-                                type: integer
-                        X-Request-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                        X-Trace-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                "500":
-                    content:
-                        application/problem+json:
-                            example:
-                                code: 1
-                                detail: string
-                                key: string
-                                request_id: string
-                                status: 500
-                                title: Gateway 内部错误。
-                                trace_id: string
-                                type: https://example.com/resource
-                            schema:
-                                $ref: '#/components/schemas/HTTPProblem'
-                    description: Gateway 内部错误。
-                    headers:
-                        X-Request-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                        X-Trace-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                "502":
-                    content:
-                        application/problem+json:
-                            example:
-                                code: 1
-                                detail: string
-                                key: string
-                                request_id: string
-                                status: 502
-                                title: 上游响应无效或不可用。
-                                trace_id: string
-                                type: https://example.com/resource
-                            schema:
-                                $ref: '#/components/schemas/HTTPProblem'
-                    description: 上游响应无效或不可用。
-                    headers:
-                        X-Request-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                        X-Trace-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                "503":
-                    content:
-                        application/problem+json:
-                            example:
-                                code: 1
-                                detail: string
-                                key: string
-                                request_id: string
-                                status: 503
-                                title: 依赖或 Gateway 暂不可用。
-                                trace_id: string
-                                type: https://example.com/resource
-                            schema:
-                                $ref: '#/components/schemas/HTTPProblem'
-                    description: 依赖或 Gateway 暂不可用。
-                    headers:
-                        X-Request-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                        X-Trace-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                "504":
-                    content:
-                        application/problem+json:
-                            example:
-                                code: 1
-                                detail: string
-                                key: string
-                                request_id: string
-                                status: 504
-                                title: 上游请求超时。
-                                trace_id: string
-                                type: https://example.com/resource
-                            schema:
-                                $ref: '#/components/schemas/HTTPProblem'
-                    description: 上游请求超时。
-                    headers:
-                        X-Request-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                        X-Trace-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-            security:
-                - bearerAuth: []
-            summary: 列出文档版本
-            tags:
-                - 版本
-        post:
-            description: 保存当前协作状态的不可变版本。
-            operationId: CreateVersion
-            parameters:
-                - in: header
-                  name: Idempotency-Key
-                  required: false
-                  schema:
-                    type: string
-                  style: simple
-                - in: path
-                  name: document_id
-                  required: true
-                  schema:
-                    format: uuid
-                    type: string
-            requestBody:
-                content:
-                    application/json:
-                        example:
-                            label: string
-                            state_vector: AA==
-                        schema:
-                            additionalProperties: false
-                            properties:
-                                label:
-                                    type: string
-                                state_vector:
-                                    description: Base64url 编码的当前 Yjs state vector。
-                                    format: byte
-                                    type: string
-                            type: object
-                required: true
-            responses:
-                "201":
-                    content:
-                        application/json:
-                            example:
-                                created_at: "2026-01-01T00:00:00Z"
-                                created_by:
-                                    avatar: string
-                                    avatar_attachment_id: 018f0c20-7b8a-7cc3-8f89-2f6f6d5f7a11
-                                    id: 018f0c20-7b8a-7cc3-8f89-2f6f6d5f7a11
-                                    username: string
-                                document_id: 018f0c20-7b8a-7cc3-8f89-2f6f6d5f7a11
-                                id: 018f0c20-7b8a-7cc3-8f89-2f6f6d5f7a11
-                                kind: string
-                                label: string
-                                sequence: 1
-                            schema:
-                                $ref: '#/components/schemas/VersionData'
-                    description: 资源已创建。
-                    headers:
-                        Location:
-                            description: 响应关联的请求标识。
-                            schema:
-                                format: uri
-                                type: string
-                        X-Request-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                        X-Trace-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                "400":
-                    content:
-                        application/problem+json:
-                            example:
-                                code: 1
-                                detail: string
-                                key: string
-                                request_id: string
-                                status: 400
-                                title: 请求格式或参数无效。
-                                trace_id: string
-                                type: https://example.com/resource
-                            schema:
-                                $ref: '#/components/schemas/HTTPProblem'
-                    description: 请求格式或参数无效。
-                    headers:
-                        X-Request-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                        X-Trace-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                "401":
-                    content:
-                        application/problem+json:
-                            example:
-                                code: 1
-                                detail: string
-                                key: string
-                                request_id: string
-                                status: 401
-                                title: 需要认证或认证已失效。
-                                trace_id: string
-                                type: https://example.com/resource
-                            schema:
-                                $ref: '#/components/schemas/HTTPProblem'
-                    description: 需要认证或认证已失效。
-                    headers:
-                        WWW-Authenticate:
-                            description: Bearer 认证挑战。
-                            schema:
-                                type: string
-                        X-Request-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                        X-Trace-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                "403":
-                    content:
-                        application/problem+json:
-                            example:
-                                code: 1
-                                detail: string
-                                key: string
-                                request_id: string
-                                status: 403
-                                title: 没有执行该操作的权限。
-                                trace_id: string
-                                type: https://example.com/resource
-                            schema:
-                                $ref: '#/components/schemas/HTTPProblem'
-                    description: 没有执行该操作的权限。
-                    headers:
-                        X-Request-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                        X-Trace-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                "404":
-                    content:
-                        application/problem+json:
-                            example:
-                                code: 1
-                                detail: string
-                                key: string
-                                request_id: string
-                                status: 404
-                                title: 资源不存在。
-                                trace_id: string
-                                type: https://example.com/resource
-                            schema:
-                                $ref: '#/components/schemas/HTTPProblem'
-                    description: 资源不存在。
-                    headers:
-                        X-Request-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                        X-Trace-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                "409":
-                    content:
-                        application/problem+json:
-                            example:
-                                code: 1
-                                detail: string
-                                key: string
-                                request_id: string
-                                status: 409
-                                title: 资源状态冲突。
-                                trace_id: string
-                                type: https://example.com/resource
-                            schema:
-                                $ref: '#/components/schemas/HTTPProblem'
-                    description: 资源状态冲突。
-                    headers:
-                        X-Request-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                        X-Trace-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                "429":
-                    content:
-                        application/problem+json:
-                            example:
-                                code: 1
-                                detail: string
-                                key: string
-                                request_id: string
-                                status: 429
-                                title: 请求频率超过限制。
-                                trace_id: string
-                                type: https://example.com/resource
-                            schema:
-                                $ref: '#/components/schemas/HTTPProblem'
-                    description: 请求频率超过限制。
-                    headers:
-                        Retry-After:
-                            description: 响应关联的请求标识。
-                            schema:
-                                format: int32
-                                minimum: 1
-                                type: integer
-                        X-Request-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                        X-Trace-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                "500":
-                    content:
-                        application/problem+json:
-                            example:
-                                code: 1
-                                detail: string
-                                key: string
-                                request_id: string
-                                status: 500
-                                title: Gateway 内部错误。
-                                trace_id: string
-                                type: https://example.com/resource
-                            schema:
-                                $ref: '#/components/schemas/HTTPProblem'
-                    description: Gateway 内部错误。
-                    headers:
-                        X-Request-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                        X-Trace-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                "502":
-                    content:
-                        application/problem+json:
-                            example:
-                                code: 1
-                                detail: string
-                                key: string
-                                request_id: string
-                                status: 502
-                                title: 上游响应无效或不可用。
-                                trace_id: string
-                                type: https://example.com/resource
-                            schema:
-                                $ref: '#/components/schemas/HTTPProblem'
-                    description: 上游响应无效或不可用。
-                    headers:
-                        X-Request-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                        X-Trace-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                "503":
-                    content:
-                        application/problem+json:
-                            example:
-                                code: 1
-                                detail: string
-                                key: string
-                                request_id: string
-                                status: 503
-                                title: 依赖或 Gateway 暂不可用。
-                                trace_id: string
-                                type: https://example.com/resource
-                            schema:
-                                $ref: '#/components/schemas/HTTPProblem'
-                    description: 依赖或 Gateway 暂不可用。
-                    headers:
-                        X-Request-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                        X-Trace-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                "504":
-                    content:
-                        application/problem+json:
-                            example:
-                                code: 1
-                                detail: string
-                                key: string
-                                request_id: string
-                                status: 504
-                                title: 上游请求超时。
-                                trace_id: string
-                                type: https://example.com/resource
-                            schema:
-                                $ref: '#/components/schemas/HTTPProblem'
-                    description: 上游请求超时。
-                    headers:
-                        X-Request-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                        X-Trace-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-            security:
-                - bearerAuth: []
-            summary: 创建文档版本
-            tags:
-                - 版本
-    /api/v1/studio/documents/{document_id}/versions/{version_id}:
-        get:
-            description: 获取指定版本的 rich-text 内容和纯文本投影。
-            operationId: GetVersion
-            parameters:
-                - in: path
-                  name: document_id
-                  required: true
-                  schema:
-                    format: uuid
-                    type: string
-                - in: path
-                  name: version_id
-                  required: true
-                  schema:
-                    format: uuid
-                    type: string
-            responses:
-                "200":
-                    content:
-                        application/json:
-                            example:
-                                content:
-                                    content: []
-                                    type: string
-                                plain_text: string
-                                version:
-                                    created_at: "2026-01-01T00:00:00Z"
-                                    created_by: {}
-                                    document_id: 018f0c20-7b8a-7cc3-8f89-2f6f6d5f7a11
-                                    id: 018f0c20-7b8a-7cc3-8f89-2f6f6d5f7a11
-                                    kind: string
-                                    label: string
-                                    sequence: 1
-                            schema:
-                                $ref: '#/components/schemas/VersionDetailData'
-                    description: 请求成功。
-                    headers:
-                        X-Request-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                        X-Trace-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                "400":
-                    content:
-                        application/problem+json:
-                            example:
-                                code: 1
-                                detail: string
-                                key: string
-                                request_id: string
-                                status: 400
-                                title: 请求格式或参数无效。
-                                trace_id: string
-                                type: https://example.com/resource
-                            schema:
-                                $ref: '#/components/schemas/HTTPProblem'
-                    description: 请求格式或参数无效。
-                    headers:
-                        X-Request-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                        X-Trace-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                "401":
-                    content:
-                        application/problem+json:
-                            example:
-                                code: 1
-                                detail: string
-                                key: string
-                                request_id: string
-                                status: 401
-                                title: 需要认证或认证已失效。
-                                trace_id: string
-                                type: https://example.com/resource
-                            schema:
-                                $ref: '#/components/schemas/HTTPProblem'
-                    description: 需要认证或认证已失效。
-                    headers:
-                        WWW-Authenticate:
-                            description: Bearer 认证挑战。
-                            schema:
-                                type: string
-                        X-Request-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                        X-Trace-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                "403":
-                    content:
-                        application/problem+json:
-                            example:
-                                code: 1
-                                detail: string
-                                key: string
-                                request_id: string
-                                status: 403
-                                title: 没有执行该操作的权限。
-                                trace_id: string
-                                type: https://example.com/resource
-                            schema:
-                                $ref: '#/components/schemas/HTTPProblem'
-                    description: 没有执行该操作的权限。
-                    headers:
-                        X-Request-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                        X-Trace-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                "404":
-                    content:
-                        application/problem+json:
-                            example:
-                                code: 1
-                                detail: string
-                                key: string
-                                request_id: string
-                                status: 404
-                                title: 资源不存在。
-                                trace_id: string
-                                type: https://example.com/resource
-                            schema:
-                                $ref: '#/components/schemas/HTTPProblem'
-                    description: 资源不存在。
-                    headers:
-                        X-Request-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                        X-Trace-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                "429":
-                    content:
-                        application/problem+json:
-                            example:
-                                code: 1
-                                detail: string
-                                key: string
-                                request_id: string
-                                status: 429
-                                title: 请求频率超过限制。
-                                trace_id: string
-                                type: https://example.com/resource
-                            schema:
-                                $ref: '#/components/schemas/HTTPProblem'
-                    description: 请求频率超过限制。
-                    headers:
-                        Retry-After:
-                            description: 响应关联的请求标识。
-                            schema:
-                                format: int32
-                                minimum: 1
-                                type: integer
-                        X-Request-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                        X-Trace-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                "500":
-                    content:
-                        application/problem+json:
-                            example:
-                                code: 1
-                                detail: string
-                                key: string
-                                request_id: string
-                                status: 500
-                                title: Gateway 内部错误。
-                                trace_id: string
-                                type: https://example.com/resource
-                            schema:
-                                $ref: '#/components/schemas/HTTPProblem'
-                    description: Gateway 内部错误。
-                    headers:
-                        X-Request-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                        X-Trace-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                "502":
-                    content:
-                        application/problem+json:
-                            example:
-                                code: 1
-                                detail: string
-                                key: string
-                                request_id: string
-                                status: 502
-                                title: 上游响应无效或不可用。
-                                trace_id: string
-                                type: https://example.com/resource
-                            schema:
-                                $ref: '#/components/schemas/HTTPProblem'
-                    description: 上游响应无效或不可用。
-                    headers:
-                        X-Request-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                        X-Trace-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                "503":
-                    content:
-                        application/problem+json:
-                            example:
-                                code: 1
-                                detail: string
-                                key: string
-                                request_id: string
-                                status: 503
-                                title: 依赖或 Gateway 暂不可用。
-                                trace_id: string
-                                type: https://example.com/resource
-                            schema:
-                                $ref: '#/components/schemas/HTTPProblem'
-                    description: 依赖或 Gateway 暂不可用。
-                    headers:
-                        X-Request-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                        X-Trace-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                "504":
-                    content:
-                        application/problem+json:
-                            example:
-                                code: 1
-                                detail: string
-                                key: string
-                                request_id: string
-                                status: 504
-                                title: 上游请求超时。
-                                trace_id: string
-                                type: https://example.com/resource
-                            schema:
-                                $ref: '#/components/schemas/HTTPProblem'
-                    description: 上游请求超时。
-                    headers:
-                        X-Request-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                        X-Trace-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-            security:
-                - bearerAuth: []
-            summary: 获取版本详情
-            tags:
-                - 版本
-    /api/v1/studio/documents/{document_id}/versions/{version_id}/restorations:
-        post:
-            description: 在 expected_sequence 匹配时生成恢复更新并创建新版本。
-            operationId: RestoreVersion
-            parameters:
-                - in: header
-                  name: Idempotency-Key
-                  required: false
-                  schema:
-                    type: string
-                  style: simple
-                - in: path
-                  name: document_id
-                  required: true
-                  schema:
-                    format: uuid
-                    type: string
-                - in: path
-                  name: version_id
-                  required: true
-                  schema:
-                    format: uuid
-                    type: string
-            requestBody:
-                content:
-                    application/json:
-                        example:
-                            expected_sequence: 1
-                        schema:
-                            additionalProperties: false
-                            properties:
-                                expected_sequence:
-                                    format: int64
-                                    type: integer
-                            required:
-                                - expected_sequence
-                            type: object
-                required: true
-            responses:
-                "201":
-                    content:
-                        application/json:
-                            example:
-                                created_at: "2026-01-01T00:00:00Z"
-                                created_by:
-                                    avatar: string
-                                    avatar_attachment_id: 018f0c20-7b8a-7cc3-8f89-2f6f6d5f7a11
-                                    id: 018f0c20-7b8a-7cc3-8f89-2f6f6d5f7a11
-                                    username: string
-                                document_id: 018f0c20-7b8a-7cc3-8f89-2f6f6d5f7a11
-                                id: 018f0c20-7b8a-7cc3-8f89-2f6f6d5f7a11
-                                kind: string
-                                label: string
-                                sequence: 1
-                            schema:
-                                $ref: '#/components/schemas/VersionData'
-                    description: 资源已创建。
-                    headers:
-                        X-Request-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                        X-Trace-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                "400":
-                    content:
-                        application/problem+json:
-                            example:
-                                code: 1
-                                detail: string
-                                key: string
-                                request_id: string
-                                status: 400
-                                title: 请求格式或参数无效。
-                                trace_id: string
-                                type: https://example.com/resource
-                            schema:
-                                $ref: '#/components/schemas/HTTPProblem'
-                    description: 请求格式或参数无效。
-                    headers:
-                        X-Request-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                        X-Trace-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                "401":
-                    content:
-                        application/problem+json:
-                            example:
-                                code: 1
-                                detail: string
-                                key: string
-                                request_id: string
-                                status: 401
-                                title: 需要认证或认证已失效。
-                                trace_id: string
-                                type: https://example.com/resource
-                            schema:
-                                $ref: '#/components/schemas/HTTPProblem'
-                    description: 需要认证或认证已失效。
-                    headers:
-                        WWW-Authenticate:
-                            description: Bearer 认证挑战。
-                            schema:
-                                type: string
-                        X-Request-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                        X-Trace-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                "403":
-                    content:
-                        application/problem+json:
-                            example:
-                                code: 1
-                                detail: string
-                                key: string
-                                request_id: string
-                                status: 403
-                                title: 没有执行该操作的权限。
-                                trace_id: string
-                                type: https://example.com/resource
-                            schema:
-                                $ref: '#/components/schemas/HTTPProblem'
-                    description: 没有执行该操作的权限。
-                    headers:
-                        X-Request-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                        X-Trace-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                "404":
-                    content:
-                        application/problem+json:
-                            example:
-                                code: 1
-                                detail: string
-                                key: string
-                                request_id: string
-                                status: 404
-                                title: 资源不存在。
-                                trace_id: string
-                                type: https://example.com/resource
-                            schema:
-                                $ref: '#/components/schemas/HTTPProblem'
-                    description: 资源不存在。
-                    headers:
-                        X-Request-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                        X-Trace-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                "409":
-                    content:
-                        application/problem+json:
-                            example:
-                                code: 1
-                                detail: string
-                                key: string
-                                request_id: string
-                                status: 409
-                                title: 资源状态冲突。
-                                trace_id: string
-                                type: https://example.com/resource
-                            schema:
-                                $ref: '#/components/schemas/HTTPProblem'
-                    description: 资源状态冲突。
-                    headers:
-                        X-Request-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                        X-Trace-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                "412":
-                    content:
-                        application/problem+json:
-                            example:
-                                code: 1
-                                detail: string
-                                key: string
-                                request_id: string
-                                status: 412
-                                title: If-Match 或其他前置条件不满足。
-                                trace_id: string
-                                type: https://example.com/resource
-                            schema:
-                                $ref: '#/components/schemas/HTTPProblem'
-                    description: If-Match 或其他前置条件不满足。
-                    headers:
-                        X-Request-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                        X-Trace-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                "429":
-                    content:
-                        application/problem+json:
-                            example:
-                                code: 1
-                                detail: string
-                                key: string
-                                request_id: string
-                                status: 429
-                                title: 请求频率超过限制。
-                                trace_id: string
-                                type: https://example.com/resource
-                            schema:
-                                $ref: '#/components/schemas/HTTPProblem'
-                    description: 请求频率超过限制。
-                    headers:
-                        Retry-After:
-                            description: 响应关联的请求标识。
-                            schema:
-                                format: int32
-                                minimum: 1
-                                type: integer
-                        X-Request-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                        X-Trace-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                "500":
-                    content:
-                        application/problem+json:
-                            example:
-                                code: 1
-                                detail: string
-                                key: string
-                                request_id: string
-                                status: 500
-                                title: Gateway 内部错误。
-                                trace_id: string
-                                type: https://example.com/resource
-                            schema:
-                                $ref: '#/components/schemas/HTTPProblem'
-                    description: Gateway 内部错误。
-                    headers:
-                        X-Request-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                        X-Trace-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                "502":
-                    content:
-                        application/problem+json:
-                            example:
-                                code: 1
-                                detail: string
-                                key: string
-                                request_id: string
-                                status: 502
-                                title: 上游响应无效或不可用。
-                                trace_id: string
-                                type: https://example.com/resource
-                            schema:
-                                $ref: '#/components/schemas/HTTPProblem'
-                    description: 上游响应无效或不可用。
-                    headers:
-                        X-Request-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                        X-Trace-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                "503":
-                    content:
-                        application/problem+json:
-                            example:
-                                code: 1
-                                detail: string
-                                key: string
-                                request_id: string
-                                status: 503
-                                title: 依赖或 Gateway 暂不可用。
-                                trace_id: string
-                                type: https://example.com/resource
-                            schema:
-                                $ref: '#/components/schemas/HTTPProblem'
-                    description: 依赖或 Gateway 暂不可用。
-                    headers:
-                        X-Request-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                        X-Trace-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                "504":
-                    content:
-                        application/problem+json:
-                            example:
-                                code: 1
-                                detail: string
-                                key: string
-                                request_id: string
-                                status: 504
-                                title: 上游请求超时。
-                                trace_id: string
-                                type: https://example.com/resource
-                            schema:
-                                $ref: '#/components/schemas/HTTPProblem'
-                    description: 上游请求超时。
-                    headers:
-                        X-Request-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-                        X-Trace-ID:
-                            description: 响应关联的请求标识。
-                            schema:
-                                type: string
-            security:
-                - bearerAuth: []
-            summary: 恢复文档版本
-            tags:
-                - 版本
     /api/v1/studio/folders:
         get:
             description: 列出指定父文件夹下的工作区文件夹。
@@ -13402,6 +12074,331 @@ paths:
             summary: 列出已删除文档
             tags:
                 - 回收站
+    /api/v1/studio/trash/{document_id}:
+        delete:
+            description: 使用强 If-Match、幂等键和 X-Confirm-Permanent-Delete=true 二次确认，立即隐藏并异步清理已删除文档，操作不可恢复。
+            operationId: PermanentlyDeleteDocument
+            parameters:
+                - in: header
+                  name: Idempotency-Key
+                  required: true
+                  schema:
+                    type: string
+                  style: simple
+                - in: header
+                  name: If-Match
+                  required: true
+                  schema:
+                    type: string
+                  style: simple
+                - in: header
+                  name: X-Confirm-Permanent-Delete
+                  required: true
+                  schema:
+                    type: string
+                  style: simple
+                - in: path
+                  name: document_id
+                  required: true
+                  schema:
+                    format: uuid
+                    type: string
+            responses:
+                "202":
+                    content:
+                        application/json:
+                            example: {}
+                            schema:
+                                $ref: '#/components/schemas/EmptyResponse'
+                    description: 请求已接受。
+                    headers:
+                        X-Request-ID:
+                            description: 响应关联的请求标识。
+                            schema:
+                                type: string
+                        X-Trace-ID:
+                            description: 响应关联的请求标识。
+                            schema:
+                                type: string
+                "400":
+                    content:
+                        application/problem+json:
+                            example:
+                                code: 1
+                                detail: string
+                                key: string
+                                request_id: string
+                                status: 400
+                                title: 请求格式或参数无效。
+                                trace_id: string
+                                type: https://example.com/resource
+                            schema:
+                                $ref: '#/components/schemas/HTTPProblem'
+                    description: 请求格式或参数无效。
+                    headers:
+                        X-Request-ID:
+                            description: 响应关联的请求标识。
+                            schema:
+                                type: string
+                        X-Trace-ID:
+                            description: 响应关联的请求标识。
+                            schema:
+                                type: string
+                "401":
+                    content:
+                        application/problem+json:
+                            example:
+                                code: 1
+                                detail: string
+                                key: string
+                                request_id: string
+                                status: 401
+                                title: 需要认证或认证已失效。
+                                trace_id: string
+                                type: https://example.com/resource
+                            schema:
+                                $ref: '#/components/schemas/HTTPProblem'
+                    description: 需要认证或认证已失效。
+                    headers:
+                        WWW-Authenticate:
+                            description: Bearer 认证挑战。
+                            schema:
+                                type: string
+                        X-Request-ID:
+                            description: 响应关联的请求标识。
+                            schema:
+                                type: string
+                        X-Trace-ID:
+                            description: 响应关联的请求标识。
+                            schema:
+                                type: string
+                "403":
+                    content:
+                        application/problem+json:
+                            example:
+                                code: 1
+                                detail: string
+                                key: string
+                                request_id: string
+                                status: 403
+                                title: 没有执行该操作的权限。
+                                trace_id: string
+                                type: https://example.com/resource
+                            schema:
+                                $ref: '#/components/schemas/HTTPProblem'
+                    description: 没有执行该操作的权限。
+                    headers:
+                        X-Request-ID:
+                            description: 响应关联的请求标识。
+                            schema:
+                                type: string
+                        X-Trace-ID:
+                            description: 响应关联的请求标识。
+                            schema:
+                                type: string
+                "404":
+                    content:
+                        application/problem+json:
+                            example:
+                                code: 1
+                                detail: string
+                                key: string
+                                request_id: string
+                                status: 404
+                                title: 资源不存在。
+                                trace_id: string
+                                type: https://example.com/resource
+                            schema:
+                                $ref: '#/components/schemas/HTTPProblem'
+                    description: 资源不存在。
+                    headers:
+                        X-Request-ID:
+                            description: 响应关联的请求标识。
+                            schema:
+                                type: string
+                        X-Trace-ID:
+                            description: 响应关联的请求标识。
+                            schema:
+                                type: string
+                "409":
+                    content:
+                        application/problem+json:
+                            example:
+                                code: 1
+                                detail: string
+                                key: string
+                                request_id: string
+                                status: 409
+                                title: 资源状态冲突。
+                                trace_id: string
+                                type: https://example.com/resource
+                            schema:
+                                $ref: '#/components/schemas/HTTPProblem'
+                    description: 资源状态冲突。
+                    headers:
+                        X-Request-ID:
+                            description: 响应关联的请求标识。
+                            schema:
+                                type: string
+                        X-Trace-ID:
+                            description: 响应关联的请求标识。
+                            schema:
+                                type: string
+                "412":
+                    content:
+                        application/problem+json:
+                            example:
+                                code: 1
+                                detail: string
+                                key: string
+                                request_id: string
+                                status: 412
+                                title: If-Match 或其他前置条件不满足。
+                                trace_id: string
+                                type: https://example.com/resource
+                            schema:
+                                $ref: '#/components/schemas/HTTPProblem'
+                    description: If-Match 或其他前置条件不满足。
+                    headers:
+                        X-Request-ID:
+                            description: 响应关联的请求标识。
+                            schema:
+                                type: string
+                        X-Trace-ID:
+                            description: 响应关联的请求标识。
+                            schema:
+                                type: string
+                "429":
+                    content:
+                        application/problem+json:
+                            example:
+                                code: 1
+                                detail: string
+                                key: string
+                                request_id: string
+                                status: 429
+                                title: 请求频率超过限制。
+                                trace_id: string
+                                type: https://example.com/resource
+                            schema:
+                                $ref: '#/components/schemas/HTTPProblem'
+                    description: 请求频率超过限制。
+                    headers:
+                        Retry-After:
+                            description: 响应关联的请求标识。
+                            schema:
+                                format: int32
+                                minimum: 1
+                                type: integer
+                        X-Request-ID:
+                            description: 响应关联的请求标识。
+                            schema:
+                                type: string
+                        X-Trace-ID:
+                            description: 响应关联的请求标识。
+                            schema:
+                                type: string
+                "500":
+                    content:
+                        application/problem+json:
+                            example:
+                                code: 1
+                                detail: string
+                                key: string
+                                request_id: string
+                                status: 500
+                                title: Gateway 内部错误。
+                                trace_id: string
+                                type: https://example.com/resource
+                            schema:
+                                $ref: '#/components/schemas/HTTPProblem'
+                    description: Gateway 内部错误。
+                    headers:
+                        X-Request-ID:
+                            description: 响应关联的请求标识。
+                            schema:
+                                type: string
+                        X-Trace-ID:
+                            description: 响应关联的请求标识。
+                            schema:
+                                type: string
+                "502":
+                    content:
+                        application/problem+json:
+                            example:
+                                code: 1
+                                detail: string
+                                key: string
+                                request_id: string
+                                status: 502
+                                title: 上游响应无效或不可用。
+                                trace_id: string
+                                type: https://example.com/resource
+                            schema:
+                                $ref: '#/components/schemas/HTTPProblem'
+                    description: 上游响应无效或不可用。
+                    headers:
+                        X-Request-ID:
+                            description: 响应关联的请求标识。
+                            schema:
+                                type: string
+                        X-Trace-ID:
+                            description: 响应关联的请求标识。
+                            schema:
+                                type: string
+                "503":
+                    content:
+                        application/problem+json:
+                            example:
+                                code: 1
+                                detail: string
+                                key: string
+                                request_id: string
+                                status: 503
+                                title: 依赖或 Gateway 暂不可用。
+                                trace_id: string
+                                type: https://example.com/resource
+                            schema:
+                                $ref: '#/components/schemas/HTTPProblem'
+                    description: 依赖或 Gateway 暂不可用。
+                    headers:
+                        X-Request-ID:
+                            description: 响应关联的请求标识。
+                            schema:
+                                type: string
+                        X-Trace-ID:
+                            description: 响应关联的请求标识。
+                            schema:
+                                type: string
+                "504":
+                    content:
+                        application/problem+json:
+                            example:
+                                code: 1
+                                detail: string
+                                key: string
+                                request_id: string
+                                status: 504
+                                title: 上游请求超时。
+                                trace_id: string
+                                type: https://example.com/resource
+                            schema:
+                                $ref: '#/components/schemas/HTTPProblem'
+                    description: 上游请求超时。
+                    headers:
+                        X-Request-ID:
+                            description: 响应关联的请求标识。
+                            schema:
+                                type: string
+                        X-Trace-ID:
+                            description: 响应关联的请求标识。
+                            schema:
+                                type: string
+            security:
+                - bearerAuth: []
+            summary: 永久删除文档
+            tags:
+                - 回收站
     /api/v1/studio/trash/{document_id}/restore:
         post:
             description: 从回收站恢复指定文档。
@@ -14442,7 +13439,6 @@ tags:
     - name: 回收站
     - name: 实时协作
     - name: 成员权限
-    - name: 版本
     - name: 管理配置
     - name: 身份与会话
     - name: 附件

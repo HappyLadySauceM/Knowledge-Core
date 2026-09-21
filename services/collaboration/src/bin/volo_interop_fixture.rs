@@ -278,31 +278,10 @@ impl collaboration::CollaborationService for FixtureHandler {
         Err(Self::unsupported())
     }
 
-    async fn list_versions(
+    async fn capture_publication_snapshot(
         &self,
-        _request: collaboration::ListVersionsRequest,
-    ) -> std::result::Result<collaboration::VersionPage, ServerError> {
-        Err(Self::unsupported())
-    }
-
-    async fn create_version(
-        &self,
-        _request: collaboration::CreateVersionRequest,
-    ) -> std::result::Result<collaboration::Version, ServerError> {
-        Err(Self::unsupported())
-    }
-
-    async fn get_version(
-        &self,
-        _request: collaboration::GetVersionRequest,
-    ) -> std::result::Result<collaboration::VersionDetail, ServerError> {
-        Err(Self::unsupported())
-    }
-
-    async fn restore_version(
-        &self,
-        _request: collaboration::RestoreVersionRequest,
-    ) -> std::result::Result<collaboration::Version, ServerError> {
+        _request: collaboration::CapturePublicationSnapshotRequest,
+    ) -> std::result::Result<collaboration::PublicationSnapshot, ServerError> {
         Err(Self::unsupported())
     }
 

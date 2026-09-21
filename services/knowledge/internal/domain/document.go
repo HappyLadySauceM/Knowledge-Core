@@ -72,19 +72,17 @@ type Document struct {
 }
 
 type PublicationSnapshot struct {
-	DocumentID      string
-	VersionID       *string
-	VersionSequence int64
-	Title           string
-	Summary         string
-	Slug            string
-	Language        string
-	Tags            []string
-	Owner           PublicUser
-	Content         RichTextDocument
-	PlainText       string
-	PublishedAt     time.Time
-	UpdatedAt       time.Time
+	DocumentID  string
+	Title       string
+	Summary     string
+	Slug        string
+	Language    string
+	Tags        []string
+	Owner       PublicUser
+	Content     RichTextDocument
+	PlainText   string
+	PublishedAt time.Time
+	UpdatedAt   time.Time
 }
 
 type Folder struct {

@@ -19,19 +19,16 @@ use uuid::Uuid;
 
 use super::{
     CommittedUpdate, DocumentEvent, DocumentStore, EventSubjects, LoadedDocument, OutboxEvent,
-    ProjectionJob, RestorationCandidate, RestoreVersion, StoredUpdate, UpdateLimits, VersionCursor,
-    VersionPage, VersionStore, WorkerBacklog, WorkerStore,
+    ProjectionJob, PurgeStore, StoredUpdate, UpdateLimits, WorkerBacklog, WorkerStore,
 };
 use crate::{
     config::PostgresConfig,
-    domain::{DocumentId, DocumentVersion, PublicUser, RequestContext, VersionId, VersionKind},
+    domain::{DocumentId, PublicUser, RequestContext},
     error::{ErrorCode, Result, ServiceError},
     richtext,
 };
 
 const MIGRATION_LOCK_KEY: i64 = 0x4b43_434f_4c4c_4142;
-const IDEMPOTENCY_TTL: Duration = Duration::from_hours(24);
-const MAX_PAGE_SIZE: i64 = 100;
 const MAX_UPDATE_PAGE_SIZE: i64 = 10_000;
 
 #[derive(Clone, Copy)]
@@ -41,7 +38,7 @@ struct Migration {
     sql: &'static str,
 }
 
-const MIGRATIONS: [Migration; 5] = [
+const MIGRATIONS: [Migration; 7] = [
     Migration {
         version: 1,
         name: "001_initial",
@@ -67,6 +64,16 @@ const MIGRATIONS: [Migration; 5] = [
         name: "005_single_document_version",
         sql: include_str!("../../migrations/005_single_document_version.sql"),
     },
+    Migration {
+        version: 6,
+        name: "006_purge_completion",
+        sql: include_str!("../../migrations/006_purge_completion.sql"),
+    },
+    Migration {
+        version: 7,
+        name: "007_remove_version_history",
+        sql: include_str!("../../migrations/007_remove_version_history.sql"),
+    },
 ];
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -87,22 +94,6 @@ struct Head {
     generation: i64,
     current_sequence: i64,
     last_snapshot_sequence: i64,
-    last_version_sequence: i64,
-    last_automatic_version_at: Option<OffsetDateTime>,
-    last_actor_id: Option<i64>,
-    last_actor_username: Option<String>,
-    last_actor_avatar: Option<String>,
-}
-
-struct NewVersion<'a> {
-    document_id: DocumentId,
-    generation: i64,
-    sequence: i64,
-    kind: VersionKind,
-    label: Option<&'a str>,
-    state: Vec<u8>,
-    actor: &'a PublicUser,
-    now: OffsetDateTime,
 }
 
 impl PostgresStore {
@@ -484,15 +475,11 @@ impl PostgresStore {
         .map_err(|error| storage_error(error, "insert document update"))?;
         sqlx::query(
             "UPDATE collaboration.documents
-             SET current_sequence = $2, last_actor_id = $3, last_actor_username = $4,
-                 last_actor_avatar = $5, updated_at = $6
+             SET current_sequence = $2, updated_at = $3
              WHERE document_id = $1",
         )
         .bind(document_id.as_uuid())
         .bind(sequence)
-        .bind(actor.id)
-        .bind(&actor.username)
-        .bind(&actor.avatar)
         .bind(now)
         .execute(&mut *transaction)
         .await
@@ -529,210 +516,6 @@ impl PostgresStore {
             state,
             projection,
             update: Some(update.to_vec()),
-        })
-    }
-
-    // Restoration is one linear transaction: candidate validation, baseline, update, version,
-    // head, projection, idempotency, and outbox.
-    #[allow(clippy::too_many_lines)]
-    async fn commit_restoration_inner(
-        &self,
-        document_id: DocumentId,
-        candidate: RestorationCandidate<'_>,
-        trace_headers: std::collections::BTreeMap<String, String>,
-    ) -> Result<RestoreVersion> {
-        let mut transaction = self
-            .pool
-            .begin()
-            .await
-            .map_err(|error| storage_error(error, "begin restoration transaction"))?;
-        let head = load_head(&mut transaction, document_id, true).await?;
-        let operation = format!("restore_version:{document_id}");
-        let request_hash = request_hash(&json!({
-            "document_id": document_id,
-            "version_id": candidate.target.id,
-            "expected_sequence": candidate.expected_sequence,
-        }))?;
-        if let Some(version) = idempotent_version(
-            &mut transaction,
-            document_id,
-            candidate.actor.id,
-            &operation,
-            candidate.idempotency_key,
-            &request_hash,
-        )
-        .await?
-        {
-            transaction.commit().await.map_err(|error| {
-                storage_error(error, "commit idempotent restoration transaction")
-            })?;
-            return Ok(RestoreVersion {
-                version,
-                committed: None,
-            });
-        }
-        if head.generation != candidate.baseline_generation
-            || head.current_sequence != candidate.baseline_sequence
-            || head.current_sequence != candidate.expected_sequence
-        {
-            return Err(ServiceError::precondition_failed());
-        }
-
-        let stored_target = get_version(&mut transaction, document_id, candidate.target.id).await?;
-        if stored_target.state != candidate.target.state {
-            return Err(ServiceError::internal(anyhow!(
-                "restoration target changed after it was loaded"
-            )));
-        }
-
-        let current_state = load_state(
-            &mut transaction,
-            document_id,
-            head.generation,
-            head.current_sequence,
-        )
-        .await?;
-        let target_projection =
-            richtext::projection_from_state(&stored_target.state).map_err(|error| {
-                ServiceError::internal(
-                    anyhow::Error::new(error).context("project restoration target version"),
-                )
-            })?;
-        let validated = richtext::candidate_from_update(
-            &current_state,
-            candidate.update,
-            candidate.limits.maximum_update_bytes,
-            candidate.limits.maximum_document_bytes,
-        )?;
-        let (state, projection, update) = if let Some((document, projection)) = validated {
-            let state = richtext::full_state(&document);
-            drop(document);
-            (state, projection, Some(candidate.update.to_vec()))
-        } else {
-            let projection = richtext::projection_from_state(&current_state)?;
-            (current_state.clone(), projection, None)
-        };
-        if projection != target_projection {
-            return Err(ServiceError::internal(anyhow!(
-                "restoration update does not produce the target version projection"
-            )));
-        }
-
-        let generation = head
-            .generation
-            .checked_add(1)
-            .ok_or_else(|| ServiceError::internal(anyhow!("document generation overflow")))?;
-        let sequence = if update.is_some() {
-            head.current_sequence
-                .checked_add(1)
-                .ok_or_else(|| ServiceError::internal(anyhow!("document sequence overflow")))?
-        } else {
-            head.current_sequence
-        };
-        let now = OffsetDateTime::now_utc();
-
-        sqlx::query(
-            "INSERT INTO collaboration.snapshots(
-               document_id, generation, sequence, state, created_at
-             ) VALUES ($1, $2, $3, $4, $5)
-             ON CONFLICT (document_id, sequence) DO UPDATE SET
-               generation = EXCLUDED.generation, state = EXCLUDED.state,
-               created_at = EXCLUDED.created_at",
-        )
-        .bind(document_id.as_uuid())
-        .bind(generation)
-        .bind(head.current_sequence)
-        .bind(&current_state)
-        .bind(now)
-        .execute(&mut *transaction)
-        .await
-        .map_err(|error| storage_error(error, "insert restoration baseline"))?;
-        if let Some(update) = &update {
-            sqlx::query(
-                "INSERT INTO collaboration.updates(
-                   document_id, generation, sequence, update, actor_id, created_at
-                 ) VALUES ($1, $2, $3, $4, $5, $6)",
-            )
-            .bind(document_id.as_uuid())
-            .bind(generation)
-            .bind(sequence)
-            .bind(update)
-            .bind(candidate.actor.id)
-            .bind(now)
-            .execute(&mut *transaction)
-            .await
-            .map_err(|error| storage_error(error, "insert restoration update"))?;
-        }
-        let version = insert_version(
-            &mut transaction,
-            NewVersion {
-                document_id,
-                generation,
-                sequence,
-                kind: VersionKind::Automatic,
-                label: None,
-                state: state.clone(),
-                actor: candidate.actor,
-                now,
-            },
-        )
-        .await?;
-        sqlx::query(
-            "UPDATE collaboration.documents
-             SET generation = $2, current_sequence = $3,
-                 last_snapshot_sequence = $4, last_version_sequence = $3,
-                 last_actor_id = $5, last_actor_username = $6,
-                 last_actor_avatar = $7, updated_at = $8
-             WHERE document_id = $1",
-        )
-        .bind(document_id.as_uuid())
-        .bind(generation)
-        .bind(sequence)
-        .bind(head.current_sequence)
-        .bind(candidate.actor.id)
-        .bind(&candidate.actor.username)
-        .bind(&candidate.actor.avatar)
-        .bind(now)
-        .execute(&mut *transaction)
-        .await
-        .map_err(|error| storage_error(error, "advance restored document head"))?;
-        enqueue_projection(&mut transaction, document_id, generation, sequence, now).await?;
-        insert_event(
-            &mut transaction,
-            &self.subjects.invalidated,
-            "restored",
-            DocumentEvent {
-                document_id,
-                generation,
-                sequence,
-                actor_id: Some(candidate.actor.id),
-            },
-            now,
-            &trace_headers,
-        )
-        .await?;
-        save_idempotency(
-            &mut transaction,
-            candidate.actor.id,
-            &operation,
-            candidate.idempotency_key,
-            &request_hash,
-            &version,
-        )
-        .await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| storage_error(error, "commit restoration transaction"))?;
-        Ok(RestoreVersion {
-            version,
-            committed: Some(CommittedUpdate {
-                generation,
-                sequence,
-                state,
-                projection,
-                update,
-            }),
         })
     }
 }
@@ -778,36 +561,6 @@ impl DocumentStore for PostgresStore {
             context,
             "append document update",
             self.append_update_inner(document_id, update, actor, limits, trace_headers),
-        )
-        .await
-    }
-
-    async fn commit_restoration(
-        &self,
-        context: &RequestContext,
-        document_id: DocumentId,
-        candidate: RestorationCandidate<'_>,
-    ) -> Result<RestoreVersion> {
-        candidate.actor.validate()?;
-        if candidate.target.document_id != document_id {
-            return Err(ServiceError::invalid_input(
-                "restoration target belongs to another document",
-            ));
-        }
-        if candidate.baseline_generation <= 0
-            || candidate.baseline_sequence < 0
-            || candidate.expected_sequence < 0
-        {
-            return Err(ServiceError::invalid_input(
-                "restoration precondition is invalid",
-            ));
-        }
-        validate_idempotency_key(candidate.idempotency_key)?;
-        let trace_headers = context.propagation_headers();
-        self.timed_request(
-            context,
-            "commit document restoration",
-            self.commit_restoration_inner(document_id, candidate, trace_headers),
         )
         .await
     }
@@ -877,7 +630,8 @@ impl DocumentStore for PostgresStore {
 }
 
 #[async_trait]
-impl VersionStore for PostgresStore {
+impl PurgeStore for PostgresStore {
+    #[cfg(any())]
     async fn create_manual_version(
         &self,
         context: &RequestContext,
@@ -898,6 +652,20 @@ impl VersionStore for PostgresStore {
                 })?;
             ensure_document(&mut transaction, document_id).await?;
             let head = load_head(&mut transaction, document_id, true).await?;
+            let already_purged: Option<OffsetDateTime> = sqlx::query_scalar(
+                "SELECT purged_at FROM collaboration.documents WHERE document_id = $1 FOR UPDATE",
+            )
+            .bind(document_id.as_uuid())
+            .fetch_one(&mut *transaction)
+            .await
+            .map_err(|error| storage_error(error, "read document purge marker"))?;
+            if already_purged.is_some() {
+                transaction
+                    .commit()
+                    .await
+                    .map_err(|error| storage_error(error, "commit idempotent purge transaction"))?;
+                return Ok(());
+            }
             let operation = format!("create_version:{document_id}");
             let request_hash = request_hash(&json!({
                 "document_id": document_id,
@@ -968,6 +736,7 @@ impl VersionStore for PostgresStore {
         .await
     }
 
+    #[cfg(any())]
     async fn list_versions(
         &self,
         context: &RequestContext,
@@ -1034,6 +803,7 @@ impl VersionStore for PostgresStore {
         .await
     }
 
+    #[cfg(any())]
     async fn get_version(
         &self,
         context: &RequestContext,
@@ -1064,21 +834,25 @@ impl VersionStore for PostgresStore {
                 .await
                 .map_err(|error| storage_error(error, "begin purge document transaction"))?;
             let head = load_head(&mut transaction, document_id, true).await?;
+            let already_purged: Option<OffsetDateTime> = sqlx::query_scalar(
+                "SELECT purged_at FROM collaboration.documents WHERE document_id = $1 FOR UPDATE",
+            )
+            .bind(document_id.as_uuid())
+            .fetch_one(&mut *transaction)
+            .await
+            .map_err(|error| storage_error(error, "read document purge marker"))?;
+            if already_purged.is_some() {
+                transaction
+                    .commit()
+                    .await
+                    .map_err(|error| storage_error(error, "commit idempotent purge transaction"))?;
+                return Ok(());
+            }
             let generation = head
                 .generation
                 .checked_add(1)
                 .ok_or_else(|| ServiceError::internal(anyhow!("document generation overflow")))?;
             let now = OffsetDateTime::now_utc();
-            sqlx::query(
-                "DELETE FROM collaboration.idempotency_keys
-                 WHERE resource_id IN (
-                   SELECT id FROM collaboration.versions WHERE document_id = $1
-                 )",
-            )
-            .bind(document_id.as_uuid())
-            .execute(&mut *transaction)
-            .await
-            .map_err(|error| storage_error(error, "delete document idempotency keys"))?;
             sqlx::query("DELETE FROM collaboration.updates WHERE document_id = $1")
                 .bind(document_id.as_uuid())
                 .execute(&mut *transaction)
@@ -1089,11 +863,6 @@ impl VersionStore for PostgresStore {
                 .execute(&mut *transaction)
                 .await
                 .map_err(|error| storage_error(error, "delete document snapshots"))?;
-            sqlx::query("DELETE FROM collaboration.versions WHERE document_id = $1")
-                .bind(document_id.as_uuid())
-                .execute(&mut *transaction)
-                .await
-                .map_err(|error| storage_error(error, "delete document versions"))?;
             sqlx::query("DELETE FROM collaboration.projection_jobs WHERE document_id = $1")
                 .bind(document_id.as_uuid())
                 .execute(&mut *transaction)
@@ -1116,9 +885,7 @@ impl VersionStore for PostgresStore {
             sqlx::query(
                 "UPDATE collaboration.documents
                  SET generation = $2, last_snapshot_sequence = current_sequence,
-                     last_version_sequence = current_sequence,
-                     last_automatic_version_at = NULL, last_actor_id = NULL,
-                     last_actor_username = NULL, last_actor_avatar = NULL, updated_at = $3
+                     purged_at = $3, updated_at = $3
                  WHERE document_id = $1",
             )
             .bind(document_id.as_uuid())
@@ -1459,103 +1226,6 @@ impl WorkerStore for PostgresStore {
         .await
     }
 
-    async fn create_automatic_version(
-        &self,
-        context: &RequestContext,
-        interval: Duration,
-    ) -> Result<bool> {
-        let interval = positive_duration(interval, "automatic version interval")?;
-        self.timed_request(context, "create automatic version", async {
-            let threshold = OffsetDateTime::now_utc() - interval;
-            let candidate = sqlx::query(
-                "SELECT document_id FROM collaboration.documents
-                 WHERE current_sequence > last_version_sequence
-                   AND last_actor_id IS NOT NULL
-                   AND (last_automatic_version_at IS NULL OR last_automatic_version_at <= $1)
-                 ORDER BY COALESCE(last_automatic_version_at, created_at), document_id LIMIT 1",
-            )
-            .bind(threshold)
-            .fetch_optional(&self.pool)
-            .await
-            .map_err(|error| storage_error(error, "find automatic version candidate"))?;
-            let Some(candidate) = candidate else {
-                return Ok(false);
-            };
-            let raw_document_id: Uuid = candidate
-                .try_get("document_id")
-                .map_err(|error| storage_error(error, "decode automatic version document id"))?;
-            let document_id = DocumentId::parse(&raw_document_id.to_string())?;
-            let mut transaction = self
-                .pool
-                .begin()
-                .await
-                .map_err(|error| storage_error(error, "begin automatic version transaction"))?;
-            let head = load_head(&mut transaction, document_id, true).await?;
-            if head.current_sequence <= head.last_version_sequence
-                || head
-                    .last_automatic_version_at
-                    .is_some_and(|last| last > threshold)
-            {
-                transaction.commit().await.map_err(|error| {
-                    storage_error(error, "commit skipped automatic version transaction")
-                })?;
-                return Ok(false);
-            }
-            let actor = PublicUser {
-                id: head.last_actor_id.ok_or_else(|| {
-                    ServiceError::internal(anyhow!("automatic version actor is missing"))
-                })?,
-                username: head.last_actor_username.ok_or_else(|| {
-                    ServiceError::internal(anyhow!("automatic version actor name is missing"))
-                })?,
-                avatar: head.last_actor_avatar.ok_or_else(|| {
-                    ServiceError::internal(anyhow!("automatic version actor avatar is missing"))
-                })?,
-            };
-            actor.validate()?;
-            let state = load_state(
-                &mut transaction,
-                document_id,
-                head.generation,
-                head.current_sequence,
-            )
-            .await?;
-            let now = OffsetDateTime::now_utc();
-            insert_version(
-                &mut transaction,
-                NewVersion {
-                    document_id,
-                    generation: head.generation,
-                    sequence: head.current_sequence,
-                    kind: VersionKind::Automatic,
-                    label: None,
-                    state,
-                    actor: &actor,
-                    now,
-                },
-            )
-            .await?;
-            sqlx::query(
-                "UPDATE collaboration.documents
-                 SET last_version_sequence = $2, last_automatic_version_at = $3,
-                     updated_at = GREATEST(updated_at, $3)
-                 WHERE document_id = $1",
-            )
-            .bind(document_id.as_uuid())
-            .bind(head.current_sequence)
-            .bind(now)
-            .execute(&mut *transaction)
-            .await
-            .map_err(|error| storage_error(error, "advance automatic version watermark"))?;
-            transaction
-                .commit()
-                .await
-                .map_err(|error| storage_error(error, "commit automatic version transaction"))?;
-            Ok(true)
-        })
-        .await
-    }
-
     async fn claim_outbox(
         &self,
         context: &RequestContext,
@@ -1799,13 +1469,17 @@ fn validate_error_key(value: &str) -> Result<()> {
     Ok(())
 }
 
-async fn insert_version(
-    connection: &mut PgConnection,
-    version: NewVersion<'_>,
-) -> Result<DocumentVersion> {
-    let id = VersionId::new();
-    let row = sqlx::query(
-        "INSERT INTO collaboration.versions(
+#[cfg(any())]
+mod legacy_version_storage {
+    use super::*;
+
+    async fn insert_version(
+        connection: &mut PgConnection,
+        version: NewVersion<'_>,
+    ) -> Result<DocumentVersion> {
+        let id = VersionId::new();
+        let row = sqlx::query(
+            "INSERT INTO collaboration.versions(
            id, document_id, generation, sequence, kind, label, state,
            created_by_id, created_by_username, created_by_avatar, created_at
          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
@@ -1820,249 +1494,244 @@ async fn insert_version(
            created_by_avatar = EXCLUDED.created_by_avatar,
            created_at = EXCLUDED.created_at
          RETURNING id",
-    )
-    .bind(id.as_uuid())
-    .bind(version.document_id.as_uuid())
-    .bind(version.generation)
-    .bind(version.sequence)
-    .bind(version.kind.as_str())
-    .bind(version.label)
-    .bind(&version.state)
-    .bind(version.actor.id)
-    .bind(&version.actor.username)
-    .bind(&version.actor.avatar)
-    .bind(version.now)
-    .fetch_one(&mut *connection)
-    .await
-    .map_err(|error| storage_error(error, "upsert document version"))?;
-    let id: Uuid = row
-        .try_get("id")
-        .map_err(|error| storage_error(error, "decode document version id"))?;
-    Ok(DocumentVersion {
-        id: VersionId::parse(&id.to_string())?,
-        document_id: version.document_id,
-        sequence: version.sequence,
-        kind: version.kind,
-        label: version.label.map(ToOwned::to_owned),
-        state: version.state,
-        created_by: version.actor.clone(),
-        created_at: version.now,
-    })
-}
+        )
+        .bind(id.as_uuid())
+        .bind(version.document_id.as_uuid())
+        .bind(version.generation)
+        .bind(version.sequence)
+        .bind(version.kind.as_str())
+        .bind(version.label)
+        .bind(&version.state)
+        .bind(version.actor.id)
+        .bind(&version.actor.username)
+        .bind(&version.actor.avatar)
+        .bind(version.now)
+        .fetch_one(&mut *connection)
+        .await
+        .map_err(|error| storage_error(error, "upsert document version"))?;
+        let id: Uuid = row
+            .try_get("id")
+            .map_err(|error| storage_error(error, "decode document version id"))?;
+        Ok(DocumentVersion {
+            id: VersionId::parse(&id.to_string())?,
+            document_id: version.document_id,
+            sequence: version.sequence,
+            kind: version.kind,
+            label: version.label.map(ToOwned::to_owned),
+            state: version.state,
+            created_by: version.actor.clone(),
+            created_at: version.now,
+        })
+    }
 
-async fn get_version(
-    connection: &mut PgConnection,
-    document_id: DocumentId,
-    version_id: VersionId,
-) -> Result<DocumentVersion> {
-    let row = sqlx::query(
-        "SELECT id, document_id, generation, sequence, kind, label, state,
+    async fn get_version(
+        connection: &mut PgConnection,
+        document_id: DocumentId,
+        version_id: VersionId,
+    ) -> Result<DocumentVersion> {
+        let row = sqlx::query(
+            "SELECT id, document_id, generation, sequence, kind, label, state,
                 created_by_id, created_by_username, created_by_avatar, created_at
          FROM collaboration.versions WHERE document_id = $1 AND id = $2",
-    )
-    .bind(document_id.as_uuid())
-    .bind(version_id.as_uuid())
-    .fetch_optional(&mut *connection)
-    .await
-    .map_err(|error| storage_error(error, "get document version"))?
-    .ok_or_else(|| ServiceError::not_found("document version not found"))?;
-    version_from_row(&row)
-}
+        )
+        .bind(document_id.as_uuid())
+        .bind(version_id.as_uuid())
+        .fetch_optional(&mut *connection)
+        .await
+        .map_err(|error| storage_error(error, "get document version"))?
+        .ok_or_else(|| ServiceError::not_found("document version not found"))?;
+        version_from_row(&row)
+    }
 
-fn version_from_row(row: &sqlx::postgres::PgRow) -> Result<DocumentVersion> {
-    let id: Uuid = row
-        .try_get("id")
-        .map_err(|error| storage_error(error, "decode version id"))?;
-    let document_id: Uuid = row
-        .try_get("document_id")
-        .map_err(|error| storage_error(error, "decode version document id"))?;
-    let kind: String = row
-        .try_get("kind")
-        .map_err(|error| storage_error(error, "decode version kind"))?;
-    document_version_from_row(row, id, document_id, &kind)
-}
+    fn version_from_row(row: &sqlx::postgres::PgRow) -> Result<DocumentVersion> {
+        let id: Uuid = row
+            .try_get("id")
+            .map_err(|error| storage_error(error, "decode version id"))?;
+        let document_id: Uuid = row
+            .try_get("document_id")
+            .map_err(|error| storage_error(error, "decode version document id"))?;
+        let kind: String = row
+            .try_get("kind")
+            .map_err(|error| storage_error(error, "decode version kind"))?;
+        document_version_from_row(row, id, document_id, &kind)
+    }
 
-fn document_version_from_row(
-    row: &sqlx::postgres::PgRow,
-    id: Uuid,
-    document_id: Uuid,
-    kind: &str,
-) -> Result<DocumentVersion> {
-    Ok(DocumentVersion {
-        id: VersionId::parse(&id.to_string())?,
-        document_id: DocumentId::parse(&document_id.to_string())?,
-        sequence: row
-            .try_get("sequence")
-            .map_err(|error| storage_error(error, "decode version sequence"))?,
-        kind: VersionKind::from_str(kind)?,
-        label: row
-            .try_get("label")
-            .map_err(|error| storage_error(error, "decode version label"))?,
-        state: row
-            .try_get("state")
-            .map_err(|error| storage_error(error, "decode version state"))?,
-        created_by: PublicUser {
-            id: row
-                .try_get("created_by_id")
-                .map_err(|error| storage_error(error, "decode version actor id"))?,
-            username: row
-                .try_get("created_by_username")
-                .map_err(|error| storage_error(error, "decode version actor username"))?,
-            avatar: row
-                .try_get("created_by_avatar")
-                .map_err(|error| storage_error(error, "decode version actor avatar"))?,
-        },
-        created_at: row
-            .try_get("created_at")
-            .map_err(|error| storage_error(error, "decode version creation time"))?,
-    })
-}
+    fn document_version_from_row(
+        row: &sqlx::postgres::PgRow,
+        id: Uuid,
+        document_id: Uuid,
+        kind: &str,
+    ) -> Result<DocumentVersion> {
+        Ok(DocumentVersion {
+            id: VersionId::parse(&id.to_string())?,
+            document_id: DocumentId::parse(&document_id.to_string())?,
+            sequence: row
+                .try_get("sequence")
+                .map_err(|error| storage_error(error, "decode version sequence"))?,
+            kind: VersionKind::from_str(kind)?,
+            label: row
+                .try_get("label")
+                .map_err(|error| storage_error(error, "decode version label"))?,
+            state: row
+                .try_get("state")
+                .map_err(|error| storage_error(error, "decode version state"))?,
+            created_by: PublicUser {
+                id: row
+                    .try_get("created_by_id")
+                    .map_err(|error| storage_error(error, "decode version actor id"))?,
+                username: row
+                    .try_get("created_by_username")
+                    .map_err(|error| storage_error(error, "decode version actor username"))?,
+                avatar: row
+                    .try_get("created_by_avatar")
+                    .map_err(|error| storage_error(error, "decode version actor avatar"))?,
+            },
+            created_at: row
+                .try_get("created_at")
+                .map_err(|error| storage_error(error, "decode version creation time"))?,
+        })
+    }
 
-async fn idempotent_version(
-    connection: &mut PgConnection,
-    document_id: DocumentId,
-    actor_id: i64,
-    operation: &str,
-    key: Option<&str>,
-    request_hash: &str,
-) -> Result<Option<DocumentVersion>> {
-    let Some(key) = key else {
-        return Ok(None);
-    };
-    sqlx::query(
-        "DELETE FROM collaboration.idempotency_keys
+    async fn idempotent_version(
+        connection: &mut PgConnection,
+        document_id: DocumentId,
+        actor_id: i64,
+        operation: &str,
+        key: Option<&str>,
+        request_hash: &str,
+    ) -> Result<Option<DocumentVersion>> {
+        let Some(key) = key else {
+            return Ok(None);
+        };
+        sqlx::query(
+            "DELETE FROM collaboration.idempotency_keys
          WHERE actor_id = $1 AND operation = $2 AND key = $3 AND expires_at <= now()",
-    )
-    .bind(actor_id)
-    .bind(operation)
-    .bind(key)
-    .execute(&mut *connection)
-    .await
-    .map_err(|error| storage_error(error, "replace expired idempotency key"))?;
-    let row = sqlx::query(
-        "SELECT request_hash, resource_id, version_sequence, version_state
+        )
+        .bind(actor_id)
+        .bind(operation)
+        .bind(key)
+        .execute(&mut *connection)
+        .await
+        .map_err(|error| storage_error(error, "replace expired idempotency key"))?;
+        let row = sqlx::query(
+            "SELECT request_hash, resource_id, version_sequence, version_state
          FROM collaboration.idempotency_keys
          WHERE actor_id = $1 AND operation = $2 AND key = $3",
-    )
-    .bind(actor_id)
-    .bind(operation)
-    .bind(key)
-    .fetch_optional(&mut *connection)
-    .await
-    .map_err(|error| storage_error(error, "load idempotency key"))?;
-    let Some(row) = row else {
-        return Ok(None);
-    };
-    let stored_hash: String = row
-        .try_get("request_hash")
-        .map_err(|error| storage_error(error, "decode idempotency request hash"))?;
-    if stored_hash.trim_end() != request_hash {
-        return Err(ServiceError::conflict(
-            "idempotency key was already used for another request",
-        ));
+        )
+        .bind(actor_id)
+        .bind(operation)
+        .bind(key)
+        .fetch_optional(&mut *connection)
+        .await
+        .map_err(|error| storage_error(error, "load idempotency key"))?;
+        let Some(row) = row else {
+            return Ok(None);
+        };
+        let stored_hash: String = row
+            .try_get("request_hash")
+            .map_err(|error| storage_error(error, "decode idempotency request hash"))?;
+        if stored_hash.trim_end() != request_hash {
+            return Err(ServiceError::conflict(
+                "idempotency key was already used for another request",
+            ));
+        }
+        let resource_id: Uuid = row
+            .try_get("resource_id")
+            .map_err(|error| storage_error(error, "decode idempotency resource id"))?;
+        let snapshot_sequence: Option<i64> = row
+            .try_get("version_sequence")
+            .map_err(|error| storage_error(error, "decode idempotency version sequence"))?;
+        let snapshot_state: Option<Vec<u8>> = row
+            .try_get("version_state")
+            .map_err(|error| storage_error(error, "decode idempotency version state"))?;
+        let mut version = get_version(
+            connection,
+            document_id,
+            VersionId::parse(&resource_id.to_string())?,
+        )
+        .await?;
+        if let (Some(sequence), Some(state)) = (snapshot_sequence, snapshot_state) {
+            version.sequence = sequence;
+            version.state = state;
+        }
+        Ok(Some(version))
     }
-    let resource_id: Uuid = row
-        .try_get("resource_id")
-        .map_err(|error| storage_error(error, "decode idempotency resource id"))?;
-    let snapshot_sequence: Option<i64> = row
-        .try_get("version_sequence")
-        .map_err(|error| storage_error(error, "decode idempotency version sequence"))?;
-    let snapshot_state: Option<Vec<u8>> = row
-        .try_get("version_state")
-        .map_err(|error| storage_error(error, "decode idempotency version state"))?;
-    let mut version = get_version(
-        connection,
-        document_id,
-        VersionId::parse(&resource_id.to_string())?,
-    )
-    .await?;
-    if let (Some(sequence), Some(state)) = (snapshot_sequence, snapshot_state) {
-        version.sequence = sequence;
-        version.state = state;
-    }
-    Ok(Some(version))
-}
 
-async fn save_idempotency(
-    connection: &mut PgConnection,
-    actor_id: i64,
-    operation: &str,
-    key: Option<&str>,
-    request_hash: &str,
-    version: &DocumentVersion,
-) -> Result<()> {
-    let Some(key) = key else {
-        return Ok(());
-    };
-    let expires_at = OffsetDateTime::now_utc()
-        + time::Duration::try_from(IDEMPOTENCY_TTL).map_err(|error| {
-            ServiceError::internal(anyhow!(error).context("convert idempotency TTL"))
-        })?;
-    let response = json!({ "version_id": version.id });
-    sqlx::query(
-        "INSERT INTO collaboration.idempotency_keys(
+    async fn save_idempotency(
+        connection: &mut PgConnection,
+        actor_id: i64,
+        operation: &str,
+        key: Option<&str>,
+        request_hash: &str,
+        version: &DocumentVersion,
+    ) -> Result<()> {
+        let Some(key) = key else {
+            return Ok(());
+        };
+        let expires_at = OffsetDateTime::now_utc()
+            + time::Duration::try_from(IDEMPOTENCY_TTL).map_err(|error| {
+                ServiceError::internal(anyhow!(error).context("convert idempotency TTL"))
+            })?;
+        let response = json!({ "version_id": version.id });
+        sqlx::query(
+            "INSERT INTO collaboration.idempotency_keys(
            actor_id, operation, key, request_hash, resource_id, response,
            version_sequence, version_state, expires_at
          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
-    )
-    .bind(actor_id)
-    .bind(operation)
-    .bind(key)
-    .bind(request_hash)
-    .bind(version.id.as_uuid())
-    .bind(response)
-    .bind(version.sequence)
-    .bind(&version.state)
-    .bind(expires_at)
-    .execute(&mut *connection)
-    .await
-    .map_err(|error| {
-        if has_database_code(&error, "23505") {
-            ServiceError::conflict("idempotency key was concurrently consumed")
-        } else {
-            storage_error(error, "save idempotency key")
-        }
-    })?;
-    Ok(())
-}
-
-fn request_hash(value: &serde_json::Value) -> Result<String> {
-    let bytes = serde_json::to_vec(value)
-        .map_err(|error| ServiceError::internal(anyhow!(error).context("encode request hash")))?;
-    Ok(sha256_hex(&bytes))
-}
-
-fn validate_label(value: Option<&str>) -> Result<Option<String>> {
-    value
-        .map(|value| {
-            let value = value.trim();
-            if value.is_empty() || value.chars().count() > 200 {
-                return Err(ServiceError::invalid_input(
-                    "version label must contain between 1 and 200 characters",
-                ));
+        )
+        .bind(actor_id)
+        .bind(operation)
+        .bind(key)
+        .bind(request_hash)
+        .bind(version.id.as_uuid())
+        .bind(response)
+        .bind(version.sequence)
+        .bind(&version.state)
+        .bind(expires_at)
+        .execute(&mut *connection)
+        .await
+        .map_err(|error| {
+            if has_database_code(&error, "23505") {
+                ServiceError::conflict("idempotency key was concurrently consumed")
+            } else {
+                storage_error(error, "save idempotency key")
             }
-            Ok(value.to_owned())
-        })
-        .transpose()
-}
-
-fn validate_idempotency_key(value: Option<&str>) -> Result<()> {
-    if value.is_some_and(|value| {
-        value.is_empty()
-            || value.len() > 128
-            || value.trim() != value
-            || !value.bytes().all(|byte| (b'!'..=b'~').contains(&byte))
-    }) {
-        return Err(ServiceError::invalid_input("idempotency key is invalid"));
+        })?;
+        Ok(())
     }
-    Ok(())
-}
 
-fn has_database_code(error: &sqlx::Error, expected: &str) -> bool {
-    error
-        .as_database_error()
-        .and_then(sqlx::error::DatabaseError::code)
-        .is_some_and(|code| code == expected)
+    fn request_hash(value: &serde_json::Value) -> Result<String> {
+        let bytes = serde_json::to_vec(value).map_err(|error| {
+            ServiceError::internal(anyhow!(error).context("encode request hash"))
+        })?;
+        Ok(sha256_hex(&bytes))
+    }
+
+    fn validate_label(value: Option<&str>) -> Result<Option<String>> {
+        value
+            .map(|value| {
+                let value = value.trim();
+                if value.is_empty() || value.chars().count() > 200 {
+                    return Err(ServiceError::invalid_input(
+                        "version label must contain between 1 and 200 characters",
+                    ));
+                }
+                Ok(value.to_owned())
+            })
+            .transpose()
+    }
+
+    fn validate_idempotency_key(value: Option<&str>) -> Result<()> {
+        if value.is_some_and(|value| {
+            value.is_empty()
+                || value.len() > 128
+                || value.trim() != value
+                || !value.bytes().all(|byte| (b'!'..=b'~').contains(&byte))
+        }) {
+            return Err(ServiceError::invalid_input("idempotency key is invalid"));
+        }
+        Ok(())
+    }
 }
 
 async fn ensure_document(connection: &mut PgConnection, document_id: DocumentId) -> Result<()> {
@@ -2099,12 +1768,10 @@ async fn load_head(
     lock: bool,
 ) -> Result<Head> {
     let query = if lock {
-        "SELECT generation, current_sequence, last_snapshot_sequence, last_version_sequence,
-                last_automatic_version_at, last_actor_id, last_actor_username, last_actor_avatar
+        "SELECT generation, current_sequence, last_snapshot_sequence
          FROM collaboration.documents WHERE document_id = $1 FOR UPDATE"
     } else {
-        "SELECT generation, current_sequence, last_snapshot_sequence, last_version_sequence,
-                last_automatic_version_at, last_actor_id, last_actor_username, last_actor_avatar
+        "SELECT generation, current_sequence, last_snapshot_sequence
          FROM collaboration.documents WHERE document_id = $1"
     };
     let row = sqlx::query(query)
@@ -2123,21 +1790,6 @@ async fn load_head(
         last_snapshot_sequence: row
             .try_get("last_snapshot_sequence")
             .map_err(|error| storage_error(error, "decode snapshot sequence"))?,
-        last_version_sequence: row
-            .try_get("last_version_sequence")
-            .map_err(|error| storage_error(error, "decode version sequence"))?,
-        last_automatic_version_at: row
-            .try_get("last_automatic_version_at")
-            .map_err(|error| storage_error(error, "decode automatic version time"))?,
-        last_actor_id: row
-            .try_get("last_actor_id")
-            .map_err(|error| storage_error(error, "decode actor id"))?,
-        last_actor_username: row
-            .try_get("last_actor_username")
-            .map_err(|error| storage_error(error, "decode actor username"))?,
-        last_actor_avatar: row
-            .try_get("last_actor_avatar")
-            .map_err(|error| storage_error(error, "decode actor avatar"))?,
     })
 }
 

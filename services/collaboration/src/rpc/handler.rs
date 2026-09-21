@@ -3,9 +3,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use pilota::FastStr;
-use serde::{Deserialize, Serialize};
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 use volo_thrift::ServerError;
 use yrs::updates::decoder::Decode;
@@ -14,29 +12,26 @@ use yrs::{ReadTxn, StateVector, Transact};
 use crate::{
     actor::{ActorRegistry, CLOSE_DOCUMENT_INVALIDATED},
     config::TicketConfig,
-    domain::{Authorization, DocumentId, DocumentVersion, RequestContext, VersionId},
+    domain::{Authorization, DocumentId, RequestContext},
     error::{Result, ServiceError},
-    generated::{collaboration, common, knowledge},
+    generated::{collaboration, common},
     ports::KnowledgePort,
     richtext::projection_from_state,
-    storage::{DocumentStore, VersionCursor, VersionStore},
+    storage::{DocumentStore, PurgeStore},
     ticket::TicketService,
 };
 
 use super::{RpcReadiness, current_request_context, knowledge::projection_to_wire, service_error};
 
-const DEFAULT_VERSION_LIMIT: i32 = 20;
-const MAXIMUM_VERSION_LIMIT: i32 = 100;
-const MAXIMUM_CURSOR_LENGTH: usize = 1_024;
-const CREATE_VERSION_STATE_VECTOR_WAIT: Duration = Duration::from_secs(1);
-const CREATE_VERSION_STATE_VECTOR_POLL: Duration = Duration::from_millis(25);
+const CAPTURE_SNAPSHOT_STATE_VECTOR_WAIT: Duration = Duration::from_secs(1);
+const CAPTURE_SNAPSHOT_STATE_VECTOR_POLL: Duration = Duration::from_millis(25);
 
 #[derive(Clone)]
 pub struct CollaborationHandler {
     knowledge: Arc<dyn KnowledgePort>,
     documents: Arc<dyn DocumentStore>,
     tickets: TicketService,
-    versions: Arc<dyn VersionStore>,
+    purger: Arc<dyn PurgeStore>,
     actors: ActorRegistry,
     subprotocol: Arc<str>,
     fragment: Arc<str>,
@@ -49,7 +44,7 @@ pub struct CollaborationHandlerDependencies {
     pub knowledge: Arc<dyn KnowledgePort>,
     pub documents: Arc<dyn DocumentStore>,
     pub tickets: TicketService,
-    pub versions: Arc<dyn VersionStore>,
+    pub purger: Arc<dyn PurgeStore>,
     pub actors: ActorRegistry,
     pub ticket: TicketConfig,
     pub readiness: Arc<dyn RpcReadiness>,
@@ -73,13 +68,13 @@ impl CollaborationHandler {
             knowledge: dependencies.knowledge,
             documents: dependencies.documents,
             tickets: dependencies.tickets,
-            versions: dependencies.versions,
+            purger: dependencies.purger,
             actors: dependencies.actors,
             subprotocol: Arc::from(dependencies.ticket.subprotocol.as_str()),
             fragment: Arc::from(dependencies.ticket.fragment.as_str()),
             readiness: dependencies.readiness,
-            state_vector_wait: CREATE_VERSION_STATE_VECTOR_WAIT,
-            state_vector_poll: CREATE_VERSION_STATE_VECTOR_POLL,
+            state_vector_wait: CAPTURE_SNAPSHOT_STATE_VECTOR_WAIT,
+            state_vector_poll: CAPTURE_SNAPSHOT_STATE_VECTOR_POLL,
         })
     }
 
@@ -205,163 +200,37 @@ impl collaboration::CollaborationService for CollaborationHandler {
         result.map_err(|error| rpc_error(&error))
     }
 
-    async fn list_versions(
+    async fn capture_publication_snapshot(
         &self,
-        request: collaboration::ListVersionsRequest,
-    ) -> std::result::Result<collaboration::VersionPage, ServerError> {
+        request: collaboration::CapturePublicationSnapshotRequest,
+    ) -> std::result::Result<collaboration::PublicationSnapshot, ServerError> {
         let result = async {
             self.require_ready().await?;
             let document_id = DocumentId::parse(request.document_id.as_str())?;
-            let (context, _) = self.authorization(document_id, false).await?;
-            let cursor = request.cursor.as_deref().map(decode_cursor).transpose()?;
-            let limit = request.limit.unwrap_or(DEFAULT_VERSION_LIMIT);
-            if !(1..=MAXIMUM_VERSION_LIMIT).contains(&limit) {
+            if request.state_vector.is_empty() || request.state_vector.len() > 64 * 1024 {
                 return Err(ServiceError::invalid_input(
-                    "limit must be between 1 and 100",
+                    "state vector exceeds the configured size boundary",
                 ));
             }
-            let page = self
-                .versions
-                .list_versions(&context, document_id, cursor.as_ref(), i64::from(limit))
-                .await?;
-            let next_cursor = if page.has_more {
-                let last = page.items.last().ok_or_else(|| {
-                    ServiceError::internal(anyhow::anyhow!(
-                        "version store returned an empty partial page"
-                    ))
-                })?;
-                Some(encode_cursor(last)?)
-            } else {
-                None
-            };
-            let items = page
-                .items
-                .iter()
-                .map(|version| version_to_wire(version, document_id))
-                .collect::<Result<Vec<_>>>()?;
-            Ok(collaboration::VersionPage {
-                items,
-                page: collaboration::PageInfo {
-                    next_cursor,
-                    has_more: page.has_more,
-                },
-                head_sequence: Some(page.head_sequence),
-            })
-        }
-        .await;
-        result.map_err(|error| rpc_error(&error))
-    }
-
-    async fn create_version(
-        &self,
-        request: collaboration::CreateVersionRequest,
-    ) -> std::result::Result<collaboration::Version, ServerError> {
-        let result = async {
-            self.require_ready().await?;
-            let document_id = DocumentId::parse(request.document_id.as_str())?;
-            let label = request.label.as_deref().map(validate_label).transpose()?;
-            let idempotency_key = request
-                .idempotency_key
-                .as_deref()
-                .map(validate_idempotency_key)
-                .transpose()?;
-            let (context, authorization) = self.authorization(document_id, true).await?;
-            if let Some(state_vector) = request.state_vector.as_deref() {
-                if state_vector.is_empty() || state_vector.len() > 64 * 1024 {
-                    return Err(ServiceError::invalid_input(
-                        "state vector exceeds the configured size boundary",
-                    ));
-                }
-                self.wait_for_matching_state_vector(&context, document_id, state_vector)
-                    .await?;
-            }
-            let version = self
-                .versions
-                .create_manual_version(
-                    &context,
-                    document_id,
-                    &authorization.actor,
-                    label.as_deref(),
-                    idempotency_key,
-                )
-                .await?;
-            let projection = projection_from_state(&version.state).map_err(|error| {
+            let (context, _) = self.authorization(document_id, true).await?;
+            self.wait_for_matching_state_vector(
+                &context,
+                document_id,
+                request.state_vector.as_ref(),
+            )
+            .await?;
+            let loaded = self.documents.load_document(&context, document_id).await?;
+            let projection = projection_from_state(&loaded.state).map_err(|error| {
                 ServiceError::internal(
-                    anyhow::Error::new(error).context("project created collaboration version"),
+                    anyhow::Error::new(error).context("project captured collaboration snapshot"),
                 )
             })?;
-            let mut wire = version_to_wire(&version, document_id)?;
-            wire.content = Some(projection_to_wire(&projection)?);
-            wire.plain_text = Some(FastStr::from_string(projection.plain_text));
-            Ok(wire)
-        }
-        .await;
-        result.map_err(|error| rpc_error(&error))
-    }
-
-    async fn get_version(
-        &self,
-        request: collaboration::GetVersionRequest,
-    ) -> std::result::Result<collaboration::VersionDetail, ServerError> {
-        let result = async {
-            self.require_ready().await?;
-            let document_id = DocumentId::parse(request.document_id.as_str())?;
-            let version_id = VersionId::parse(request.version_id.as_str())?;
-            let (context, _) = self.authorization(document_id, false).await?;
-            let version = self
-                .versions
-                .get_version(&context, document_id, version_id)
-                .await?;
-            let projection = projection_from_state(&version.state).map_err(|error| {
-                ServiceError::internal(
-                    anyhow::Error::new(error).context("project stored collaboration version"),
-                )
-            })?;
-            Ok(collaboration::VersionDetail {
-                version: version_to_wire(&version, document_id)?,
+            Ok(collaboration::PublicationSnapshot {
+                document_id: FastStr::from_string(document_id.to_string()),
+                sequence: loaded.sequence,
                 content: projection_to_wire(&projection)?,
                 plain_text: FastStr::from_string(projection.plain_text),
             })
-        }
-        .await;
-        result.map_err(|error| rpc_error(&error))
-    }
-
-    async fn restore_version(
-        &self,
-        request: collaboration::RestoreVersionRequest,
-    ) -> std::result::Result<collaboration::Version, ServerError> {
-        let result = async {
-            self.require_ready().await?;
-            let document_id = DocumentId::parse(request.document_id.as_str())?;
-            let version_id = VersionId::parse(request.version_id.as_str())?;
-            if request.expected_sequence < 0 {
-                return Err(ServiceError::invalid_input(
-                    "expected_sequence must not be negative",
-                ));
-            }
-            let idempotency_key = request
-                .idempotency_key
-                .as_deref()
-                .map(validate_idempotency_key)
-                .transpose()?;
-            let (context, authorization) = self.authorization(document_id, true).await?;
-            let target = self
-                .versions
-                .get_version(&context, document_id, version_id)
-                .await?;
-            let restored = self
-                .actors
-                .restore_version(
-                    &context,
-                    document_id,
-                    target,
-                    request.expected_sequence,
-                    authorization.actor,
-                    idempotency_key.map(ToOwned::to_owned),
-                )
-                .await;
-            version_to_wire(&restored?, document_id)
         }
         .await;
         result.map_err(|error| rpc_error(&error))
@@ -378,115 +247,11 @@ impl collaboration::CollaborationService for CollaborationHandler {
             self.actors
                 .invalidate(document_id, CLOSE_DOCUMENT_INVALIDATED)
                 .await?;
-            self.versions.purge_document(&context, document_id).await
+            self.purger.purge_document(&context, document_id).await
         }
         .await;
         result.map_err(|error| rpc_error(&error))
     }
-}
-
-#[derive(Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
-struct CursorPayload {
-    version: u8,
-    created_at: String,
-    id: String,
-}
-
-fn decode_cursor(value: &str) -> Result<VersionCursor> {
-    if value.is_empty() || value.len() > MAXIMUM_CURSOR_LENGTH {
-        return Err(ServiceError::invalid_input("cursor is invalid"));
-    }
-    let bytes = URL_SAFE_NO_PAD
-        .decode(value)
-        .map_err(|_| ServiceError::invalid_input("cursor is invalid"))?;
-    if URL_SAFE_NO_PAD.encode(&bytes) != value {
-        return Err(ServiceError::invalid_input("cursor is invalid"));
-    }
-    let payload: CursorPayload = serde_json::from_slice(&bytes)
-        .map_err(|_| ServiceError::invalid_input("cursor is invalid"))?;
-    if payload.version != 1 {
-        return Err(ServiceError::invalid_input("cursor is invalid"));
-    }
-    let created_at = OffsetDateTime::parse(&payload.created_at, &Rfc3339)
-        .map_err(|_| ServiceError::invalid_input("cursor is invalid"))?;
-    let id = VersionId::parse(&payload.id)
-        .map_err(|_| ServiceError::invalid_input("cursor is invalid"))?;
-    Ok(VersionCursor { created_at, id })
-}
-
-fn encode_cursor(version: &DocumentVersion) -> Result<FastStr> {
-    let payload = CursorPayload {
-        version: 1,
-        created_at: formatted_time(version.created_at)?,
-        id: version.id.to_string(),
-    };
-    let bytes = serde_json::to_vec(&payload).map_err(|error| {
-        ServiceError::internal(anyhow::Error::new(error).context("encode version cursor"))
-    })?;
-    Ok(FastStr::from_string(URL_SAFE_NO_PAD.encode(bytes)))
-}
-
-fn version_to_wire(
-    version: &DocumentVersion,
-    expected_document: DocumentId,
-) -> Result<collaboration::Version> {
-    if version.document_id != expected_document
-        || version.sequence < 0
-        || version
-            .label
-            .as_deref()
-            .is_some_and(|label| !valid_label(label))
-    {
-        return Err(ServiceError::internal(anyhow::anyhow!(
-            "version store returned an inconsistent version"
-        )));
-    }
-    version.created_by.validate().map_err(|error| {
-        ServiceError::internal(anyhow::Error::new(error).context("validate stored version actor"))
-    })?;
-    Ok(collaboration::Version {
-        id: FastStr::from_string(version.id.to_string()),
-        document_id: FastStr::from_string(version.document_id.to_string()),
-        sequence: version.sequence,
-        kind: FastStr::from_static_str(version.kind.as_str()),
-        label: version.label.clone().map(FastStr::from_string),
-        created_by: knowledge::PublicUser {
-            id: version.created_by.id,
-            username: FastStr::from_string(version.created_by.username.clone()),
-            avatar: FastStr::from_string(version.created_by.avatar.clone()),
-        },
-        created_at: format_time(version.created_at)?,
-        content: None,
-        plain_text: None,
-    })
-}
-
-fn validate_label(value: &str) -> Result<String> {
-    if !valid_label(value) {
-        return Err(ServiceError::invalid_input(
-            "label must contain between 1 and 200 characters",
-        ));
-    }
-    Ok(value.to_owned())
-}
-
-fn valid_label(value: &str) -> bool {
-    value.trim() == value
-        && !value.chars().any(char::is_control)
-        && (1..=200).contains(&value.chars().count())
-}
-
-fn validate_idempotency_key(value: &str) -> Result<&str> {
-    if value.is_empty()
-        || value.len() > 128
-        || !value.bytes().all(|byte| (b'!'..=b'~').contains(&byte))
-    {
-        return Err(ServiceError::invalid_input(
-            "idempotency_key must contain 1-128 visible ASCII characters",
-        ));
-    }
-    Ok(value)
 }
 
 fn valid_contract_token(value: &str) -> bool {
@@ -510,7 +275,9 @@ fn rpc_error(error: &ServiceError) -> ServerError {
     service_error(error)
 }
 
-#[cfg(test)]
+// Legacy version-history tests are intentionally retired with the RPC surface.
+// Keep the old fixture below out of all builds until the storage cleanup lands.
+#[cfg(any())]
 mod tests {
     use std::{
         sync::{

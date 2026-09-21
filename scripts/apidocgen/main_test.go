@@ -40,8 +40,10 @@ func TestGenerateCoversGatewayAndCollaborationContracts(t *testing.T) {
 			}
 		}
 	}
-	if operationCount != 51 {
-		t.Fatalf("OpenAPI operation count = %d, want 51", operationCount)
+	// Four version-history routes were retired; permanent trash deletion keeps
+	// the public contract at the current 48 operations.
+	if operationCount != 48 {
+		t.Fatalf("OpenAPI operation count = %d, want 48", operationCount)
 	}
 	if got := value.AsyncAPI["asyncapi"]; got != "3.0.0" {
 		t.Fatalf("AsyncAPI version = %#v", got)

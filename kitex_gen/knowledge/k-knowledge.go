@@ -4945,8 +4945,6 @@ func (p *PublishSnapshotRequest) FastRead(buf []byte) (int, error) {
 	var fieldId int16
 	var issetDocumentId bool = false
 	var issetExpectedMetadataRevision bool = false
-	var issetVersionId bool = false
-	var issetVersionSequence bool = false
 	var issetTitle bool = false
 	var issetSummary bool = false
 	var issetSlug bool = false
@@ -5001,7 +4999,7 @@ func (p *PublishSnapshotRequest) FastRead(buf []byte) (int, error) {
 				if err != nil {
 					goto ReadFieldError
 				}
-				issetVersionId = true
+				issetTitle = true
 			} else {
 				l, err = thrift.Binary.Skip(buf[offset:], fieldTypeId)
 				offset += l
@@ -5010,13 +5008,13 @@ func (p *PublishSnapshotRequest) FastRead(buf []byte) (int, error) {
 				}
 			}
 		case 4:
-			if fieldTypeId == thrift.I64 {
+			if fieldTypeId == thrift.STRING {
 				l, err = p.FastReadField4(buf[offset:])
 				offset += l
 				if err != nil {
 					goto ReadFieldError
 				}
-				issetVersionSequence = true
+				issetSummary = true
 			} else {
 				l, err = thrift.Binary.Skip(buf[offset:], fieldTypeId)
 				offset += l
@@ -5031,7 +5029,7 @@ func (p *PublishSnapshotRequest) FastRead(buf []byte) (int, error) {
 				if err != nil {
 					goto ReadFieldError
 				}
-				issetTitle = true
+				issetSlug = true
 			} else {
 				l, err = thrift.Binary.Skip(buf[offset:], fieldTypeId)
 				offset += l
@@ -5046,36 +5044,6 @@ func (p *PublishSnapshotRequest) FastRead(buf []byte) (int, error) {
 				if err != nil {
 					goto ReadFieldError
 				}
-				issetSummary = true
-			} else {
-				l, err = thrift.Binary.Skip(buf[offset:], fieldTypeId)
-				offset += l
-				if err != nil {
-					goto SkipFieldError
-				}
-			}
-		case 7:
-			if fieldTypeId == thrift.STRING {
-				l, err = p.FastReadField7(buf[offset:])
-				offset += l
-				if err != nil {
-					goto ReadFieldError
-				}
-				issetSlug = true
-			} else {
-				l, err = thrift.Binary.Skip(buf[offset:], fieldTypeId)
-				offset += l
-				if err != nil {
-					goto SkipFieldError
-				}
-			}
-		case 8:
-			if fieldTypeId == thrift.STRING {
-				l, err = p.FastReadField8(buf[offset:])
-				offset += l
-				if err != nil {
-					goto ReadFieldError
-				}
 				issetLanguage = true
 			} else {
 				l, err = thrift.Binary.Skip(buf[offset:], fieldTypeId)
@@ -5084,9 +5052,9 @@ func (p *PublishSnapshotRequest) FastRead(buf []byte) (int, error) {
 					goto SkipFieldError
 				}
 			}
-		case 9:
+		case 7:
 			if fieldTypeId == thrift.LIST {
-				l, err = p.FastReadField9(buf[offset:])
+				l, err = p.FastReadField7(buf[offset:])
 				offset += l
 				if err != nil {
 					goto ReadFieldError
@@ -5099,9 +5067,9 @@ func (p *PublishSnapshotRequest) FastRead(buf []byte) (int, error) {
 					goto SkipFieldError
 				}
 			}
-		case 10:
+		case 8:
 			if fieldTypeId == thrift.STRUCT {
-				l, err = p.FastReadField10(buf[offset:])
+				l, err = p.FastReadField8(buf[offset:])
 				offset += l
 				if err != nil {
 					goto ReadFieldError
@@ -5114,9 +5082,9 @@ func (p *PublishSnapshotRequest) FastRead(buf []byte) (int, error) {
 					goto SkipFieldError
 				}
 			}
-		case 11:
+		case 9:
 			if fieldTypeId == thrift.STRING {
-				l, err = p.FastReadField11(buf[offset:])
+				l, err = p.FastReadField9(buf[offset:])
 				offset += l
 				if err != nil {
 					goto ReadFieldError
@@ -5129,9 +5097,9 @@ func (p *PublishSnapshotRequest) FastRead(buf []byte) (int, error) {
 					goto SkipFieldError
 				}
 			}
-		case 12:
+		case 10:
 			if fieldTypeId == thrift.STRING {
-				l, err = p.FastReadField12(buf[offset:])
+				l, err = p.FastReadField10(buf[offset:])
 				offset += l
 				if err != nil {
 					goto ReadFieldError
@@ -5162,48 +5130,38 @@ func (p *PublishSnapshotRequest) FastRead(buf []byte) (int, error) {
 		goto RequiredFieldNotSetError
 	}
 
-	if !issetVersionId {
+	if !issetTitle {
 		fieldId = 3
 		goto RequiredFieldNotSetError
 	}
 
-	if !issetVersionSequence {
+	if !issetSummary {
 		fieldId = 4
 		goto RequiredFieldNotSetError
 	}
 
-	if !issetTitle {
+	if !issetSlug {
 		fieldId = 5
 		goto RequiredFieldNotSetError
 	}
 
-	if !issetSummary {
+	if !issetLanguage {
 		fieldId = 6
 		goto RequiredFieldNotSetError
 	}
 
-	if !issetSlug {
+	if !issetTags {
 		fieldId = 7
 		goto RequiredFieldNotSetError
 	}
 
-	if !issetLanguage {
+	if !issetContent {
 		fieldId = 8
 		goto RequiredFieldNotSetError
 	}
 
-	if !issetTags {
-		fieldId = 9
-		goto RequiredFieldNotSetError
-	}
-
-	if !issetContent {
-		fieldId = 10
-		goto RequiredFieldNotSetError
-	}
-
 	if !issetPlainText {
-		fieldId = 11
+		fieldId = 9
 		goto RequiredFieldNotSetError
 	}
 	return offset, nil
@@ -5255,39 +5213,11 @@ func (p *PublishSnapshotRequest) FastReadField3(buf []byte) (int, error) {
 		offset += l
 		_field = v
 	}
-	p.VersionId = _field
-	return offset, nil
-}
-
-func (p *PublishSnapshotRequest) FastReadField4(buf []byte) (int, error) {
-	offset := 0
-
-	var _field int64
-	if v, l, err := thrift.Binary.ReadI64(buf[offset:]); err != nil {
-		return offset, err
-	} else {
-		offset += l
-		_field = v
-	}
-	p.VersionSequence = _field
-	return offset, nil
-}
-
-func (p *PublishSnapshotRequest) FastReadField5(buf []byte) (int, error) {
-	offset := 0
-
-	var _field string
-	if v, l, err := thrift.Binary.ReadString(buf[offset:]); err != nil {
-		return offset, err
-	} else {
-		offset += l
-		_field = v
-	}
 	p.Title = _field
 	return offset, nil
 }
 
-func (p *PublishSnapshotRequest) FastReadField6(buf []byte) (int, error) {
+func (p *PublishSnapshotRequest) FastReadField4(buf []byte) (int, error) {
 	offset := 0
 
 	var _field string
@@ -5301,7 +5231,7 @@ func (p *PublishSnapshotRequest) FastReadField6(buf []byte) (int, error) {
 	return offset, nil
 }
 
-func (p *PublishSnapshotRequest) FastReadField7(buf []byte) (int, error) {
+func (p *PublishSnapshotRequest) FastReadField5(buf []byte) (int, error) {
 	offset := 0
 
 	var _field string
@@ -5315,7 +5245,7 @@ func (p *PublishSnapshotRequest) FastReadField7(buf []byte) (int, error) {
 	return offset, nil
 }
 
-func (p *PublishSnapshotRequest) FastReadField8(buf []byte) (int, error) {
+func (p *PublishSnapshotRequest) FastReadField6(buf []byte) (int, error) {
 	offset := 0
 
 	var _field string
@@ -5329,7 +5259,7 @@ func (p *PublishSnapshotRequest) FastReadField8(buf []byte) (int, error) {
 	return offset, nil
 }
 
-func (p *PublishSnapshotRequest) FastReadField9(buf []byte) (int, error) {
+func (p *PublishSnapshotRequest) FastReadField7(buf []byte) (int, error) {
 	offset := 0
 
 	_, size, l, err := thrift.Binary.ReadListBegin(buf[offset:])
@@ -5353,7 +5283,7 @@ func (p *PublishSnapshotRequest) FastReadField9(buf []byte) (int, error) {
 	return offset, nil
 }
 
-func (p *PublishSnapshotRequest) FastReadField10(buf []byte) (int, error) {
+func (p *PublishSnapshotRequest) FastReadField8(buf []byte) (int, error) {
 	offset := 0
 	_field := NewRichTextDocument()
 	if l, err := _field.FastRead(buf[offset:]); err != nil {
@@ -5365,7 +5295,7 @@ func (p *PublishSnapshotRequest) FastReadField10(buf []byte) (int, error) {
 	return offset, nil
 }
 
-func (p *PublishSnapshotRequest) FastReadField11(buf []byte) (int, error) {
+func (p *PublishSnapshotRequest) FastReadField9(buf []byte) (int, error) {
 	offset := 0
 
 	var _field string
@@ -5379,7 +5309,7 @@ func (p *PublishSnapshotRequest) FastReadField11(buf []byte) (int, error) {
 	return offset, nil
 }
 
-func (p *PublishSnapshotRequest) FastReadField12(buf []byte) (int, error) {
+func (p *PublishSnapshotRequest) FastReadField10(buf []byte) (int, error) {
 	offset := 0
 
 	var _field *string
@@ -5401,17 +5331,15 @@ func (p *PublishSnapshotRequest) FastWriteNocopy(buf []byte, w thrift.NocopyWrit
 	offset := 0
 	if p != nil {
 		offset += p.fastWriteField2(buf[offset:], w)
-		offset += p.fastWriteField4(buf[offset:], w)
 		offset += p.fastWriteField1(buf[offset:], w)
 		offset += p.fastWriteField3(buf[offset:], w)
+		offset += p.fastWriteField4(buf[offset:], w)
 		offset += p.fastWriteField5(buf[offset:], w)
 		offset += p.fastWriteField6(buf[offset:], w)
 		offset += p.fastWriteField7(buf[offset:], w)
 		offset += p.fastWriteField8(buf[offset:], w)
 		offset += p.fastWriteField9(buf[offset:], w)
 		offset += p.fastWriteField10(buf[offset:], w)
-		offset += p.fastWriteField11(buf[offset:], w)
-		offset += p.fastWriteField12(buf[offset:], w)
 	}
 	offset += thrift.Binary.WriteFieldStop(buf[offset:])
 	return offset
@@ -5430,8 +5358,6 @@ func (p *PublishSnapshotRequest) BLength() int {
 		l += p.field8Length()
 		l += p.field9Length()
 		l += p.field10Length()
-		l += p.field11Length()
-		l += p.field12Length()
 	}
 	l += thrift.Binary.FieldStopLength()
 	return l
@@ -5454,48 +5380,34 @@ func (p *PublishSnapshotRequest) fastWriteField2(buf []byte, w thrift.NocopyWrit
 func (p *PublishSnapshotRequest) fastWriteField3(buf []byte, w thrift.NocopyWriter) int {
 	offset := 0
 	offset += thrift.Binary.WriteFieldBegin(buf[offset:], thrift.STRING, 3)
-	offset += thrift.Binary.WriteStringNocopy(buf[offset:], w, p.VersionId)
+	offset += thrift.Binary.WriteStringNocopy(buf[offset:], w, p.Title)
 	return offset
 }
 
 func (p *PublishSnapshotRequest) fastWriteField4(buf []byte, w thrift.NocopyWriter) int {
 	offset := 0
-	offset += thrift.Binary.WriteFieldBegin(buf[offset:], thrift.I64, 4)
-	offset += thrift.Binary.WriteI64(buf[offset:], p.VersionSequence)
+	offset += thrift.Binary.WriteFieldBegin(buf[offset:], thrift.STRING, 4)
+	offset += thrift.Binary.WriteStringNocopy(buf[offset:], w, p.Summary)
 	return offset
 }
 
 func (p *PublishSnapshotRequest) fastWriteField5(buf []byte, w thrift.NocopyWriter) int {
 	offset := 0
 	offset += thrift.Binary.WriteFieldBegin(buf[offset:], thrift.STRING, 5)
-	offset += thrift.Binary.WriteStringNocopy(buf[offset:], w, p.Title)
+	offset += thrift.Binary.WriteStringNocopy(buf[offset:], w, p.Slug)
 	return offset
 }
 
 func (p *PublishSnapshotRequest) fastWriteField6(buf []byte, w thrift.NocopyWriter) int {
 	offset := 0
 	offset += thrift.Binary.WriteFieldBegin(buf[offset:], thrift.STRING, 6)
-	offset += thrift.Binary.WriteStringNocopy(buf[offset:], w, p.Summary)
+	offset += thrift.Binary.WriteStringNocopy(buf[offset:], w, p.Language)
 	return offset
 }
 
 func (p *PublishSnapshotRequest) fastWriteField7(buf []byte, w thrift.NocopyWriter) int {
 	offset := 0
-	offset += thrift.Binary.WriteFieldBegin(buf[offset:], thrift.STRING, 7)
-	offset += thrift.Binary.WriteStringNocopy(buf[offset:], w, p.Slug)
-	return offset
-}
-
-func (p *PublishSnapshotRequest) fastWriteField8(buf []byte, w thrift.NocopyWriter) int {
-	offset := 0
-	offset += thrift.Binary.WriteFieldBegin(buf[offset:], thrift.STRING, 8)
-	offset += thrift.Binary.WriteStringNocopy(buf[offset:], w, p.Language)
-	return offset
-}
-
-func (p *PublishSnapshotRequest) fastWriteField9(buf []byte, w thrift.NocopyWriter) int {
-	offset := 0
-	offset += thrift.Binary.WriteFieldBegin(buf[offset:], thrift.LIST, 9)
+	offset += thrift.Binary.WriteFieldBegin(buf[offset:], thrift.LIST, 7)
 	listBeginOffset := offset
 	offset += thrift.Binary.ListBeginLength()
 	var length int
@@ -5507,24 +5419,24 @@ func (p *PublishSnapshotRequest) fastWriteField9(buf []byte, w thrift.NocopyWrit
 	return offset
 }
 
-func (p *PublishSnapshotRequest) fastWriteField10(buf []byte, w thrift.NocopyWriter) int {
+func (p *PublishSnapshotRequest) fastWriteField8(buf []byte, w thrift.NocopyWriter) int {
 	offset := 0
-	offset += thrift.Binary.WriteFieldBegin(buf[offset:], thrift.STRUCT, 10)
+	offset += thrift.Binary.WriteFieldBegin(buf[offset:], thrift.STRUCT, 8)
 	offset += p.Content.FastWriteNocopy(buf[offset:], w)
 	return offset
 }
 
-func (p *PublishSnapshotRequest) fastWriteField11(buf []byte, w thrift.NocopyWriter) int {
+func (p *PublishSnapshotRequest) fastWriteField9(buf []byte, w thrift.NocopyWriter) int {
 	offset := 0
-	offset += thrift.Binary.WriteFieldBegin(buf[offset:], thrift.STRING, 11)
+	offset += thrift.Binary.WriteFieldBegin(buf[offset:], thrift.STRING, 9)
 	offset += thrift.Binary.WriteStringNocopy(buf[offset:], w, p.PlainText)
 	return offset
 }
 
-func (p *PublishSnapshotRequest) fastWriteField12(buf []byte, w thrift.NocopyWriter) int {
+func (p *PublishSnapshotRequest) fastWriteField10(buf []byte, w thrift.NocopyWriter) int {
 	offset := 0
 	if p.IsSetIdempotencyKey() {
-		offset += thrift.Binary.WriteFieldBegin(buf[offset:], thrift.STRING, 12)
+		offset += thrift.Binary.WriteFieldBegin(buf[offset:], thrift.STRING, 10)
 		offset += thrift.Binary.WriteStringNocopy(buf[offset:], w, *p.IdempotencyKey)
 	}
 	return offset
@@ -5547,46 +5459,32 @@ func (p *PublishSnapshotRequest) field2Length() int {
 func (p *PublishSnapshotRequest) field3Length() int {
 	l := 0
 	l += thrift.Binary.FieldBeginLength()
-	l += thrift.Binary.StringLengthNocopy(p.VersionId)
+	l += thrift.Binary.StringLengthNocopy(p.Title)
 	return l
 }
 
 func (p *PublishSnapshotRequest) field4Length() int {
 	l := 0
 	l += thrift.Binary.FieldBeginLength()
-	l += thrift.Binary.I64Length()
+	l += thrift.Binary.StringLengthNocopy(p.Summary)
 	return l
 }
 
 func (p *PublishSnapshotRequest) field5Length() int {
 	l := 0
 	l += thrift.Binary.FieldBeginLength()
-	l += thrift.Binary.StringLengthNocopy(p.Title)
+	l += thrift.Binary.StringLengthNocopy(p.Slug)
 	return l
 }
 
 func (p *PublishSnapshotRequest) field6Length() int {
 	l := 0
 	l += thrift.Binary.FieldBeginLength()
-	l += thrift.Binary.StringLengthNocopy(p.Summary)
-	return l
-}
-
-func (p *PublishSnapshotRequest) field7Length() int {
-	l := 0
-	l += thrift.Binary.FieldBeginLength()
-	l += thrift.Binary.StringLengthNocopy(p.Slug)
-	return l
-}
-
-func (p *PublishSnapshotRequest) field8Length() int {
-	l := 0
-	l += thrift.Binary.FieldBeginLength()
 	l += thrift.Binary.StringLengthNocopy(p.Language)
 	return l
 }
 
-func (p *PublishSnapshotRequest) field9Length() int {
+func (p *PublishSnapshotRequest) field7Length() int {
 	l := 0
 	l += thrift.Binary.FieldBeginLength()
 	l += thrift.Binary.ListBeginLength()
@@ -5597,21 +5495,21 @@ func (p *PublishSnapshotRequest) field9Length() int {
 	return l
 }
 
-func (p *PublishSnapshotRequest) field10Length() int {
+func (p *PublishSnapshotRequest) field8Length() int {
 	l := 0
 	l += thrift.Binary.FieldBeginLength()
 	l += p.Content.BLength()
 	return l
 }
 
-func (p *PublishSnapshotRequest) field11Length() int {
+func (p *PublishSnapshotRequest) field9Length() int {
 	l := 0
 	l += thrift.Binary.FieldBeginLength()
 	l += thrift.Binary.StringLengthNocopy(p.PlainText)
 	return l
 }
 
-func (p *PublishSnapshotRequest) field12Length() int {
+func (p *PublishSnapshotRequest) field10Length() int {
 	l := 0
 	if p.IsSetIdempotencyKey() {
 		l += thrift.Binary.FieldBeginLength()
@@ -6403,6 +6301,20 @@ func (p *SetPublicationRequest) FastRead(buf []byte) (int, error) {
 					goto SkipFieldError
 				}
 			}
+		case 4:
+			if fieldTypeId == thrift.STRING {
+				l, err = p.FastReadField4(buf[offset:])
+				offset += l
+				if err != nil {
+					goto ReadFieldError
+				}
+			} else {
+				l, err = thrift.Binary.Skip(buf[offset:], fieldTypeId)
+				offset += l
+				if err != nil {
+					goto SkipFieldError
+				}
+			}
 		default:
 			l, err = thrift.Binary.Skip(buf[offset:], fieldTypeId)
 			offset += l
@@ -6479,6 +6391,20 @@ func (p *SetPublicationRequest) FastReadField3(buf []byte) (int, error) {
 	return offset, nil
 }
 
+func (p *SetPublicationRequest) FastReadField4(buf []byte) (int, error) {
+	offset := 0
+
+	var _field *string
+	if v, l, err := thrift.Binary.ReadString(buf[offset:]); err != nil {
+		return offset, err
+	} else {
+		offset += l
+		_field = &v
+	}
+	p.IdempotencyKey = _field
+	return offset, nil
+}
+
 func (p *SetPublicationRequest) FastWrite(buf []byte) int {
 	return p.FastWriteNocopy(buf, nil)
 }
@@ -6489,6 +6415,7 @@ func (p *SetPublicationRequest) FastWriteNocopy(buf []byte, w thrift.NocopyWrite
 		offset += p.fastWriteField2(buf[offset:], w)
 		offset += p.fastWriteField3(buf[offset:], w)
 		offset += p.fastWriteField1(buf[offset:], w)
+		offset += p.fastWriteField4(buf[offset:], w)
 	}
 	offset += thrift.Binary.WriteFieldStop(buf[offset:])
 	return offset
@@ -6500,6 +6427,7 @@ func (p *SetPublicationRequest) BLength() int {
 		l += p.field1Length()
 		l += p.field2Length()
 		l += p.field3Length()
+		l += p.field4Length()
 	}
 	l += thrift.Binary.FieldStopLength()
 	return l
@@ -6526,6 +6454,15 @@ func (p *SetPublicationRequest) fastWriteField3(buf []byte, w thrift.NocopyWrite
 	return offset
 }
 
+func (p *SetPublicationRequest) fastWriteField4(buf []byte, w thrift.NocopyWriter) int {
+	offset := 0
+	if p.IsSetIdempotencyKey() {
+		offset += thrift.Binary.WriteFieldBegin(buf[offset:], thrift.STRING, 4)
+		offset += thrift.Binary.WriteStringNocopy(buf[offset:], w, *p.IdempotencyKey)
+	}
+	return offset
+}
+
 func (p *SetPublicationRequest) field1Length() int {
 	l := 0
 	l += thrift.Binary.FieldBeginLength()
@@ -6544,6 +6481,15 @@ func (p *SetPublicationRequest) field3Length() int {
 	l := 0
 	l += thrift.Binary.FieldBeginLength()
 	l += thrift.Binary.BoolLength()
+	return l
+}
+
+func (p *SetPublicationRequest) field4Length() int {
+	l := 0
+	if p.IsSetIdempotencyKey() {
+		l += thrift.Binary.FieldBeginLength()
+		l += thrift.Binary.StringLengthNocopy(*p.IdempotencyKey)
+	}
 	return l
 }
 
@@ -6702,6 +6648,212 @@ func (p *DeleteDocumentRequest) field2Length() int {
 	l := 0
 	l += thrift.Binary.FieldBeginLength()
 	l += thrift.Binary.I64Length()
+	return l
+}
+
+func (p *PurgeDeletedDocumentRequest) FastRead(buf []byte) (int, error) {
+
+	var err error
+	var offset int
+	var l int
+	var fieldTypeId thrift.TType
+	var fieldId int16
+	var issetDocumentId bool = false
+	var issetExpectedRevision bool = false
+	for {
+		fieldTypeId, fieldId, l, err = thrift.Binary.ReadFieldBegin(buf[offset:])
+		offset += l
+		if err != nil {
+			goto ReadFieldBeginError
+		}
+		if fieldTypeId == thrift.STOP {
+			break
+		}
+		switch fieldId {
+		case 1:
+			if fieldTypeId == thrift.STRING {
+				l, err = p.FastReadField1(buf[offset:])
+				offset += l
+				if err != nil {
+					goto ReadFieldError
+				}
+				issetDocumentId = true
+			} else {
+				l, err = thrift.Binary.Skip(buf[offset:], fieldTypeId)
+				offset += l
+				if err != nil {
+					goto SkipFieldError
+				}
+			}
+		case 2:
+			if fieldTypeId == thrift.I64 {
+				l, err = p.FastReadField2(buf[offset:])
+				offset += l
+				if err != nil {
+					goto ReadFieldError
+				}
+				issetExpectedRevision = true
+			} else {
+				l, err = thrift.Binary.Skip(buf[offset:], fieldTypeId)
+				offset += l
+				if err != nil {
+					goto SkipFieldError
+				}
+			}
+		case 3:
+			if fieldTypeId == thrift.STRING {
+				l, err = p.FastReadField3(buf[offset:])
+				offset += l
+				if err != nil {
+					goto ReadFieldError
+				}
+			} else {
+				l, err = thrift.Binary.Skip(buf[offset:], fieldTypeId)
+				offset += l
+				if err != nil {
+					goto SkipFieldError
+				}
+			}
+		default:
+			l, err = thrift.Binary.Skip(buf[offset:], fieldTypeId)
+			offset += l
+			if err != nil {
+				goto SkipFieldError
+			}
+		}
+	}
+
+	if !issetDocumentId {
+		fieldId = 1
+		goto RequiredFieldNotSetError
+	}
+
+	if !issetExpectedRevision {
+		fieldId = 2
+		goto RequiredFieldNotSetError
+	}
+	return offset, nil
+ReadFieldBeginError:
+	return offset, thrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
+ReadFieldError:
+	return offset, thrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_PurgeDeletedDocumentRequest[fieldId]), err)
+SkipFieldError:
+	return offset, thrift.PrependError(fmt.Sprintf("%T field %d skip type %d error: ", p, fieldId, fieldTypeId), err)
+RequiredFieldNotSetError:
+	return offset, thrift.NewProtocolException(thrift.INVALID_DATA, fmt.Sprintf("required field %s is not set", fieldIDToName_PurgeDeletedDocumentRequest[fieldId]))
+}
+
+func (p *PurgeDeletedDocumentRequest) FastReadField1(buf []byte) (int, error) {
+	offset := 0
+
+	var _field string
+	if v, l, err := thrift.Binary.ReadString(buf[offset:]); err != nil {
+		return offset, err
+	} else {
+		offset += l
+		_field = v
+	}
+	p.DocumentId = _field
+	return offset, nil
+}
+
+func (p *PurgeDeletedDocumentRequest) FastReadField2(buf []byte) (int, error) {
+	offset := 0
+
+	var _field int64
+	if v, l, err := thrift.Binary.ReadI64(buf[offset:]); err != nil {
+		return offset, err
+	} else {
+		offset += l
+		_field = v
+	}
+	p.ExpectedRevision = _field
+	return offset, nil
+}
+
+func (p *PurgeDeletedDocumentRequest) FastReadField3(buf []byte) (int, error) {
+	offset := 0
+
+	var _field *string
+	if v, l, err := thrift.Binary.ReadString(buf[offset:]); err != nil {
+		return offset, err
+	} else {
+		offset += l
+		_field = &v
+	}
+	p.IdempotencyKey = _field
+	return offset, nil
+}
+
+func (p *PurgeDeletedDocumentRequest) FastWrite(buf []byte) int {
+	return p.FastWriteNocopy(buf, nil)
+}
+
+func (p *PurgeDeletedDocumentRequest) FastWriteNocopy(buf []byte, w thrift.NocopyWriter) int {
+	offset := 0
+	if p != nil {
+		offset += p.fastWriteField2(buf[offset:], w)
+		offset += p.fastWriteField1(buf[offset:], w)
+		offset += p.fastWriteField3(buf[offset:], w)
+	}
+	offset += thrift.Binary.WriteFieldStop(buf[offset:])
+	return offset
+}
+
+func (p *PurgeDeletedDocumentRequest) BLength() int {
+	l := 0
+	if p != nil {
+		l += p.field1Length()
+		l += p.field2Length()
+		l += p.field3Length()
+	}
+	l += thrift.Binary.FieldStopLength()
+	return l
+}
+
+func (p *PurgeDeletedDocumentRequest) fastWriteField1(buf []byte, w thrift.NocopyWriter) int {
+	offset := 0
+	offset += thrift.Binary.WriteFieldBegin(buf[offset:], thrift.STRING, 1)
+	offset += thrift.Binary.WriteStringNocopy(buf[offset:], w, p.DocumentId)
+	return offset
+}
+
+func (p *PurgeDeletedDocumentRequest) fastWriteField2(buf []byte, w thrift.NocopyWriter) int {
+	offset := 0
+	offset += thrift.Binary.WriteFieldBegin(buf[offset:], thrift.I64, 2)
+	offset += thrift.Binary.WriteI64(buf[offset:], p.ExpectedRevision)
+	return offset
+}
+
+func (p *PurgeDeletedDocumentRequest) fastWriteField3(buf []byte, w thrift.NocopyWriter) int {
+	offset := 0
+	if p.IsSetIdempotencyKey() {
+		offset += thrift.Binary.WriteFieldBegin(buf[offset:], thrift.STRING, 3)
+		offset += thrift.Binary.WriteStringNocopy(buf[offset:], w, *p.IdempotencyKey)
+	}
+	return offset
+}
+
+func (p *PurgeDeletedDocumentRequest) field1Length() int {
+	l := 0
+	l += thrift.Binary.FieldBeginLength()
+	l += thrift.Binary.StringLengthNocopy(p.DocumentId)
+	return l
+}
+
+func (p *PurgeDeletedDocumentRequest) field2Length() int {
+	l := 0
+	l += thrift.Binary.FieldBeginLength()
+	l += thrift.Binary.I64Length()
+	return l
+}
+
+func (p *PurgeDeletedDocumentRequest) field3Length() int {
+	l := 0
+	if p.IsSetIdempotencyKey() {
+		l += thrift.Binary.FieldBeginLength()
+		l += thrift.Binary.StringLengthNocopy(*p.IdempotencyKey)
+	}
 	return l
 }
 
@@ -11676,6 +11828,153 @@ func (p *KnowledgeServiceDeleteDocumentResult) field0Length() int {
 	return l
 }
 
+func (p *KnowledgeServicePurgeDeletedDocumentArgs) FastRead(buf []byte) (int, error) {
+
+	var err error
+	var offset int
+	var l int
+	var fieldTypeId thrift.TType
+	var fieldId int16
+	for {
+		fieldTypeId, fieldId, l, err = thrift.Binary.ReadFieldBegin(buf[offset:])
+		offset += l
+		if err != nil {
+			goto ReadFieldBeginError
+		}
+		if fieldTypeId == thrift.STOP {
+			break
+		}
+		switch fieldId {
+		case 1:
+			if fieldTypeId == thrift.STRUCT {
+				l, err = p.FastReadField1(buf[offset:])
+				offset += l
+				if err != nil {
+					goto ReadFieldError
+				}
+			} else {
+				l, err = thrift.Binary.Skip(buf[offset:], fieldTypeId)
+				offset += l
+				if err != nil {
+					goto SkipFieldError
+				}
+			}
+		default:
+			l, err = thrift.Binary.Skip(buf[offset:], fieldTypeId)
+			offset += l
+			if err != nil {
+				goto SkipFieldError
+			}
+		}
+	}
+
+	return offset, nil
+ReadFieldBeginError:
+	return offset, thrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
+ReadFieldError:
+	return offset, thrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_KnowledgeServicePurgeDeletedDocumentArgs[fieldId]), err)
+SkipFieldError:
+	return offset, thrift.PrependError(fmt.Sprintf("%T field %d skip type %d error: ", p, fieldId, fieldTypeId), err)
+}
+
+func (p *KnowledgeServicePurgeDeletedDocumentArgs) FastReadField1(buf []byte) (int, error) {
+	offset := 0
+	_field := NewPurgeDeletedDocumentRequest()
+	if l, err := _field.FastRead(buf[offset:]); err != nil {
+		return offset, err
+	} else {
+		offset += l
+	}
+	p.Request = _field
+	return offset, nil
+}
+
+func (p *KnowledgeServicePurgeDeletedDocumentArgs) FastWrite(buf []byte) int {
+	return p.FastWriteNocopy(buf, nil)
+}
+
+func (p *KnowledgeServicePurgeDeletedDocumentArgs) FastWriteNocopy(buf []byte, w thrift.NocopyWriter) int {
+	offset := 0
+	if p != nil {
+		offset += p.fastWriteField1(buf[offset:], w)
+	}
+	offset += thrift.Binary.WriteFieldStop(buf[offset:])
+	return offset
+}
+
+func (p *KnowledgeServicePurgeDeletedDocumentArgs) BLength() int {
+	l := 0
+	if p != nil {
+		l += p.field1Length()
+	}
+	l += thrift.Binary.FieldStopLength()
+	return l
+}
+
+func (p *KnowledgeServicePurgeDeletedDocumentArgs) fastWriteField1(buf []byte, w thrift.NocopyWriter) int {
+	offset := 0
+	offset += thrift.Binary.WriteFieldBegin(buf[offset:], thrift.STRUCT, 1)
+	offset += p.Request.FastWriteNocopy(buf[offset:], w)
+	return offset
+}
+
+func (p *KnowledgeServicePurgeDeletedDocumentArgs) field1Length() int {
+	l := 0
+	l += thrift.Binary.FieldBeginLength()
+	l += p.Request.BLength()
+	return l
+}
+
+func (p *KnowledgeServicePurgeDeletedDocumentResult) FastRead(buf []byte) (int, error) {
+
+	var err error
+	var offset int
+	var l int
+	var fieldTypeId thrift.TType
+	var fieldId int16
+	for {
+		fieldTypeId, fieldId, l, err = thrift.Binary.ReadFieldBegin(buf[offset:])
+		offset += l
+		if err != nil {
+			goto ReadFieldBeginError
+		}
+		if fieldTypeId == thrift.STOP {
+			break
+		}
+		l, err = thrift.Binary.Skip(buf[offset:], fieldTypeId)
+		offset += l
+		if err != nil {
+			goto SkipFieldError
+		}
+	}
+
+	return offset, nil
+ReadFieldBeginError:
+	return offset, thrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
+SkipFieldError:
+	return offset, thrift.PrependError(fmt.Sprintf("%T field %d skip type %d error: ", p, fieldId, fieldTypeId), err)
+}
+
+func (p *KnowledgeServicePurgeDeletedDocumentResult) FastWrite(buf []byte) int {
+	return p.FastWriteNocopy(buf, nil)
+}
+
+func (p *KnowledgeServicePurgeDeletedDocumentResult) FastWriteNocopy(buf []byte, w thrift.NocopyWriter) int {
+	offset := 0
+	if p != nil {
+	}
+	offset += thrift.Binary.WriteFieldStop(buf[offset:])
+	return offset
+}
+
+func (p *KnowledgeServicePurgeDeletedDocumentResult) BLength() int {
+	l := 0
+	if p != nil {
+	}
+	l += thrift.Binary.FieldStopLength()
+	return l
+}
+
 func (p *KnowledgeServiceRestoreDeletedDocumentArgs) FastRead(buf []byte) (int, error) {
 
 	var err error
@@ -13474,6 +13773,14 @@ func (p *KnowledgeServiceDeleteDocumentArgs) GetFirstArgument() interface{} {
 
 func (p *KnowledgeServiceDeleteDocumentResult) GetResult() interface{} {
 	return p.Success
+}
+
+func (p *KnowledgeServicePurgeDeletedDocumentArgs) GetFirstArgument() interface{} {
+	return p.Request
+}
+
+func (p *KnowledgeServicePurgeDeletedDocumentResult) GetResult() interface{} {
+	return nil
 }
 
 func (p *KnowledgeServiceRestoreDeletedDocumentArgs) GetFirstArgument() interface{} {

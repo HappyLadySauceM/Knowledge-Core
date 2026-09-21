@@ -29,60 +29,19 @@ struct CollaborationSession {
   7: optional i32 instance_ordinal
 }
 
-struct Version {
-  1: required string id
-  2: required string document_id
-  3: required i64 sequence
-  4: required string kind
-  5: optional string label
-  6: required knowledge.PublicUser created_by
-  7: required string created_at
-  // CreateVersion may include the exact projection captured by the write.
-  // ListVersions and compatibility responses leave these fields unset.
-  8: optional knowledge.RichTextDocument content
-  9: optional string plain_text
-}
-
-struct PageInfo {
-  1: optional string next_cursor
-  2: required bool has_more
-}
-
-struct VersionPage {
-  1: required list<Version> items
-  2: required PageInfo page
-  3: optional i64 head_sequence
-}
-
-struct VersionDetail {
-  1: required Version version
-  2: required knowledge.RichTextDocument content
-  3: required string plain_text
-}
-
-struct ListVersionsRequest {
+// Captures the current durable collaboration state for publication without
+// creating a history record. The state vector is a lower-bound barrier: the
+// returned projection contains every client clock known by the caller.
+struct CapturePublicationSnapshotRequest {
   1: required string document_id
-  2: optional string cursor
-  3: optional i32 limit
+  2: required binary state_vector
 }
 
-struct CreateVersionRequest {
+struct PublicationSnapshot {
   1: required string document_id
-  2: optional string label
-  3: optional string idempotency_key
-  4: optional binary state_vector
-}
-
-struct GetVersionRequest {
-  1: required string document_id
-  2: required string version_id
-}
-
-struct RestoreVersionRequest {
-  1: required string document_id
-  2: required string version_id
-  3: required i64 expected_sequence
-  4: optional string idempotency_key
+  2: required i64 sequence
+  3: required knowledge.RichTextDocument content
+  4: required string plain_text
 }
 
 struct PurgeDocumentRequest {
@@ -92,9 +51,6 @@ struct PurgeDocumentRequest {
 service CollaborationService {
   common.PingResponse Ping(1: common.PingRequest request)
   CollaborationSession CreateSession(1: CreateSessionRequest request)
-  VersionPage ListVersions(1: ListVersionsRequest request)
-  Version CreateVersion(1: CreateVersionRequest request)
-  VersionDetail GetVersion(1: GetVersionRequest request)
-  Version RestoreVersion(1: RestoreVersionRequest request)
+  PublicationSnapshot CapturePublicationSnapshot(1: CapturePublicationSnapshotRequest request)
   void PurgeDocument(1: PurgeDocumentRequest request)
 }

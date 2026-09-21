@@ -293,6 +293,13 @@ struct DeleteDocumentRequest {
   2: required string if_match (api.header="If-Match")
 }
 
+struct PermanentDeleteDocumentRequest {
+  1: required string document_id (api.path="document_id")
+  2: required string if_match (api.header="If-Match")
+  3: required string idempotency_key (api.header="Idempotency-Key")
+  4: required string confirmation (api.header="X-Confirm-Permanent-Delete")
+}
+
 struct MemberData {
   1: required PublicUserData user (api.body="user")
   2: required string role (api.body="role")
@@ -321,53 +328,6 @@ struct UpdateMemberRequest {
   2: required string user_id (api.path="user_id")
   3: required string if_match (api.header="If-Match")
   4: required string role (api.body="role")
-}
-
-struct VersionData {
-  1: required string id (api.body="id")
-  2: required string document_id (api.body="document_id")
-  3: required i64 sequence (api.body="sequence")
-  4: required string kind (api.body="kind")
-  5: optional string label (api.body="label")
-  6: required PublicUserData created_by (api.body="created_by")
-  7: required string created_at (api.body="created_at")
-}
-
-struct VersionDetailData {
-  1: required VersionData version (api.body="version")
-  2: required RichTextDocumentData content (api.body="content")
-  3: required string plain_text (api.body="plain_text")
-}
-
-struct VersionPageData {
-  1: required list<VersionData> items (api.body="items")
-  2: required PageInfoData page (api.body="page")
-  3: optional i64 head_sequence (api.body="head_sequence")
-}
-
-struct ListVersionsRequest {
-  1: required string document_id (api.path="document_id")
-  2: optional string cursor (api.query="cursor")
-  3: optional i32 limit (api.query="limit")
-}
-
-struct CreateVersionRequest {
-  1: required string document_id (api.path="document_id")
-  2: optional string label (api.body="label")
-  3: optional string idempotency_key (api.header="Idempotency-Key")
-  4: optional string state_vector (api.body="state_vector")
-}
-
-struct VersionPathRequest {
-  1: required string document_id (api.path="document_id")
-  2: required string version_id (api.path="version_id")
-}
-
-struct RestoreVersionRequest {
-  1: required string document_id (api.path="document_id")
-  2: required string version_id (api.path="version_id")
-  3: required i64 expected_sequence (api.body="expected_sequence")
-  4: optional string idempotency_key (api.header="Idempotency-Key")
 }
 
 struct PublicAttachmentRequest { 1: required string attachment_id (api.path="attachment_id") }
@@ -472,10 +432,7 @@ service GatewayService {
   MemberData AddMember(1: AddMemberRequest request) (api.post="/api/v1/studio/documents/:document_id/members")
   MemberData UpdateMember(1: UpdateMemberRequest request) (api.patch="/api/v1/studio/documents/:document_id/members/:user_id")
   EmptyResponse DeleteMember(1: MemberPathRequest request) (api.delete="/api/v1/studio/documents/:document_id/members/:user_id")
-  VersionPageData ListVersions(1: ListVersionsRequest request) (api.get="/api/v1/studio/documents/:document_id/versions")
-  VersionData CreateVersion(1: CreateVersionRequest request) (api.post="/api/v1/studio/documents/:document_id/versions")
-  VersionDetailData GetVersion(1: VersionPathRequest request) (api.get="/api/v1/studio/documents/:document_id/versions/:version_id")
-  VersionData RestoreVersion(1: RestoreVersionRequest request) (api.post="/api/v1/studio/documents/:document_id/versions/:version_id/restorations")
   DocumentPageData ListDeletedDocuments(1: ListDocumentsRequest request) (api.get="/api/v1/studio/trash")
   DocumentData RestoreDeletedDocument(1: DocumentIDRequest request) (api.post="/api/v1/studio/trash/:document_id/restore")
+  EmptyResponse PermanentlyDeleteDocument(1: PermanentDeleteDocumentRequest request) (api.delete="/api/v1/studio/trash/:document_id")
 }

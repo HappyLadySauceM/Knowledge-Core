@@ -119,6 +119,13 @@ var serviceMethods = map[string]kitex.MethodInfo{
 		false,
 		kitex.WithStreamingMode(kitex.StreamingNone),
 	),
+	"PurgeDeletedDocument": kitex.NewMethodInfo(
+		purgeDeletedDocumentHandler,
+		newKnowledgeServicePurgeDeletedDocumentArgs,
+		newKnowledgeServicePurgeDeletedDocumentResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
 	"RestoreDeletedDocument": kitex.NewMethodInfo(
 		restoreDeletedDocumentHandler,
 		newKnowledgeServiceRestoreDeletedDocumentArgs,
@@ -518,6 +525,24 @@ func newKnowledgeServiceDeleteDocumentResult() interface{} {
 	return knowledge.NewKnowledgeServiceDeleteDocumentResult()
 }
 
+func purgeDeletedDocumentHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*knowledge.KnowledgeServicePurgeDeletedDocumentArgs)
+
+	err := handler.(knowledge.KnowledgeService).PurgeDeletedDocument(ctx, realArg.Request)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+func newKnowledgeServicePurgeDeletedDocumentArgs() interface{} {
+	return knowledge.NewKnowledgeServicePurgeDeletedDocumentArgs()
+}
+
+func newKnowledgeServicePurgeDeletedDocumentResult() interface{} {
+	return knowledge.NewKnowledgeServicePurgeDeletedDocumentResult()
+}
+
 func restoreDeletedDocumentHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
 	realArg := arg.(*knowledge.KnowledgeServiceRestoreDeletedDocumentArgs)
 	realResult := result.(*knowledge.KnowledgeServiceRestoreDeletedDocumentResult)
@@ -838,6 +863,16 @@ func (p *kClient) DeleteDocument(ctx context.Context, request *knowledge.DeleteD
 		return
 	}
 	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) PurgeDeletedDocument(ctx context.Context, request *knowledge.PurgeDeletedDocumentRequest) (err error) {
+	var _args knowledge.KnowledgeServicePurgeDeletedDocumentArgs
+	_args.Request = request
+	var _result knowledge.KnowledgeServicePurgeDeletedDocumentResult
+	if err = p.c.Call(ctx, "PurgeDeletedDocument", &_args, &_result); err != nil {
+		return
+	}
+	return nil
 }
 
 func (p *kClient) RestoreDeletedDocument(ctx context.Context, request *knowledge.DocumentIDRequest) (r *knowledge.Document, err error) {

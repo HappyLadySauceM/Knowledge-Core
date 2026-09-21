@@ -182,7 +182,7 @@ func TestCORSRequiresExactConfiguredOrigin(t *testing.T) {
 	if got := string(request.Response.Header.Peek("Access-Control-Allow-Origin")); got != "https://example.com" {
 		t.Fatalf("Access-Control-Allow-Origin = %q", got)
 	}
-	const allowedHeaders = "Authorization, Content-Type, Idempotency-Key, If-Match, X-Request-ID, traceparent, tracestate"
+	const allowedHeaders = "Authorization, Content-Type, Idempotency-Key, If-Match, X-Confirm-Permanent-Delete, X-Request-ID, traceparent, tracestate"
 	if got := string(request.Response.Header.Peek("Access-Control-Allow-Headers")); got != allowedHeaders {
 		t.Fatalf("Access-Control-Allow-Headers = %q", got)
 	}

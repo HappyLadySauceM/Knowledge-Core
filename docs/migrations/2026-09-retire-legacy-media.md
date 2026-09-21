@@ -27,6 +27,11 @@ If the cluster still has pre-migration images, roll out the new Attachment, Know
 
 Publication returns `202` and normally converges within 30 seconds. A failed job is retried with bounded backoff and parked after eight attempts. The document exposes `publish_failed` or `unpublish_failed` and a stable error key. Publishing or unpublishing the document again creates a higher generation and is the supported operator redrive; Attachment ignores stale generations and treats identical commands idempotently.
 
+For a document already marked for permanent deletion, the purge worker may
+redrive a parked `clear` job for that document only. It never drops the job
+before Attachment acknowledges the clear, so a temporary Attachment outage
+cannot strand references when Knowledge is physically purged.
+
 For reconciliation, compare `knowledge.documents.publication_generation` with Attachment's internal `GetPublicationReferenceState` RPC. Never edit reference rows by hand. Issue the document publication command again so Knowledge creates a new durable intent.
 
 ## Compatibility result

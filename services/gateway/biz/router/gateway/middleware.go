@@ -148,16 +148,6 @@ func _publishdocumentMw() []app.HandlerFunc {
 	return nil
 }
 
-func _listversionsMw() []app.HandlerFunc {
-	// your code...
-	return nil
-}
-
-func _createversionMw() []app.HandlerFunc {
-	// your code...
-	return nil
-}
-
 func _membersMw() []app.HandlerFunc {
 	// your code...
 	return nil
@@ -169,26 +159,6 @@ func _deletememberMw() []app.HandlerFunc {
 }
 
 func _updatememberMw() []app.HandlerFunc {
-	// your code...
-	return nil
-}
-
-func _versionsMw() []app.HandlerFunc {
-	// your code...
-	return nil
-}
-
-func _getversionMw() []app.HandlerFunc {
-	// your code...
-	return nil
-}
-
-func _version_idMw() []app.HandlerFunc {
-	// your code...
-	return nil
-}
-
-func _restoreversionMw() []app.HandlerFunc {
 	// your code...
 	return nil
 }
@@ -350,4 +320,9 @@ func _getconfigurationdeliveryMw() []app.HandlerFunc {
 
 func _getemailverificationstatusMw() []app.HandlerFunc {
 	return []app.HandlerFunc{gatewaymiddleware.RequireAuthenticated(), gatewaymiddleware.ActionRateLimit()}
+}
+
+func _permanentlydeletedocumentMw() []app.HandlerFunc {
+	// your code...
+	return nil
 }

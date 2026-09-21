@@ -28,31 +28,10 @@ var serviceMethods = map[string]kitex.MethodInfo{
 		false,
 		kitex.WithStreamingMode(kitex.StreamingNone),
 	),
-	"ListVersions": kitex.NewMethodInfo(
-		listVersionsHandler,
-		newCollaborationServiceListVersionsArgs,
-		newCollaborationServiceListVersionsResult,
-		false,
-		kitex.WithStreamingMode(kitex.StreamingNone),
-	),
-	"CreateVersion": kitex.NewMethodInfo(
-		createVersionHandler,
-		newCollaborationServiceCreateVersionArgs,
-		newCollaborationServiceCreateVersionResult,
-		false,
-		kitex.WithStreamingMode(kitex.StreamingNone),
-	),
-	"GetVersion": kitex.NewMethodInfo(
-		getVersionHandler,
-		newCollaborationServiceGetVersionArgs,
-		newCollaborationServiceGetVersionResult,
-		false,
-		kitex.WithStreamingMode(kitex.StreamingNone),
-	),
-	"RestoreVersion": kitex.NewMethodInfo(
-		restoreVersionHandler,
-		newCollaborationServiceRestoreVersionArgs,
-		newCollaborationServiceRestoreVersionResult,
+	"CapturePublicationSnapshot": kitex.NewMethodInfo(
+		capturePublicationSnapshotHandler,
+		newCollaborationServiceCapturePublicationSnapshotArgs,
+		newCollaborationServiceCapturePublicationSnapshotResult,
 		false,
 		kitex.WithStreamingMode(kitex.StreamingNone),
 	),
@@ -165,76 +144,22 @@ func newCollaborationServiceCreateSessionResult() interface{} {
 	return collaboration.NewCollaborationServiceCreateSessionResult()
 }
 
-func listVersionsHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
-	realArg := arg.(*collaboration.CollaborationServiceListVersionsArgs)
-	realResult := result.(*collaboration.CollaborationServiceListVersionsResult)
-	success, err := handler.(collaboration.CollaborationService).ListVersions(ctx, realArg.Request)
+func capturePublicationSnapshotHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*collaboration.CollaborationServiceCapturePublicationSnapshotArgs)
+	realResult := result.(*collaboration.CollaborationServiceCapturePublicationSnapshotResult)
+	success, err := handler.(collaboration.CollaborationService).CapturePublicationSnapshot(ctx, realArg.Request)
 	if err != nil {
 		return err
 	}
 	realResult.Success = success
 	return nil
 }
-func newCollaborationServiceListVersionsArgs() interface{} {
-	return collaboration.NewCollaborationServiceListVersionsArgs()
+func newCollaborationServiceCapturePublicationSnapshotArgs() interface{} {
+	return collaboration.NewCollaborationServiceCapturePublicationSnapshotArgs()
 }
 
-func newCollaborationServiceListVersionsResult() interface{} {
-	return collaboration.NewCollaborationServiceListVersionsResult()
-}
-
-func createVersionHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
-	realArg := arg.(*collaboration.CollaborationServiceCreateVersionArgs)
-	realResult := result.(*collaboration.CollaborationServiceCreateVersionResult)
-	success, err := handler.(collaboration.CollaborationService).CreateVersion(ctx, realArg.Request)
-	if err != nil {
-		return err
-	}
-	realResult.Success = success
-	return nil
-}
-func newCollaborationServiceCreateVersionArgs() interface{} {
-	return collaboration.NewCollaborationServiceCreateVersionArgs()
-}
-
-func newCollaborationServiceCreateVersionResult() interface{} {
-	return collaboration.NewCollaborationServiceCreateVersionResult()
-}
-
-func getVersionHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
-	realArg := arg.(*collaboration.CollaborationServiceGetVersionArgs)
-	realResult := result.(*collaboration.CollaborationServiceGetVersionResult)
-	success, err := handler.(collaboration.CollaborationService).GetVersion(ctx, realArg.Request)
-	if err != nil {
-		return err
-	}
-	realResult.Success = success
-	return nil
-}
-func newCollaborationServiceGetVersionArgs() interface{} {
-	return collaboration.NewCollaborationServiceGetVersionArgs()
-}
-
-func newCollaborationServiceGetVersionResult() interface{} {
-	return collaboration.NewCollaborationServiceGetVersionResult()
-}
-
-func restoreVersionHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
-	realArg := arg.(*collaboration.CollaborationServiceRestoreVersionArgs)
-	realResult := result.(*collaboration.CollaborationServiceRestoreVersionResult)
-	success, err := handler.(collaboration.CollaborationService).RestoreVersion(ctx, realArg.Request)
-	if err != nil {
-		return err
-	}
-	realResult.Success = success
-	return nil
-}
-func newCollaborationServiceRestoreVersionArgs() interface{} {
-	return collaboration.NewCollaborationServiceRestoreVersionArgs()
-}
-
-func newCollaborationServiceRestoreVersionResult() interface{} {
-	return collaboration.NewCollaborationServiceRestoreVersionResult()
+func newCollaborationServiceCapturePublicationSnapshotResult() interface{} {
+	return collaboration.NewCollaborationServiceCapturePublicationSnapshotResult()
 }
 
 func purgeDocumentHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
@@ -285,41 +210,11 @@ func (p *kClient) CreateSession(ctx context.Context, request *collaboration.Crea
 	return _result.GetSuccess(), nil
 }
 
-func (p *kClient) ListVersions(ctx context.Context, request *collaboration.ListVersionsRequest) (r *collaboration.VersionPage, err error) {
-	var _args collaboration.CollaborationServiceListVersionsArgs
+func (p *kClient) CapturePublicationSnapshot(ctx context.Context, request *collaboration.CapturePublicationSnapshotRequest) (r *collaboration.PublicationSnapshot, err error) {
+	var _args collaboration.CollaborationServiceCapturePublicationSnapshotArgs
 	_args.Request = request
-	var _result collaboration.CollaborationServiceListVersionsResult
-	if err = p.c.Call(ctx, "ListVersions", &_args, &_result); err != nil {
-		return
-	}
-	return _result.GetSuccess(), nil
-}
-
-func (p *kClient) CreateVersion(ctx context.Context, request *collaboration.CreateVersionRequest) (r *collaboration.Version, err error) {
-	var _args collaboration.CollaborationServiceCreateVersionArgs
-	_args.Request = request
-	var _result collaboration.CollaborationServiceCreateVersionResult
-	if err = p.c.Call(ctx, "CreateVersion", &_args, &_result); err != nil {
-		return
-	}
-	return _result.GetSuccess(), nil
-}
-
-func (p *kClient) GetVersion(ctx context.Context, request *collaboration.GetVersionRequest) (r *collaboration.VersionDetail, err error) {
-	var _args collaboration.CollaborationServiceGetVersionArgs
-	_args.Request = request
-	var _result collaboration.CollaborationServiceGetVersionResult
-	if err = p.c.Call(ctx, "GetVersion", &_args, &_result); err != nil {
-		return
-	}
-	return _result.GetSuccess(), nil
-}
-
-func (p *kClient) RestoreVersion(ctx context.Context, request *collaboration.RestoreVersionRequest) (r *collaboration.Version, err error) {
-	var _args collaboration.CollaborationServiceRestoreVersionArgs
-	_args.Request = request
-	var _result collaboration.CollaborationServiceRestoreVersionResult
-	if err = p.c.Call(ctx, "RestoreVersion", &_args, &_result); err != nil {
+	var _result collaboration.CollaborationServiceCapturePublicationSnapshotResult
+	if err = p.c.Call(ctx, "CapturePublicationSnapshot", &_args, &_result); err != nil {
 		return
 	}
 	return _result.GetSuccess(), nil

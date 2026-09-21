@@ -1,6 +1,6 @@
 # Knowledge Core
 
-Knowledge Core 是一个支持文档元数据、权限、通用附件、实时协作与版本恢复的知识协作后端。仓库包含 Go module 与 Rust workspace；Collaboration 服务使用 Rust、Yrs 和标准 y-sync 协议。
+Knowledge Core 是一个支持文档元数据、权限、通用附件、实时协作与双状态发布的知识协作后端。仓库包含 Go module 与 Rust workspace；Collaboration 服务使用 Rust、Yrs 和标准 y-sync 协议。
 
 当前实现包含六个服务：
 
@@ -8,7 +8,7 @@ Knowledge Core 是一个支持文档元数据、权限、通用附件、实时�
 - Identity：用户注册、密码认证、邮箱验证、密码重置、账户锁定、Refresh Token 轮换、会话撤销、Ed25519 JWT 签发与用户状态复核。
 - Knowledge：文档元数据、成员权限、发布、回收站、投影、配额和 outbox；旧文档附件接口处于迁移兼容窗口。
 - Attachment：图片、音频、视频、文档、压缩包和普通文件的 multipart 上传、扫描、引用与生命周期。
-- Collaboration：Yrs/y-sync WebSocket、一次性 session ticket、持久化 update、快照、版本、恢复和多实例同步。
+- Collaboration：Yrs/y-sync WebSocket、一次性 session ticket、持久化实时编辑稿、快照捕获和多实例同步。
 - Platform：站点、邮件和 AI 运行时配置，负责修订控制、敏感值加密、审计与可靠变更事件发布。
 
 详细架构和运行时契约见 [docs/framework-design.md](docs/framework-design.md)，编码约束见 [AGENTS.md](AGENTS.md)。
@@ -28,10 +28,9 @@ Knowledge Core 是一个支持文档元数据、权限、通用附件、实时�
 | 管理员配置 | `/api/v1/admin/configuration/:namespace` | 管理员读取/写入 `site`、`email`、`ai`；使用强 ETag 和幂等键 |
 | Studio 文档 | `/api/v1/studio/documents` | 列表、创建、读取、更新、删除、发布和取消发布 |
 | 成员 | `/api/v1/studio/documents/:document_id/members` | viewer/editor 成员管理 |
-| 版本 | `/api/v1/studio/documents/:document_id/versions` | 手工版本、详情和恢复 |
 | 协作会话 | `POST /api/v1/studio/documents/:document_id/collaboration-sessions` | 创建短期、单次使用的 WebSocket ticket |
 | 附件 | `/api/v1/studio/documents/:document_id/attachments` | 预签名上传、完成扫描和删除 |
-| 回收站 | `/api/v1/studio/trash` | 删除文档列表与恢复 |
+| 回收站 | `/api/v1/studio/trash` | 删除文档列表、恢复与带二次确认的永久删除 |
 | 实时协作 | `ws://localhost:8091/v1/documents/:document_id` | y-sync、awareness、权限复核、只读控制和稳定关闭码；Higress 按完整 URI 做通常同文档同实例的 hash，实例变化时由 PostgreSQL/JetStream 收敛 |
 
 完整 HTTP 契约源为 [idl/http/v1/gateway.thrift](idl/http/v1/gateway.thrift)。
@@ -103,7 +102,7 @@ flowchart LR
     Gateway --> Redis
 ```
 
-Knowledge 不保存 Yjs update、快照或版本；这些数据属于 Collaboration。Collaboration 不直连 Identity 或 Knowledge 数据库，而是通过生成的 Knowledge Thrift RPC 取得文档权限并提交投影。
+Knowledge 保存最近一次公开快照；Collaboration 只保存实时编辑稿、update 与压缩快照。编辑稿自动保存不会改动公开页，发布/更新时 Gateway 先从 Collaboration 捕获已提交 CRDT 状态，再让 Knowledge 替换公开快照。取消发布仅撤下快照，不删除编辑稿；永久删除先立即隐藏，再由可重试 worker 清理两边状态。Collaboration 不直连 Identity 或 Knowledge 数据库，而是通过生成的 Knowledge Thrift RPC 取得文档权限并提交投影。
 
 ## 环境要求
 

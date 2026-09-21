@@ -28,10 +28,11 @@ type DocumentService interface {
 	Create(context.Context, knowledgelogic.CreateDocumentInput) (*domain.Document, error)
 	Get(context.Context, string, int64) (*domain.Document, error)
 	Update(context.Context, knowledgelogic.UpdateDocumentInput) (*domain.Document, error)
-	SetPublication(context.Context, string, int64, int64, bool) (*domain.Document, error)
+	SetPublication(context.Context, string, int64, int64, bool, string) (*domain.Document, error)
 	PublishSnapshot(context.Context, string, int64, int64, knowledgelogic.PublishSnapshotInput) (*domain.Document, error)
 	Delete(context.Context, string, int64, int64) (*domain.Document, error)
 	Restore(context.Context, string, int64) (*domain.Document, error)
+	PurgeDeleted(context.Context, string, int64, int64, string) error
 	IsMediaPublished(context.Context, string) (bool, error)
 }
 
@@ -213,7 +214,7 @@ func (h *Handler) SetPublication(ctx context.Context, request *knowledgev1.SetPu
 	if err != nil {
 		return nil, err
 	}
-	document, serviceErr := h.documents.SetPublication(ctx, request.DocumentId, actorID, request.ExpectedRevision, request.Published)
+	document, serviceErr := h.documents.SetPublication(ctx, request.DocumentId, actorID, request.ExpectedRevision, request.Published, stringValue(request.IdempotencyKey))
 	if serviceErr != nil {
 		return nil, h.transportError(ctx, "set_publication_failed", serviceErr)
 	}
@@ -231,7 +232,7 @@ func (h *Handler) PublishSnapshot(ctx context.Context, request *knowledgev1.Publ
 		return nil, h.transportInvalidInput(ctx, "publish_snapshot_failed", parseErr)
 	}
 	document, serviceErr := h.documents.PublishSnapshot(ctx, request.DocumentId, actorID, request.ExpectedMetadataRevision, knowledgelogic.PublishSnapshotInput{
-		VersionID: request.VersionId, VersionSequence: request.VersionSequence, Title: request.Title, Summary: request.Summary,
+		Title: request.Title, Summary: request.Summary,
 		Slug: request.Slug, Language: request.Language, Tags: append([]string(nil), request.Tags...), Content: content,
 		PlainText: request.PlainText, IdempotencyKey: stringValue(request.IdempotencyKey),
 	})
@@ -332,6 +333,18 @@ func (h *Handler) RestoreDeletedDocument(ctx context.Context, request *knowledge
 		return nil, h.transportError(ctx, "restore_document_failed", serviceErr)
 	}
 	return h.documentResult(ctx, "restore_document_failed", document)
+}
+
+func (h *Handler) PurgeDeletedDocument(ctx context.Context, request *knowledgev1.PurgeDeletedDocumentRequest) error {
+	ctx = metadata.EnsureRequestID(ctx)
+	actorID, err := h.requireActor(ctx, request != nil)
+	if err != nil {
+		return err
+	}
+	if serviceErr := h.documents.PurgeDeleted(ctx, request.DocumentId, actorID, request.ExpectedRevision, stringValue(request.IdempotencyKey)); serviceErr != nil {
+		return h.transportError(ctx, "purge_deleted_document_failed", serviceErr)
+	}
+	return nil
 }
 
 func (h *Handler) ListDeletedDocuments(ctx context.Context, request *knowledgev1.ListDocumentsRequest) (*knowledgev1.DocumentPage, error) {

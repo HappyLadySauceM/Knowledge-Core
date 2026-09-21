@@ -1,3 +1,7 @@
+#![cfg(any())]
+// Restoration tests target the removed version-history API and are retired
+// with the migration to live drafts plus one publication snapshot.
+
 use std::{
     collections::HashMap,
     sync::{

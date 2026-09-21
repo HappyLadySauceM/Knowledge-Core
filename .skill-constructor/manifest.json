@@ -3,11 +3,11 @@
   "facts": [
     {
       "id": "architecture.design",
-      "revision": 175,
+      "revision": 183,
       "section": "architecture",
       "sources": [
         {
-          "detail": "evidence-sha256:e73402989739a97e69a9668bb05bd9ed6e4dc6f35d81bf011c66a5e4f18e1ee2",
+          "detail": "evidence-sha256:0ab1e9fe862a0d1a9ce514baccef02cead73a79433a5d2a9a46db6b82b015ee2",
           "kind": "documented",
           "reference": "README.md#knowledge-core"
         },
@@ -16,12 +16,12 @@
           "reference": "docs/framework-design.md"
         },
         {
-          "detail": "evidence-sha256:e73402989739a97e69a9668bb05bd9ed6e4dc6f35d81bf011c66a5e4f18e1ee2",
+          "detail": "evidence-sha256:0ab1e9fe862a0d1a9ce514baccef02cead73a79433a5d2a9a46db6b82b015ee2",
           "kind": "documented",
           "reference": "docs/framework-design.md#9"
         },
         {
-          "detail": "evidence-sha256:e73402989739a97e69a9668bb05bd9ed6e4dc6f35d81bf011c66a5e4f18e1ee2",
+          "detail": "evidence-sha256:0ab1e9fe862a0d1a9ce514baccef02cead73a79433a5d2a9a46db6b82b015ee2",
           "kind": "documented",
           "reference": "docs/framework-design.md#knowledge-core"
         },
@@ -30,7 +30,7 @@
           "reference": "docs/platform-configuration.md#\u914d\u7f6e\u540c\u6b65"
         },
         {
-          "detail": "evidence-sha256:e73402989739a97e69a9668bb05bd9ed6e4dc6f35d81bf011c66a5e4f18e1ee2",
+          "detail": "evidence-sha256:0ab1e9fe862a0d1a9ce514baccef02cead73a79433a5d2a9a46db6b82b015ee2",
           "kind": "documented",
           "reference": "docs/rust-collaboration-design.md#rust-collaboration"
         },
@@ -48,7 +48,7 @@
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-09-10T06:56:39Z",
+      "updatedAt": "2026-09-21T05:05:47Z",
       "value": {
         "containers": [
           {
@@ -668,21 +668,21 @@
     },
     {
       "id": "security.secrets-and-config",
-      "revision": 179,
+      "revision": 183,
       "section": "conventions",
       "sources": [
         {
-          "detail": "evidence-sha256:284e8a63df399a1222a9445114d9c87b3750962333f6a795a9370c788a0ab964",
+          "detail": "evidence-sha256:2bfe2ca25eb0aa3af5d2efb49efaa1aa6bfecc90e006f4a5348206df51b37f87",
           "kind": "documented",
           "reference": "README.md#compose"
         },
         {
-          "detail": "evidence-sha256:284e8a63df399a1222a9445114d9c87b3750962333f6a795a9370c788a0ab964",
+          "detail": "evidence-sha256:2bfe2ca25eb0aa3af5d2efb49efaa1aa6bfecc90e006f4a5348206df51b37f87",
           "kind": "documented",
           "reference": "README.md#k3s-gitops"
         },
         {
-          "detail": "evidence-sha256:284e8a63df399a1222a9445114d9c87b3750962333f6a795a9370c788a0ab964",
+          "detail": "evidence-sha256:2bfe2ca25eb0aa3af5d2efb49efaa1aa6bfecc90e006f4a5348206df51b37f87",
           "kind": "documented",
           "reference": "README.md#section"
         },
@@ -692,7 +692,7 @@
           "reference": "deploy/base/README.md#application-deployment-base"
         },
         {
-          "detail": "evidence-sha256:284e8a63df399a1222a9445114d9c87b3750962333f6a795a9370c788a0ab964",
+          "detail": "evidence-sha256:2bfe2ca25eb0aa3af5d2efb49efaa1aa6bfecc90e006f4a5348206df51b37f87",
           "kind": "documented",
           "reference": "deploy/nacos/README.md#nacos-application-configuration"
         },
@@ -702,27 +702,27 @@
           "reference": "deploy/overlay/dev/README.md#development-overlay"
         },
         {
-          "detail": "evidence-sha256:284e8a63df399a1222a9445114d9c87b3750962333f6a795a9370c788a0ab964",
+          "detail": "evidence-sha256:2bfe2ca25eb0aa3af5d2efb49efaa1aa6bfecc90e006f4a5348206df51b37f87",
           "kind": "documented",
           "reference": "docs/framework-design.md#11"
         },
         {
-          "detail": "evidence-sha256:284e8a63df399a1222a9445114d9c87b3750962333f6a795a9370c788a0ab964",
+          "detail": "evidence-sha256:2bfe2ca25eb0aa3af5d2efb49efaa1aa6bfecc90e006f4a5348206df51b37f87",
           "kind": "documented",
           "reference": "docs/framework-design.md#12"
         },
         {
-          "detail": "evidence-sha256:284e8a63df399a1222a9445114d9c87b3750962333f6a795a9370c788a0ab964",
+          "detail": "evidence-sha256:2bfe2ca25eb0aa3af5d2efb49efaa1aa6bfecc90e006f4a5348206df51b37f87",
           "kind": "documented",
           "reference": "docs/framework-design.md#8-secret-tls"
         },
         {
-          "detail": "evidence-sha256:284e8a63df399a1222a9445114d9c87b3750962333f6a795a9370c788a0ab964",
+          "detail": "evidence-sha256:2bfe2ca25eb0aa3af5d2efb49efaa1aa6bfecc90e006f4a5348206df51b37f87",
           "kind": "documented",
           "reference": "docs/migrations/2026-08-auth-productionization.md#section"
         },
         {
-          "detail": "evidence-sha256:284e8a63df399a1222a9445114d9c87b3750962333f6a795a9370c788a0ab964",
+          "detail": "evidence-sha256:2bfe2ca25eb0aa3af5d2efb49efaa1aa6bfecc90e006f4a5348206df51b37f87",
           "kind": "documented",
           "reference": "docs/migrations/2026-08-platform-configuration.md#platform-configuration-migration"
         },
@@ -732,22 +732,22 @@
           "reference": "docs/migrations/2026-09-retire-legacy-media.md#required-rollout-order"
         },
         {
-          "detail": "evidence-sha256:284e8a63df399a1222a9445114d9c87b3750962333f6a795a9370c788a0ab964",
+          "detail": "evidence-sha256:2bfe2ca25eb0aa3af5d2efb49efaa1aa6bfecc90e006f4a5348206df51b37f87",
           "kind": "documented",
           "reference": "docs/platform-configuration.md#section"
         },
         {
-          "detail": "evidence-sha256:284e8a63df399a1222a9445114d9c87b3750962333f6a795a9370c788a0ab964",
+          "detail": "evidence-sha256:2bfe2ca25eb0aa3af5d2efb49efaa1aa6bfecc90e006f4a5348206df51b37f87",
           "kind": "documented",
           "reference": "docs/rust-collaboration-design.md#2-1"
         },
         {
-          "detail": "evidence-sha256:284e8a63df399a1222a9445114d9c87b3750962333f6a795a9370c788a0ab964",
+          "detail": "evidence-sha256:2bfe2ca25eb0aa3af5d2efb49efaa1aa6bfecc90e006f4a5348206df51b37f87",
           "kind": "documented",
           "reference": "docs/rust-collaboration-design.md#7"
         },
         {
-          "detail": "evidence-sha256:284e8a63df399a1222a9445114d9c87b3750962333f6a795a9370c788a0ab964",
+          "detail": "evidence-sha256:2bfe2ca25eb0aa3af5d2efb49efaa1aa6bfecc90e006f4a5348206df51b37f87",
           "kind": "documented",
           "reference": "docs/trace-architecture.md#7-collector-tempo"
         },
@@ -765,7 +765,7 @@
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-09-10T09:14:25Z",
+      "updatedAt": "2026-09-21T05:05:47Z",
       "value": "Secrets may be injected only from environment variables, Kubernetes Secrets, or SOPS-encrypted GitOps manifests. Sensitive values must not be stored in plaintext in source, configuration, logs, metrics, trace spans, or release metadata."
     },
     {
@@ -1113,11 +1113,11 @@
     "profile": "generic",
     "slug": "knowledge-core"
   },
-  "revision": 180,
+  "revision": 185,
   "scan": {
-    "fingerprint": "167324466721b94c821bcf71c74c5dfdce63c1f78bfc2e2a4fdcc362dc24ee81",
-    "inventoryCount": 463
+    "fingerprint": "13b512e3b7a8da45ea3e2d448dc60c31f86dcabac534807e88273e60bbdb2863",
+    "inventoryCount": 472
   },
   "schemaVersion": 3,
-  "updatedAt": "2026-09-11T04:51:07Z"
+  "updatedAt": "2026-09-21T05:50:26Z"
 }

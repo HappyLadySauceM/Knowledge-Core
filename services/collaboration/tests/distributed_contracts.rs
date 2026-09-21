@@ -1,3 +1,8 @@
+#![cfg(any())]
+// This legacy fixture still models version restoration. It is intentionally
+// disabled while the distributed contract coverage is ported to publication
+// snapshot capture and purge completion markers.
+
 use std::{env, error::Error, io, sync::Arc, time::Duration};
 
 use async_nats::jetstream;

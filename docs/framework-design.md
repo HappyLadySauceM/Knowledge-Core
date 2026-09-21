@@ -11,9 +11,9 @@ Knowledge Core 是一个包含 Go module 与 Rust workspace 的 Monorepo。公�
 当前实现覆盖：
 
 - 用户注册、密码登录、账户锁定、Ed25519 access token 和用户状态复核。
-- 文档元数据、成员权限、发布、软删除、恢复、延迟清理和公开投影。
+- 文档元数据、成员权限、双状态发布、软删除、永久删除和公开快照。
 - 附件预签名上传、异步 ClamAV 扫描、短期下载地址和对象清理。
-- Yjs update 持久化、快照压缩、手工/自动版本、恢复、多实例同步和权限失效。
+- Yjs update 持久化、快照压缩、公开快照捕获、多实例同步和权限失效。
 - Gateway 的严格输入边界、安全中间件、限流、稳定错误映射和上游编排。
 - 管理员实时写入站点、邮件和 AI 配置；Platform 对修订、密文、审计和可靠变更事件负责。
 
@@ -33,15 +33,15 @@ Knowledge Core 是一个包含 Go module 与 Rust workspace 的 Monorepo。公�
 | Identity | RPC `:8881`，admin `:8081` | PostgreSQL `identity` schema | PostgreSQL、Redis |
 | Knowledge | RPC `:8882`，admin `:8083` | PostgreSQL `knowledge` schema 中的文档、成员、公开投影和 outbox；文档附件进入兼容迁移窗口 | PostgreSQL、NATS JetStream、Identity RPC、Collaboration RPC、Attachment RPC |
 | Attachment | RPC `:8884`，admin `:8085` | PostgreSQL `attachment` schema 中的通用附件、multipart 状态、扫描任务和引用 | PostgreSQL、MinIO、ClamAV |
-| Collaboration | WebSocket `:8091`，RPC `:8883`，admin `:8084` | PostgreSQL `collaboration` schema 中的 Yjs update、snapshot、version、projection job 和 outbox | PostgreSQL、Redis、NATS JetStream、Knowledge RPC |
+| Collaboration | WebSocket `:8091`，RPC `:8883`，admin `:8084` | PostgreSQL `collaboration` schema 中的实时 Yjs update、snapshot、purge marker、projection job 和 outbox | PostgreSQL、Redis、NATS JetStream、Knowledge RPC |
 | Platform | RPC `:8885`，admin `:8086` | PostgreSQL `platform` schema 中的配置快照、审计、幂等记录和 outbox | PostgreSQL、NATS JetStream |
 
 所有权规则如下：
 
 - Gateway 是 HTTP edge，不持久化领域数据，不直连 Identity、Knowledge 或 Collaboration 的数据库。
 - Identity 只拥有用户、凭据状态和 token version。其他服务通过 Identity RPC 获取当前用户或解析成员用户名。
-- Knowledge 拥有文档元数据、成员、公开投影、幂等记录和 outbox，不保存 Yjs 二进制状态或版本；图片、视频、文件和压缩包由 Attachment 统一拥有，旧文档附件接口仅保留兼容窗口。
-- Collaboration 拥有协作状态和版本，不复制文档权限规则。创建 session 时通过 Knowledge RPC 复核访问级别；短期单次 ticket 被消费后建立有明确到期时间的连接。
+- Knowledge 拥有文档元数据、成员、最近一次公开快照、幂等记录和 outbox，不保存 Yjs 二进制编辑状态；图片、视频、文件和压缩包由 Attachment 统一拥有，旧文档附件接口仅保留兼容窗口。
+- Collaboration 拥有实时协作状态，不复制文档权限规则。创建 session 时通过 Knowledge RPC 复核访问级别；短期单次 ticket 被消费后建立有明确到期时间的连接。
 - Platform 拥有网页管理员可写的业务配置。Gateway 只提供 HTTP façade；其他服务不得直写 `platform` schema。Nacos 继续拥有进程启动和基础设施连接配置，两类配置不互相覆盖。
 - `pkg/` 只承载跨服务公共能力，禁止导入 `services/*`。
 
@@ -73,7 +73,7 @@ services/collaboration/
   src/websocket.rs    Axum WebSocket、y-sync 与 awareness
   src/rpc/            Volo server/client、静态 DNS 发现与 mTLS
   src/storage/        SQLx PostgreSQL repository 与 migration
-  src/worker.rs       投影、快照、自动版本、outbox 与失效订阅
+  src/worker.rs       投影、快照压缩、outbox 与失效订阅
   interop/            最小 Node/Yjs/y-prosemirror 互操作 fixture
   tools/rust-codegen/ Collaboration Thrift/Volo 生成工具
 
@@ -113,7 +113,7 @@ Platform
 Collaboration
   SQLx migration + Redis ticket store + NATS JetStream
   -> Knowledge Volo client (static host:port) + document actors
-  -> Axum WebSocket/admin + Volo RPC + version/projection/outbox workers
+  -> Axum WebSocket/admin + Volo RPC + projection/outbox workers
 ```
 
 已打开资源在成功创建后立即注册 cleanup；注册失败时同步关闭刚创建的资源。请求路径不使用全局 Viper、全局连接或隐藏式依赖注入。
@@ -130,7 +130,8 @@ HTTP 契约源是 `idl/http/v1/gateway.thrift`。Gateway 当前公开：
 | 公开附件 | `GET /api/v1/attachments/:attachment_id/content` |
 | Studio 文档 | `/api/v1/studio/documents` 下的列表、创建、读取、更新、删除、发布和取消发布 |
 | 成员 | `/api/v1/studio/documents/:document_id/members` |
-| 版本 | `/api/v1/studio/documents/:document_id/versions` |
+| 发布 | `PUT /api/v1/studio/documents/:document_id/publication`（发布/更新）与 `DELETE`（取消发布） |
+| 永久删除 | `DELETE /api/v1/studio/trash/:document_id`（If-Match + Idempotency-Key + X-Confirm-Permanent-Delete=true，异步清理） |
 | 协作会话 | `POST /api/v1/studio/documents/:document_id/collaboration-sessions` |
 | 附件 | `/api/v1/studio/documents/:document_id/attachments` |
 | 回收站 | `/api/v1/studio/trash` |
@@ -143,7 +144,7 @@ Gateway 的 HTTP 规则：
 - 错误响应使用 RFC 9457 `application/problem+json`，包含稳定 `code`、`key`、`request_id`，可用时包含 `trace_id`。未知内部错误不暴露 cause、SQL、地址或堆栈。Gateway 从上游 Kitex BizStatus extras 重建 catalog，按 kind 映射 HTTP 状态，不把 `KindInternal` 改写成 unavailable；仅 `identity.account_locked` / `knowledge.gone` / 各服务 `precondition_failed` 覆盖为 423/410/412。无 BizStatus 的熔断或拨号失败映射为 `gateway.dependency_unavailable`（503），传输超时映射为 `gateway.upstream_timeout`（504），extras 非法映射为 `gateway.invalid_upstream_response`（502）。
 - Studio 路由和 `/users/me` 必须认证；公开文档允许匿名读取。文档 `access` 为 `none|viewer|editor|owner`：匿名或与文档无成员关系时为 `none`，携带有效 token 时返回调用方可见的访问上下文。
 - 文档和成员写操作使用强 ETag，格式为 `"<revision>"`；调用方必须把读取到的值原样放入 `If-Match`。
-- 支持幂等的创建/恢复操作使用 `Idempotency-Key`；分页 cursor 是 opaque token。
+- 支持幂等的创建、发布/更新、取消发布和永久删除操作使用 `Idempotency-Key`；分页 cursor 是 opaque token。
 - 附件下载返回 `303 See Other` 和短期预签名 `Location`，不代理对象正文。通用附件列表按 `(created_at, id)` 降序使用不透明稳定游标分页；响应中的可选 `page` 字段用于兼容旧客户端，当前服务始终返回 `next_cursor` 与 `has_more`。
 - 响应中的公开 HTTP/WebSocket URL 只来自已校验配置，不信任请求 `Host`。
 
@@ -167,7 +168,7 @@ Knowledge RPC 除文档、成员和附件用例外，还提供：
 - `Ping`：返回 Knowledge 本进程 readiness（PostgreSQL、NATS、S3、ClamAV），不探活 Identity 或 Collaboration。
 - `Live`：只证明 Knowledge RPC 进程存活，不读取 readiness。Collaboration 不再把它当作启动或 supervisor 的 Ready 门闩。
 
-Collaboration RPC 提供 `Ping`、`CreateSession`、版本列表/创建/详情/恢复和 `PurgeDocument`。除 `Ping` 外的六个业务 RPC 都先检查完整应用 readiness；not-ready 时统一返回 `40007 / collaboration.unavailable`，且不会调用 Knowledge、ticket、store 或 actor。Gateway 通过 `CreateSession` 获得短期 ticket；Knowledge 的清理 worker 通过 `PurgeDocument` 删除协作数据。生产 RPC 双向验证 mTLS，并通过 TTHeader 传播 deadline、request ID、W3C trace，以及确实需要用户上下文的 access-token metadata；不再使用应用层 service-token，token 永不进入日志或 telemetry。
+Collaboration RPC 提供 `Ping`、`CreateSession`、`CapturePublicationSnapshot` 和 `PurgeDocument`。除 `Ping` 外的三个业务 RPC 都先检查完整应用 readiness；not-ready 时统一返回 `40007 / collaboration.unavailable`，且不会调用 Knowledge、ticket、store 或 actor。Gateway 通过 `CreateSession` 获得短期 ticket；发布/更新先捕获已提交 CRDT 状态，Knowledge 保存最近一次公开快照；Knowledge 的清理 worker 通过 `PurgeDocument` 幂等清理协作状态。生产 RPC 双向验证 mTLS，并通过 TTHeader 传播 deadline、request ID、W3C trace，以及确实需要用户上下文的 access-token metadata；不再使用应用层 service-token，token 永不进入日志或 telemetry。
 
 内部 RPC 客户端使用静态 `host:port`，由系统 DNS 解析：k3s 使用 ClusterIP Service FQDN，Compose/CI 使用 Docker 服务名。Go Kitex 通过 `WithHostPorts` 拨号；Collaboration 的 Volo Knowledge 客户端用 `StaticDiscover` 在每次 discover 时解析同一地址，非法 `host:port`、DNS 失败、空结果或超时均 fail closed，且不 watch Kubernetes EndpointSlice。进程不再向注册中心报名。Collaboration RPC 与 WebSocket 都走共享 ClusterIP Service；生产环境拒绝 `localhost` 与环回拨号地址。
 
@@ -204,23 +205,23 @@ AutoMigrate 只适用于当前增量阶段，不替代破坏性 schema 演进的
 
 ### 7.2 Knowledge
 
-Knowledge 使用带版本记录的显式 SQL migration。`knowledge` schema 包含 documents、slug aliases、members、projections、attachments、scan jobs、outbox 和 idempotency keys。
+Knowledge 使用带版本记录的显式 SQL migration。`knowledge` schema 包含 documents、slug aliases、members、projections、公开快照、attachments、scan jobs、outbox 和 idempotency keys。
 
 - metadata、content 和 permission 使用独立 revision。
 - 写操作通过 revision/`If-Match` 提供乐观并发控制。
 - 文档子串搜索先用 `UNION` 从 metadata 与 projection trigram GIN 索引生成去重 document ID，再应用权限、状态、稳定游标排序和最终宽行读取。
-- 文档软删除后进入保留期；worker 依次清理 Collaboration 数据、S3 对象和 Knowledge 记录。
+- 文档软删除后进入回收站；永久删除请求会立即隐藏条目，worker 先完成附件引用清理，再依次幂等清理 Collaboration 状态、公开快照和 Knowledge 记录。若清理任务已 parked，永久删除 worker 只对该文档受控 redrive，避免级联删除清理载荷。
 - outbox 与领域变更同一事务保存受限 W3C propagation headers；发布失败最多退避 8 次，随后进入 parked 状态，保留 message ID 供人工 redrive。消费者按事件 ID/业务 revision 幂等处理。
 - 领域变更与 outbox 在同一数据库事务内落地，并同事务 `NOTIFY knowledge_workers`（payload `outbox` / `attachment`）唤醒后台 worker；`workers.poll_interval`（默认 30s）只做到期重试、过期上传、purge/maintenance 与 LISTEN 断线补偿。worker 使用 JetStream server PubAck 后才标记 published，并以 outbox message ID 作为 deduplication ID；stream 缺失或发布失败会记录 retry，不能把 Core NATS 接收当成持久化成功。消费者仍必须按事件 ID/业务 revision 幂等处理。
 - 附件创建在文档 row lock 之外还按 uploader 获取 transaction advisory lock，使跨文档的用户配额检查与插入串行化；完成上传后进入按 next-attempt 稳定排序的扫描队列。ClamAV 不可用时有界退避，污染或类型不匹配对象进入 rejected 并异步删除，只有 ready 对象可下载。
 
 ### 7.3 Collaboration
 
-Collaboration 使用按版本有序执行并逐项校验 checksum 的显式 SQLx schema migration，保存 document heads、updates、snapshots、versions、projection jobs、idempotency keys 和 outbox。首次 migration 遇到未受本 migration 历史管理的旧 Node schema 时拒绝启动，不能误记为成功；已有 schema 只追加尚未记录的新版本，已应用 migration 的名称或内容漂移会拒绝启动。
+Collaboration 使用按版本有序执行并逐项校验 checksum 的显式 SQLx schema migration，保存 document heads、updates、snapshots、purge marker、projection jobs、idempotency keys 和 outbox。历史迁移保持不可变，向前迁移删除版本表、自动版本水位和版本耦合字段；首次 migration 遇到未受本 migration 历史管理的旧 Node schema 时拒绝启动，不能误记为成功；已有 schema 只追加尚未记录的新版本，已应用 migration 的名称或内容漂移会拒绝启动。
 
 - update sequence 单调递增，快照与 compaction 不改变可恢复语义。
 - compaction 候选通过单个 lateral aggregate 同时计算待压缩 update 数量和字节数，选中后仍在 document row lock 下重新检查阈值。
-- 手工/自动版本保存不可变 Yjs state；恢复要求 expected sequence，在 actor 内生成恢复 update，并在单一事务中提交 baseline/update/version/head/projection/idempotency/outbox，避免覆盖并发更新或产生部分状态。
+- 编辑稿由 Collaboration 持续自动保存；发布/更新通过 state vector 捕获已提交 CRDT 状态，公开快照由 Knowledge 单独保存。取消发布不推进权限修订，不发送权限失效事件；成员变更和删除仍会失效协作权限。
 - 投影 worker 把当前 Yjs 文档转换为受限 rich-text JSON 和 plain text，再调用 Knowledge；失败按有界重试处理。
 - Collaboration outbox 与事件 headers 同事务保存 trace context，发布时透传 W3C headers；JetStream delivery 超过 8 次会停车并保持幂等 event key，避免循环/重试放大 span 数量。
 - `knowledge.permissions.changed` 和 `collaboration.documents.invalidated` 只用于失效通知，不替代 PostgreSQL 持久化。
@@ -337,13 +338,13 @@ ApplicationSet 由 GitOps 仓库声明。平台组件与六个应用服务各自
 
 ### 当前不兼容基线的迁移记录
 
-本次契约重构已明确批准不保留向后兼容层。相对基线 `0372116`，compat guard 预期失败，主要变化是认证路由改为 users/sessions 资源模型、成功响应移除 envelope、文档 ID 改为 UUID、Unix 秒时间改为 RFC3339、通用 document operation/status 方法改为明确的 CRUD/publication/member/version/attachment 端点。
+本次契约重构已明确批准不保留向后兼容层。相对基线 `0372116`，compat guard 预期失败，主要变化是认证路由改为 users/sessions 资源模型、成功响应移除 envelope、文档 ID 改为 UUID、Unix 秒时间改为 RFC3339、通用 document operation/status 方法改为明确的 CRUD/publication/member/attachment 端点；历史版本 HTTP/RPC 入口已移除。
 
 迁移时必须重新生成所有 HTTP/RPC client，并让 Gateway、Identity、Knowledge、Collaboration 与调用方在同一发布窗口切换；旧 client 不得继续调用新服务。存在旧契约数据的环境应在切换前完成一次性数据转换或清空非生产数据，不做 dual-read、dual-write 或兼容代理。发布验证必须使用本文件第 4、5 节的新契约和强 ETag 语义。
 
 ## 12. 当前验证边界
 
-当前自动化测试覆盖领域校验、用例、transport 映射、严格 HTTP 输入、JWT、配置、资源关闭，以及 Collaboration 的 commit-before-broadcast、actor 恢复、重复 update、版本恢复、投影/outbox、真实 PostgreSQL/Redis/NATS、双向 Kitex/Volo mTLS/metadata、Yjs fixture 和多实例 JetStream fanout/redelivery。仍需明确保留以下边界：
+当前自动化测试覆盖领域校验、用例、transport 映射、严格 HTTP 输入、JWT、配置、资源关闭，以及 Collaboration 的 commit-before-broadcast、actor 恢复、重复 update、公开快照捕获、投影/outbox、真实 PostgreSQL/Redis/NATS、双向 Kitex/Volo mTLS/metadata、Yjs fixture 和多实例 JetStream fanout/redelivery。仍需明确保留以下边界：
 
 - Identity repository/migration 没有针对真实 PostgreSQL 的自动化集成测试。
 - Knowledge repository/migration、事务、约束和 SQL cursor 没有针对真实 PostgreSQL 的自动化集成测试。

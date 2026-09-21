@@ -8,11 +8,10 @@ use crate::{
     domain::RequestContext,
     error::{ErrorCode, ServiceError},
     generated::collaboration::{
-        CollaborationServiceCreateSessionResultSend, CollaborationServiceCreateVersionResultSend,
-        CollaborationServiceGetVersionResultSend, CollaborationServiceListVersionsResultSend,
-        CollaborationServicePingResultSend, CollaborationServicePurgeDocumentResultSend,
-        CollaborationServiceRequestRecv, CollaborationServiceResponseSend,
-        CollaborationServiceRestoreVersionResultSend,
+        CollaborationServiceCapturePublicationSnapshotResultSend,
+        CollaborationServiceCreateSessionResultSend, CollaborationServicePingResultSend,
+        CollaborationServicePurgeDocumentResultSend, CollaborationServiceRequestRecv,
+        CollaborationServiceResponseSend,
     },
 };
 
@@ -75,24 +74,9 @@ fn default_response(request: &CollaborationServiceRequestRecv) -> CollaborationS
                 CollaborationServiceCreateSessionResultSend::default(),
             )
         }
-        CollaborationServiceRequestRecv::ListVersions(_) => {
-            CollaborationServiceResponseSend::ListVersions(
-                CollaborationServiceListVersionsResultSend::default(),
-            )
-        }
-        CollaborationServiceRequestRecv::CreateVersion(_) => {
-            CollaborationServiceResponseSend::CreateVersion(
-                CollaborationServiceCreateVersionResultSend::default(),
-            )
-        }
-        CollaborationServiceRequestRecv::GetVersion(_) => {
-            CollaborationServiceResponseSend::GetVersion(
-                CollaborationServiceGetVersionResultSend::default(),
-            )
-        }
-        CollaborationServiceRequestRecv::RestoreVersion(_) => {
-            CollaborationServiceResponseSend::RestoreVersion(
-                CollaborationServiceRestoreVersionResultSend::default(),
+        CollaborationServiceRequestRecv::CapturePublicationSnapshot(_) => {
+            CollaborationServiceResponseSend::CapturePublicationSnapshot(
+                CollaborationServiceCapturePublicationSnapshotResultSend::default(),
             )
         }
         CollaborationServiceRequestRecv::PurgeDocument(_) => {

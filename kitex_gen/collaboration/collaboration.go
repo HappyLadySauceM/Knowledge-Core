@@ -148,569 +148,107 @@ var fieldIDToName_CollaborationSession = map[int16]string{
 	7: "instance_ordinal",
 }
 
-type Version struct {
-	Id         string                      `thrift:"id,1,required" frugal:"1,required,string" json:"id"`
-	DocumentId string                      `thrift:"document_id,2,required" frugal:"2,required,string" json:"document_id"`
-	Sequence   int64                       `thrift:"sequence,3,required" frugal:"3,required,i64" json:"sequence"`
-	Kind       string                      `thrift:"kind,4,required" frugal:"4,required,string" json:"kind"`
-	Label      *string                     `thrift:"label,5,optional" frugal:"5,optional,string" json:"label,omitempty"`
-	CreatedBy  *knowledge.PublicUser       `thrift:"created_by,6,required" frugal:"6,required,knowledge.PublicUser" json:"created_by"`
-	CreatedAt  string                      `thrift:"created_at,7,required" frugal:"7,required,string" json:"created_at"`
-	Content    *knowledge.RichTextDocument `thrift:"content,8,optional" frugal:"8,optional,knowledge.RichTextDocument" json:"content,omitempty"`
-	PlainText  *string                     `thrift:"plain_text,9,optional" frugal:"9,optional,string" json:"plain_text,omitempty"`
+type CapturePublicationSnapshotRequest struct {
+	DocumentId  string `thrift:"document_id,1,required" frugal:"1,required,string" json:"document_id"`
+	StateVector []byte `thrift:"state_vector,2,required" frugal:"2,required,binary" json:"state_vector"`
 }
 
-func NewVersion() *Version {
-	return &Version{}
+func NewCapturePublicationSnapshotRequest() *CapturePublicationSnapshotRequest {
+	return &CapturePublicationSnapshotRequest{}
 }
 
-func (p *Version) InitDefault() {
+func (p *CapturePublicationSnapshotRequest) InitDefault() {
 }
 
-func (p *Version) GetId() (v string) {
-	return p.Id
-}
-
-func (p *Version) GetDocumentId() (v string) {
+func (p *CapturePublicationSnapshotRequest) GetDocumentId() (v string) {
 	return p.DocumentId
 }
 
-func (p *Version) GetSequence() (v int64) {
-	return p.Sequence
-}
-
-func (p *Version) GetKind() (v string) {
-	return p.Kind
-}
-
-var Version_Label_DEFAULT string
-
-func (p *Version) GetLabel() (v string) {
-	if !p.IsSetLabel() {
-		return Version_Label_DEFAULT
-	}
-	return *p.Label
-}
-
-var Version_CreatedBy_DEFAULT *knowledge.PublicUser
-
-func (p *Version) GetCreatedBy() (v *knowledge.PublicUser) {
-	if !p.IsSetCreatedBy() {
-		return Version_CreatedBy_DEFAULT
-	}
-	return p.CreatedBy
-}
-
-func (p *Version) GetCreatedAt() (v string) {
-	return p.CreatedAt
-}
-
-var Version_Content_DEFAULT *knowledge.RichTextDocument
-
-func (p *Version) GetContent() (v *knowledge.RichTextDocument) {
-	if !p.IsSetContent() {
-		return Version_Content_DEFAULT
-	}
-	return p.Content
-}
-
-var Version_PlainText_DEFAULT string
-
-func (p *Version) GetPlainText() (v string) {
-	if !p.IsSetPlainText() {
-		return Version_PlainText_DEFAULT
-	}
-	return *p.PlainText
-}
-func (p *Version) SetId(val string) {
-	p.Id = val
-}
-func (p *Version) SetDocumentId(val string) {
-	p.DocumentId = val
-}
-func (p *Version) SetSequence(val int64) {
-	p.Sequence = val
-}
-func (p *Version) SetKind(val string) {
-	p.Kind = val
-}
-func (p *Version) SetLabel(val *string) {
-	p.Label = val
-}
-func (p *Version) SetCreatedBy(val *knowledge.PublicUser) {
-	p.CreatedBy = val
-}
-func (p *Version) SetCreatedAt(val string) {
-	p.CreatedAt = val
-}
-func (p *Version) SetContent(val *knowledge.RichTextDocument) {
-	p.Content = val
-}
-func (p *Version) SetPlainText(val *string) {
-	p.PlainText = val
-}
-
-func (p *Version) IsSetLabel() bool {
-	return p.Label != nil
-}
-
-func (p *Version) IsSetCreatedBy() bool {
-	return p.CreatedBy != nil
-}
-
-func (p *Version) IsSetContent() bool {
-	return p.Content != nil
-}
-
-func (p *Version) IsSetPlainText() bool {
-	return p.PlainText != nil
-}
-
-func (p *Version) String() string {
-	if p == nil {
-		return "<nil>"
-	}
-	return fmt.Sprintf("Version(%+v)", *p)
-}
-
-var fieldIDToName_Version = map[int16]string{
-	1: "id",
-	2: "document_id",
-	3: "sequence",
-	4: "kind",
-	5: "label",
-	6: "created_by",
-	7: "created_at",
-	8: "content",
-	9: "plain_text",
-}
-
-type PageInfo struct {
-	NextCursor *string `thrift:"next_cursor,1,optional" frugal:"1,optional,string" json:"next_cursor,omitempty"`
-	HasMore    bool    `thrift:"has_more,2,required" frugal:"2,required,bool" json:"has_more"`
-}
-
-func NewPageInfo() *PageInfo {
-	return &PageInfo{}
-}
-
-func (p *PageInfo) InitDefault() {
-}
-
-var PageInfo_NextCursor_DEFAULT string
-
-func (p *PageInfo) GetNextCursor() (v string) {
-	if !p.IsSetNextCursor() {
-		return PageInfo_NextCursor_DEFAULT
-	}
-	return *p.NextCursor
-}
-
-func (p *PageInfo) GetHasMore() (v bool) {
-	return p.HasMore
-}
-func (p *PageInfo) SetNextCursor(val *string) {
-	p.NextCursor = val
-}
-func (p *PageInfo) SetHasMore(val bool) {
-	p.HasMore = val
-}
-
-func (p *PageInfo) IsSetNextCursor() bool {
-	return p.NextCursor != nil
-}
-
-func (p *PageInfo) String() string {
-	if p == nil {
-		return "<nil>"
-	}
-	return fmt.Sprintf("PageInfo(%+v)", *p)
-}
-
-var fieldIDToName_PageInfo = map[int16]string{
-	1: "next_cursor",
-	2: "has_more",
-}
-
-type VersionPage struct {
-	Items        []*Version `thrift:"items,1,required" frugal:"1,required,list<Version>" json:"items"`
-	Page         *PageInfo  `thrift:"page,2,required" frugal:"2,required,PageInfo" json:"page"`
-	HeadSequence *int64     `thrift:"head_sequence,3,optional" frugal:"3,optional,i64" json:"head_sequence,omitempty"`
-}
-
-func NewVersionPage() *VersionPage {
-	return &VersionPage{}
-}
-
-func (p *VersionPage) InitDefault() {
-}
-
-func (p *VersionPage) GetItems() (v []*Version) {
-	return p.Items
-}
-
-var VersionPage_Page_DEFAULT *PageInfo
-
-func (p *VersionPage) GetPage() (v *PageInfo) {
-	if !p.IsSetPage() {
-		return VersionPage_Page_DEFAULT
-	}
-	return p.Page
-}
-
-var VersionPage_HeadSequence_DEFAULT int64
-
-func (p *VersionPage) GetHeadSequence() (v int64) {
-	if !p.IsSetHeadSequence() {
-		return VersionPage_HeadSequence_DEFAULT
-	}
-	return *p.HeadSequence
-}
-func (p *VersionPage) SetItems(val []*Version) {
-	p.Items = val
-}
-func (p *VersionPage) SetPage(val *PageInfo) {
-	p.Page = val
-}
-func (p *VersionPage) SetHeadSequence(val *int64) {
-	p.HeadSequence = val
-}
-
-func (p *VersionPage) IsSetPage() bool {
-	return p.Page != nil
-}
-
-func (p *VersionPage) IsSetHeadSequence() bool {
-	return p.HeadSequence != nil
-}
-
-func (p *VersionPage) String() string {
-	if p == nil {
-		return "<nil>"
-	}
-	return fmt.Sprintf("VersionPage(%+v)", *p)
-}
-
-var fieldIDToName_VersionPage = map[int16]string{
-	1: "items",
-	2: "page",
-	3: "head_sequence",
-}
-
-type VersionDetail struct {
-	Version   *Version                    `thrift:"version,1,required" frugal:"1,required,Version" json:"version"`
-	Content   *knowledge.RichTextDocument `thrift:"content,2,required" frugal:"2,required,knowledge.RichTextDocument" json:"content"`
-	PlainText string                      `thrift:"plain_text,3,required" frugal:"3,required,string" json:"plain_text"`
-}
-
-func NewVersionDetail() *VersionDetail {
-	return &VersionDetail{}
-}
-
-func (p *VersionDetail) InitDefault() {
-}
-
-var VersionDetail_Version_DEFAULT *Version
-
-func (p *VersionDetail) GetVersion() (v *Version) {
-	if !p.IsSetVersion() {
-		return VersionDetail_Version_DEFAULT
-	}
-	return p.Version
-}
-
-var VersionDetail_Content_DEFAULT *knowledge.RichTextDocument
-
-func (p *VersionDetail) GetContent() (v *knowledge.RichTextDocument) {
-	if !p.IsSetContent() {
-		return VersionDetail_Content_DEFAULT
-	}
-	return p.Content
-}
-
-func (p *VersionDetail) GetPlainText() (v string) {
-	return p.PlainText
-}
-func (p *VersionDetail) SetVersion(val *Version) {
-	p.Version = val
-}
-func (p *VersionDetail) SetContent(val *knowledge.RichTextDocument) {
-	p.Content = val
-}
-func (p *VersionDetail) SetPlainText(val string) {
-	p.PlainText = val
-}
-
-func (p *VersionDetail) IsSetVersion() bool {
-	return p.Version != nil
-}
-
-func (p *VersionDetail) IsSetContent() bool {
-	return p.Content != nil
-}
-
-func (p *VersionDetail) String() string {
-	if p == nil {
-		return "<nil>"
-	}
-	return fmt.Sprintf("VersionDetail(%+v)", *p)
-}
-
-var fieldIDToName_VersionDetail = map[int16]string{
-	1: "version",
-	2: "content",
-	3: "plain_text",
-}
-
-type ListVersionsRequest struct {
-	DocumentId string  `thrift:"document_id,1,required" frugal:"1,required,string" json:"document_id"`
-	Cursor     *string `thrift:"cursor,2,optional" frugal:"2,optional,string" json:"cursor,omitempty"`
-	Limit      *int32  `thrift:"limit,3,optional" frugal:"3,optional,i32" json:"limit,omitempty"`
-}
-
-func NewListVersionsRequest() *ListVersionsRequest {
-	return &ListVersionsRequest{}
-}
-
-func (p *ListVersionsRequest) InitDefault() {
-}
-
-func (p *ListVersionsRequest) GetDocumentId() (v string) {
-	return p.DocumentId
-}
-
-var ListVersionsRequest_Cursor_DEFAULT string
-
-func (p *ListVersionsRequest) GetCursor() (v string) {
-	if !p.IsSetCursor() {
-		return ListVersionsRequest_Cursor_DEFAULT
-	}
-	return *p.Cursor
-}
-
-var ListVersionsRequest_Limit_DEFAULT int32
-
-func (p *ListVersionsRequest) GetLimit() (v int32) {
-	if !p.IsSetLimit() {
-		return ListVersionsRequest_Limit_DEFAULT
-	}
-	return *p.Limit
-}
-func (p *ListVersionsRequest) SetDocumentId(val string) {
-	p.DocumentId = val
-}
-func (p *ListVersionsRequest) SetCursor(val *string) {
-	p.Cursor = val
-}
-func (p *ListVersionsRequest) SetLimit(val *int32) {
-	p.Limit = val
-}
-
-func (p *ListVersionsRequest) IsSetCursor() bool {
-	return p.Cursor != nil
-}
-
-func (p *ListVersionsRequest) IsSetLimit() bool {
-	return p.Limit != nil
-}
-
-func (p *ListVersionsRequest) String() string {
-	if p == nil {
-		return "<nil>"
-	}
-	return fmt.Sprintf("ListVersionsRequest(%+v)", *p)
-}
-
-var fieldIDToName_ListVersionsRequest = map[int16]string{
-	1: "document_id",
-	2: "cursor",
-	3: "limit",
-}
-
-type CreateVersionRequest struct {
-	DocumentId     string  `thrift:"document_id,1,required" frugal:"1,required,string" json:"document_id"`
-	Label          *string `thrift:"label,2,optional" frugal:"2,optional,string" json:"label,omitempty"`
-	IdempotencyKey *string `thrift:"idempotency_key,3,optional" frugal:"3,optional,string" json:"idempotency_key,omitempty"`
-	StateVector    []byte  `thrift:"state_vector,4,optional" frugal:"4,optional,binary" json:"state_vector,omitempty"`
-}
-
-func NewCreateVersionRequest() *CreateVersionRequest {
-	return &CreateVersionRequest{}
-}
-
-func (p *CreateVersionRequest) InitDefault() {
-}
-
-func (p *CreateVersionRequest) GetDocumentId() (v string) {
-	return p.DocumentId
-}
-
-var CreateVersionRequest_Label_DEFAULT string
-
-func (p *CreateVersionRequest) GetLabel() (v string) {
-	if !p.IsSetLabel() {
-		return CreateVersionRequest_Label_DEFAULT
-	}
-	return *p.Label
-}
-
-var CreateVersionRequest_IdempotencyKey_DEFAULT string
-
-func (p *CreateVersionRequest) GetIdempotencyKey() (v string) {
-	if !p.IsSetIdempotencyKey() {
-		return CreateVersionRequest_IdempotencyKey_DEFAULT
-	}
-	return *p.IdempotencyKey
-}
-
-var CreateVersionRequest_StateVector_DEFAULT []byte
-
-func (p *CreateVersionRequest) GetStateVector() (v []byte) {
-	if !p.IsSetStateVector() {
-		return CreateVersionRequest_StateVector_DEFAULT
-	}
+func (p *CapturePublicationSnapshotRequest) GetStateVector() (v []byte) {
 	return p.StateVector
 }
-func (p *CreateVersionRequest) SetDocumentId(val string) {
+func (p *CapturePublicationSnapshotRequest) SetDocumentId(val string) {
 	p.DocumentId = val
 }
-func (p *CreateVersionRequest) SetLabel(val *string) {
-	p.Label = val
-}
-func (p *CreateVersionRequest) SetIdempotencyKey(val *string) {
-	p.IdempotencyKey = val
-}
-func (p *CreateVersionRequest) SetStateVector(val []byte) {
+func (p *CapturePublicationSnapshotRequest) SetStateVector(val []byte) {
 	p.StateVector = val
 }
 
-func (p *CreateVersionRequest) IsSetLabel() bool {
-	return p.Label != nil
-}
-
-func (p *CreateVersionRequest) IsSetIdempotencyKey() bool {
-	return p.IdempotencyKey != nil
-}
-
-func (p *CreateVersionRequest) IsSetStateVector() bool {
-	return p.StateVector != nil
-}
-
-func (p *CreateVersionRequest) String() string {
+func (p *CapturePublicationSnapshotRequest) String() string {
 	if p == nil {
 		return "<nil>"
 	}
-	return fmt.Sprintf("CreateVersionRequest(%+v)", *p)
+	return fmt.Sprintf("CapturePublicationSnapshotRequest(%+v)", *p)
 }
 
-var fieldIDToName_CreateVersionRequest = map[int16]string{
+var fieldIDToName_CapturePublicationSnapshotRequest = map[int16]string{
 	1: "document_id",
-	2: "label",
-	3: "idempotency_key",
-	4: "state_vector",
+	2: "state_vector",
 }
 
-type GetVersionRequest struct {
-	DocumentId string `thrift:"document_id,1,required" frugal:"1,required,string" json:"document_id"`
-	VersionId  string `thrift:"version_id,2,required" frugal:"2,required,string" json:"version_id"`
+type PublicationSnapshot struct {
+	DocumentId string                      `thrift:"document_id,1,required" frugal:"1,required,string" json:"document_id"`
+	Sequence   int64                       `thrift:"sequence,2,required" frugal:"2,required,i64" json:"sequence"`
+	Content    *knowledge.RichTextDocument `thrift:"content,3,required" frugal:"3,required,knowledge.RichTextDocument" json:"content"`
+	PlainText  string                      `thrift:"plain_text,4,required" frugal:"4,required,string" json:"plain_text"`
 }
 
-func NewGetVersionRequest() *GetVersionRequest {
-	return &GetVersionRequest{}
+func NewPublicationSnapshot() *PublicationSnapshot {
+	return &PublicationSnapshot{}
 }
 
-func (p *GetVersionRequest) InitDefault() {
+func (p *PublicationSnapshot) InitDefault() {
 }
 
-func (p *GetVersionRequest) GetDocumentId() (v string) {
+func (p *PublicationSnapshot) GetDocumentId() (v string) {
 	return p.DocumentId
 }
 
-func (p *GetVersionRequest) GetVersionId() (v string) {
-	return p.VersionId
-}
-func (p *GetVersionRequest) SetDocumentId(val string) {
-	p.DocumentId = val
-}
-func (p *GetVersionRequest) SetVersionId(val string) {
-	p.VersionId = val
+func (p *PublicationSnapshot) GetSequence() (v int64) {
+	return p.Sequence
 }
 
-func (p *GetVersionRequest) String() string {
+var PublicationSnapshot_Content_DEFAULT *knowledge.RichTextDocument
+
+func (p *PublicationSnapshot) GetContent() (v *knowledge.RichTextDocument) {
+	if !p.IsSetContent() {
+		return PublicationSnapshot_Content_DEFAULT
+	}
+	return p.Content
+}
+
+func (p *PublicationSnapshot) GetPlainText() (v string) {
+	return p.PlainText
+}
+func (p *PublicationSnapshot) SetDocumentId(val string) {
+	p.DocumentId = val
+}
+func (p *PublicationSnapshot) SetSequence(val int64) {
+	p.Sequence = val
+}
+func (p *PublicationSnapshot) SetContent(val *knowledge.RichTextDocument) {
+	p.Content = val
+}
+func (p *PublicationSnapshot) SetPlainText(val string) {
+	p.PlainText = val
+}
+
+func (p *PublicationSnapshot) IsSetContent() bool {
+	return p.Content != nil
+}
+
+func (p *PublicationSnapshot) String() string {
 	if p == nil {
 		return "<nil>"
 	}
-	return fmt.Sprintf("GetVersionRequest(%+v)", *p)
+	return fmt.Sprintf("PublicationSnapshot(%+v)", *p)
 }
 
-var fieldIDToName_GetVersionRequest = map[int16]string{
+var fieldIDToName_PublicationSnapshot = map[int16]string{
 	1: "document_id",
-	2: "version_id",
-}
-
-type RestoreVersionRequest struct {
-	DocumentId       string  `thrift:"document_id,1,required" frugal:"1,required,string" json:"document_id"`
-	VersionId        string  `thrift:"version_id,2,required" frugal:"2,required,string" json:"version_id"`
-	ExpectedSequence int64   `thrift:"expected_sequence,3,required" frugal:"3,required,i64" json:"expected_sequence"`
-	IdempotencyKey   *string `thrift:"idempotency_key,4,optional" frugal:"4,optional,string" json:"idempotency_key,omitempty"`
-}
-
-func NewRestoreVersionRequest() *RestoreVersionRequest {
-	return &RestoreVersionRequest{}
-}
-
-func (p *RestoreVersionRequest) InitDefault() {
-}
-
-func (p *RestoreVersionRequest) GetDocumentId() (v string) {
-	return p.DocumentId
-}
-
-func (p *RestoreVersionRequest) GetVersionId() (v string) {
-	return p.VersionId
-}
-
-func (p *RestoreVersionRequest) GetExpectedSequence() (v int64) {
-	return p.ExpectedSequence
-}
-
-var RestoreVersionRequest_IdempotencyKey_DEFAULT string
-
-func (p *RestoreVersionRequest) GetIdempotencyKey() (v string) {
-	if !p.IsSetIdempotencyKey() {
-		return RestoreVersionRequest_IdempotencyKey_DEFAULT
-	}
-	return *p.IdempotencyKey
-}
-func (p *RestoreVersionRequest) SetDocumentId(val string) {
-	p.DocumentId = val
-}
-func (p *RestoreVersionRequest) SetVersionId(val string) {
-	p.VersionId = val
-}
-func (p *RestoreVersionRequest) SetExpectedSequence(val int64) {
-	p.ExpectedSequence = val
-}
-func (p *RestoreVersionRequest) SetIdempotencyKey(val *string) {
-	p.IdempotencyKey = val
-}
-
-func (p *RestoreVersionRequest) IsSetIdempotencyKey() bool {
-	return p.IdempotencyKey != nil
-}
-
-func (p *RestoreVersionRequest) String() string {
-	if p == nil {
-		return "<nil>"
-	}
-	return fmt.Sprintf("RestoreVersionRequest(%+v)", *p)
-}
-
-var fieldIDToName_RestoreVersionRequest = map[int16]string{
-	1: "document_id",
-	2: "version_id",
-	3: "expected_sequence",
-	4: "idempotency_key",
+	2: "sequence",
+	3: "content",
+	4: "plain_text",
 }
 
 type PurgeDocumentRequest struct {
@@ -747,13 +285,7 @@ type CollaborationService interface {
 
 	CreateSession(ctx context.Context, request *CreateSessionRequest) (r *CollaborationSession, err error)
 
-	ListVersions(ctx context.Context, request *ListVersionsRequest) (r *VersionPage, err error)
-
-	CreateVersion(ctx context.Context, request *CreateVersionRequest) (r *Version, err error)
-
-	GetVersion(ctx context.Context, request *GetVersionRequest) (r *VersionDetail, err error)
-
-	RestoreVersion(ctx context.Context, request *RestoreVersionRequest) (r *Version, err error)
+	CapturePublicationSnapshot(ctx context.Context, request *CapturePublicationSnapshotRequest) (r *PublicationSnapshot, err error)
 
 	PurgeDocument(ctx context.Context, request *PurgeDocumentRequest) (err error)
 }
@@ -910,307 +442,79 @@ var fieldIDToName_CollaborationServiceCreateSessionResult = map[int16]string{
 	0: "success",
 }
 
-type CollaborationServiceListVersionsArgs struct {
-	Request *ListVersionsRequest `thrift:"request,1" frugal:"1,default,ListVersionsRequest" json:"request"`
+type CollaborationServiceCapturePublicationSnapshotArgs struct {
+	Request *CapturePublicationSnapshotRequest `thrift:"request,1" frugal:"1,default,CapturePublicationSnapshotRequest" json:"request"`
 }
 
-func NewCollaborationServiceListVersionsArgs() *CollaborationServiceListVersionsArgs {
-	return &CollaborationServiceListVersionsArgs{}
+func NewCollaborationServiceCapturePublicationSnapshotArgs() *CollaborationServiceCapturePublicationSnapshotArgs {
+	return &CollaborationServiceCapturePublicationSnapshotArgs{}
 }
 
-func (p *CollaborationServiceListVersionsArgs) InitDefault() {
+func (p *CollaborationServiceCapturePublicationSnapshotArgs) InitDefault() {
 }
 
-var CollaborationServiceListVersionsArgs_Request_DEFAULT *ListVersionsRequest
+var CollaborationServiceCapturePublicationSnapshotArgs_Request_DEFAULT *CapturePublicationSnapshotRequest
 
-func (p *CollaborationServiceListVersionsArgs) GetRequest() (v *ListVersionsRequest) {
+func (p *CollaborationServiceCapturePublicationSnapshotArgs) GetRequest() (v *CapturePublicationSnapshotRequest) {
 	if !p.IsSetRequest() {
-		return CollaborationServiceListVersionsArgs_Request_DEFAULT
+		return CollaborationServiceCapturePublicationSnapshotArgs_Request_DEFAULT
 	}
 	return p.Request
 }
-func (p *CollaborationServiceListVersionsArgs) SetRequest(val *ListVersionsRequest) {
+func (p *CollaborationServiceCapturePublicationSnapshotArgs) SetRequest(val *CapturePublicationSnapshotRequest) {
 	p.Request = val
 }
 
-func (p *CollaborationServiceListVersionsArgs) IsSetRequest() bool {
+func (p *CollaborationServiceCapturePublicationSnapshotArgs) IsSetRequest() bool {
 	return p.Request != nil
 }
 
-func (p *CollaborationServiceListVersionsArgs) String() string {
+func (p *CollaborationServiceCapturePublicationSnapshotArgs) String() string {
 	if p == nil {
 		return "<nil>"
 	}
-	return fmt.Sprintf("CollaborationServiceListVersionsArgs(%+v)", *p)
+	return fmt.Sprintf("CollaborationServiceCapturePublicationSnapshotArgs(%+v)", *p)
 }
 
-var fieldIDToName_CollaborationServiceListVersionsArgs = map[int16]string{
+var fieldIDToName_CollaborationServiceCapturePublicationSnapshotArgs = map[int16]string{
 	1: "request",
 }
 
-type CollaborationServiceListVersionsResult struct {
-	Success *VersionPage `thrift:"success,0,optional" frugal:"0,optional,VersionPage" json:"success,omitempty"`
+type CollaborationServiceCapturePublicationSnapshotResult struct {
+	Success *PublicationSnapshot `thrift:"success,0,optional" frugal:"0,optional,PublicationSnapshot" json:"success,omitempty"`
 }
 
-func NewCollaborationServiceListVersionsResult() *CollaborationServiceListVersionsResult {
-	return &CollaborationServiceListVersionsResult{}
+func NewCollaborationServiceCapturePublicationSnapshotResult() *CollaborationServiceCapturePublicationSnapshotResult {
+	return &CollaborationServiceCapturePublicationSnapshotResult{}
 }
 
-func (p *CollaborationServiceListVersionsResult) InitDefault() {
+func (p *CollaborationServiceCapturePublicationSnapshotResult) InitDefault() {
 }
 
-var CollaborationServiceListVersionsResult_Success_DEFAULT *VersionPage
+var CollaborationServiceCapturePublicationSnapshotResult_Success_DEFAULT *PublicationSnapshot
 
-func (p *CollaborationServiceListVersionsResult) GetSuccess() (v *VersionPage) {
+func (p *CollaborationServiceCapturePublicationSnapshotResult) GetSuccess() (v *PublicationSnapshot) {
 	if !p.IsSetSuccess() {
-		return CollaborationServiceListVersionsResult_Success_DEFAULT
+		return CollaborationServiceCapturePublicationSnapshotResult_Success_DEFAULT
 	}
 	return p.Success
 }
-func (p *CollaborationServiceListVersionsResult) SetSuccess(x interface{}) {
-	p.Success = x.(*VersionPage)
+func (p *CollaborationServiceCapturePublicationSnapshotResult) SetSuccess(x interface{}) {
+	p.Success = x.(*PublicationSnapshot)
 }
 
-func (p *CollaborationServiceListVersionsResult) IsSetSuccess() bool {
+func (p *CollaborationServiceCapturePublicationSnapshotResult) IsSetSuccess() bool {
 	return p.Success != nil
 }
 
-func (p *CollaborationServiceListVersionsResult) String() string {
+func (p *CollaborationServiceCapturePublicationSnapshotResult) String() string {
 	if p == nil {
 		return "<nil>"
 	}
-	return fmt.Sprintf("CollaborationServiceListVersionsResult(%+v)", *p)
+	return fmt.Sprintf("CollaborationServiceCapturePublicationSnapshotResult(%+v)", *p)
 }
 
-var fieldIDToName_CollaborationServiceListVersionsResult = map[int16]string{
-	0: "success",
-}
-
-type CollaborationServiceCreateVersionArgs struct {
-	Request *CreateVersionRequest `thrift:"request,1" frugal:"1,default,CreateVersionRequest" json:"request"`
-}
-
-func NewCollaborationServiceCreateVersionArgs() *CollaborationServiceCreateVersionArgs {
-	return &CollaborationServiceCreateVersionArgs{}
-}
-
-func (p *CollaborationServiceCreateVersionArgs) InitDefault() {
-}
-
-var CollaborationServiceCreateVersionArgs_Request_DEFAULT *CreateVersionRequest
-
-func (p *CollaborationServiceCreateVersionArgs) GetRequest() (v *CreateVersionRequest) {
-	if !p.IsSetRequest() {
-		return CollaborationServiceCreateVersionArgs_Request_DEFAULT
-	}
-	return p.Request
-}
-func (p *CollaborationServiceCreateVersionArgs) SetRequest(val *CreateVersionRequest) {
-	p.Request = val
-}
-
-func (p *CollaborationServiceCreateVersionArgs) IsSetRequest() bool {
-	return p.Request != nil
-}
-
-func (p *CollaborationServiceCreateVersionArgs) String() string {
-	if p == nil {
-		return "<nil>"
-	}
-	return fmt.Sprintf("CollaborationServiceCreateVersionArgs(%+v)", *p)
-}
-
-var fieldIDToName_CollaborationServiceCreateVersionArgs = map[int16]string{
-	1: "request",
-}
-
-type CollaborationServiceCreateVersionResult struct {
-	Success *Version `thrift:"success,0,optional" frugal:"0,optional,Version" json:"success,omitempty"`
-}
-
-func NewCollaborationServiceCreateVersionResult() *CollaborationServiceCreateVersionResult {
-	return &CollaborationServiceCreateVersionResult{}
-}
-
-func (p *CollaborationServiceCreateVersionResult) InitDefault() {
-}
-
-var CollaborationServiceCreateVersionResult_Success_DEFAULT *Version
-
-func (p *CollaborationServiceCreateVersionResult) GetSuccess() (v *Version) {
-	if !p.IsSetSuccess() {
-		return CollaborationServiceCreateVersionResult_Success_DEFAULT
-	}
-	return p.Success
-}
-func (p *CollaborationServiceCreateVersionResult) SetSuccess(x interface{}) {
-	p.Success = x.(*Version)
-}
-
-func (p *CollaborationServiceCreateVersionResult) IsSetSuccess() bool {
-	return p.Success != nil
-}
-
-func (p *CollaborationServiceCreateVersionResult) String() string {
-	if p == nil {
-		return "<nil>"
-	}
-	return fmt.Sprintf("CollaborationServiceCreateVersionResult(%+v)", *p)
-}
-
-var fieldIDToName_CollaborationServiceCreateVersionResult = map[int16]string{
-	0: "success",
-}
-
-type CollaborationServiceGetVersionArgs struct {
-	Request *GetVersionRequest `thrift:"request,1" frugal:"1,default,GetVersionRequest" json:"request"`
-}
-
-func NewCollaborationServiceGetVersionArgs() *CollaborationServiceGetVersionArgs {
-	return &CollaborationServiceGetVersionArgs{}
-}
-
-func (p *CollaborationServiceGetVersionArgs) InitDefault() {
-}
-
-var CollaborationServiceGetVersionArgs_Request_DEFAULT *GetVersionRequest
-
-func (p *CollaborationServiceGetVersionArgs) GetRequest() (v *GetVersionRequest) {
-	if !p.IsSetRequest() {
-		return CollaborationServiceGetVersionArgs_Request_DEFAULT
-	}
-	return p.Request
-}
-func (p *CollaborationServiceGetVersionArgs) SetRequest(val *GetVersionRequest) {
-	p.Request = val
-}
-
-func (p *CollaborationServiceGetVersionArgs) IsSetRequest() bool {
-	return p.Request != nil
-}
-
-func (p *CollaborationServiceGetVersionArgs) String() string {
-	if p == nil {
-		return "<nil>"
-	}
-	return fmt.Sprintf("CollaborationServiceGetVersionArgs(%+v)", *p)
-}
-
-var fieldIDToName_CollaborationServiceGetVersionArgs = map[int16]string{
-	1: "request",
-}
-
-type CollaborationServiceGetVersionResult struct {
-	Success *VersionDetail `thrift:"success,0,optional" frugal:"0,optional,VersionDetail" json:"success,omitempty"`
-}
-
-func NewCollaborationServiceGetVersionResult() *CollaborationServiceGetVersionResult {
-	return &CollaborationServiceGetVersionResult{}
-}
-
-func (p *CollaborationServiceGetVersionResult) InitDefault() {
-}
-
-var CollaborationServiceGetVersionResult_Success_DEFAULT *VersionDetail
-
-func (p *CollaborationServiceGetVersionResult) GetSuccess() (v *VersionDetail) {
-	if !p.IsSetSuccess() {
-		return CollaborationServiceGetVersionResult_Success_DEFAULT
-	}
-	return p.Success
-}
-func (p *CollaborationServiceGetVersionResult) SetSuccess(x interface{}) {
-	p.Success = x.(*VersionDetail)
-}
-
-func (p *CollaborationServiceGetVersionResult) IsSetSuccess() bool {
-	return p.Success != nil
-}
-
-func (p *CollaborationServiceGetVersionResult) String() string {
-	if p == nil {
-		return "<nil>"
-	}
-	return fmt.Sprintf("CollaborationServiceGetVersionResult(%+v)", *p)
-}
-
-var fieldIDToName_CollaborationServiceGetVersionResult = map[int16]string{
-	0: "success",
-}
-
-type CollaborationServiceRestoreVersionArgs struct {
-	Request *RestoreVersionRequest `thrift:"request,1" frugal:"1,default,RestoreVersionRequest" json:"request"`
-}
-
-func NewCollaborationServiceRestoreVersionArgs() *CollaborationServiceRestoreVersionArgs {
-	return &CollaborationServiceRestoreVersionArgs{}
-}
-
-func (p *CollaborationServiceRestoreVersionArgs) InitDefault() {
-}
-
-var CollaborationServiceRestoreVersionArgs_Request_DEFAULT *RestoreVersionRequest
-
-func (p *CollaborationServiceRestoreVersionArgs) GetRequest() (v *RestoreVersionRequest) {
-	if !p.IsSetRequest() {
-		return CollaborationServiceRestoreVersionArgs_Request_DEFAULT
-	}
-	return p.Request
-}
-func (p *CollaborationServiceRestoreVersionArgs) SetRequest(val *RestoreVersionRequest) {
-	p.Request = val
-}
-
-func (p *CollaborationServiceRestoreVersionArgs) IsSetRequest() bool {
-	return p.Request != nil
-}
-
-func (p *CollaborationServiceRestoreVersionArgs) String() string {
-	if p == nil {
-		return "<nil>"
-	}
-	return fmt.Sprintf("CollaborationServiceRestoreVersionArgs(%+v)", *p)
-}
-
-var fieldIDToName_CollaborationServiceRestoreVersionArgs = map[int16]string{
-	1: "request",
-}
-
-type CollaborationServiceRestoreVersionResult struct {
-	Success *Version `thrift:"success,0,optional" frugal:"0,optional,Version" json:"success,omitempty"`
-}
-
-func NewCollaborationServiceRestoreVersionResult() *CollaborationServiceRestoreVersionResult {
-	return &CollaborationServiceRestoreVersionResult{}
-}
-
-func (p *CollaborationServiceRestoreVersionResult) InitDefault() {
-}
-
-var CollaborationServiceRestoreVersionResult_Success_DEFAULT *Version
-
-func (p *CollaborationServiceRestoreVersionResult) GetSuccess() (v *Version) {
-	if !p.IsSetSuccess() {
-		return CollaborationServiceRestoreVersionResult_Success_DEFAULT
-	}
-	return p.Success
-}
-func (p *CollaborationServiceRestoreVersionResult) SetSuccess(x interface{}) {
-	p.Success = x.(*Version)
-}
-
-func (p *CollaborationServiceRestoreVersionResult) IsSetSuccess() bool {
-	return p.Success != nil
-}
-
-func (p *CollaborationServiceRestoreVersionResult) String() string {
-	if p == nil {
-		return "<nil>"
-	}
-	return fmt.Sprintf("CollaborationServiceRestoreVersionResult(%+v)", *p)
-}
-
-var fieldIDToName_CollaborationServiceRestoreVersionResult = map[int16]string{
+var fieldIDToName_CollaborationServiceCapturePublicationSnapshotResult = map[int16]string{
 	0: "success",
 }
 

@@ -89,20 +89,10 @@ func Register(r *server.Hertz) {
 						_document_id.POST("/members", append(_addmemberMw(), gateway.AddMember)...)
 						_document_id.DELETE("/publication", append(_unpublishdocumentMw(), gateway.UnpublishDocument)...)
 						_document_id.PUT("/publication", append(_publishdocumentMw(), gateway.PublishDocument)...)
-						_document_id.GET("/versions", append(_listversionsMw(), gateway.ListVersions)...)
-						_document_id.POST("/versions", append(_createversionMw(), gateway.CreateVersion)...)
 						{
 							_members := _document_id.Group("/members", _membersMw()...)
 							_members.DELETE("/:user_id", append(_deletememberMw(), gateway.DeleteMember)...)
 							_members.PATCH("/:user_id", append(_updatememberMw(), gateway.UpdateMember)...)
-						}
-						{
-							_versions := _document_id.Group("/versions", _versionsMw()...)
-							_versions.GET("/:version_id", append(_getversionMw(), gateway.GetVersion)...)
-							{
-								_version_id := _versions.Group("/:version_id", _version_idMw()...)
-								_version_id.POST("/restorations", append(_restoreversionMw(), gateway.RestoreVersion)...)
-							}
 						}
 					}
 				}
@@ -113,6 +103,7 @@ func Register(r *server.Hertz) {
 				}
 				{
 					_trash := _studio.Group("/trash", _trashMw()...)
+					_trash.DELETE("/:document_id", append(_permanentlydeletedocumentMw(), gateway.PermanentlyDeleteDocument)...)
 					{
 						_document_id0 := _trash.Group("/:document_id", _document_id0Mw()...)
 						_document_id0.POST("/restore", append(_restoredeleteddocumentMw(), gateway.RestoreDeletedDocument)...)

@@ -27,6 +27,7 @@ type Client interface {
 	DeleteFolder(ctx context.Context, request *knowledge.DeleteFolderRequest, callOptions ...callopt.Option) (err error)
 	SetPublication(ctx context.Context, request *knowledge.SetPublicationRequest, callOptions ...callopt.Option) (r *knowledge.Document, err error)
 	DeleteDocument(ctx context.Context, request *knowledge.DeleteDocumentRequest, callOptions ...callopt.Option) (r *knowledge.Document, err error)
+	PurgeDeletedDocument(ctx context.Context, request *knowledge.PurgeDeletedDocumentRequest, callOptions ...callopt.Option) (err error)
 	RestoreDeletedDocument(ctx context.Context, request *knowledge.DocumentIDRequest, callOptions ...callopt.Option) (r *knowledge.Document, err error)
 	ListDeletedDocuments(ctx context.Context, request *knowledge.ListDocumentsRequest, callOptions ...callopt.Option) (r *knowledge.DocumentPage, err error)
 	ListMembers(ctx context.Context, request *knowledge.DocumentIDRequest, callOptions ...callopt.Option) (r *knowledge.MemberList, err error)
@@ -140,6 +141,11 @@ func (p *kKnowledgeServiceClient) SetPublication(ctx context.Context, request *k
 func (p *kKnowledgeServiceClient) DeleteDocument(ctx context.Context, request *knowledge.DeleteDocumentRequest, callOptions ...callopt.Option) (r *knowledge.Document, err error) {
 	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
 	return p.kClient.DeleteDocument(ctx, request)
+}
+
+func (p *kKnowledgeServiceClient) PurgeDeletedDocument(ctx context.Context, request *knowledge.PurgeDeletedDocumentRequest, callOptions ...callopt.Option) (err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.PurgeDeletedDocument(ctx, request)
 }
 
 func (p *kKnowledgeServiceClient) RestoreDeletedDocument(ctx context.Context, request *knowledge.DocumentIDRequest, callOptions ...callopt.Option) (r *knowledge.Document, err error) {
