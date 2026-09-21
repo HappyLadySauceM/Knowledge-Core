@@ -25,6 +25,11 @@ env:
   NPM_CONFIG_FETCH_RETRY_FACTOR: "2"
   NPM_CONFIG_FETCH_RETRY_MINTIMEOUT: "10000"
   NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT: "120000"
+  CARGO_NET_RETRY: "5"
+  CARGO_HTTP_TIMEOUT: "120"
+  CARGO_HTTP_MULTIPLEXING: "false"
+  CI_DOWNLOAD_RETRY_ATTEMPTS: "5"
+  CI_ARTIFACT_CACHE_ROOT: "/cache/ci-templates/artifacts"
 
 # Serialize releases for this project/branch while allowing the matrix jobs in
 # one run to consume all available ARC capacity.
@@ -44,7 +49,7 @@ jobs:
       contents: read
     steps:
       - name: Mark Feishu pipeline task in progress
-        uses: HappyLadySauceM/ci-templates/.github/actions/feishu-pipeline-task@0afa6fd5c6a58c2ad4529d02920afeefe2ec039e
+        uses: HappyLadySauceM/ci-templates/.github/actions/feishu-pipeline-task@eba5084e8c19ef384e18b3e230f7fe0d3c17b4de
         with:
           operation: sync
           phase: in_progress
@@ -412,9 +417,10 @@ jobs:
         with:
           fetch-depth: 1
           fetch-tags: true
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: knowledge-core-plan-${{ github.run_id }}
+      - name: Restore plan artifact with cache fallback
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: ci-templates artifact-cache restore --name "knowledge-core-plan-${GITHUB_RUN_ID}" --destination .
       - name: Generate one release summary
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
@@ -442,24 +448,10 @@ jobs:
         with:
           fetch-depth: 1
       - name: Prepare Harbor credentials
-        env:
-          HARBOR_DOCKER_CONFIG_JSON: ${{ secrets.HARBOR_DOCKER_CONFIG_JSON }}
-          HARBOR_CA_PEM: ${{ secrets.HARBOR_CA_PEM }}
-        run: |
-          set -euo pipefail
-          umask 077
-          install -d "$RUNNER_TEMP/harbor"
-          printf '%s' "$HARBOR_DOCKER_CONFIG_JSON" > "$RUNNER_TEMP/harbor/config.json"
-          printf '%s' "$HARBOR_CA_PEM" > "$RUNNER_TEMP/harbor/ca.crt"
-          test -s "$RUNNER_TEMP/harbor/config.json" && test -s "$RUNNER_TEMP/harbor/ca.crt"
-          if [[ -s /etc/ssl/certs/ca-certificates.crt ]]; then
-            cat /etc/ssl/certs/ca-certificates.crt "$RUNNER_TEMP/harbor/ca.crt" > "$RUNNER_TEMP/harbor/ca-bundle.crt"
-          else
-            cp "$RUNNER_TEMP/harbor/ca.crt" "$RUNNER_TEMP/harbor/ca-bundle.crt"
-          fi
-          echo "DOCKER_CONFIG=$RUNNER_TEMP/harbor" >> "$GITHUB_ENV"
-          echo "SSL_CERT_FILE=$RUNNER_TEMP/harbor/ca-bundle.crt" >> "$GITHUB_ENV"
-          echo "CI_REGISTRY_CA_FILE=$RUNNER_TEMP/harbor/ca.crt" >> "$GITHUB_ENV"
+        uses: HappyLadySauceM/ci-templates/.github/actions/prepare-harbor@eba5084e8c19ef384e18b3e230f7fe0d3c17b4de
+        with:
+          docker-config-json: ${{ secrets.HARBOR_DOCKER_CONFIG_JSON }}
+          ca-pem: ${{ secrets.HARBOR_CA_PEM }}
       - name: Verify BuildKit and prewarm configured base images
         run: |
           set -euo pipefail
@@ -491,30 +483,16 @@ jobs:
           else
             echo 'hit=false' >> "$GITHUB_OUTPUT"
           fi
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      - name: Restore Go artifact with cache fallback
         if: steps.local-binary.outputs.hit != 'true'
-        with:
-          name: knowledge-core-binary-${{ matrix.service }}-${{ github.run_id }}
-          path: .ci-artifacts
-      - name: Prepare Harbor credentials
         env:
-          HARBOR_DOCKER_CONFIG_JSON: ${{ secrets.HARBOR_DOCKER_CONFIG_JSON }}
-          HARBOR_CA_PEM: ${{ secrets.HARBOR_CA_PEM }}
-        run: |
-          set -euo pipefail
-          umask 077
-          install -d "$RUNNER_TEMP/harbor"
-          printf '%s' "$HARBOR_DOCKER_CONFIG_JSON" > "$RUNNER_TEMP/harbor/config.json"
-          printf '%s' "$HARBOR_CA_PEM" > "$RUNNER_TEMP/harbor/ca.crt"
-          test -s "$RUNNER_TEMP/harbor/config.json" && test -s "$RUNNER_TEMP/harbor/ca.crt"
-          if [[ -s /etc/ssl/certs/ca-certificates.crt ]]; then
-            cat /etc/ssl/certs/ca-certificates.crt "$RUNNER_TEMP/harbor/ca.crt" > "$RUNNER_TEMP/harbor/ca-bundle.crt"
-          else
-            cp "$RUNNER_TEMP/harbor/ca.crt" "$RUNNER_TEMP/harbor/ca-bundle.crt"
-          fi
-          echo "DOCKER_CONFIG=$RUNNER_TEMP/harbor" >> "$GITHUB_ENV"
-          echo "SSL_CERT_FILE=$RUNNER_TEMP/harbor/ca-bundle.crt" >> "$GITHUB_ENV"
-          echo "CI_REGISTRY_CA_FILE=$RUNNER_TEMP/harbor/ca.crt" >> "$GITHUB_ENV"
+          GITHUB_TOKEN: ${{ github.token }}
+        run: ci-templates artifact-cache restore --name "knowledge-core-binary-${{ matrix.service }}-${GITHUB_RUN_ID}" --destination .ci-artifacts
+      - name: Prepare Harbor credentials
+        uses: HappyLadySauceM/ci-templates/.github/actions/prepare-harbor@eba5084e8c19ef384e18b3e230f7fe0d3c17b4de
+        with:
+          docker-config-json: ${{ secrets.HARBOR_DOCKER_CONFIG_JSON }}
+          ca-pem: ${{ secrets.HARBOR_CA_PEM }}
       - name: Build immutable candidate
         env:
           SERVICE: ${{ matrix.service }}
@@ -571,30 +549,16 @@ jobs:
           else
             echo 'hit=false' >> "$GITHUB_OUTPUT"
           fi
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      - name: Restore Rust artifact with cache fallback
         if: steps.local-binary.outputs.hit != 'true'
-        with:
-          name: knowledge-core-binary-${{ matrix.service }}-${{ github.run_id }}
-          path: .ci-artifacts
-      - name: Prepare Harbor credentials
         env:
-          HARBOR_DOCKER_CONFIG_JSON: ${{ secrets.HARBOR_DOCKER_CONFIG_JSON }}
-          HARBOR_CA_PEM: ${{ secrets.HARBOR_CA_PEM }}
-        run: |
-          set -euo pipefail
-          umask 077
-          install -d "$RUNNER_TEMP/harbor"
-          printf '%s' "$HARBOR_DOCKER_CONFIG_JSON" > "$RUNNER_TEMP/harbor/config.json"
-          printf '%s' "$HARBOR_CA_PEM" > "$RUNNER_TEMP/harbor/ca.crt"
-          test -s "$RUNNER_TEMP/harbor/config.json" && test -s "$RUNNER_TEMP/harbor/ca.crt"
-          if [[ -s /etc/ssl/certs/ca-certificates.crt ]]; then
-            cat /etc/ssl/certs/ca-certificates.crt "$RUNNER_TEMP/harbor/ca.crt" > "$RUNNER_TEMP/harbor/ca-bundle.crt"
-          else
-            cp "$RUNNER_TEMP/harbor/ca.crt" "$RUNNER_TEMP/harbor/ca-bundle.crt"
-          fi
-          echo "DOCKER_CONFIG=$RUNNER_TEMP/harbor" >> "$GITHUB_ENV"
-          echo "SSL_CERT_FILE=$RUNNER_TEMP/harbor/ca-bundle.crt" >> "$GITHUB_ENV"
-          echo "CI_REGISTRY_CA_FILE=$RUNNER_TEMP/harbor/ca.crt" >> "$GITHUB_ENV"
+          GITHUB_TOKEN: ${{ github.token }}
+        run: ci-templates artifact-cache restore --name "knowledge-core-binary-${{ matrix.service }}-${GITHUB_RUN_ID}" --destination .ci-artifacts
+      - name: Prepare Harbor credentials
+        uses: HappyLadySauceM/ci-templates/.github/actions/prepare-harbor@eba5084e8c19ef384e18b3e230f7fe0d3c17b4de
+        with:
+          docker-config-json: ${{ secrets.HARBOR_DOCKER_CONFIG_JSON }}
+          ca-pem: ${{ secrets.HARBOR_CA_PEM }}
       - name: Build immutable candidate
         env:
           SERVICE: ${{ matrix.service }}
@@ -660,18 +624,24 @@ jobs:
           # 快进 main 需要 origin/main 是 HEAD 的祖先。
           fetch-depth: 0
           token: ${{ steps.app-token.outputs.token }}
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: knowledge-core-plan-${{ github.run_id }}
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: knowledge-core-release-notes-${{ github.run_id }}
-      - if: needs.plan.outputs.has_build_changes == 'true'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          pattern: knowledge-core-candidate-*-${{ github.run_id }}
-          path: .candidates
-          merge-multiple: true
+      - name: Restore deployment artifacts with cache fallback
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          ci-templates artifact-cache restore --name "knowledge-core-plan-${GITHUB_RUN_ID}" --destination .
+          ci-templates artifact-cache restore --name "knowledge-core-release-notes-${GITHUB_RUN_ID}" --destination .
+          if [[ "${{ needs.plan.outputs.has_build_changes }}" == true ]]; then
+            ci-templates artifact-cache restore --pattern "knowledge-core-candidate-*-${GITHUB_RUN_ID}" --destination .candidates
+            for candidate in .candidates/*.json; do
+              [[ -f "$candidate" ]] || continue
+              service="$(jq -r '.service // empty' "$candidate")"
+              tag="$(jq -r '.candidate_tag // empty' "$candidate")"
+              digest="$(jq -r '.digest // empty' "$candidate")"
+              test -n "$service" -a -n "$tag" -a -n "$digest"
+              ci-templates restore-candidate --config "$CI_PROJECT_CONFIG" --service "$service" --tag "$tag" --digest "$digest"
+            done
+          fi
       - name: Prepare deployment credentials
         env:
           HARBOR_DOCKER_CONFIG_JSON: ${{ secrets.HARBOR_DOCKER_CONFIG_JSON }}
@@ -820,7 +790,10 @@ jobs:
 
   cleanup-candidates:
     needs: [plan, deploy-release]
-    if: always() && needs.plan.outputs.has_build_changes == 'true' && (needs.deploy-release.outputs.smoke_ok != 'true' || needs.deploy-release.outputs.candidates_promoted == 'true')
+    # A skipped/failed release must retain the immutable candidate so a later
+    # rerun can reuse it.  Only a verified promotion makes the tag disposable.
+    # 发布跳过或失败时保留候选镜像，只有验证通过并晋级后才允许删除。
+    if: always() && needs.plan.outputs.has_build_changes == 'true' && needs.deploy-release.outputs.candidates_promoted == 'true'
     runs-on: hls-standard
     timeout-minutes: 10
     environment: release
@@ -829,23 +802,10 @@ jobs:
         with:
           fetch-depth: 1
       - name: Prepare Harbor credentials
-        env:
-          HARBOR_DOCKER_CONFIG_JSON: ${{ secrets.HARBOR_DOCKER_CONFIG_JSON }}
-          HARBOR_CA_PEM: ${{ secrets.HARBOR_CA_PEM }}
-        run: |
-          set -euo pipefail
-          umask 077
-          install -d "$RUNNER_TEMP/harbor"
-          printf '%s' "$HARBOR_DOCKER_CONFIG_JSON" > "$RUNNER_TEMP/harbor/config.json"
-          printf '%s' "$HARBOR_CA_PEM" > "$RUNNER_TEMP/harbor/ca.crt"
-          test -s "$RUNNER_TEMP/harbor/config.json" && test -s "$RUNNER_TEMP/harbor/ca.crt"
-          if [[ -s /etc/ssl/certs/ca-certificates.crt ]]; then
-            cat /etc/ssl/certs/ca-certificates.crt "$RUNNER_TEMP/harbor/ca.crt" > "$RUNNER_TEMP/harbor/ca-bundle.crt"
-          else
-            cp "$RUNNER_TEMP/harbor/ca.crt" "$RUNNER_TEMP/harbor/ca-bundle.crt"
-          fi
-          echo "DOCKER_CONFIG=$RUNNER_TEMP/harbor" >> "$GITHUB_ENV"
-          echo "SSL_CERT_FILE=$RUNNER_TEMP/harbor/ca-bundle.crt" >> "$GITHUB_ENV"
+        uses: HappyLadySauceM/ci-templates/.github/actions/prepare-harbor@eba5084e8c19ef384e18b3e230f7fe0d3c17b4de
+        with:
+          docker-config-json: ${{ secrets.HARBOR_DOCKER_CONFIG_JSON }}
+          ca-pem: ${{ secrets.HARBOR_CA_PEM }}
       - name: Remove candidate tags after promotion or rollback
         env:
           BUILD_SERVICES: ${{ needs.plan.outputs.build_services }}
@@ -876,7 +836,7 @@ jobs:
       - name: Mark Feishu pipeline task complete
         if: vars.FEISHU_TASK_TRACKER_ENABLED == 'true'
         continue-on-error: true
-        uses: HappyLadySauceM/ci-templates/.github/actions/feishu-pipeline-task@0afa6fd5c6a58c2ad4529d02920afeefe2ec039e
+        uses: HappyLadySauceM/ci-templates/.github/actions/feishu-pipeline-task@eba5084e8c19ef384e18b3e230f7fe0d3c17b4de
         with:
           operation: sync
           phase: completed
