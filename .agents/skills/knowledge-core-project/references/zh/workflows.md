@@ -62,6 +62,7 @@
 状态：`verified`
 
 - `.github/workflows/feishu-notify.yml`
+- `.github/workflows/maintenance.yml`
 - `.github/workflows/pipeline.yml`
 
 来源： `filesystem:ci-config`

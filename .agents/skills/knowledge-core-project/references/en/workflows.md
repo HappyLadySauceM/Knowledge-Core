@@ -60,6 +60,7 @@ Sources: `Makefile`, `detected:project-scripts`
 Status: `verified`
 
 - `.github/workflows/feishu-notify.yml`
+- `.github/workflows/maintenance.yml`
 - `.github/workflows/pipeline.yml`
 
 Sources: `filesystem:ci-config`

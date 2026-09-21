@@ -320,7 +320,7 @@
     },
     {
       "id": "cicd.config-files",
-      "revision": 160,
+      "revision": 190,
       "section": "workflows",
       "sources": [
         {
@@ -329,9 +329,10 @@
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-09-02T15:10:39Z",
+      "updatedAt": "2026-09-21T15:21:24Z",
       "value": [
         ".github/workflows/feishu-notify.yml",
+        ".github/workflows/maintenance.yml",
         ".github/workflows/pipeline.yml"
       ]
     },
@@ -1113,11 +1114,11 @@
     "profile": "generic",
     "slug": "knowledge-core"
   },
-  "revision": 189,
+  "revision": 190,
   "scan": {
-    "fingerprint": "52348cecc88428fd4892669c5131d2d534c20b9ded26f4b6a73937fc7d471126",
-    "inventoryCount": 477
+    "fingerprint": "57790f0400ee5cf13e4ac951d519ac23bbe105d1312a82188c764b2e6ba3a220",
+    "inventoryCount": 478
   },
   "schemaVersion": 3,
-  "updatedAt": "2026-09-21T13:13:01Z"
+  "updatedAt": "2026-09-21T15:21:24Z"
 }
