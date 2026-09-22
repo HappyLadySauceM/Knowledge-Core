@@ -603,6 +603,9 @@ components:
                     type: string
                 cursor:
                     type: string
+                folder_id:
+                    format: uuid
+                    type: string
                 limit:
                     format: int32
                     type: integer
@@ -4192,6 +4195,12 @@ paths:
                   schema:
                     type: string
                 - in: query
+                  name: folder_id
+                  required: false
+                  schema:
+                    format: uuid
+                    type: string
+                - in: query
                   name: limit
                   required: false
                   schema:
@@ -7060,6 +7069,12 @@ paths:
                   name: cursor
                   required: false
                   schema:
+                    type: string
+                - in: query
+                  name: folder_id
+                  required: false
+                  schema:
+                    format: uuid
                     type: string
                 - in: query
                   name: limit
@@ -13651,6 +13666,12 @@ paths:
                   name: cursor
                   required: false
                   schema:
+                    type: string
+                - in: query
+                  name: folder_id
+                  required: false
+                  schema:
+                    format: uuid
                     type: string
                 - in: query
                   name: limit

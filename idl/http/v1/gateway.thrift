@@ -293,6 +293,7 @@ struct ListDocumentsRequest {
   3: optional i32 limit (api.query="limit")
   4: optional string access (api.query="access")
   5: optional string publication (api.query="publication")
+  6: optional string folder_id (api.query="folder_id")
 }
 
 struct ListFoldersRequest { 1: optional string parent_id (api.query="parent_id") }

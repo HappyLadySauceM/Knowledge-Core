@@ -1226,6 +1226,7 @@ type ListDocumentsRequest struct {
 	Limit       *int32  `thrift:"limit,3,optional" frugal:"3,optional,i32" json:"limit,omitempty"`
 	Access      *string `thrift:"access,4,optional" frugal:"4,optional,string" json:"access,omitempty"`
 	Publication *string `thrift:"publication,5,optional" frugal:"5,optional,string" json:"publication,omitempty"`
+	FolderId    *string `thrift:"folder_id,6,optional" frugal:"6,optional,string" json:"folder_id,omitempty"`
 }
 
 func NewListDocumentsRequest() *ListDocumentsRequest {
@@ -1279,6 +1280,15 @@ func (p *ListDocumentsRequest) GetPublication() (v string) {
 	}
 	return *p.Publication
 }
+
+var ListDocumentsRequest_FolderId_DEFAULT string
+
+func (p *ListDocumentsRequest) GetFolderId() (v string) {
+	if !p.IsSetFolderId() {
+		return ListDocumentsRequest_FolderId_DEFAULT
+	}
+	return *p.FolderId
+}
 func (p *ListDocumentsRequest) SetQuery(val *string) {
 	p.Query = val
 }
@@ -1293,6 +1303,9 @@ func (p *ListDocumentsRequest) SetAccess(val *string) {
 }
 func (p *ListDocumentsRequest) SetPublication(val *string) {
 	p.Publication = val
+}
+func (p *ListDocumentsRequest) SetFolderId(val *string) {
+	p.FolderId = val
 }
 
 func (p *ListDocumentsRequest) IsSetQuery() bool {
@@ -1315,6 +1328,10 @@ func (p *ListDocumentsRequest) IsSetPublication() bool {
 	return p.Publication != nil
 }
 
+func (p *ListDocumentsRequest) IsSetFolderId() bool {
+	return p.FolderId != nil
+}
+
 func (p *ListDocumentsRequest) String() string {
 	if p == nil {
 		return "<nil>"
@@ -1328,6 +1345,7 @@ var fieldIDToName_ListDocumentsRequest = map[int16]string{
 	3: "limit",
 	4: "access",
 	5: "publication",
+	6: "folder_id",
 }
 
 type GetPublishedDocumentRequest struct {

@@ -674,6 +674,7 @@ func listInput(request *knowledgev1.ListDocumentsRequest, actorID int64) knowled
 	return knowledgelogic.ListDocumentsInput{
 		ActorID: actorID, Query: stringValue(request.Query), Cursor: stringValue(request.Cursor),
 		Limit: int32Value(request.Limit), Access: stringValue(request.Access), Publication: stringValue(request.Publication),
+		FolderID: stringValue(request.FolderId),
 	}
 }
 

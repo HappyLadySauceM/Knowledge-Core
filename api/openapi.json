@@ -840,6 +840,10 @@
           "cursor": {
             "type": "string"
           },
+          "folder_id": {
+            "format": "uuid",
+            "type": "string"
+          },
           "limit": {
             "format": "int32",
             "type": "integer"
@@ -5962,6 +5966,15 @@
           },
           {
             "in": "query",
+            "name": "folder_id",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
             "name": "limit",
             "required": false,
             "schema": {
@@ -10070,6 +10083,15 @@
             "name": "cursor",
             "required": false,
             "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "folder_id",
+            "required": false,
+            "schema": {
+              "format": "uuid",
               "type": "string"
             }
           },
@@ -19483,6 +19505,15 @@
             "name": "cursor",
             "required": false,
             "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "folder_id",
+            "required": false,
+            "schema": {
+              "format": "uuid",
               "type": "string"
             }
           },

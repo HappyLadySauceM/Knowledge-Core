@@ -143,6 +143,7 @@ type ListDocumentsInput struct {
 	Limit       int32
 	Access      string
 	Publication string
+	FolderID    string
 }
 
 type DocumentPage struct {
@@ -285,6 +286,7 @@ func (l *DocumentLogic) List(ctx context.Context, input ListDocumentsInput) (Doc
 	documents, err := l.repository.ListDocuments(ctx, repository.ListOptions{
 		ActorID: input.ActorID, Query: strings.TrimSpace(input.Query), Cursor: cursor, Limit: limit,
 		Access: input.Access, Publication: input.Publication,
+		FolderID: input.FolderID,
 	})
 	if err != nil {
 		return DocumentPage{}, mapError(err)
@@ -693,14 +695,19 @@ func validateListInput(input ListDocumentsInput, public bool) error {
 	if err := domain.ValidatePage(input.Limit, input.Cursor, input.Query); err != nil {
 		return err
 	}
-	if public && (input.Access != "" || input.Publication != "") {
-		return &domain.ValidationError{Field: "filters", Reason: "access and publication are not valid for the public collection"}
+	if public && (input.Access != "" || input.Publication != "" || input.FolderID != "") {
+		return &domain.ValidationError{Field: "filters", Reason: "access, publication, and folder are not valid for the public collection"}
 	}
 	if input.Access != "" && input.Access != domain.AccessOwner && input.Access != "shared" {
 		return &domain.ValidationError{Field: "access", Reason: "must be owner or shared"}
 	}
 	if input.Publication != "" && input.Publication != "published" && input.Publication != "draft" {
 		return &domain.ValidationError{Field: "publication", Reason: "must be published or draft"}
+	}
+	if input.FolderID != "" {
+		if err := domain.ValidateID("folder_id", input.FolderID); err != nil {
+			return err
+		}
 	}
 	return nil
 }

@@ -31,6 +31,7 @@ type listInput struct {
 	limit       *int32
 	access      *string
 	publication *string
+	folderID    *string
 }
 
 type createDocumentBody struct {
@@ -115,6 +116,7 @@ func decodeListInput(request *app.RequestContext, studio bool) (listInput, error
 	if studio {
 		allowed["access"] = struct{}{}
 		allowed["publication"] = struct{}{}
+		allowed["folder_id"] = struct{}{}
 	}
 	values, err := strictQuery(request, allowed)
 	if err != nil {
@@ -123,6 +125,7 @@ func decodeListInput(request *app.RequestContext, studio bool) (listInput, error
 	result := listInput{
 		query: queryPointer(values, "q"), cursor: queryPointer(values, "cursor"),
 		access: queryPointer(values, "access"), publication: queryPointer(values, "publication"),
+		folderID: queryPointer(values, "folder_id"),
 	}
 	if result.query != nil {
 		if !utf8.ValidString(*result.query) || len([]rune(*result.query)) > 200 || containsControl(*result.query) {
@@ -148,6 +151,11 @@ func decodeListInput(request *app.RequestContext, studio bool) (listInput, error
 	}
 	if result.publication != nil && *result.publication != "published" && *result.publication != "draft" {
 		return listInput{}, errors.New("publication must be published or draft")
+	}
+	if result.folderID != nil {
+		if _, err := uuid.Parse(*result.folderID); err != nil {
+			return listInput{}, errors.New("folder_id must be a UUID")
+		}
 	}
 	return result, nil
 }

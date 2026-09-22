@@ -28189,6 +28189,8 @@ pub mod volo_gen {
             pub access: ::std::option::Option<::pilota::FastStr>,
 
             pub publication: ::std::option::Option<::pilota::FastStr>,
+
+            pub folder_id: ::std::option::Option<::pilota::FastStr>,
         }
         impl ::pilota::thrift::Message for ListDocumentsRequest {
             fn encode<T: ::pilota::thrift::TOutputProtocol>(
@@ -28217,6 +28219,9 @@ pub mod volo_gen {
                 if let Some(value) = self.publication.as_ref() {
                     __protocol.write_faststr_field(5, (value).clone())?;
                 }
+                if let Some(value) = self.folder_id.as_ref() {
+                    __protocol.write_faststr_field(6, (value).clone())?;
+                }
                 __protocol.write_field_stop()?;
                 __protocol.write_struct_end()?;
                 ::std::result::Result::Ok(())
@@ -28233,6 +28238,7 @@ pub mod volo_gen {
                 let mut var_3 = None;
                 let mut var_4 = None;
                 let mut var_5 = None;
+                let mut var_6 = None;
 
                 let mut __pilota_decoding_field_id = None;
 
@@ -28271,6 +28277,11 @@ pub mod volo_gen {
                             {
                                 var_5 = Some(__protocol.read_faststr()?);
                             }
+                            Some(6)
+                                if field_ident.field_type == ::pilota::thrift::TType::Binary =>
+                            {
+                                var_6 = Some(__protocol.read_faststr()?);
+                            }
                             _ => {
                                 __protocol.skip(field_ident.field_type)?;
                             }
@@ -28297,6 +28308,7 @@ pub mod volo_gen {
                     limit: var_3,
                     access: var_4,
                     publication: var_5,
+                    folder_id: var_6,
                 };
                 ::std::result::Result::Ok(data)
             }
@@ -28317,6 +28329,7 @@ pub mod volo_gen {
                     let mut var_3 = None;
                     let mut var_4 = None;
                     let mut var_5 = None;
+                    let mut var_6 = None;
 
                     let mut __pilota_decoding_field_id = None;
 
@@ -28359,6 +28372,12 @@ pub mod volo_gen {
                                 {
                                     var_5 = Some(__protocol.read_faststr().await?);
                                 }
+                                Some(6)
+                                    if field_ident.field_type
+                                        == ::pilota::thrift::TType::Binary =>
+                                {
+                                    var_6 = Some(__protocol.read_faststr().await?);
+                                }
                                 _ => {
                                     __protocol.skip(field_ident.field_type).await?;
                                 }
@@ -28383,6 +28402,7 @@ pub mod volo_gen {
                         limit: var_3,
                         access: var_4,
                         publication: var_5,
+                        folder_id: var_6,
                     };
                     ::std::result::Result::Ok(data)
                 })
@@ -28413,6 +28433,10 @@ pub mod volo_gen {
                         .publication
                         .as_ref()
                         .map_or(0, |value| __protocol.faststr_field_len(Some(5), value))
+                    + self
+                        .folder_id
+                        .as_ref()
+                        .map_or(0, |value| __protocol.faststr_field_len(Some(6), value))
                     + __protocol.field_stop_len()
                     + __protocol.struct_end_len()
             }

@@ -116,6 +116,7 @@ struct ListDocumentsRequest {
   3: optional i32 limit
   4: optional string access
   5: optional string publication
+  6: optional string folder_id
 }
 
 struct GetPublishedDocumentRequest { 1: required string slug }

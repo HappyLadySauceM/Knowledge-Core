@@ -56,3 +56,14 @@ func TestBuildListDocumentsQueryHidesPurgePendingTrash(t *testing.T) {
 		t.Fatalf("trash query does not hide permanently deleted entries:\n%s", query)
 	}
 }
+
+func TestBuildListDocumentsQueryFiltersByFolderBeforePagination(t *testing.T) {
+	folderID := "9c35013e-8274-4a50-ac5f-3bfdb19ababc"
+	query, args := buildListDocumentsQuery(ListOptions{ActorID: 42, FolderID: folderID}, 20)
+	if !strings.Contains(query, "d.folder_id = ?::uuid") {
+		t.Fatalf("folder query is missing the server-side filter:\n%s", query)
+	}
+	if !reflect.DeepEqual(args, []any{int64(42), int64(42), int64(42), folderID, 21}) {
+		t.Fatalf("args = %#v", args)
+	}
+}

@@ -299,6 +299,7 @@ type ListOptions struct {
 	Limit       int
 	Access      string
 	Publication string
+	FolderID    string
 	Published   bool
 	Deleted     bool
 }
@@ -428,6 +429,10 @@ JOIN (
 		conditions = append(conditions, "d.publication_status = 'published'")
 	case "draft":
 		conditions = append(conditions, "d.publication_status <> 'published'")
+	}
+	if options.FolderID != "" {
+		conditions = append(conditions, "d.folder_id = ?::uuid")
+		args = append(args, options.FolderID)
 	}
 	orderColumn := "d.updated_at"
 	if options.Published {

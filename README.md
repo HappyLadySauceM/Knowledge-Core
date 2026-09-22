@@ -26,7 +26,7 @@ Knowledge Core 是一个支持文档元数据、权限、通用附件、实时�
 | 通用附件 | `/api/v1/attachments` | Attachment façade、稳定游标分页、16MiB 分片上传、幂等重试、扫描状态和回收 |
 | 站点配置 | `GET /api/v1/site-profile` | 站点标题、双语标语、首图和焦点位置 |
 | 管理员配置 | `/api/v1/admin/configuration/:namespace` | 管理员读取/写入 `site`、`email`、`ai`；使用强 ETag 和幂等键 |
-| Studio 文档 | `/api/v1/studio/documents` | 列表、创建、读取、更新、删除、发布和取消发布 |
+| Studio 文档 | `/api/v1/studio/documents` | 列表（含 `folder_id` 服务端分页过滤）、创建、读取、更新、删除、发布和取消发布 |
 | 文档提交 | `/api/v1/studio/documents/:document_id/commits` | 创建、查看、重命名和恢复显式历史提交；恢复产生新提交 |
 | 成员 | `/api/v1/studio/documents/:document_id/members` | viewer/editor 成员管理 |
 | 协作会话 | `POST /api/v1/studio/documents/:document_id/collaboration-sessions` | 创建短期、单次使用的 WebSocket ticket |

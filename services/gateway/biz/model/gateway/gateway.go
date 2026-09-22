@@ -14155,6 +14155,7 @@ type ListDocumentsRequest struct {
 	Limit       *int32  `thrift:"limit,3,optional" json:"limit,omitempty" query:"limit"`
 	Access      *string `thrift:"access,4,optional" json:"access,omitempty" query:"access"`
 	Publication *string `thrift:"publication,5,optional" json:"publication,omitempty" query:"publication"`
+	FolderID    *string `thrift:"folder_id,6,optional" json:"folder_id,omitempty" query:"folder_id"`
 }
 
 func NewListDocumentsRequest() *ListDocumentsRequest {
@@ -14209,12 +14210,22 @@ func (p *ListDocumentsRequest) GetPublication() (v string) {
 	return *p.Publication
 }
 
+var ListDocumentsRequest_FolderID_DEFAULT string
+
+func (p *ListDocumentsRequest) GetFolderID() (v string) {
+	if !p.IsSetFolderID() {
+		return ListDocumentsRequest_FolderID_DEFAULT
+	}
+	return *p.FolderID
+}
+
 var fieldIDToName_ListDocumentsRequest = map[int16]string{
 	1: "query",
 	2: "cursor",
 	3: "limit",
 	4: "access",
 	5: "publication",
+	6: "folder_id",
 }
 
 func (p *ListDocumentsRequest) IsSetQuery() bool {
@@ -14235,6 +14246,10 @@ func (p *ListDocumentsRequest) IsSetAccess() bool {
 
 func (p *ListDocumentsRequest) IsSetPublication() bool {
 	return p.Publication != nil
+}
+
+func (p *ListDocumentsRequest) IsSetFolderID() bool {
+	return p.FolderID != nil
 }
 
 func (p *ListDocumentsRequest) Read(iprot thrift.TProtocol) (err error) {
@@ -14291,6 +14306,14 @@ func (p *ListDocumentsRequest) Read(iprot thrift.TProtocol) (err error) {
 		case 5:
 			if fieldTypeId == thrift.STRING {
 				if err = p.ReadField5(iprot); err != nil {
+					goto ReadFieldError
+				}
+			} else if err = iprot.Skip(fieldTypeId); err != nil {
+				goto SkipFieldError
+			}
+		case 6:
+			if fieldTypeId == thrift.STRING {
+				if err = p.ReadField6(iprot); err != nil {
 					goto ReadFieldError
 				}
 			} else if err = iprot.Skip(fieldTypeId); err != nil {
@@ -14380,6 +14403,17 @@ func (p *ListDocumentsRequest) ReadField5(iprot thrift.TProtocol) error {
 	p.Publication = _field
 	return nil
 }
+func (p *ListDocumentsRequest) ReadField6(iprot thrift.TProtocol) error {
+
+	var _field *string
+	if v, err := iprot.ReadString(); err != nil {
+		return err
+	} else {
+		_field = &v
+	}
+	p.FolderID = _field
+	return nil
+}
 
 func (p *ListDocumentsRequest) Write(oprot thrift.TProtocol) (err error) {
 	var fieldId int16
@@ -14405,6 +14439,10 @@ func (p *ListDocumentsRequest) Write(oprot thrift.TProtocol) (err error) {
 		}
 		if err = p.writeField5(oprot); err != nil {
 			fieldId = 5
+			goto WriteFieldError
+		}
+		if err = p.writeField6(oprot); err != nil {
+			fieldId = 6
 			goto WriteFieldError
 		}
 	}
@@ -14518,6 +14556,25 @@ WriteFieldBeginError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 5 begin error: ", p), err)
 WriteFieldEndError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 5 end error: ", p), err)
+}
+
+func (p *ListDocumentsRequest) writeField6(oprot thrift.TProtocol) (err error) {
+	if p.IsSetFolderID() {
+		if err = oprot.WriteFieldBegin("folder_id", thrift.STRING, 6); err != nil {
+			goto WriteFieldBeginError
+		}
+		if err := oprot.WriteString(*p.FolderID); err != nil {
+			return err
+		}
+		if err = oprot.WriteFieldEnd(); err != nil {
+			goto WriteFieldEndError
+		}
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 6 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 6 end error: ", p), err)
 }
 
 func (p *ListDocumentsRequest) String() string {

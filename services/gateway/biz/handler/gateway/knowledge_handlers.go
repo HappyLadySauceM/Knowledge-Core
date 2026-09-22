@@ -760,7 +760,7 @@ func handleDeleteMember(ctx context.Context, request *app.RequestContext) {
 
 func listRequest(input listInput) *knowledgev1.ListDocumentsRequest {
 	return &knowledgev1.ListDocumentsRequest{
-		Query: input.query, Cursor: input.cursor, Limit: input.limit, Access: input.access, Publication: input.publication,
+		Query: input.query, Cursor: input.cursor, Limit: input.limit, Access: input.access, Publication: input.publication, FolderId: input.folderID,
 	}
 }
 

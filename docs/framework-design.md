@@ -128,7 +128,7 @@ HTTP 契约源是 `idl/http/v1/gateway.thrift`。Gateway 当前公开：
 | 用户/会话 | `POST /api/v1/users`、`POST /api/v1/sessions`、`GET /api/v1/users/me` |
 | 公开文档 | `GET /api/v1/documents`、`GET /api/v1/documents/:slug` |
 | 公开附件 | `GET /api/v1/attachments/:attachment_id/content` |
-| Studio 文档 | `/api/v1/studio/documents` 下的列表、创建、读取、更新、删除、发布和取消发布 |
+| Studio 文档 | `/api/v1/studio/documents` 下的列表（支持 `folder_id` 服务端分页过滤）、创建、读取、更新、删除、发布和取消发布 |
 | 成员 | `/api/v1/studio/documents/:document_id/members` |
 | 发布 | `PUT /api/v1/studio/documents/:document_id/publication`（发布/更新）与 `DELETE`（取消发布） |
 | 永久删除 | `DELETE /api/v1/studio/trash/:document_id`（If-Match + Idempotency-Key + X-Confirm-Permanent-Delete=true，异步清理） |
