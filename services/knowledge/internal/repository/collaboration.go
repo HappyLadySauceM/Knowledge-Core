@@ -57,6 +57,9 @@ func (s *Store) UpsertProjection(ctx context.Context, projection domain.Projecti
 		}).Error; err != nil {
 			return fmt.Errorf("advance projected document sequence: %w", err)
 		}
+		if err := markHistoryDirty(tx, projection.DocumentID, projection.ProjectedAt.UTC()); err != nil {
+			return fmt.Errorf("schedule history checkpoint: %w", err)
+		}
 		return nil
 	})
 }

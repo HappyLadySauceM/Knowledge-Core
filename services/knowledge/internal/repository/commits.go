@@ -105,6 +105,13 @@ func (s *Store) CreateCommit(ctx context.Context, documentID string, actorID int
 				return err
 			}
 		}
+		var latest model.DocumentCommit
+		if err := tx.Where("document_id = ?", documentID).Order("created_at DESC, id DESC").First(&latest).Error; err == nil && latest.ContentHash == hash {
+			result, err = commitFromModel(&latest)
+			return err
+		} else if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("load latest document commit: %w", err)
+		}
 		encoded, err := jsoncodec.Marshal(content)
 		if err != nil {
 			return err
@@ -117,7 +124,7 @@ func (s *Store) CreateCommit(ctx context.Context, documentID string, actorID int
 		commit := &model.DocumentCommit{ID: id, DocumentID: documentID, Kind: input.Kind, Label: input.Label,
 			Description: input.Description, ContributorID: actorID, ContributorName: record.OwnerUsername,
 			Sequence: projection.Sequence, ContentHash: hash, Content: encoded, PlainText: plainText,
-			IsAnchor: true, CreatedAt: now, UpdatedAt: now}
+			IsAnchor: input.Kind == "publish" || input.Kind == "restore", CreatedAt: now, UpdatedAt: now}
 		if err := tx.Create(commit).Error; err != nil {
 			return mapWriteError("create document commit", err)
 		}

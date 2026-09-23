@@ -61,6 +61,7 @@ type Document struct {
 	PublicationError      *string
 	PublicationGeneration int64
 	PublicationHash       string
+	ActivePublicationHash string
 	Icon                  string
 	CoverAttachmentID     *string
 	CoverFocalX           float64

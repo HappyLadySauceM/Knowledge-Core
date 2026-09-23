@@ -59,6 +59,7 @@ type PublicationSnapshotInput struct {
 	Tags              []string
 	Content           domain.RichTextDocument
 	PlainText         string
+	ContentSequence   int64
 	PublicationHash   string
 	Icon              string
 	CoverAttachmentID *string
@@ -170,6 +171,12 @@ func (s *Store) getDocument(db *gorm.DB, id string, actorID int64, includeDelete
 		return nil, err
 	}
 	document := documentFromModel(&record, access, projection)
+	var activePublication model.DocumentPublication
+	if err := db.Select("publication_hash").Where("document_id = ?", record.ID).First(&activePublication).Error; err == nil {
+		document.ActivePublicationHash = activePublication.PublicationHash
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, fmt.Errorf("load active publication hash: %w", err)
+	}
 	if err := s.loadDocumentStructure(db, document); err != nil {
 		return nil, err
 	}
@@ -388,6 +395,7 @@ func buildListDocumentsQuery(options ListOptions, limit int) (string, []any) {
 FROM knowledge.documents d
 LEFT JOIN knowledge.document_members m ON m.document_id = d.id AND m.user_id = ?
 LEFT JOIN knowledge.document_projections p ON p.document_id = d.id
+LEFT JOIN knowledge.document_placements placement ON placement.document_id = d.id AND placement.owner_id = d.owner_id
 LEFT JOIN knowledge.document_publications pub ON pub.document_id = d.id`
 	args := []any{options.ActorID, options.ActorID}
 	if options.Query != "" {
@@ -431,7 +439,7 @@ JOIN (
 		conditions = append(conditions, "d.publication_status <> 'published'")
 	}
 	if options.FolderID != "" {
-		conditions = append(conditions, "d.folder_id = ?::uuid")
+		conditions = append(conditions, "placement.folder_id = ?::uuid")
 		args = append(args, options.FolderID)
 	}
 	orderColumn := "d.updated_at"

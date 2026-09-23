@@ -143,6 +143,7 @@ type PublicationCandidate struct {
 	OwnerAvatar       string    `gorm:"type:text;not null"`
 	Content           []byte    `gorm:"type:jsonb;not null"`
 	PlainText         string    `gorm:"type:text;not null"`
+	ContentSequence   int64     `gorm:"not null;default:0"`
 	MediaIDs          []byte    `gorm:"type:jsonb;not null"`
 	PublicationHash   string    `gorm:"size:64;not null;default:''"`
 	Icon              string    `gorm:"size:16;not null;default:''"`
@@ -173,6 +174,69 @@ type DocumentCommit struct {
 }
 
 func (DocumentCommit) TableName() string { return "knowledge.document_commits" }
+
+type DocumentHistory struct {
+	ID               string    `gorm:"type:uuid;primaryKey"`
+	DocumentID       string    `gorm:"type:uuid;not null"`
+	Kind             string    `gorm:"size:24;not null"`
+	Sequence         int64     `gorm:"not null"`
+	MetadataRevision int64     `gorm:"not null"`
+	SemanticHash     string    `gorm:"size:64;not null"`
+	Content          []byte    `gorm:"type:jsonb;not null"`
+	PlainText        string    `gorm:"type:text;not null"`
+	Metadata         []byte    `gorm:"type:jsonb;not null"`
+	Contributors     []byte    `gorm:"type:jsonb;not null"`
+	BlockDiff        []byte    `gorm:"type:jsonb;not null"`
+	IsAnchor         bool      `gorm:"not null"`
+	CreatedAt        time.Time `gorm:"type:timestamptz;not null"`
+}
+
+func (DocumentHistory) TableName() string { return "knowledge.document_history" }
+
+type HistoryActivity struct {
+	DocumentID     string     `gorm:"type:uuid;primaryKey"`
+	FirstDirtyAt   time.Time  `gorm:"type:timestamptz;not null"`
+	LastDirtyAt    time.Time  `gorm:"type:timestamptz;not null"`
+	LastCheckpoint *time.Time `gorm:"type:timestamptz"`
+	Contributors   []byte     `gorm:"type:jsonb;not null"`
+	UpdatedAt      time.Time  `gorm:"type:timestamptz;not null"`
+}
+
+func (HistoryActivity) TableName() string { return "knowledge.history_activity" }
+
+type Space struct {
+	ID                       string    `gorm:"type:uuid;primaryKey"`
+	ScopeType                string    `gorm:"size:16;not null"`
+	ScopeID                  int64     `gorm:"not null"`
+	Name                     string    `gorm:"size:160;not null"`
+	Description              string    `gorm:"size:1000;not null"`
+	Visibility               string    `gorm:"size:24;not null"`
+	PublicPublicationEnabled bool      `gorm:"not null"`
+	Revision                 int64     `gorm:"not null"`
+	CreatedBy                int64     `gorm:"not null"`
+	CreatedAt                time.Time `gorm:"type:timestamptz;not null"`
+	UpdatedAt                time.Time `gorm:"type:timestamptz;not null"`
+}
+
+func (Space) TableName() string { return "knowledge.spaces" }
+
+type PageNode struct {
+	ID                string    `gorm:"type:uuid;primaryKey"`
+	ScopeType         string    `gorm:"size:16;not null"`
+	ScopeID           int64     `gorm:"not null"`
+	SpaceID           *string   `gorm:"type:uuid"`
+	DocumentID        string    `gorm:"type:uuid;not null"`
+	ParentID          *string   `gorm:"type:uuid"`
+	Position          int64     `gorm:"not null"`
+	Depth             int       `gorm:"not null"`
+	PermissionMode    string    `gorm:"size:16;not null"`
+	ProvisioningState string    `gorm:"size:16;not null"`
+	Revision          int64     `gorm:"not null"`
+	CreatedAt         time.Time `gorm:"type:timestamptz;not null"`
+	UpdatedAt         time.Time `gorm:"type:timestamptz;not null"`
+}
+
+func (PageNode) TableName() string { return "knowledge.page_nodes" }
 
 type PublishedMediaReference struct {
 	DocumentID   string    `gorm:"type:uuid;primaryKey"`

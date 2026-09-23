@@ -11,7 +11,7 @@ Knowledge Core is a knowledge-collaboration backend that separates identity, doc
 - Identity and session security
 - Document metadata and permissions
 - Attachments
-- Realtime collaboration and version restore
+- Realtime collaboration, automatic history, and publication snapshots
 - Platform-managed business configuration
 - HTTP and WebSocket edge orchestration
 **Out of scope**
@@ -72,9 +72,9 @@ flowchart LR
     subgraph System[System in scope]
         Gateway["Gateway\npublic HTTP edge, security middleware, rate limits, and typed RPC orchestration"]
         Identity["Identity\nusers, credentials, sessions, token validity, and account actions"]
-        Knowledge["Knowledge\ndocuments, folders, permissions, publication, quota, and projections"]
+        Knowledge["Knowledge\ndocuments, automatic history, spaces and page-tree metadata, permissions, publication, quota, and projections"]
         Attachment["Attachment\nreusable file metadata, multipart upload, scanning, references, and trash"]
-        Collaboration["Collaboration\nWebSocket/Yjs state, snapshots, versions, restore, and permission invalidation"]
+        Collaboration["Collaboration\nWebSocket/Yjs draft persistence, publication snapshot capture, document purge, and permission invalidation"]
         Platform["Platform\nrevisioned site/email/AI configuration, audit, and reliable change events"]
     end
 ```
@@ -116,6 +116,14 @@ flowchart LR
 ### Configuration change
 
 - **description**: Platform commits revision, audit, idempotency, and outbox atomically, then publishes coordinate-only events. GetConsumerState returns DesiredRevision=0 idle state when a namespace has not been written, rather than NotFound. Identity reads Platform consumer snapshots and reports application status over the trusted mTLS mesh without an application service token.
+
+### Automatic document history
+
+- **description**: Knowledge turns committed Collaboration projections into hash-deduplicated automatic checkpoints after idle or maximum edit windows, and retains publication anchors.
+
+### Draft and publication snapshot
+
+- **description**: Collaboration persists the realtime Yjs draft; publication captures a committed snapshot and Knowledge atomically promotes only the requested generation and semantic hash.
 
 
 ## Quality attributes
@@ -194,4 +202,4 @@ flowchart LR
 - **mitigation**: Pin IDL generation, enforce compatibility checks, and fail readiness on critical stream/subject mismatches.
 
 
-<!-- fact:architecture.design status:verified sources:README.md#knowledge-core, docs/framework-design.md, docs/framework-design.md#9, docs/framework-design.md#knowledge-core, docs/platform-configuration.md#配置同步, docs/rust-collaboration-design.md#rust-collaboration, Knowledge-Core/.tmp/architecture-design.md, user-confirmed-en-locale-source, user-confirmed-internal-rpc-auth-boundary -->
+<!-- fact:architecture.design status:verified sources:README.md#automatic-document-history, README.md#knowledge-core, docs/framework-design.md, docs/framework-design.md#9, docs/framework-design.md#knowledge-core, docs/platform-configuration.md#配置同步, docs/rust-collaboration-design.md#rust-collaboration, Knowledge-Core/.tmp/architecture-design.md, user-confirmed-en-locale-source, user-confirmed-internal-rpc-auth-boundary -->

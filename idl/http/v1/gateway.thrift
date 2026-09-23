@@ -156,6 +156,7 @@ struct RichTextAttrsData {
   10: optional i32 colspan (api.body="colspan")
   11: optional i32 rowspan (api.body="rowspan")
   12: optional list<i32> colwidth (api.body="colwidth")
+  13: optional string block_id (api.body="blockId")
 }
 
 struct RichTextMarkData {
@@ -201,6 +202,8 @@ struct DocumentData {
   22: optional string cover_attachment_id (api.body="cover_attachment_id")
   23: optional double cover_focal_x (api.body="cover_focal_x")
   24: optional double cover_focal_y (api.body="cover_focal_y")
+  25: required i64 publication_generation (api.body="publication_generation")
+  26: optional string active_publication_hash (api.body="active_publication_hash")
 }
 
 struct DocumentDetailData {
@@ -274,6 +277,35 @@ struct RestoreCommitRequest {
   1: required string document_id (api.path="document_id")
   2: required string commit_id (api.path="commit_id")
   3: required string idempotency_key (api.header="Idempotency-Key")
+}
+
+struct HistoryRevisionData {
+  1: required string id (api.body="id")
+  2: required string document_id (api.body="document_id")
+  3: required string kind (api.body="kind")
+  4: required i64 sequence (api.body="sequence")
+  5: required i64 metadata_revision (api.body="metadata_revision")
+  6: required string semantic_hash (api.body="semantic_hash")
+  7: required RichTextDocumentData content (api.body="content")
+  8: required string plain_text (api.body="plain_text")
+  9: required string metadata_json (api.body="metadata_json")
+  10: required string contributors_json (api.body="contributors_json")
+  11: required string block_diff_json (api.body="block_diff_json")
+  12: required bool is_anchor (api.body="is_anchor")
+  13: required string created_at (api.body="created_at")
+}
+struct HistoryPageData {
+  1: required list<HistoryRevisionData> items (api.body="items")
+  2: required PageInfoData page (api.body="page")
+}
+struct ListHistoryRequest {
+  1: required string document_id (api.path="document_id")
+  2: optional i32 limit (api.query="limit")
+  3: optional string cursor (api.query="cursor")
+}
+struct HistoryIDRequest {
+  1: required string document_id (api.path="document_id")
+  2: required string revision_id (api.path="revision_id")
 }
 
 struct FolderData {
@@ -497,4 +529,6 @@ service GatewayService {
   CommitData GetCommit(1: CommitIDRequest request) (api.get="/api/v1/studio/documents/:document_id/commits/:commit_id")
   CommitData RenameCommit(1: RenameCommitRequest request) (api.patch="/api/v1/studio/documents/:document_id/commits/:commit_id")
   DocumentData RestoreCommit(1: RestoreCommitRequest request) (api.post="/api/v1/studio/documents/:document_id/commits/:commit_id/restore")
+  HistoryPageData ListHistory(1: ListHistoryRequest request) (api.get="/api/v1/studio/documents/:document_id/history")
+  HistoryRevisionData GetHistory(1: HistoryIDRequest request) (api.get="/api/v1/studio/documents/:document_id/history/:revision_id")
 }

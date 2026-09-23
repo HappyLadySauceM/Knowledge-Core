@@ -21,6 +21,7 @@ type RichTextAttrs struct {
 	Colspan      *int32  `json:"colspan,omitempty"`
 	Rowspan      *int32  `json:"rowspan,omitempty"`
 	Colwidth     []int32 `json:"colwidth,omitempty"`
+	BlockID      *string `json:"blockId,omitempty"`
 }
 
 type RichTextMark struct {
@@ -113,6 +114,12 @@ func validateRichTextNode(node *RichTextNode, depth int, count *int) error {
 
 func validateRichTextAttrs(nodeType string, attrs *RichTextAttrs) error {
 	var joined error
+	if attrs.BlockID != nil {
+		value := strings.TrimSpace(*attrs.BlockID)
+		if len(value) < 1 || len(value) > 128 {
+			joined = errors.Join(joined, &ValidationError{Field: "content", Reason: "contains an invalid block ID"})
+		}
+	}
 	if attrs.Level != nil && (*attrs.Level < 1 || *attrs.Level > 6) {
 		joined = errors.Join(joined, &ValidationError{Field: "content", Reason: "heading level must be between 1 and 6"})
 	}

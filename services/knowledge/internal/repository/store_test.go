@@ -60,7 +60,10 @@ func TestBuildListDocumentsQueryHidesPurgePendingTrash(t *testing.T) {
 func TestBuildListDocumentsQueryFiltersByFolderBeforePagination(t *testing.T) {
 	folderID := "9c35013e-8274-4a50-ac5f-3bfdb19ababc"
 	query, args := buildListDocumentsQuery(ListOptions{ActorID: 42, FolderID: folderID}, 20)
-	if !strings.Contains(query, "d.folder_id = ?::uuid") {
+	if !strings.Contains(query, "LEFT JOIN knowledge.document_placements placement ON placement.document_id = d.id AND placement.owner_id = d.owner_id") {
+		t.Fatalf("folder query is missing the authoritative placement join:\n%s", query)
+	}
+	if !strings.Contains(query, "placement.folder_id = ?::uuid") {
 		t.Fatalf("folder query is missing the server-side filter:\n%s", query)
 	}
 	if !reflect.DeepEqual(args, []any{int64(42), int64(42), int64(42), folderID, 21}) {

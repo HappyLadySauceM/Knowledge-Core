@@ -37,6 +37,8 @@ type Repository interface {
 	ListPurgeCandidates(context.Context, int) ([]repository.PurgeCandidate, error)
 	PurgeDocument(context.Context, string) error
 	PurgeMaintenanceData(context.Context) error
+	CreateDueHistoryCheckpoint(context.Context) (*repository.HistoryCheckpoint, error)
+	PruneHistory(context.Context) error
 }
 
 type PublicationReferences interface {
@@ -247,7 +249,21 @@ func (w *Worker) Shutdown(ctx context.Context) error {
 func (w *Worker) runOnce() {
 	w.runBounded("outbox", w.processOutbox)
 	w.runBounded("publication", w.processPublicationReferences)
+	w.runBounded("history", w.processHistory)
 	w.runBounded("purge", w.processPurge)
+}
+
+func (w *Worker) processHistory(ctx context.Context) error {
+	for processed := 0; processed < 20; processed++ {
+		checkpoint, err := w.repository.CreateDueHistoryCheckpoint(coretrace.Suppress(ctx))
+		if err != nil {
+			return err
+		}
+		if checkpoint == nil {
+			break
+		}
+	}
+	return w.repository.PruneHistory(coretrace.Suppress(ctx))
 }
 
 func (w *Worker) runBounded(operation string, run func(context.Context) error) {

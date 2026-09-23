@@ -56,7 +56,7 @@ func toDocumentData(value *knowledgev1.Document) (*gatewaymodel.DocumentData, er
 		ProjectedAt: copyString(value.ProjectedAt), CreatedAt: value.CreatedAt, UpdatedAt: value.UpdatedAt,
 		Language: copyString(value.Language), Tags: append([]string(nil), value.Tags...), FolderID: copyString(value.FolderId),
 		PublicationStatus: value.PublicationStatus, PublicationError: copyString(value.PublicationError),
-		PublicationHash: copyString(value.PublicationHash), Icon: copyString(value.Icon), CoverAttachmentID: copyString(value.CoverAttachmentId),
+		PublicationHash: copyString(value.PublicationHash), ActivePublicationHash: copyString(value.ActivePublicationHash), PublicationGeneration: value.PublicationGeneration, Icon: copyString(value.Icon), CoverAttachmentID: copyString(value.CoverAttachmentId),
 		CoverFocalX: copyFloat(value.CoverFocalX), CoverFocalY: copyFloat(value.CoverFocalY),
 	}, nil
 }
@@ -120,6 +120,38 @@ func toCommitData(value *knowledgev1.Commit) (*gatewaymodel.CommitData, error) {
 		Description: copyString(value.Description), Contributor: value.Contributor, Sequence: value.Sequence,
 		ContentHash: value.ContentHash, Content: content, PlainText: value.PlainText,
 		CreatedAt: value.CreatedAt, UpdatedAt: value.UpdatedAt,
+	}, nil
+}
+
+func toHistoryPageData(value *knowledgev1.HistoryPage) (*gatewaymodel.HistoryPageData, error) {
+	if value == nil || value.Page == nil {
+		return nil, errors.New("knowledge history page is incomplete")
+	}
+	items := make([]*gatewaymodel.HistoryRevisionData, 0, len(value.Items))
+	for _, item := range value.Items {
+		converted, err := toHistoryRevisionData(item)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, converted)
+	}
+	return &gatewaymodel.HistoryPageData{Items: items, Page: &gatewaymodel.PageInfoData{NextCursor: copyString(value.Page.NextCursor), HasMore: value.Page.HasMore}}, nil
+}
+
+func toHistoryRevisionData(value *knowledgev1.HistoryRevision) (*gatewaymodel.HistoryRevisionData, error) {
+	if value == nil || !validUUIDv7(value.Id) || !validUUIDv7(value.DocumentId) || value.Sequence < 0 || value.MetadataRevision < 1 ||
+		strings.TrimSpace(value.SemanticHash) == "" || !validRFC3339(value.CreatedAt) {
+		return nil, errors.New("knowledge history revision is incomplete")
+	}
+	content, err := toRichTextDocumentData(value.Content)
+	if err != nil {
+		return nil, err
+	}
+	return &gatewaymodel.HistoryRevisionData{
+		ID: value.Id, DocumentID: value.DocumentId, Kind: value.Kind, Sequence: value.Sequence,
+		MetadataRevision: value.MetadataRevision, SemanticHash: value.SemanticHash, Content: content,
+		PlainText: value.PlainText, MetadataJSON: value.MetadataJson, ContributorsJSON: value.ContributorsJson,
+		BlockDiffJSON: value.BlockDiffJson, IsAnchor: value.IsAnchor, CreatedAt: value.CreatedAt,
 	}, nil
 }
 
@@ -202,6 +234,7 @@ func fromRichTextAttrsData(value *gatewaymodel.RichTextAttrsData) *knowledgev1.R
 		Language: copyString(value.Language), Href: copyString(value.Href), AttachmentId: copyString(value.AttachmentID),
 		Alt: copyString(value.Alt), Title: copyString(value.Title), TextAlign: copyString(value.TextAlign),
 		Colspan: copyInt32(value.Colspan), Rowspan: copyInt32(value.Rowspan), Colwidth: append([]int32(nil), value.Colwidth...),
+		BlockId: copyString(value.BlockID),
 	}
 }
 
@@ -307,6 +340,7 @@ func toRichTextAttrsData(value *knowledgev1.RichTextAttrs) *gatewaymodel.RichTex
 		Language: copyString(value.Language), Href: copyString(value.Href), AttachmentID: copyString(value.AttachmentId),
 		Alt: copyString(value.Alt), Title: copyString(value.Title), TextAlign: copyString(value.TextAlign),
 		Colspan: copyInt32(value.Colspan), Rowspan: copyInt32(value.Rowspan), Colwidth: append([]int32(nil), value.Colwidth...),
+		BlockID: copyString(value.BlockId),
 	}
 }
 

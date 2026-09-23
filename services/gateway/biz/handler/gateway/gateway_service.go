@@ -684,3 +684,15 @@ func RenameCommit(ctx context.Context, c *app.RequestContext) {
 func RestoreCommit(ctx context.Context, c *app.RequestContext) {
 	handleRestoreCommit(ctx, c)
 }
+
+// ListHistory .
+// @router /api/v1/studio/documents/:document_id/history [GET]
+func ListHistory(ctx context.Context, c *app.RequestContext) {
+	handleListHistory(ctx, c)
+}
+
+// GetHistory .
+// @router /api/v1/studio/documents/:document_id/history/:revision_id [GET]
+func GetHistory(ctx context.Context, c *app.RequestContext) {
+	handleGetHistory(ctx, c)
+}

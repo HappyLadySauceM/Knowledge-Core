@@ -159,6 +159,7 @@ type RichTextAttrs struct {
 	Colspan      *int32  `thrift:"colspan,10,optional" frugal:"10,optional,i32" json:"colspan,omitempty"`
 	Rowspan      *int32  `thrift:"rowspan,11,optional" frugal:"11,optional,i32" json:"rowspan,omitempty"`
 	Colwidth     []int32 `thrift:"colwidth,12,optional" frugal:"12,optional,list<i32>" json:"colwidth,omitempty"`
+	BlockId      *string `thrift:"block_id,13,optional" frugal:"13,optional,string" json:"block_id,omitempty"`
 }
 
 func NewRichTextAttrs() *RichTextAttrs {
@@ -275,6 +276,15 @@ func (p *RichTextAttrs) GetColwidth() (v []int32) {
 	}
 	return p.Colwidth
 }
+
+var RichTextAttrs_BlockId_DEFAULT string
+
+func (p *RichTextAttrs) GetBlockId() (v string) {
+	if !p.IsSetBlockId() {
+		return RichTextAttrs_BlockId_DEFAULT
+	}
+	return *p.BlockId
+}
 func (p *RichTextAttrs) SetLevel(val *int32) {
 	p.Level = val
 }
@@ -310,6 +320,9 @@ func (p *RichTextAttrs) SetRowspan(val *int32) {
 }
 func (p *RichTextAttrs) SetColwidth(val []int32) {
 	p.Colwidth = val
+}
+func (p *RichTextAttrs) SetBlockId(val *string) {
+	p.BlockId = val
 }
 
 func (p *RichTextAttrs) IsSetLevel() bool {
@@ -360,6 +373,10 @@ func (p *RichTextAttrs) IsSetColwidth() bool {
 	return p.Colwidth != nil
 }
 
+func (p *RichTextAttrs) IsSetBlockId() bool {
+	return p.BlockId != nil
+}
+
 func (p *RichTextAttrs) String() string {
 	if p == nil {
 		return "<nil>"
@@ -380,6 +397,7 @@ var fieldIDToName_RichTextAttrs = map[int16]string{
 	10: "colspan",
 	11: "rowspan",
 	12: "colwidth",
+	13: "block_id",
 }
 
 type RichTextMark struct {
@@ -569,30 +587,32 @@ var fieldIDToName_RichTextDocument = map[int16]string{
 }
 
 type Document struct {
-	Id                string      `thrift:"id,1,required" frugal:"1,required,string" json:"id"`
-	Title             string      `thrift:"title,2,required" frugal:"2,required,string" json:"title"`
-	Summary           string      `thrift:"summary,3,required" frugal:"3,required,string" json:"summary"`
-	Slug              string      `thrift:"slug,4,required" frugal:"4,required,string" json:"slug"`
-	Owner             *PublicUser `thrift:"owner,5,required" frugal:"5,required,PublicUser" json:"owner"`
-	Access            string      `thrift:"access,6,required" frugal:"6,required,string" json:"access"`
-	Published         bool        `thrift:"published,7,required" frugal:"7,required,bool" json:"published"`
-	MetadataRevision  int64       `thrift:"metadata_revision,8,required" frugal:"8,required,i64" json:"metadata_revision"`
-	ContentRevision   int64       `thrift:"content_revision,9,required" frugal:"9,required,i64" json:"content_revision"`
-	PublishedAt       *string     `thrift:"published_at,10,optional" frugal:"10,optional,string" json:"published_at,omitempty"`
-	DeletedAt         *string     `thrift:"deleted_at,11,optional" frugal:"11,optional,string" json:"deleted_at,omitempty"`
-	ProjectedAt       *string     `thrift:"projected_at,12,optional" frugal:"12,optional,string" json:"projected_at,omitempty"`
-	CreatedAt         string      `thrift:"created_at,13,required" frugal:"13,required,string" json:"created_at"`
-	UpdatedAt         string      `thrift:"updated_at,14,required" frugal:"14,required,string" json:"updated_at"`
-	Language          *string     `thrift:"language,15,optional" frugal:"15,optional,string" json:"language,omitempty"`
-	Tags              []string    `thrift:"tags,16,optional" frugal:"16,optional,list<string>" json:"tags,omitempty"`
-	FolderId          *string     `thrift:"folder_id,17,optional" frugal:"17,optional,string" json:"folder_id,omitempty"`
-	PublicationStatus string      `thrift:"publication_status,18,required" frugal:"18,required,string" json:"publication_status"`
-	PublicationError  *string     `thrift:"publication_error,19,optional" frugal:"19,optional,string" json:"publication_error,omitempty"`
-	PublicationHash   *string     `thrift:"publication_hash,20,optional" frugal:"20,optional,string" json:"publication_hash,omitempty"`
-	Icon              *string     `thrift:"icon,21,optional" frugal:"21,optional,string" json:"icon,omitempty"`
-	CoverAttachmentId *string     `thrift:"cover_attachment_id,22,optional" frugal:"22,optional,string" json:"cover_attachment_id,omitempty"`
-	CoverFocalX       *float64    `thrift:"cover_focal_x,23,optional" frugal:"23,optional,double" json:"cover_focal_x,omitempty"`
-	CoverFocalY       *float64    `thrift:"cover_focal_y,24,optional" frugal:"24,optional,double" json:"cover_focal_y,omitempty"`
+	Id                    string      `thrift:"id,1,required" frugal:"1,required,string" json:"id"`
+	Title                 string      `thrift:"title,2,required" frugal:"2,required,string" json:"title"`
+	Summary               string      `thrift:"summary,3,required" frugal:"3,required,string" json:"summary"`
+	Slug                  string      `thrift:"slug,4,required" frugal:"4,required,string" json:"slug"`
+	Owner                 *PublicUser `thrift:"owner,5,required" frugal:"5,required,PublicUser" json:"owner"`
+	Access                string      `thrift:"access,6,required" frugal:"6,required,string" json:"access"`
+	Published             bool        `thrift:"published,7,required" frugal:"7,required,bool" json:"published"`
+	MetadataRevision      int64       `thrift:"metadata_revision,8,required" frugal:"8,required,i64" json:"metadata_revision"`
+	ContentRevision       int64       `thrift:"content_revision,9,required" frugal:"9,required,i64" json:"content_revision"`
+	PublishedAt           *string     `thrift:"published_at,10,optional" frugal:"10,optional,string" json:"published_at,omitempty"`
+	DeletedAt             *string     `thrift:"deleted_at,11,optional" frugal:"11,optional,string" json:"deleted_at,omitempty"`
+	ProjectedAt           *string     `thrift:"projected_at,12,optional" frugal:"12,optional,string" json:"projected_at,omitempty"`
+	CreatedAt             string      `thrift:"created_at,13,required" frugal:"13,required,string" json:"created_at"`
+	UpdatedAt             string      `thrift:"updated_at,14,required" frugal:"14,required,string" json:"updated_at"`
+	Language              *string     `thrift:"language,15,optional" frugal:"15,optional,string" json:"language,omitempty"`
+	Tags                  []string    `thrift:"tags,16,optional" frugal:"16,optional,list<string>" json:"tags,omitempty"`
+	FolderId              *string     `thrift:"folder_id,17,optional" frugal:"17,optional,string" json:"folder_id,omitempty"`
+	PublicationStatus     string      `thrift:"publication_status,18,required" frugal:"18,required,string" json:"publication_status"`
+	PublicationError      *string     `thrift:"publication_error,19,optional" frugal:"19,optional,string" json:"publication_error,omitempty"`
+	PublicationHash       *string     `thrift:"publication_hash,20,optional" frugal:"20,optional,string" json:"publication_hash,omitempty"`
+	Icon                  *string     `thrift:"icon,21,optional" frugal:"21,optional,string" json:"icon,omitempty"`
+	CoverAttachmentId     *string     `thrift:"cover_attachment_id,22,optional" frugal:"22,optional,string" json:"cover_attachment_id,omitempty"`
+	CoverFocalX           *float64    `thrift:"cover_focal_x,23,optional" frugal:"23,optional,double" json:"cover_focal_x,omitempty"`
+	CoverFocalY           *float64    `thrift:"cover_focal_y,24,optional" frugal:"24,optional,double" json:"cover_focal_y,omitempty"`
+	PublicationGeneration int64       `thrift:"publication_generation,25,required" frugal:"25,required,i64" json:"publication_generation"`
+	ActivePublicationHash *string     `thrift:"active_publication_hash,26,optional" frugal:"26,optional,string" json:"active_publication_hash,omitempty"`
 }
 
 func NewDocument() *Document {
@@ -762,6 +782,19 @@ func (p *Document) GetCoverFocalY() (v float64) {
 	}
 	return *p.CoverFocalY
 }
+
+func (p *Document) GetPublicationGeneration() (v int64) {
+	return p.PublicationGeneration
+}
+
+var Document_ActivePublicationHash_DEFAULT string
+
+func (p *Document) GetActivePublicationHash() (v string) {
+	if !p.IsSetActivePublicationHash() {
+		return Document_ActivePublicationHash_DEFAULT
+	}
+	return *p.ActivePublicationHash
+}
 func (p *Document) SetId(val string) {
 	p.Id = val
 }
@@ -834,6 +867,12 @@ func (p *Document) SetCoverFocalX(val *float64) {
 func (p *Document) SetCoverFocalY(val *float64) {
 	p.CoverFocalY = val
 }
+func (p *Document) SetPublicationGeneration(val int64) {
+	p.PublicationGeneration = val
+}
+func (p *Document) SetActivePublicationHash(val *string) {
+	p.ActivePublicationHash = val
+}
 
 func (p *Document) IsSetOwner() bool {
 	return p.Owner != nil
@@ -887,6 +926,10 @@ func (p *Document) IsSetCoverFocalY() bool {
 	return p.CoverFocalY != nil
 }
 
+func (p *Document) IsSetActivePublicationHash() bool {
+	return p.ActivePublicationHash != nil
+}
+
 func (p *Document) String() string {
 	if p == nil {
 		return "<nil>"
@@ -919,6 +962,8 @@ var fieldIDToName_Document = map[int16]string{
 	22: "cover_attachment_id",
 	23: "cover_focal_x",
 	24: "cover_focal_y",
+	25: "publication_generation",
+	26: "active_publication_hash",
 }
 
 type DocumentDetail struct {
@@ -1723,6 +1768,7 @@ type PublishSnapshotRequest struct {
 	CoverAttachmentId        *string           `thrift:"cover_attachment_id,13,optional" frugal:"13,optional,string" json:"cover_attachment_id,omitempty"`
 	CoverFocalX              *float64          `thrift:"cover_focal_x,14,optional" frugal:"14,optional,double" json:"cover_focal_x,omitempty"`
 	CoverFocalY              *float64          `thrift:"cover_focal_y,15,optional" frugal:"15,optional,double" json:"cover_focal_y,omitempty"`
+	ContentSequence          int64             `thrift:"content_sequence,16,required" frugal:"16,required,i64" json:"content_sequence"`
 }
 
 func NewPublishSnapshotRequest() *PublishSnapshotRequest {
@@ -1826,6 +1872,10 @@ func (p *PublishSnapshotRequest) GetCoverFocalY() (v float64) {
 	}
 	return *p.CoverFocalY
 }
+
+func (p *PublishSnapshotRequest) GetContentSequence() (v int64) {
+	return p.ContentSequence
+}
 func (p *PublishSnapshotRequest) SetDocumentId(val string) {
 	p.DocumentId = val
 }
@@ -1870,6 +1920,9 @@ func (p *PublishSnapshotRequest) SetCoverFocalX(val *float64) {
 }
 func (p *PublishSnapshotRequest) SetCoverFocalY(val *float64) {
 	p.CoverFocalY = val
+}
+func (p *PublishSnapshotRequest) SetContentSequence(val int64) {
+	p.ContentSequence = val
 }
 
 func (p *PublishSnapshotRequest) IsSetContent() bool {
@@ -1923,6 +1976,7 @@ var fieldIDToName_PublishSnapshotRequest = map[int16]string{
 	13: "cover_attachment_id",
 	14: "cover_focal_x",
 	15: "cover_focal_y",
+	16: "content_sequence",
 }
 
 type Commit struct {
@@ -2459,6 +2513,302 @@ func (p *RestoreCommitRequest) String() string {
 var fieldIDToName_RestoreCommitRequest = map[int16]string{
 	1: "commit_id",
 	2: "idempotency_key",
+}
+
+type HistoryRevision struct {
+	Id               string            `thrift:"id,1,required" frugal:"1,required,string" json:"id"`
+	DocumentId       string            `thrift:"document_id,2,required" frugal:"2,required,string" json:"document_id"`
+	Kind             string            `thrift:"kind,3,required" frugal:"3,required,string" json:"kind"`
+	Sequence         int64             `thrift:"sequence,4,required" frugal:"4,required,i64" json:"sequence"`
+	MetadataRevision int64             `thrift:"metadata_revision,5,required" frugal:"5,required,i64" json:"metadata_revision"`
+	SemanticHash     string            `thrift:"semantic_hash,6,required" frugal:"6,required,string" json:"semantic_hash"`
+	Content          *RichTextDocument `thrift:"content,7,required" frugal:"7,required,RichTextDocument" json:"content"`
+	PlainText        string            `thrift:"plain_text,8,required" frugal:"8,required,string" json:"plain_text"`
+	MetadataJson     string            `thrift:"metadata_json,9,required" frugal:"9,required,string" json:"metadata_json"`
+	ContributorsJson string            `thrift:"contributors_json,10,required" frugal:"10,required,string" json:"contributors_json"`
+	BlockDiffJson    string            `thrift:"block_diff_json,11,required" frugal:"11,required,string" json:"block_diff_json"`
+	IsAnchor         bool              `thrift:"is_anchor,12,required" frugal:"12,required,bool" json:"is_anchor"`
+	CreatedAt        string            `thrift:"created_at,13,required" frugal:"13,required,string" json:"created_at"`
+}
+
+func NewHistoryRevision() *HistoryRevision {
+	return &HistoryRevision{}
+}
+
+func (p *HistoryRevision) InitDefault() {
+}
+
+func (p *HistoryRevision) GetId() (v string) {
+	return p.Id
+}
+
+func (p *HistoryRevision) GetDocumentId() (v string) {
+	return p.DocumentId
+}
+
+func (p *HistoryRevision) GetKind() (v string) {
+	return p.Kind
+}
+
+func (p *HistoryRevision) GetSequence() (v int64) {
+	return p.Sequence
+}
+
+func (p *HistoryRevision) GetMetadataRevision() (v int64) {
+	return p.MetadataRevision
+}
+
+func (p *HistoryRevision) GetSemanticHash() (v string) {
+	return p.SemanticHash
+}
+
+var HistoryRevision_Content_DEFAULT *RichTextDocument
+
+func (p *HistoryRevision) GetContent() (v *RichTextDocument) {
+	if !p.IsSetContent() {
+		return HistoryRevision_Content_DEFAULT
+	}
+	return p.Content
+}
+
+func (p *HistoryRevision) GetPlainText() (v string) {
+	return p.PlainText
+}
+
+func (p *HistoryRevision) GetMetadataJson() (v string) {
+	return p.MetadataJson
+}
+
+func (p *HistoryRevision) GetContributorsJson() (v string) {
+	return p.ContributorsJson
+}
+
+func (p *HistoryRevision) GetBlockDiffJson() (v string) {
+	return p.BlockDiffJson
+}
+
+func (p *HistoryRevision) GetIsAnchor() (v bool) {
+	return p.IsAnchor
+}
+
+func (p *HistoryRevision) GetCreatedAt() (v string) {
+	return p.CreatedAt
+}
+func (p *HistoryRevision) SetId(val string) {
+	p.Id = val
+}
+func (p *HistoryRevision) SetDocumentId(val string) {
+	p.DocumentId = val
+}
+func (p *HistoryRevision) SetKind(val string) {
+	p.Kind = val
+}
+func (p *HistoryRevision) SetSequence(val int64) {
+	p.Sequence = val
+}
+func (p *HistoryRevision) SetMetadataRevision(val int64) {
+	p.MetadataRevision = val
+}
+func (p *HistoryRevision) SetSemanticHash(val string) {
+	p.SemanticHash = val
+}
+func (p *HistoryRevision) SetContent(val *RichTextDocument) {
+	p.Content = val
+}
+func (p *HistoryRevision) SetPlainText(val string) {
+	p.PlainText = val
+}
+func (p *HistoryRevision) SetMetadataJson(val string) {
+	p.MetadataJson = val
+}
+func (p *HistoryRevision) SetContributorsJson(val string) {
+	p.ContributorsJson = val
+}
+func (p *HistoryRevision) SetBlockDiffJson(val string) {
+	p.BlockDiffJson = val
+}
+func (p *HistoryRevision) SetIsAnchor(val bool) {
+	p.IsAnchor = val
+}
+func (p *HistoryRevision) SetCreatedAt(val string) {
+	p.CreatedAt = val
+}
+
+func (p *HistoryRevision) IsSetContent() bool {
+	return p.Content != nil
+}
+
+func (p *HistoryRevision) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("HistoryRevision(%+v)", *p)
+}
+
+var fieldIDToName_HistoryRevision = map[int16]string{
+	1:  "id",
+	2:  "document_id",
+	3:  "kind",
+	4:  "sequence",
+	5:  "metadata_revision",
+	6:  "semantic_hash",
+	7:  "content",
+	8:  "plain_text",
+	9:  "metadata_json",
+	10: "contributors_json",
+	11: "block_diff_json",
+	12: "is_anchor",
+	13: "created_at",
+}
+
+type HistoryPage struct {
+	Items []*HistoryRevision `thrift:"items,1,required" frugal:"1,required,list<HistoryRevision>" json:"items"`
+	Page  *PageInfo          `thrift:"page,2,required" frugal:"2,required,PageInfo" json:"page"`
+}
+
+func NewHistoryPage() *HistoryPage {
+	return &HistoryPage{}
+}
+
+func (p *HistoryPage) InitDefault() {
+}
+
+func (p *HistoryPage) GetItems() (v []*HistoryRevision) {
+	return p.Items
+}
+
+var HistoryPage_Page_DEFAULT *PageInfo
+
+func (p *HistoryPage) GetPage() (v *PageInfo) {
+	if !p.IsSetPage() {
+		return HistoryPage_Page_DEFAULT
+	}
+	return p.Page
+}
+func (p *HistoryPage) SetItems(val []*HistoryRevision) {
+	p.Items = val
+}
+func (p *HistoryPage) SetPage(val *PageInfo) {
+	p.Page = val
+}
+
+func (p *HistoryPage) IsSetPage() bool {
+	return p.Page != nil
+}
+
+func (p *HistoryPage) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("HistoryPage(%+v)", *p)
+}
+
+var fieldIDToName_HistoryPage = map[int16]string{
+	1: "items",
+	2: "page",
+}
+
+type ListHistoryRequest struct {
+	DocumentId string  `thrift:"document_id,1,required" frugal:"1,required,string" json:"document_id"`
+	Limit      *int32  `thrift:"limit,2,optional" frugal:"2,optional,i32" json:"limit,omitempty"`
+	Cursor     *string `thrift:"cursor,3,optional" frugal:"3,optional,string" json:"cursor,omitempty"`
+}
+
+func NewListHistoryRequest() *ListHistoryRequest {
+	return &ListHistoryRequest{}
+}
+
+func (p *ListHistoryRequest) InitDefault() {
+}
+
+func (p *ListHistoryRequest) GetDocumentId() (v string) {
+	return p.DocumentId
+}
+
+var ListHistoryRequest_Limit_DEFAULT int32
+
+func (p *ListHistoryRequest) GetLimit() (v int32) {
+	if !p.IsSetLimit() {
+		return ListHistoryRequest_Limit_DEFAULT
+	}
+	return *p.Limit
+}
+
+var ListHistoryRequest_Cursor_DEFAULT string
+
+func (p *ListHistoryRequest) GetCursor() (v string) {
+	if !p.IsSetCursor() {
+		return ListHistoryRequest_Cursor_DEFAULT
+	}
+	return *p.Cursor
+}
+func (p *ListHistoryRequest) SetDocumentId(val string) {
+	p.DocumentId = val
+}
+func (p *ListHistoryRequest) SetLimit(val *int32) {
+	p.Limit = val
+}
+func (p *ListHistoryRequest) SetCursor(val *string) {
+	p.Cursor = val
+}
+
+func (p *ListHistoryRequest) IsSetLimit() bool {
+	return p.Limit != nil
+}
+
+func (p *ListHistoryRequest) IsSetCursor() bool {
+	return p.Cursor != nil
+}
+
+func (p *ListHistoryRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("ListHistoryRequest(%+v)", *p)
+}
+
+var fieldIDToName_ListHistoryRequest = map[int16]string{
+	1: "document_id",
+	2: "limit",
+	3: "cursor",
+}
+
+type HistoryIDRequest struct {
+	DocumentId string `thrift:"document_id,1,required" frugal:"1,required,string" json:"document_id"`
+	RevisionId string `thrift:"revision_id,2,required" frugal:"2,required,string" json:"revision_id"`
+}
+
+func NewHistoryIDRequest() *HistoryIDRequest {
+	return &HistoryIDRequest{}
+}
+
+func (p *HistoryIDRequest) InitDefault() {
+}
+
+func (p *HistoryIDRequest) GetDocumentId() (v string) {
+	return p.DocumentId
+}
+
+func (p *HistoryIDRequest) GetRevisionId() (v string) {
+	return p.RevisionId
+}
+func (p *HistoryIDRequest) SetDocumentId(val string) {
+	p.DocumentId = val
+}
+func (p *HistoryIDRequest) SetRevisionId(val string) {
+	p.RevisionId = val
+}
+
+func (p *HistoryIDRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("HistoryIDRequest(%+v)", *p)
+}
+
+var fieldIDToName_HistoryIDRequest = map[int16]string{
+	1: "document_id",
+	2: "revision_id",
 }
 
 type ListFoldersRequest struct {
@@ -3392,6 +3742,10 @@ type KnowledgeService interface {
 	RenameCommit(ctx context.Context, request *RenameCommitRequest) (r *Commit, err error)
 
 	RestoreCommit(ctx context.Context, request *RestoreCommitRequest) (r *Document, err error)
+
+	ListHistory(ctx context.Context, request *ListHistoryRequest) (r *HistoryPage, err error)
+
+	GetHistory(ctx context.Context, request *HistoryIDRequest) (r *HistoryRevision, err error)
 }
 
 type KnowledgeServicePingArgs struct {
@@ -5595,5 +5949,157 @@ func (p *KnowledgeServiceRestoreCommitResult) String() string {
 }
 
 var fieldIDToName_KnowledgeServiceRestoreCommitResult = map[int16]string{
+	0: "success",
+}
+
+type KnowledgeServiceListHistoryArgs struct {
+	Request *ListHistoryRequest `thrift:"request,1" frugal:"1,default,ListHistoryRequest" json:"request"`
+}
+
+func NewKnowledgeServiceListHistoryArgs() *KnowledgeServiceListHistoryArgs {
+	return &KnowledgeServiceListHistoryArgs{}
+}
+
+func (p *KnowledgeServiceListHistoryArgs) InitDefault() {
+}
+
+var KnowledgeServiceListHistoryArgs_Request_DEFAULT *ListHistoryRequest
+
+func (p *KnowledgeServiceListHistoryArgs) GetRequest() (v *ListHistoryRequest) {
+	if !p.IsSetRequest() {
+		return KnowledgeServiceListHistoryArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+func (p *KnowledgeServiceListHistoryArgs) SetRequest(val *ListHistoryRequest) {
+	p.Request = val
+}
+
+func (p *KnowledgeServiceListHistoryArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *KnowledgeServiceListHistoryArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("KnowledgeServiceListHistoryArgs(%+v)", *p)
+}
+
+var fieldIDToName_KnowledgeServiceListHistoryArgs = map[int16]string{
+	1: "request",
+}
+
+type KnowledgeServiceListHistoryResult struct {
+	Success *HistoryPage `thrift:"success,0,optional" frugal:"0,optional,HistoryPage" json:"success,omitempty"`
+}
+
+func NewKnowledgeServiceListHistoryResult() *KnowledgeServiceListHistoryResult {
+	return &KnowledgeServiceListHistoryResult{}
+}
+
+func (p *KnowledgeServiceListHistoryResult) InitDefault() {
+}
+
+var KnowledgeServiceListHistoryResult_Success_DEFAULT *HistoryPage
+
+func (p *KnowledgeServiceListHistoryResult) GetSuccess() (v *HistoryPage) {
+	if !p.IsSetSuccess() {
+		return KnowledgeServiceListHistoryResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *KnowledgeServiceListHistoryResult) SetSuccess(x interface{}) {
+	p.Success = x.(*HistoryPage)
+}
+
+func (p *KnowledgeServiceListHistoryResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *KnowledgeServiceListHistoryResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("KnowledgeServiceListHistoryResult(%+v)", *p)
+}
+
+var fieldIDToName_KnowledgeServiceListHistoryResult = map[int16]string{
+	0: "success",
+}
+
+type KnowledgeServiceGetHistoryArgs struct {
+	Request *HistoryIDRequest `thrift:"request,1" frugal:"1,default,HistoryIDRequest" json:"request"`
+}
+
+func NewKnowledgeServiceGetHistoryArgs() *KnowledgeServiceGetHistoryArgs {
+	return &KnowledgeServiceGetHistoryArgs{}
+}
+
+func (p *KnowledgeServiceGetHistoryArgs) InitDefault() {
+}
+
+var KnowledgeServiceGetHistoryArgs_Request_DEFAULT *HistoryIDRequest
+
+func (p *KnowledgeServiceGetHistoryArgs) GetRequest() (v *HistoryIDRequest) {
+	if !p.IsSetRequest() {
+		return KnowledgeServiceGetHistoryArgs_Request_DEFAULT
+	}
+	return p.Request
+}
+func (p *KnowledgeServiceGetHistoryArgs) SetRequest(val *HistoryIDRequest) {
+	p.Request = val
+}
+
+func (p *KnowledgeServiceGetHistoryArgs) IsSetRequest() bool {
+	return p.Request != nil
+}
+
+func (p *KnowledgeServiceGetHistoryArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("KnowledgeServiceGetHistoryArgs(%+v)", *p)
+}
+
+var fieldIDToName_KnowledgeServiceGetHistoryArgs = map[int16]string{
+	1: "request",
+}
+
+type KnowledgeServiceGetHistoryResult struct {
+	Success *HistoryRevision `thrift:"success,0,optional" frugal:"0,optional,HistoryRevision" json:"success,omitempty"`
+}
+
+func NewKnowledgeServiceGetHistoryResult() *KnowledgeServiceGetHistoryResult {
+	return &KnowledgeServiceGetHistoryResult{}
+}
+
+func (p *KnowledgeServiceGetHistoryResult) InitDefault() {
+}
+
+var KnowledgeServiceGetHistoryResult_Success_DEFAULT *HistoryRevision
+
+func (p *KnowledgeServiceGetHistoryResult) GetSuccess() (v *HistoryRevision) {
+	if !p.IsSetSuccess() {
+		return KnowledgeServiceGetHistoryResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *KnowledgeServiceGetHistoryResult) SetSuccess(x interface{}) {
+	p.Success = x.(*HistoryRevision)
+}
+
+func (p *KnowledgeServiceGetHistoryResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *KnowledgeServiceGetHistoryResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("KnowledgeServiceGetHistoryResult(%+v)", *p)
+}
+
+var fieldIDToName_KnowledgeServiceGetHistoryResult = map[int16]string{
 	0: "success",
 }

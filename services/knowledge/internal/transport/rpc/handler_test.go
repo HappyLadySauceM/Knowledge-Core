@@ -14,6 +14,7 @@ import (
 	"github.com/HappyLadySauce/Knowledge-Core/services/knowledge/internal/domain"
 	knowledgeerrors "github.com/HappyLadySauce/Knowledge-Core/services/knowledge/internal/errors"
 	knowledgelogic "github.com/HappyLadySauce/Knowledge-Core/services/knowledge/internal/logic"
+	"github.com/HappyLadySauce/Knowledge-Core/services/knowledge/internal/repository"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 )
 
@@ -82,6 +83,12 @@ func (s *documentServiceStub) RenameCommit(context.Context, string, int64, strin
 }
 func (s *documentServiceStub) RestoreCommit(context.Context, string, int64, string) (*domain.Document, error) {
 	return s.document, s.err
+}
+func (s *documentServiceStub) ListHistory(context.Context, string, int64, int) ([]*repository.HistoryCheckpoint, error) {
+	return nil, s.err
+}
+func (s *documentServiceStub) GetHistory(context.Context, string, string, int64) (*repository.HistoryCheckpoint, error) {
+	return nil, s.err
 }
 
 type memberServiceStub struct{}

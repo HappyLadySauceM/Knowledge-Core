@@ -325,6 +325,7 @@ func handlePublishDocument(ctx context.Context, request *app.RequestContext) {
 		Title: draft.Title, Summary: summary, Slug: draft.Slug, Language: language, Tags: append([]string(nil), draft.Tags...),
 		Content: captured.Content, PlainText: captured.PlainText, IdempotencyKey: optionalString(idempotency), PublicationHash: &publicationHash,
 		Icon: optionalString(body.Icon), CoverAttachmentId: optionalString(body.CoverAttachmentID), CoverFocalX: body.CoverFocalX, CoverFocalY: body.CoverFocalY,
+		ContentSequence: captured.Sequence,
 	})
 	if err != nil {
 		gatewaymiddleware.WriteKnowledgeError(ctx, request, err)
@@ -488,6 +489,57 @@ func handleListCommits(ctx context.Context, request *app.RequestContext) {
 		return
 	}
 	data, err := toCommitPageData(page)
+	if err != nil {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidUpstreamResponse)
+		return
+	}
+	writeJSON(ctx, request, consts.StatusOK, data)
+}
+
+func handleListHistory(ctx context.Context, request *app.RequestContext) {
+	documentID, pathErr := pathUUID(request, "document_id")
+	values, queryErr := strictQuery(request, map[string]struct{}{"limit": {}})
+	limit, limitErr := parseVersionLimit(queryPointer(values, "limit"))
+	if pathErr != nil || queryErr != nil || limitErr != nil || requireNoBody(request) != nil {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidRequest)
+		return
+	}
+	dependencies, ok := gatewaymiddleware.FromRequest(request)
+	if !ok {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInternal)
+		return
+	}
+	page, err := dependencies.Knowledge.ListHistory(upstreamContext(ctx, request), &knowledgev1.ListHistoryRequest{DocumentId: documentID, Limit: optionalInt32(limit)})
+	if err != nil {
+		gatewaymiddleware.WriteKnowledgeError(ctx, request, err)
+		return
+	}
+	data, err := toHistoryPageData(page)
+	if err != nil {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidUpstreamResponse)
+		return
+	}
+	writeJSON(ctx, request, consts.StatusOK, data)
+}
+
+func handleGetHistory(ctx context.Context, request *app.RequestContext) {
+	documentID, documentErr := pathUUID(request, "document_id")
+	revisionID, revisionErr := pathUUID(request, "revision_id")
+	if documentErr != nil || revisionErr != nil || requireNoQuery(request) != nil || requireNoBody(request) != nil {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidRequest)
+		return
+	}
+	dependencies, ok := gatewaymiddleware.FromRequest(request)
+	if !ok {
+		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInternal)
+		return
+	}
+	item, err := dependencies.Knowledge.GetHistory(upstreamContext(ctx, request), &knowledgev1.HistoryIDRequest{DocumentId: documentID, RevisionId: revisionID})
+	if err != nil {
+		gatewaymiddleware.WriteKnowledgeError(ctx, request, err)
+		return
+	}
+	data, err := toHistoryRevisionData(item)
 	if err != nil {
 		gatewaymiddleware.WriteError(ctx, request, gatewaymiddleware.ErrInvalidUpstreamResponse)
 		return

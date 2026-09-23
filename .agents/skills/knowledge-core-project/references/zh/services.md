@@ -28,13 +28,13 @@
 
 ### Knowledge
 
-- **apis**：RPC KnowledgeService：文档 CRUD/发布/回收、文件夹、成员、兼容附件、AuthorizeCollaboration、ProjectCollaboration、Ping、Live
-- **data**：PostgreSQL schema knowledge；旧文档附件兼容窗口
+- **apis**：RPC KnowledgeService：文档 CRUD/发布/回收、自动历史记录列表/详情、兼容文件夹、成员、兼容附件、AuthorizeCollaboration、ProjectCollaboration、Ping、Live
+- **data**：PostgreSQL schema knowledge；文档、自动历史记录、空间、页面节点、发布候选/快照与旧兼容表
 - **dependencies**：PostgreSQL、NATS JetStream、S3/MinIO、ClamAV、Identity RPC、Collaboration RPC
 - **doesNotOwn**：Yjs 二进制、通用附件对象或用户凭据
 - **language**：Go
 - **ports**：{"admin":8083,"rpc":8882}
-- **role**：文档元数据、成员、发布、文件夹、配额与 outbox
+- **role**：文档元数据、自动历史记录、空间/页面树、成员、发布、配额与 outbox
 
 ### Attachment
 
@@ -48,13 +48,13 @@
 
 ### Collaboration
 
-- **apis**：RPC CollaborationService：CreateSession、版本列表/创建/详情/恢复、PurgeDocument、`:8091` 上的 WebSocket y-sync
+- **apis**：RPC CollaborationService：CreateSession、CapturePublicationSnapshot、PurgeDocument、`:8091` 上的 WebSocket y-sync
 - **data**：PostgreSQL schema collaboration
 - **dependencies**：PostgreSQL、Redis、NATS JetStream、Knowledge RPC
 - **doesNotOwn**：文档权限规则或用户凭据
 - **language**：Rust
 - **ports**：{"admin":8084,"rpc":8883,"websocket":8091}
-- **role**：实时 Yjs 持久化、版本、恢复和多实例同步
+- **role**：实时 Yjs 草稿持久化、发布快照捕获、文档清理与多实例同步
 
 ### Platform
 
@@ -66,7 +66,7 @@
 - **ports**：{"admin":8086,"rpc":8885}
 - **role**：管理员可写的站点、邮件与 AI 配置
 
-<!-- fact:services.catalog status:verified sources:filesystem:service-definitions, identity-maddy-smtp-probe, idl/rpc/v1 and architecture-design.md, user-confirmed -->
+<!-- fact:services.catalog status:verified sources:filesystem:service-definitions, idl/rpc/v1, identity-maddy-smtp-probe, idl/rpc/v1 and architecture-design.md, user-confirmed -->
 
 ## 附录
 

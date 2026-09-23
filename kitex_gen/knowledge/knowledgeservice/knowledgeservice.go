@@ -224,6 +224,20 @@ var serviceMethods = map[string]kitex.MethodInfo{
 		false,
 		kitex.WithStreamingMode(kitex.StreamingNone),
 	),
+	"ListHistory": kitex.NewMethodInfo(
+		listHistoryHandler,
+		newKnowledgeServiceListHistoryArgs,
+		newKnowledgeServiceListHistoryResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
+	"GetHistory": kitex.NewMethodInfo(
+		getHistoryHandler,
+		newKnowledgeServiceGetHistoryArgs,
+		newKnowledgeServiceGetHistoryResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
 }
 
 var (
@@ -830,6 +844,42 @@ func newKnowledgeServiceRestoreCommitResult() interface{} {
 	return knowledge.NewKnowledgeServiceRestoreCommitResult()
 }
 
+func listHistoryHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*knowledge.KnowledgeServiceListHistoryArgs)
+	realResult := result.(*knowledge.KnowledgeServiceListHistoryResult)
+	success, err := handler.(knowledge.KnowledgeService).ListHistory(ctx, realArg.Request)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newKnowledgeServiceListHistoryArgs() interface{} {
+	return knowledge.NewKnowledgeServiceListHistoryArgs()
+}
+
+func newKnowledgeServiceListHistoryResult() interface{} {
+	return knowledge.NewKnowledgeServiceListHistoryResult()
+}
+
+func getHistoryHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*knowledge.KnowledgeServiceGetHistoryArgs)
+	realResult := result.(*knowledge.KnowledgeServiceGetHistoryResult)
+	success, err := handler.(knowledge.KnowledgeService).GetHistory(ctx, realArg.Request)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newKnowledgeServiceGetHistoryArgs() interface{} {
+	return knowledge.NewKnowledgeServiceGetHistoryArgs()
+}
+
+func newKnowledgeServiceGetHistoryResult() interface{} {
+	return knowledge.NewKnowledgeServiceGetHistoryResult()
+}
+
 type kClient struct {
 	c client.Client
 }
@@ -1135,6 +1185,26 @@ func (p *kClient) RestoreCommit(ctx context.Context, request *knowledge.RestoreC
 	_args.Request = request
 	var _result knowledge.KnowledgeServiceRestoreCommitResult
 	if err = p.c.Call(ctx, "RestoreCommit", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) ListHistory(ctx context.Context, request *knowledge.ListHistoryRequest) (r *knowledge.HistoryPage, err error) {
+	var _args knowledge.KnowledgeServiceListHistoryArgs
+	_args.Request = request
+	var _result knowledge.KnowledgeServiceListHistoryResult
+	if err = p.c.Call(ctx, "ListHistory", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) GetHistory(ctx context.Context, request *knowledge.HistoryIDRequest) (r *knowledge.HistoryRevision, err error) {
+	var _args knowledge.KnowledgeServiceGetHistoryArgs
+	_args.Request = request
+	var _result knowledge.KnowledgeServiceGetHistoryResult
+	if err = p.c.Call(ctx, "GetHistory", &_args, &_result); err != nil {
 		return
 	}
 	return _result.GetSuccess(), nil

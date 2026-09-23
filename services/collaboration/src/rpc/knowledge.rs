@@ -356,6 +356,7 @@ fn attrs_to_wire(value: &Value) -> Result<knowledge::RichTextAttrs> {
                     .collect::<Result<Vec<_>>>()
             })
             .transpose()?,
+        block_id: optional_string(attrs, "blockId"),
     })
 }
 

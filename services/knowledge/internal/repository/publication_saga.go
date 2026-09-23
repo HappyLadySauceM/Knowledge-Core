@@ -73,7 +73,7 @@ func (s *Store) PublishSnapshot(ctx context.Context, id string, actorID, expecte
 			DocumentID: id, Generation: generation,
 			Title: input.Title, Summary: input.Summary, Slug: input.Slug, Language: input.Language, Tags: tags,
 			OwnerID: record.OwnerID, OwnerUsername: record.OwnerUsername, OwnerAvatar: record.OwnerAvatar,
-			Content: content, PlainText: input.PlainText, MediaIDs: mediaIDs, CreatedAt: now, UpdatedAt: now,
+			Content: content, PlainText: input.PlainText, ContentSequence: input.ContentSequence, MediaIDs: mediaIDs, CreatedAt: now, UpdatedAt: now,
 			PublicationHash: input.PublicationHash, Icon: input.Icon, CoverAttachmentID: input.CoverAttachmentID,
 			CoverFocalX: input.CoverFocalX, CoverFocalY: input.CoverFocalY,
 		}
@@ -317,6 +317,17 @@ func (s *Store) PromotePublication(ctx context.Context, job domain.PublicationRe
 			"publication_error": nil, "updated_at": now,
 		}).Error; err != nil {
 			return fmt.Errorf("activate publication: %w", err)
+		}
+		if err := tx.Where("id = ?", record.ID).First(record).Error; err != nil {
+			return fmt.Errorf("reload published document: %w", err)
+		}
+		projection := &model.Projection{DocumentID: record.ID, Sequence: candidate.ContentSequence, Content: candidate.Content, PlainText: candidate.PlainText, ProjectedAt: now}
+		if err := createHistoryAnchor(tx, record, projection, "publish", map[string]any{
+			"title": candidate.Title, "summary": candidate.Summary, "language": candidate.Language,
+			"tags": candidateTags, "icon": candidate.Icon, "cover_attachment_id": candidate.CoverAttachmentID,
+			"cover_focal_x": candidate.CoverFocalX, "cover_focal_y": candidate.CoverFocalY,
+		}, now); err != nil {
+			return err
 		}
 		if err := tx.Where("document_id = ?", job.DocumentID).Delete(&model.PublicationCandidate{}).Error; err != nil {
 			return fmt.Errorf("remove promoted publication candidate: %w", err)

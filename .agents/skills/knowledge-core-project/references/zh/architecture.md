@@ -11,7 +11,7 @@ Knowledge Core 是知识协作后端，通过 typed contract 将身份、文档�
 - 身份与会话安全
 - 文档元数据与权限
 - 附件
-- 实时协作与版本恢复
+- 实时协作、自动历史记录与发布快照
 - Platform 管理的业务配置
 - HTTP 与 WebSocket 边缘编排
 
@@ -73,9 +73,9 @@ flowchart LR
     subgraph System[System in scope]
         Gateway["Gateway\n公网 HTTP 边缘、安全中间件、限流与 typed RPC 编排"]
         Identity["Identity\n用户、凭据、会话、token 有效性与账户操作"]
-        Knowledge["Knowledge\n文档、文件夹、权限、发布、配额与投影"]
+        Knowledge["Knowledge\n文档、自动历史记录、空间与页面树元数据、权限、发布、配额与投影"]
         Attachment["Attachment\n可复用文件元数据、分片上传、扫描、引用与回收"]
-        Collaboration["Collaboration\nWebSocket/Yjs 状态、快照、版本、恢复与权限失效"]
+        Collaboration["Collaboration\nWebSocket/Yjs 草稿持久化、发布快照捕获、文档清理与权限失效"]
         Platform["Platform\n带修订的站点/邮件/AI 配置、审计与可靠变更事件"]
     end
 ```
@@ -115,6 +115,14 @@ flowchart LR
 ### 配置变更
 
 - **说明**：Platform 在一个事务内提交修订、审计、幂等和 outbox，然后发布只含坐标的事件。若 namespace 尚未写入，GetConsumerState 返回 DesiredRevision=0 的空闲状态，而不是 NotFound。Identity 在受信任的 mTLS mesh 中读取 Platform consumer 快照并报告应用状态，不使用应用层 service token。
+
+### 自动文档历史记录
+
+- **说明**：Knowledge 将已提交的 Collaboration 投影按空闲窗口或最长编辑窗口生成经语义哈希去重的自动检查点，并保留发布锚点。
+
+### 草稿与发布快照
+
+- **说明**：Collaboration 持久化实时 Yjs 草稿；发布操作捕获已提交快照，Knowledge 只原子提升请求对应的 generation 与语义哈希。
 
 ## 质量属性
 
@@ -189,4 +197,4 @@ flowchart LR
 
 - **缓解**：固定 IDL 生成，强制兼容性检查，并在关键 stream/subject 不匹配时拒绝 ready。
 
-<!-- fact:architecture.design status:verified sources:README.md#knowledge-core, docs/framework-design.md, docs/framework-design.md#9, docs/framework-design.md#knowledge-core, docs/platform-configuration.md#配置同步, docs/rust-collaboration-design.md#rust-collaboration, Knowledge-Core/.tmp/architecture-design.md, user-confirmed-en-locale-source, user-confirmed-internal-rpc-auth-boundary -->
+<!-- fact:architecture.design status:verified sources:README.md#automatic-document-history, README.md#knowledge-core, docs/framework-design.md, docs/framework-design.md#9, docs/framework-design.md#knowledge-core, docs/platform-configuration.md#配置同步, docs/rust-collaboration-design.md#rust-collaboration, Knowledge-Core/.tmp/architecture-design.md, user-confirmed-en-locale-source, user-confirmed-internal-rpc-auth-boundary -->

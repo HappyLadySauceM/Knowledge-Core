@@ -42,6 +42,8 @@ type Client interface {
 	GetCommit(ctx context.Context, request *knowledge.CommitIDRequest, callOptions ...callopt.Option) (r *knowledge.Commit, err error)
 	RenameCommit(ctx context.Context, request *knowledge.RenameCommitRequest, callOptions ...callopt.Option) (r *knowledge.Commit, err error)
 	RestoreCommit(ctx context.Context, request *knowledge.RestoreCommitRequest, callOptions ...callopt.Option) (r *knowledge.Document, err error)
+	ListHistory(ctx context.Context, request *knowledge.ListHistoryRequest, callOptions ...callopt.Option) (r *knowledge.HistoryPage, err error)
+	GetHistory(ctx context.Context, request *knowledge.HistoryIDRequest, callOptions ...callopt.Option) (r *knowledge.HistoryRevision, err error)
 }
 
 // NewClient creates a client for the service defined in IDL.
@@ -221,4 +223,14 @@ func (p *kKnowledgeServiceClient) RenameCommit(ctx context.Context, request *kno
 func (p *kKnowledgeServiceClient) RestoreCommit(ctx context.Context, request *knowledge.RestoreCommitRequest, callOptions ...callopt.Option) (r *knowledge.Document, err error) {
 	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
 	return p.kClient.RestoreCommit(ctx, request)
+}
+
+func (p *kKnowledgeServiceClient) ListHistory(ctx context.Context, request *knowledge.ListHistoryRequest, callOptions ...callopt.Option) (r *knowledge.HistoryPage, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.ListHistory(ctx, request)
+}
+
+func (p *kKnowledgeServiceClient) GetHistory(ctx context.Context, request *knowledge.HistoryIDRequest, callOptions ...callopt.Option) (r *knowledge.HistoryRevision, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.GetHistory(ctx, request)
 }

@@ -361,3 +361,18 @@ func _restorecommitMw() []app.HandlerFunc {
 	// your code...
 	return nil
 }
+
+func _listhistoryMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _historyMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _gethistoryMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}

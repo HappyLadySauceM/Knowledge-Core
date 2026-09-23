@@ -40,10 +40,10 @@ func TestGenerateCoversGatewayAndCollaborationContracts(t *testing.T) {
 			}
 		}
 	}
-	// The explicit commit history contract replaces the removed version routes
-	// and adds five document commit operations to the public Gateway contract.
-	if operationCount != 53 {
-		t.Fatalf("OpenAPI operation count = %d, want 53", operationCount)
+	// Automatic history adds list/detail operations while the old commit routes
+	// remain available only for the rolling-deployment compatibility window.
+	if operationCount != 55 {
+		t.Fatalf("OpenAPI operation count = %d, want 55", operationCount)
 	}
 	if got := value.AsyncAPI["asyncapi"]; got != "3.0.0" {
 		t.Fatalf("AsyncAPI version = %#v", got)

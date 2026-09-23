@@ -28,13 +28,13 @@ Clients enter through Gateway HTTP or Collaboration WebSocket. Gateway calls Ide
 
 ### Knowledge
 
-- **apis**: RPC KnowledgeService: document CRUD/publish/trash, folders, members, legacy attachments, AuthorizeCollaboration, ProjectCollaboration, Ping, Live
-- **data**: PostgreSQL schema knowledge; legacy document-attachment compatibility window
+- **apis**: RPC KnowledgeService: document CRUD/publish/trash, automatic history list/detail, folders compatibility, members, legacy attachments, AuthorizeCollaboration, ProjectCollaboration, Ping, Live
+- **data**: PostgreSQL schema knowledge; documents, automatic history, spaces, page nodes, publication candidates/snapshots, and legacy compatibility tables
 - **dependencies**: PostgreSQL, NATS JetStream, S3/MinIO, ClamAV, Identity RPC, Collaboration RPC
 - **doesNotOwn**: Yjs binaries, generic attachment objects, or user credentials
 - **language**: Go
 - **ports**: {"admin":8083,"rpc":8882}
-- **role**: Document metadata, members, publication, folders, quota, outbox
+- **role**: Document metadata, automatic history, spaces/page tree, members, publication, quota, and outbox
 
 ### Attachment
 
@@ -48,13 +48,13 @@ Clients enter through Gateway HTTP or Collaboration WebSocket. Gateway calls Ide
 
 ### Collaboration
 
-- **apis**: RPC CollaborationService: CreateSession, version list/create/get/restore, PurgeDocument, WebSocket y-sync on :8091
+- **apis**: RPC CollaborationService: CreateSession, CapturePublicationSnapshot, PurgeDocument, WebSocket y-sync on :8091
 - **data**: PostgreSQL schema collaboration
 - **dependencies**: PostgreSQL, Redis, NATS JetStream, Knowledge RPC
 - **doesNotOwn**: Document permission rules or user credentials
 - **language**: Rust
 - **ports**: {"admin":8084,"rpc":8883,"websocket":8091}
-- **role**: Realtime Yjs persistence, versions, restore, multi-instance sync
+- **role**: Realtime Yjs draft persistence, publication snapshot capture, document purge, and multi-instance sync
 
 ### Platform
 
@@ -67,7 +67,7 @@ Clients enter through Gateway HTTP or Collaboration WebSocket. Gateway calls Ide
 - **role**: Admin-writable site, email, and AI configuration
 
 
-<!-- fact:services.catalog status:verified sources:filesystem:service-definitions, identity-maddy-smtp-probe, idl/rpc/v1 and architecture-design.md, user-confirmed -->
+<!-- fact:services.catalog status:verified sources:filesystem:service-definitions, idl/rpc/v1, identity-maddy-smtp-probe, idl/rpc/v1 and architecture-design.md, user-confirmed -->
 
 ## Appendix
 

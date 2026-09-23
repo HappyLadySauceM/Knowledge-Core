@@ -259,7 +259,9 @@ impl collaboration::CollaborationService for CollaborationHandler {
 
 fn projection_hash(projection: &crate::domain::Projection) -> String {
     let mut hasher = Sha256::new();
-    if let Ok(value) = serde_json::to_vec(&(&projection.content, &projection.plain_text)) {
+    let mut semantic_content = projection.content.clone();
+    strip_history_block_ids(&mut semantic_content);
+    if let Ok(value) = serde_json::to_vec(&(&semantic_content, &projection.plain_text)) {
         hasher.update(value);
     }
     let mut result = String::with_capacity(64);
@@ -268,6 +270,24 @@ fn projection_hash(projection: &crate::domain::Projection) -> String {
         let _ = write!(result, "{byte:02x}");
     }
     result
+}
+
+fn strip_history_block_ids(value: &mut serde_json::Value) {
+    match value {
+        serde_json::Value::Array(items) => {
+            for item in items {
+                strip_history_block_ids(item);
+            }
+        }
+        serde_json::Value::Object(fields) => {
+            fields.remove("blockId");
+            fields.remove("block_id");
+            for nested in fields.values_mut() {
+                strip_history_block_ids(nested);
+            }
+        }
+        _ => {}
+    }
 }
 
 fn valid_contract_token(value: &str) -> bool {
@@ -1108,5 +1128,18 @@ mod tests {
                 )))
             }
         }
+    }
+
+    #[test]
+    fn publication_hash_ignores_history_only_block_ids() {
+        let left = Projection {
+            content: serde_json::json!({"type":"doc","content":[{"type":"paragraph","attrs":{"blockId":"a"}}]}),
+            plain_text: String::new(),
+        };
+        let right = Projection {
+            content: serde_json::json!({"type":"doc","content":[{"type":"paragraph","attrs":{"blockId":"b"}}]}),
+            plain_text: String::new(),
+        };
+        assert_eq!(projection_hash(&left), projection_hash(&right));
     }
 }

@@ -33,6 +33,7 @@ struct RichTextAttrs {
   10: optional i32 colspan
   11: optional i32 rowspan
   12: optional list<i32> colwidth
+  13: optional string block_id
 }
 
 struct RichTextMark {
@@ -78,6 +79,8 @@ struct Document {
   22: optional string cover_attachment_id
   23: optional double cover_focal_x
   24: optional double cover_focal_y
+  25: required i64 publication_generation
+  26: optional string active_publication_hash
 }
 
 struct DocumentDetail {
@@ -160,6 +163,7 @@ struct PublishSnapshotRequest {
   13: optional string cover_attachment_id
   14: optional double cover_focal_x
   15: optional double cover_focal_y
+  16: required i64 content_sequence
 }
 
 enum CommitKind {
@@ -220,6 +224,38 @@ struct RenameCommitRequest {
 struct RestoreCommitRequest {
   1: required string commit_id
   2: optional string idempotency_key
+}
+
+struct HistoryRevision {
+  1: required string id
+  2: required string document_id
+  3: required string kind
+  4: required i64 sequence
+  5: required i64 metadata_revision
+  6: required string semantic_hash
+  7: required RichTextDocument content
+  8: required string plain_text
+  9: required string metadata_json
+  10: required string contributors_json
+  11: required string block_diff_json
+  12: required bool is_anchor
+  13: required string created_at
+}
+
+struct HistoryPage {
+  1: required list<HistoryRevision> items
+  2: required PageInfo page
+}
+
+struct ListHistoryRequest {
+  1: required string document_id
+  2: optional i32 limit
+  3: optional string cursor
+}
+
+struct HistoryIDRequest {
+  1: required string document_id
+  2: required string revision_id
 }
 
 struct ListFoldersRequest { 1: optional string parent_id }
@@ -340,4 +376,6 @@ service KnowledgeService {
   Commit GetCommit(1: CommitIDRequest request)
   Commit RenameCommit(1: RenameCommitRequest request)
   Document RestoreCommit(1: RestoreCommitRequest request)
+  HistoryPage ListHistory(1: ListHistoryRequest request)
+  HistoryRevision GetHistory(1: HistoryIDRequest request)
 }

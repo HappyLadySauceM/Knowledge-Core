@@ -22,6 +22,7 @@ func publicationHashForSnapshot(snapshot *model.DocumentPublication) (string, er
 	if err := jsoncodec.Unmarshal(snapshot.Content, &content); err != nil {
 		return "", fmt.Errorf("decode publication content: %w", err)
 	}
+	content = stripHistoryBlockIDs(content)
 	contentPayload, err := jsoncodec.Marshal([]any{content, snapshot.PlainText})
 	if err != nil {
 		return "", fmt.Errorf("encode publication content hash: %w", err)
@@ -49,6 +50,28 @@ func publicationHashForSnapshot(snapshot *model.DocumentPublication) (string, er
 	}
 	digest := sha256.Sum256(payload)
 	return hex.EncodeToString(digest[:]), nil
+}
+
+func stripHistoryBlockIDs(value any) any {
+	switch typed := value.(type) {
+	case []any:
+		result := make([]any, len(typed))
+		for index, nested := range typed {
+			result[index] = stripHistoryBlockIDs(nested)
+		}
+		return result
+	case map[string]any:
+		result := make(map[string]any, len(typed))
+		for key, nested := range typed {
+			if key == "blockId" || key == "block_id" {
+				continue
+			}
+			result[key] = stripHistoryBlockIDs(nested)
+		}
+		return result
+	default:
+		return value
+	}
 }
 
 func publicationSummary(summary, plainText string) string {

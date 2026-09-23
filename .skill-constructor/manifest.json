@@ -3,9 +3,13 @@
   "facts": [
     {
       "id": "architecture.design",
-      "revision": 183,
+      "revision": 192,
       "section": "architecture",
       "sources": [
+        {
+          "kind": "documented",
+          "reference": "README.md#automatic-document-history"
+        },
         {
           "detail": "evidence-sha256:0ab1e9fe862a0d1a9ce514baccef02cead73a79433a5d2a9a46db6b82b015ee2",
           "kind": "documented",
@@ -48,7 +52,7 @@
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-09-21T05:05:47Z",
+      "updatedAt": "2026-09-23T08:28:15Z",
       "value": {
         "containers": [
           {
@@ -61,7 +65,7 @@
           },
           {
             "name": "Knowledge",
-            "responsibility": "documents, folders, permissions, publication, quota, and projections"
+            "responsibility": "documents, automatic history, spaces and page-tree metadata, permissions, publication, quota, and projections"
           },
           {
             "name": "Attachment",
@@ -69,7 +73,7 @@
           },
           {
             "name": "Collaboration",
-            "responsibility": "WebSocket/Yjs state, snapshots, versions, restore, and permission invalidation"
+            "responsibility": "WebSocket/Yjs draft persistence, publication snapshot capture, document purge, and permission invalidation"
           },
           {
             "name": "Platform",
@@ -199,6 +203,14 @@
           {
             "description": "Platform commits revision, audit, idempotency, and outbox atomically, then publishes coordinate-only events. GetConsumerState returns DesiredRevision=0 idle state when a namespace has not been written, rather than NotFound. Identity reads Platform consumer snapshots and reports application status over the trusted mTLS mesh without an application service token.",
             "name": "Configuration change"
+          },
+          {
+            "description": "Knowledge turns committed Collaboration projections into hash-deduplicated automatic checkpoints after idle or maximum edit windows, and retains publication anchors.",
+            "name": "Automatic document history"
+          },
+          {
+            "description": "Collaboration persists the realtime Yjs draft; publication captures a committed snapshot and Knowledge atomically promotes only the requested generation and semantic hash.",
+            "name": "Draft and publication snapshot"
           }
         ],
         "principles": [
@@ -261,7 +273,7 @@
             "Identity and session security",
             "Document metadata and permissions",
             "Attachments",
-            "Realtime collaboration and version restore",
+            "Realtime collaboration, automatic history, and publication snapshots",
             "Platform-managed business configuration",
             "HTTP and WebSocket edge orchestration"
           ],
@@ -771,13 +783,17 @@
     },
     {
       "id": "services.catalog",
-      "revision": 178,
+      "revision": 192,
       "section": "services",
       "sources": [
         {
           "detail": "evidence-sha256:4861a558e13e8261cad5522bcd050aeb7c528bee7c7ce522497d57fee6c27f8e",
           "kind": "detected",
           "reference": "filesystem:service-definitions"
+        },
+        {
+          "kind": "detected",
+          "reference": "idl/rpc/v1"
         },
         {
           "kind": "observed",
@@ -793,7 +809,7 @@
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-09-10T09:13:39Z",
+      "updatedAt": "2026-09-23T08:28:15Z",
       "value": [
         {
           "apis": [
@@ -842,10 +858,10 @@
         },
         {
           "apis": [
-            "RPC KnowledgeService: document CRUD/publish/trash, folders, members",
+            "RPC KnowledgeService: document CRUD/publish/trash, automatic history list/detail, folders compatibility, members",
             "legacy attachments, AuthorizeCollaboration, ProjectCollaboration, Ping, Live"
           ],
-          "data": "PostgreSQL schema knowledge; legacy document-attachment compatibility window",
+          "data": "PostgreSQL schema knowledge; documents, automatic history, spaces, page nodes, publication candidates/snapshots, and legacy compatibility tables",
           "dependencies": [
             "PostgreSQL",
             "NATS JetStream",
@@ -861,7 +877,7 @@
             "admin": 8083,
             "rpc": 8882
           },
-          "role": "Document metadata, members, publication, folders, quota, outbox"
+          "role": "Document metadata, automatic history, spaces/page tree, members, publication, quota, and outbox"
         },
         {
           "apis": [
@@ -885,7 +901,7 @@
         },
         {
           "apis": [
-            "RPC CollaborationService: CreateSession, version list/create/get/restore, PurgeDocument",
+            "RPC CollaborationService: CreateSession, CapturePublicationSnapshot, PurgeDocument",
             "WebSocket y-sync on :8091"
           ],
           "data": "PostgreSQL schema collaboration",
@@ -903,7 +919,7 @@
             "rpc": 8883,
             "websocket": 8091
           },
-          "role": "Realtime Yjs persistence, versions, restore, multi-instance sync"
+          "role": "Realtime Yjs draft persistence, publication snapshot capture, document purge, and multi-instance sync"
         },
         {
           "apis": [
@@ -1114,11 +1130,11 @@
     "profile": "generic",
     "slug": "knowledge-core"
   },
-  "revision": 190,
+  "revision": 193,
   "scan": {
-    "fingerprint": "57790f0400ee5cf13e4ac951d519ac23bbe105d1312a82188c764b2e6ba3a220",
-    "inventoryCount": 478
+    "fingerprint": "141023af6a6a7a84bc0585691f6e20c5de2516cf80a5f4d0d9b668c0aac04ac7",
+    "inventoryCount": 480
   },
   "schemaVersion": 3,
-  "updatedAt": "2026-09-21T15:21:24Z"
+  "updatedAt": "2026-09-23T08:31:14Z"
 }

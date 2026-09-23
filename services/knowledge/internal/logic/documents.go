@@ -34,6 +34,36 @@ type DocumentRepository interface {
 	GetCommit(context.Context, string, int64) (*domain.Commit, error)
 	RenameCommit(context.Context, string, int64, string, string) (*domain.Commit, error)
 	RestoreCommit(context.Context, string, int64, repository.Idempotency) (*domain.Document, error)
+	ListHistory(context.Context, string, int64, int) ([]*repository.HistoryCheckpoint, error)
+	GetHistory(context.Context, string, string, int64) (*repository.HistoryCheckpoint, error)
+}
+
+func (l *DocumentLogic) ListHistory(ctx context.Context, documentID string, actorID int64, limit int) ([]*repository.HistoryCheckpoint, error) {
+	if err := domain.ValidateID("document_id", documentID); err != nil {
+		return nil, mapError(err)
+	}
+	if actorID <= 0 {
+		return nil, mapError(repository.ErrForbidden)
+	}
+	result, err := l.repository.ListHistory(ctx, documentID, actorID, limit)
+	if err != nil {
+		return nil, mapError(err)
+	}
+	return result, nil
+}
+
+func (l *DocumentLogic) GetHistory(ctx context.Context, documentID, revisionID string, actorID int64) (*repository.HistoryCheckpoint, error) {
+	if err := domain.ValidateID("document_id", documentID); err != nil {
+		return nil, mapError(err)
+	}
+	if err := domain.ValidateID("revision_id", revisionID); err != nil {
+		return nil, mapError(err)
+	}
+	result, err := l.repository.GetHistory(ctx, documentID, revisionID, actorID)
+	if err != nil {
+		return nil, mapError(err)
+	}
+	return result, nil
 }
 
 func (l *DocumentLogic) ListFolders(ctx context.Context, actorID int64, parentID *string) ([]*domain.Folder, error) {
@@ -190,6 +220,7 @@ type PublishSnapshotInput struct {
 	Tags              []string
 	Content           domain.RichTextDocument
 	PlainText         string
+	ContentSequence   int64
 	PublicationHash   string
 	Icon              string
 	CoverAttachmentID *string
@@ -528,7 +559,7 @@ func (l *DocumentLogic) PublishSnapshot(ctx context.Context, documentID string, 
 	result, err := l.repository.PublishSnapshot(ctx, documentID, actorID, expected, repository.PublicationSnapshotInput{
 		Title: input.Title, Summary: input.Summary,
 		Slug: input.Slug, Language: input.Language, Tags: append([]string(nil), input.Tags...), Content: input.Content,
-		PlainText: input.PlainText, MediaIDs: publicationMediaIDs(input.Content), Idempotency: idempotencyValue,
+		PlainText: input.PlainText, ContentSequence: input.ContentSequence, MediaIDs: publicationMediaIDs(input.Content), Idempotency: idempotencyValue,
 		PublicationHash: input.PublicationHash, Icon: input.Icon, CoverAttachmentID: input.CoverAttachmentID,
 		CoverFocalX: input.CoverFocalX, CoverFocalY: input.CoverFocalY,
 	})

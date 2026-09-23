@@ -388,3 +388,17 @@ operations:
     security: bearer
     success_status: 202
     errors: [400, 401, 403, 404, 409, 412, 429, 500, 502, 503, 504]
+  ListHistory:
+    tag: 文档历史
+    summary: 列出自动历史记录
+    description: 按时间倒序返回经语义去重的权威草稿历史。
+    security: bearer
+    success_status: 200
+    errors: [400, 401, 403, 404, 429, 500, 502, 503, 504]
+  GetHistory:
+    tag: 文档历史
+    summary: 获取历史记录
+    description: 获取指定历史记录的正文、展示元数据、贡献者和块级差异。
+    security: bearer
+    success_status: 200
+    errors: [400, 401, 403, 404, 429, 500, 502, 503, 504]

@@ -11,11 +11,13 @@ import (
 	commonv1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/common"
 	knowledgev1 "github.com/HappyLadySauce/Knowledge-Core/kitex_gen/knowledge"
 	coreauth "github.com/HappyLadySauce/Knowledge-Core/pkg/auth"
+	jsoncodec "github.com/HappyLadySauce/Knowledge-Core/pkg/codec/json"
 	apperror "github.com/HappyLadySauce/Knowledge-Core/pkg/error"
 	"github.com/HappyLadySauce/Knowledge-Core/pkg/metadata"
 	"github.com/HappyLadySauce/Knowledge-Core/services/knowledge/internal/domain"
 	knowledgeerrors "github.com/HappyLadySauce/Knowledge-Core/services/knowledge/internal/errors"
 	knowledgelogic "github.com/HappyLadySauce/Knowledge-Core/services/knowledge/internal/logic"
+	"github.com/HappyLadySauce/Knowledge-Core/services/knowledge/internal/repository"
 )
 
 const serviceName = "knowledge"
@@ -38,6 +40,8 @@ type DocumentService interface {
 	GetCommit(context.Context, string, int64) (*domain.Commit, error)
 	RenameCommit(context.Context, string, int64, string, string) (*domain.Commit, error)
 	RestoreCommit(context.Context, string, int64, string) (*domain.Document, error)
+	ListHistory(context.Context, string, int64, int) ([]*repository.HistoryCheckpoint, error)
+	GetHistory(context.Context, string, string, int64) (*repository.HistoryCheckpoint, error)
 	IsMediaPublished(context.Context, string) (bool, error)
 }
 
@@ -240,7 +244,7 @@ func (h *Handler) PublishSnapshot(ctx context.Context, request *knowledgev1.Publ
 	document, serviceErr := h.documents.PublishSnapshot(ctx, request.DocumentId, actorID, request.ExpectedMetadataRevision, knowledgelogic.PublishSnapshotInput{
 		Title: request.Title, Summary: request.Summary,
 		Slug: request.Slug, Language: request.Language, Tags: append([]string(nil), request.Tags...), Content: content,
-		PlainText: request.PlainText, PublicationHash: stringValue(request.PublicationHash), Icon: stringValue(request.Icon),
+		PlainText: request.PlainText, ContentSequence: request.ContentSequence, PublicationHash: stringValue(request.PublicationHash), Icon: stringValue(request.Icon),
 		CoverAttachmentID: request.CoverAttachmentId, CoverFocalX: floatValue(request.CoverFocalX), CoverFocalY: floatValue(request.CoverFocalY),
 		IdempotencyKey: stringValue(request.IdempotencyKey),
 	})
@@ -329,6 +333,42 @@ func (h *Handler) RestoreCommit(ctx context.Context, request *knowledgev1.Restor
 		return nil, h.transportError(ctx, "restore_commit_failed", serviceErr)
 	}
 	return h.documentResult(ctx, "restore_commit_failed", document)
+}
+
+func (h *Handler) ListHistory(ctx context.Context, request *knowledgev1.ListHistoryRequest) (*knowledgev1.HistoryPage, error) {
+	actorID, err := h.requireActor(ctx, request != nil)
+	if err != nil {
+		return nil, h.transportError(ctx, "list_history_failed", err)
+	}
+	items, serviceErr := h.documents.ListHistory(ctx, request.DocumentId, actorID, int(int32Value(request.Limit)))
+	if serviceErr != nil {
+		return nil, h.transportError(ctx, "list_history_failed", serviceErr)
+	}
+	result := make([]*knowledgev1.HistoryRevision, 0, len(items))
+	for _, item := range items {
+		value, conversionErr := toTransportHistory(item)
+		if conversionErr != nil {
+			return nil, h.transportError(ctx, "list_history_failed", conversionErr)
+		}
+		result = append(result, value)
+	}
+	return &knowledgev1.HistoryPage{Items: result, Page: &knowledgev1.PageInfo{HasMore: false}}, nil
+}
+
+func (h *Handler) GetHistory(ctx context.Context, request *knowledgev1.HistoryIDRequest) (*knowledgev1.HistoryRevision, error) {
+	actorID, err := h.requireActor(ctx, request != nil)
+	if err != nil {
+		return nil, h.transportError(ctx, "get_history_failed", err)
+	}
+	item, serviceErr := h.documents.GetHistory(ctx, request.DocumentId, request.RevisionId, actorID)
+	if serviceErr != nil {
+		return nil, h.transportError(ctx, "get_history_failed", serviceErr)
+	}
+	result, conversionErr := toTransportHistory(item)
+	if conversionErr != nil {
+		return nil, h.transportError(ctx, "get_history_failed", conversionErr)
+	}
+	return result, nil
 }
 
 func (h *Handler) ListFolders(ctx context.Context, request *knowledgev1.ListFoldersRequest) (*knowledgev1.FolderList, error) {
@@ -703,6 +743,7 @@ func toTransportDocument(value *domain.Document) *knowledgev1.Document {
 		Tags: append([]string(nil), value.Tags...), FolderId: value.FolderID,
 		PublicationStatus: value.PublicationStatus, PublicationError: value.PublicationError,
 		PublicationHash: nonEmptyStringPointer(value.PublicationHash), Icon: nonEmptyStringPointer(value.Icon),
+		PublicationGeneration: value.PublicationGeneration, ActivePublicationHash: nonEmptyStringPointer(value.ActivePublicationHash),
 		CoverAttachmentId: value.CoverAttachmentID, CoverFocalX: optionalFloat(value.CoverFocalX), CoverFocalY: optionalFloat(value.CoverFocalY),
 	}
 }
@@ -722,6 +763,24 @@ func toTransportCommit(value *domain.Commit) *knowledgev1.Commit {
 		Description: nonEmptyStringPointer(value.Description), Contributor: value.Contributor, Sequence: value.Sequence,
 		ContentHash: value.ContentHash, Content: toTransportRichText(value.Content), PlainText: value.PlainText,
 		CreatedAt: value.CreatedAt.UTC().Format(time.RFC3339Nano), UpdatedAt: value.UpdatedAt.UTC().Format(time.RFC3339Nano)}
+}
+
+func toTransportHistory(value *repository.HistoryCheckpoint) (*knowledgev1.HistoryRevision, error) {
+	if value == nil {
+		return nil, errors.New("history revision is nil")
+	}
+	var content domain.RichTextDocument
+	if err := jsoncodec.Unmarshal(value.Content, &content); err != nil {
+		return nil, fmt.Errorf("decode history content: %w", err)
+	}
+	return &knowledgev1.HistoryRevision{
+		Id: value.ID, DocumentId: value.DocumentID, Kind: value.Kind, Sequence: value.Sequence,
+		MetadataRevision: value.MetadataRevision, SemanticHash: value.SemanticHash,
+		Content: toTransportRichText(content), PlainText: value.PlainText,
+		MetadataJson: string(value.Metadata), ContributorsJson: string(value.Contributors),
+		BlockDiffJson: string(value.BlockDiff), IsAnchor: value.IsAnchor,
+		CreatedAt: value.CreatedAt.UTC().Format(time.RFC3339Nano),
+	}, nil
 }
 
 func commitKindName(value knowledgev1.CommitKind) string {
@@ -818,7 +877,7 @@ func toTransportRichTextAttrs(value *domain.RichTextAttrs) *knowledgev1.RichText
 		Level: value.Level, Start: value.Start, Checked: value.Checked, Language: value.Language,
 		Href: value.Href, AttachmentId: value.AttachmentID, Alt: value.Alt, Title: value.Title,
 		TextAlign: value.TextAlign, Colspan: value.Colspan, Rowspan: value.Rowspan,
-		Colwidth: append([]int32(nil), value.Colwidth...),
+		Colwidth: append([]int32(nil), value.Colwidth...), BlockId: value.BlockID,
 	}
 }
 
@@ -884,7 +943,7 @@ func fromTransportRichTextAttrs(value *knowledgev1.RichTextAttrs) *domain.RichTe
 		Level: value.Level, Start: value.Start, Checked: value.Checked, Language: value.Language,
 		Href: value.Href, AttachmentID: value.AttachmentId, Alt: value.Alt, Title: value.Title,
 		TextAlign: value.TextAlign, Colspan: value.Colspan, Rowspan: value.Rowspan,
-		Colwidth: append([]int32(nil), value.Colwidth...),
+		Colwidth: append([]int32(nil), value.Colwidth...), BlockID: value.BlockId,
 	}
 }
 

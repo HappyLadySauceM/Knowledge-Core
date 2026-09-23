@@ -77,6 +77,12 @@ func (s *documentRepositoryStub) RenameCommit(context.Context, string, int64, st
 func (s *documentRepositoryStub) RestoreCommit(context.Context, string, int64, repository.Idempotency) (*domain.Document, error) {
 	return nil, errUnusedDocumentRepository
 }
+func (s *documentRepositoryStub) ListHistory(context.Context, string, int64, int) ([]*repository.HistoryCheckpoint, error) {
+	return nil, errUnusedDocumentRepository
+}
+func (s *documentRepositoryStub) GetHistory(context.Context, string, string, int64) (*repository.HistoryCheckpoint, error) {
+	return nil, errUnusedDocumentRepository
+}
 
 func TestPublishSnapshotAcceptsParagraphOnlyTextWithEmptyContent(t *testing.T) {
 	document := &domain.Document{
