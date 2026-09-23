@@ -123,7 +123,7 @@ Knowledge 保存最近一次公开快照；Collaboration 只保存实时编辑�
 
 `.github/workflows/pipeline.yml` 按 `plan → Go/Rust 门禁 → candidates → release summary → Argo 部署` 拆分任务。质量检查直接生成 `.ci-artifacts/` 二进制；镜像阶段只做运行时打包并校验 artifact SHA256，不再重复编译。候选镜像使用提交 SHA 标签，Smoke 通过后才提升为 `dev`；失败时只回滚尚未通过 Smoke 的 GitOps 修订，并保留 Harbor 候选 tag 供同一 SHA 重跑复用。只有候选成功提升为 active tag 后才清理。失败重跑在发布前会用制品中的 digest 幂等恢复候选标签；digest 不存在时明确失败并要求重建，不会误报为发布问题。
 
-流水线通过共享 `ci-templates` 控制镜像接入带摘要校验的 Artifact 节点缓存、最多五次的退避下载和 `Retry-After`。每日 `maintenance.yml` 以 fail-closed 方式清理超过 72 小时的候选与运行制品；显式 `/cache` 下的依赖和工具缓存按 30 天保留及 80%/70% 水位回收。发布失败、Argo/Smoke 未通过或 Harbor 查询失败时不执行候选删除。
+流水线通过共享 `ci-templates` 接入带摘要校验的 Artifact 节点缓存、最多五次的退避下载和 `Retry-After`；跨节点 Artifact 上传由共享 Action 完整重试一次，连续失败仍阻断发布。每日 `maintenance.yml` 使用独立 `maintenance` Environment，以 fail-closed 方式清理超过 72 小时的候选与运行制品；显式 `/cache` 下的依赖和工具缓存按 30 天保留及 80%/70% 水位回收。发布失败、Argo/Smoke 未通过或 Harbor 查询失败时不执行候选删除。
 
 部署 Smoke 在 Gateway 健康检查之后验证 Collaboration StatefulSet 已完成滚动更新：所有副本必须 Ready、观测到的 current/update revision 必须一致，且活动副本必须使用同一个不可变镜像 digest。这样 Gateway 的快照捕获调用不会在旧 RPC 副本仍接收流量时被提前放行；本地无 Kubernetes 凭据时该副本一致性检查会跳过，仅保留 HTTP 健康检查。
 

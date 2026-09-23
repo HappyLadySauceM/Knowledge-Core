@@ -49,7 +49,7 @@ jobs:
       contents: read
     steps:
       - name: Mark Feishu pipeline task in progress
-        uses: HappyLadySauceM/ci-templates/.github/actions/feishu-pipeline-task@1185e7484dc87896f4d373afefa98cd81aa75adc
+        uses: HappyLadySauceM/ci-templates/.github/actions/feishu-pipeline-task@e05f029f7a981aad7b681d80d951b09c7e9c87aa
         with:
           operation: sync
           phase: in_progress
@@ -84,7 +84,7 @@ jobs:
       docs_changed: ${{ steps.plan.outputs.docs_changed }}
       base_sha: ${{ steps.plan.outputs.base_sha }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: HappyLadySauceM/ci-templates/.github/actions/checkout-with-retry@e05f029f7a981aad7b681d80d951b09c7e9c87aa # v7.0.1
         with:
           fetch-depth: 0
       - name: Plan affected services
@@ -97,9 +97,10 @@ jobs:
           print(load_config(os.environ["CI_PROJECT_CONFIG"]).release_branch)
           PY
           )"
-          git fetch --no-tags origin "$release_branch"
+          ci-templates network-run --profile download --label git-fetch-release -- git fetch --no-tags origin "$release_branch"
           base="$(git rev-parse "origin/$release_branch")"
           ci-templates validate --config "$CI_PROJECT_CONFIG"
+          ci-templates network-audit --root .
           changes="$(ci-templates changes --config "$CI_PROJECT_CONFIG" --base "$base" --details-file changes.json)"
           echo "$changes"
           services="$(jq -r '.services | join(",")' <<<"$changes")"
@@ -157,14 +158,13 @@ jobs:
             echo "docs_changed=$docs_changed"
             echo "base_sha=$base"
           } >> "$GITHUB_OUTPUT"
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: HappyLadySauceM/ci-templates/.github/actions/upload-artifact-with-retry@e05f029f7a981aad7b681d80d951b09c7e9c87aa # v7.0.1
         with:
           # Keep names stable within one run so rerun-failed can reuse artifacts
           # produced by jobs that were already successful in an earlier attempt.
           # 在同一 run 内保持名称稳定，让 rerun-failed 可以复用前一次成功作业的产物。
           name: knowledge-core-plan-${{ github.run_id }}
           path: changes.json
-          overwrite: true
           if-no-files-found: error
           retention-days: 7
 
@@ -179,10 +179,10 @@ jobs:
       group: ${{ github.repository }}-${{ github.workflow }}-deploy-verify-${{ github.ref }}
       cancel-in-progress: true
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: HappyLadySauceM/ci-templates/.github/actions/checkout-with-retry@e05f029f7a981aad7b681d80d951b09c7e9c87aa # v7.0.1
         with:
           fetch-depth: 1
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - uses: HappyLadySauceM/ci-templates/.github/actions/setup-go-with-retry@e05f029f7a981aad7b681d80d951b09c7e9c87aa # v7.0.0
         with:
           go-version-file: go.mod
           cache: false
@@ -205,7 +205,7 @@ jobs:
     runs-on: hls-standard
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: HappyLadySauceM/ci-templates/.github/actions/checkout-with-retry@e05f029f7a981aad7b681d80d951b09c7e9c87aa # v7.0.1
         with:
           fetch-depth: 0
       - name: Validate documentation whitespace
@@ -222,10 +222,10 @@ jobs:
     env:
       KC_RUST_GATE: "0"
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: HappyLadySauceM/ci-templates/.github/actions/checkout-with-retry@e05f029f7a981aad7b681d80d951b09c7e9c87aa # v7.0.1
         with:
           fetch-depth: 1
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - uses: HappyLadySauceM/ci-templates/.github/actions/setup-go-with-retry@e05f029f7a981aad7b681d80d951b09c7e9c87aa # v7.0.0
         with:
           go-version-file: go.mod
           cache: false
@@ -238,6 +238,8 @@ jobs:
           [[ -x "$bin_dir/hz" ]] || GOBIN="$bin_dir" go install github.com/cloudwego/hertz/cmd/hz@v0.9.7
           [[ -x "$bin_dir/thriftgo" ]] || GOBIN="$bin_dir" go install github.com/cloudwego/thriftgo@v0.4.5
           echo "$bin_dir" >> "$GITHUB_PATH"
+      - name: Fetch Go dependencies with bounded retry
+        run: ci-templates network-run --profile download --label go-mod-download -- go mod download
       - name: Run Go gates and publish verified binaries
         env:
           BUILD_SERVICES: ${{ needs.plan.outputs.build_services }}
@@ -268,43 +270,38 @@ jobs:
             fi
           done
       - if: contains(fromJSON(needs.plan.outputs.go_build_matrix), 'gateway')
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: HappyLadySauceM/ci-templates/.github/actions/upload-artifact-with-retry@e05f029f7a981aad7b681d80d951b09c7e9c87aa # v7.0.1
         with:
           name: knowledge-core-binary-gateway-${{ github.run_id }}
           path: .ci-artifacts/gateway
-          overwrite: true
           if-no-files-found: error
           retention-days: 7
       - if: contains(fromJSON(needs.plan.outputs.go_build_matrix), 'identity')
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: HappyLadySauceM/ci-templates/.github/actions/upload-artifact-with-retry@e05f029f7a981aad7b681d80d951b09c7e9c87aa # v7.0.1
         with:
           name: knowledge-core-binary-identity-${{ github.run_id }}
           path: .ci-artifacts/identity
-          overwrite: true
           if-no-files-found: error
           retention-days: 7
       - if: contains(fromJSON(needs.plan.outputs.go_build_matrix), 'knowledge')
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: HappyLadySauceM/ci-templates/.github/actions/upload-artifact-with-retry@e05f029f7a981aad7b681d80d951b09c7e9c87aa # v7.0.1
         with:
           name: knowledge-core-binary-knowledge-${{ github.run_id }}
           path: .ci-artifacts/knowledge
-          overwrite: true
           if-no-files-found: error
           retention-days: 7
       - if: contains(fromJSON(needs.plan.outputs.go_build_matrix), 'attachment')
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: HappyLadySauceM/ci-templates/.github/actions/upload-artifact-with-retry@e05f029f7a981aad7b681d80d951b09c7e9c87aa # v7.0.1
         with:
           name: knowledge-core-binary-attachment-${{ github.run_id }}
           path: .ci-artifacts/attachment
-          overwrite: true
           if-no-files-found: error
           retention-days: 7
       - if: contains(fromJSON(needs.plan.outputs.go_build_matrix), 'platform')
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: HappyLadySauceM/ci-templates/.github/actions/upload-artifact-with-retry@e05f029f7a981aad7b681d80d951b09c7e9c87aa # v7.0.1
         with:
           name: knowledge-core-binary-platform-${{ github.run_id }}
           path: .ci-artifacts/platform
-          overwrite: true
           if-no-files-found: error
           retention-days: 7
 
@@ -326,7 +323,7 @@ jobs:
       CARGO_HTTP_TIMEOUT: "120"
       CARGO_HTTP_MULTIPLEXING: "false"
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: HappyLadySauceM/ci-templates/.github/actions/checkout-with-retry@e05f029f7a981aad7b681d80d951b09c7e9c87aa # v7.0.1
         with:
           fetch-depth: 1
       - name: Check pinned Rust toolchain
@@ -341,6 +338,8 @@ jobs:
           # the artifacts produced by this quality gate instead of compiling
           # the workspace a second time on a separate runner.
           echo "CARGO_TARGET_DIR=/cache/knowledge-core-cargo-target" >> "$GITHUB_ENV"
+      - name: Fetch Rust dependencies with bounded retry
+        run: ci-templates network-run --profile download --label cargo-fetch -- cargo fetch --locked
       - name: Restore pinned cargo-deny from runner cache
         run: |
           set -euo pipefail
@@ -353,7 +352,7 @@ jobs:
             done
           fi
           echo "$bin_dir" >> "$GITHUB_PATH"
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: HappyLadySauceM/ci-templates/.github/actions/setup-node-with-retry@e05f029f7a981aad7b681d80d951b09c7e9c87aa # v7.0.0
         with:
           node-version: 24.18.1
           mirror: https://cdn.npmmirror.com/binaries/node
@@ -396,11 +395,10 @@ jobs:
           if ! scripts/ci-artifact-cache.sh publish knowledge-core-binary-collaboration .ci-artifacts/collaboration; then
             echo "::warning::local cache publish failed for collaboration; GitHub Artifacts remains available"
           fi
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: HappyLadySauceM/ci-templates/.github/actions/upload-artifact-with-retry@e05f029f7a981aad7b681d80d951b09c7e9c87aa # v7.0.1
         with:
           name: knowledge-core-binary-collaboration-${{ github.run_id }}
           path: .ci-artifacts/collaboration
-          overwrite: true
           if-no-files-found: error
           retention-days: 7
   release-notes:
@@ -413,7 +411,7 @@ jobs:
       group: ${{ github.repository }}-${{ github.workflow }}-release-notes-${{ github.ref }}
       cancel-in-progress: true
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: HappyLadySauceM/ci-templates/.github/actions/checkout-with-retry@e05f029f7a981aad7b681d80d951b09c7e9c87aa # v7.0.1
         with:
           fetch-depth: 1
           fetch-tags: true
@@ -429,11 +427,10 @@ jobs:
           set -euo pipefail
           test -n "${DEEPSEEK_API_KEY:-}" || { echo 'DEEPSEEK_API_KEY is required' >&2; exit 1; }
           ci-templates summarize --config "$CI_PROJECT_CONFIG" --services "$SERVICES" --changes-file changes.json --output release.md
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: HappyLadySauceM/ci-templates/.github/actions/upload-artifact-with-retry@e05f029f7a981aad7b681d80d951b09c7e9c87aa # v7.0.1
         with:
           name: knowledge-core-release-notes-${{ github.run_id }}
           path: release.md
-          overwrite: true
           if-no-files-found: error
           retention-days: 7
 
@@ -444,11 +441,11 @@ jobs:
     timeout-minutes: 20
     environment: release
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: HappyLadySauceM/ci-templates/.github/actions/checkout-with-retry@e05f029f7a981aad7b681d80d951b09c7e9c87aa # v7.0.1
         with:
           fetch-depth: 1
       - name: Prepare Harbor credentials
-        uses: HappyLadySauceM/ci-templates/.github/actions/prepare-harbor@1185e7484dc87896f4d373afefa98cd81aa75adc
+        uses: HappyLadySauceM/ci-templates/.github/actions/prepare-harbor@e05f029f7a981aad7b681d80d951b09c7e9c87aa
         with:
           docker-config-json: ${{ secrets.HARBOR_DOCKER_CONFIG_JSON }}
           ca-pem: ${{ secrets.HARBOR_CA_PEM }}
@@ -470,7 +467,7 @@ jobs:
       matrix:
         service: ${{ fromJSON(needs.plan.outputs.go_build_matrix) }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: HappyLadySauceM/ci-templates/.github/actions/checkout-with-retry@e05f029f7a981aad7b681d80d951b09c7e9c87aa # v7.0.1
         with:
           fetch-depth: 1
       - name: Restore binary from same-node cache
@@ -489,7 +486,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: ci-templates artifact-cache restore --name "knowledge-core-binary-${{ matrix.service }}-${GITHUB_RUN_ID}" --destination .ci-artifacts
       - name: Prepare Harbor credentials
-        uses: HappyLadySauceM/ci-templates/.github/actions/prepare-harbor@1185e7484dc87896f4d373afefa98cd81aa75adc
+        uses: HappyLadySauceM/ci-templates/.github/actions/prepare-harbor@e05f029f7a981aad7b681d80d951b09c7e9c87aa
         with:
           docker-config-json: ${{ secrets.HARBOR_DOCKER_CONFIG_JSON }}
           ca-pem: ${{ secrets.HARBOR_CA_PEM }}
@@ -516,11 +513,10 @@ jobs:
           jq --arg source_sha "$GITHUB_SHA" --arg candidate_tag "$candidate_tag" \
             '. + {source_sha:$source_sha,candidate_tag:$candidate_tag}' <<<"$result" > "candidate-$SERVICE.json"
           jq -e '.kustomize_name and .image and .digest' "candidate-$SERVICE.json" >/dev/null
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: HappyLadySauceM/ci-templates/.github/actions/upload-artifact-with-retry@e05f029f7a981aad7b681d80d951b09c7e9c87aa # v7.0.1
         with:
           name: knowledge-core-candidate-${{ matrix.service }}-${{ github.run_id }}
           path: candidate-${{ matrix.service }}.json
-          overwrite: true
           if-no-files-found: error
           retention-days: 7
 
@@ -536,7 +532,7 @@ jobs:
       matrix:
         service: ${{ fromJSON(needs.plan.outputs.rust_build_matrix) }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: HappyLadySauceM/ci-templates/.github/actions/checkout-with-retry@e05f029f7a981aad7b681d80d951b09c7e9c87aa # v7.0.1
         with:
           fetch-depth: 1
       - name: Restore binary from same-node cache
@@ -555,7 +551,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: ci-templates artifact-cache restore --name "knowledge-core-binary-${{ matrix.service }}-${GITHUB_RUN_ID}" --destination .ci-artifacts
       - name: Prepare Harbor credentials
-        uses: HappyLadySauceM/ci-templates/.github/actions/prepare-harbor@1185e7484dc87896f4d373afefa98cd81aa75adc
+        uses: HappyLadySauceM/ci-templates/.github/actions/prepare-harbor@e05f029f7a981aad7b681d80d951b09c7e9c87aa
         with:
           docker-config-json: ${{ secrets.HARBOR_DOCKER_CONFIG_JSON }}
           ca-pem: ${{ secrets.HARBOR_CA_PEM }}
@@ -582,11 +578,10 @@ jobs:
           jq --arg source_sha "$GITHUB_SHA" --arg candidate_tag "$candidate_tag" \
             '. + {source_sha:$source_sha,candidate_tag:$candidate_tag}' <<<"$result" > "candidate-$SERVICE.json"
           jq -e '.kustomize_name and .image and .digest' "candidate-$SERVICE.json" >/dev/null
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: HappyLadySauceM/ci-templates/.github/actions/upload-artifact-with-retry@e05f029f7a981aad7b681d80d951b09c7e9c87aa # v7.0.1
         with:
           name: knowledge-core-candidate-${{ matrix.service }}-${{ github.run_id }}
           path: candidate-${{ matrix.service }}.json
-          overwrite: true
           if-no-files-found: error
           retention-days: 7
 
@@ -618,7 +613,7 @@ jobs:
           private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: ${{ github.event.repository.name }},deploy
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: HappyLadySauceM/ci-templates/.github/actions/checkout-with-retry@e05f029f7a981aad7b681d80d951b09c7e9c87aa # v7.0.1
         with:
           # Fast-forwarding main needs origin/main as an ancestor of HEAD.
           # 快进 main 需要 origin/main 是 HEAD 的祖先。
@@ -705,7 +700,7 @@ jobs:
           echo "$result"
           echo "gitops_revision=$(jq -r '.gitops_revision' <<<"$result")" >> "$GITHUB_OUTPUT"
           echo "gitops_base_revision=$(jq -r '.gitops_base_revision' <<<"$result")" >> "$GITHUB_OUTPUT"
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: HappyLadySauceM/ci-templates/.github/actions/checkout-with-retry@e05f029f7a981aad7b681d80d951b09c7e9c87aa # v7.0.1
         with:
           repository: ${{ github.repository_owner }}/deploy
           ref: ${{ steps.gitops.outputs.gitops_revision }}
@@ -802,11 +797,11 @@ jobs:
     timeout-minutes: 10
     environment: release
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: HappyLadySauceM/ci-templates/.github/actions/checkout-with-retry@e05f029f7a981aad7b681d80d951b09c7e9c87aa # v7.0.1
         with:
           fetch-depth: 1
       - name: Prepare Harbor credentials
-        uses: HappyLadySauceM/ci-templates/.github/actions/prepare-harbor@1185e7484dc87896f4d373afefa98cd81aa75adc
+        uses: HappyLadySauceM/ci-templates/.github/actions/prepare-harbor@e05f029f7a981aad7b681d80d951b09c7e9c87aa
         with:
           docker-config-json: ${{ secrets.HARBOR_DOCKER_CONFIG_JSON }}
           ca-pem: ${{ secrets.HARBOR_CA_PEM }}
@@ -840,7 +835,7 @@ jobs:
       - name: Mark Feishu pipeline task complete
         if: vars.FEISHU_TASK_TRACKER_ENABLED == 'true'
         continue-on-error: true
-        uses: HappyLadySauceM/ci-templates/.github/actions/feishu-pipeline-task@1185e7484dc87896f4d373afefa98cd81aa75adc
+        uses: HappyLadySauceM/ci-templates/.github/actions/feishu-pipeline-task@e05f029f7a981aad7b681d80d951b09c7e9c87aa
         with:
           operation: sync
           phase: completed
@@ -856,7 +851,7 @@ jobs:
         if: vars.FEISHU_TASK_TRACKER_ENABLED != 'true'
         # Pin to the ci-templates commit that added CI-card notify.py.
         # 钉死到加入 CI 卡片的 ci-templates 提交。
-        uses: HappyLadySauceM/ci-templates/.github/actions/feishu-notify@21d1752cc7f4fda3237cd7229be20ee3e608f1cf
+        uses: HappyLadySauceM/ci-templates/.github/actions/feishu-notify@e05f029f7a981aad7b681d80d951b09c7e9c87aa
         with:
           webhook: ${{ secrets.FEISHU_WEBHOOK_URL }}
           secret: ${{ secrets.FEISHU_WEBHOOK_SECRET }}
@@ -865,7 +860,7 @@ jobs:
           conclusion: ${{ contains(needs.*.result, 'failure') && 'failure' || contains(needs.*.result, 'cancelled') && 'cancelled' || 'success' }}
       - name: Notify Feishu release
         if: needs.deploy-release.result == 'success' && needs.deploy-release.outputs.release_tag != ''
-        uses: HappyLadySauceM/ci-templates/.github/actions/feishu-notify@21d1752cc7f4fda3237cd7229be20ee3e608f1cf
+        uses: HappyLadySauceM/ci-templates/.github/actions/feishu-notify@e05f029f7a981aad7b681d80d951b09c7e9c87aa
         with:
           webhook: ${{ secrets.FEISHU_WEBHOOK_URL }}
           secret: ${{ secrets.FEISHU_WEBHOOK_SECRET }}
