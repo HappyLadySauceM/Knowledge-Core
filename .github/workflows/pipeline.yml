@@ -339,7 +339,7 @@ jobs:
           # the workspace a second time on a separate runner.
           echo "CARGO_TARGET_DIR=/cache/knowledge-core-cargo-target" >> "$GITHUB_ENV"
       - name: Fetch Rust dependencies with bounded retry
-        run: ci-templates network-run --profile download --label cargo-fetch -- cargo fetch --locked
+        run: ci-templates network-run --profile download --label cargo-fetch -- cargo fetch --locked --manifest-path services/collaboration/Cargo.toml
       - name: Restore pinned cargo-deny from runner cache
         run: |
           set -euo pipefail
