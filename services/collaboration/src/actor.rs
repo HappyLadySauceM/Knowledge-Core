@@ -964,6 +964,13 @@ impl DocumentActor {
                     if let Err(close) = self.validate_awareness_ownership(connection_id, &update) {
                         if close == CLOSE_INVALID_PROTOCOL {
                             self.metrics.protocol_rejection("awareness-ownership");
+                            tracing::warn!(
+                                component = "collaboration.actor",
+                                cause = "awareness-ownership",
+                                document_id = %self.document_id,
+                                connection_id = %connection_id,
+                                "rejected awareness update that claimed foreign or excess client IDs"
+                            );
                         }
                         return Err(close);
                     }
