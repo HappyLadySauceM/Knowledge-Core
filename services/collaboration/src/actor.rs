@@ -964,11 +964,32 @@ impl DocumentActor {
                     if let Err(close) = self.validate_awareness_ownership(connection_id, &update) {
                         if close == CLOSE_INVALID_PROTOCOL {
                             self.metrics.protocol_rejection("awareness-ownership");
+                            let owned = self
+                                .connections
+                                .get(&connection_id)
+                                .map(|connection| connection.awareness_clients.len())
+                                .unwrap_or(0);
+                            let claimed: Vec<String> = update
+                                .clients
+                                .iter()
+                                .map(|(client_id, entry)| {
+                                    format!(
+                                        "{client_id}:{}",
+                                        if entry.json.as_ref() == "null" {
+                                            "null"
+                                        } else {
+                                            "set"
+                                        }
+                                    )
+                                })
+                                .collect();
                             tracing::warn!(
                                 component = "collaboration.actor",
                                 cause = "awareness-ownership",
                                 document_id = %self.document_id,
                                 connection_id = %connection_id,
+                                owned_clients = owned,
+                                claimed_clients = %claimed.join(","),
                                 "rejected awareness update that claimed foreign or excess client IDs"
                             );
                         }
