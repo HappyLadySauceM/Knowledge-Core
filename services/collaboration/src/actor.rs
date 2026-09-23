@@ -967,8 +967,7 @@ impl DocumentActor {
                             let owned = self
                                 .connections
                                 .get(&connection_id)
-                                .map(|connection| connection.awareness_clients.len())
-                                .unwrap_or(0);
+                                .map_or(0, |connection| connection.awareness_clients.len());
                             let claimed: Vec<String> = update
                                 .clients
                                 .iter()
