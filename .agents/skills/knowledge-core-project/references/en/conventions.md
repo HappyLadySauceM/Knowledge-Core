@@ -22,7 +22,11 @@ Repository text uses LF except `.bat` / `.cmd`. Module and directory ownership l
 
 Use the service-mesh mTLS boundary for trusted backend-only Attachment publication-reference and Platform consumer RPCs. Do not add a second application service token; preserve access-token metadata and administrator JWT checks for methods that require user context.
 
-<!-- fact:conventions.code-style status:verified sources:AGENTS.md, docs/trace-architecture.md#4-噪音过滤, user-confirmed, user-confirmed-internal-rpc-auth-boundary, user-confirmed-schema-v2-rerecord -->
+## Collaboration rich-text and telemetry
+
+Collaboration validates Web StableBlockId `blockId` metadata on the allowlisted block nodes before committing or broadcasting a Yjs update; values are strings whose trimmed length is 1..=128 bytes. Invalid updates preserve bounded `richtext-invalid` and `invalid-update` metrics. Awareness rejection logs remain low-cardinality and omit document IDs, connection IDs, and client ID lists.
+
+<!-- fact:conventions.code-style status:verified sources:AGENTS.md, docs/trace-architecture.md#4-噪音过滤, services/collaboration/src/richtext.rs and services/collaboration/src/actor.rs, user-confirmed, user-confirmed-internal-rpc-auth-boundary, user-confirmed-schema-v2-rerecord -->
 
 ## 4. Repository modules
 

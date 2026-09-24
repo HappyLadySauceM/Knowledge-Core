@@ -7,6 +7,32 @@ export const FRAGMENT_NAME = "default";
 const ATTACHMENT_ID = "01890f47-76a8-7b1c-b4db-1d9d3906f73b";
 // Set before the first transaction so the committed update bytes are reproducible.
 const FIXTURE_CLIENT_ID = 0x4b430001;
+const STABLE_BLOCK_TYPES = new Set([
+  "paragraph",
+  "heading",
+  "bulletList",
+  "orderedList",
+  "listItem",
+  "taskList",
+  "taskItem",
+  "blockquote",
+  "codeBlock",
+  "horizontalRule",
+  "image",
+  "attachment",
+  "table",
+  "tableRow",
+  "tableHeader",
+  "tableCell",
+  "callout",
+  "columns",
+  "column",
+  "formula",
+]);
+
+function blockAttrs(defaults = {}) {
+  return { ...defaults, blockId: { default: null } };
+}
 
 export const richTextSchema = new Schema({
   nodes: {
@@ -14,67 +40,84 @@ export const richTextSchema = new Schema({
     paragraph: {
       content: "inline*",
       group: "block",
-      attrs: { textAlign: { default: "left" } },
+      attrs: blockAttrs({ textAlign: { default: "left" } }),
     },
     heading: {
       content: "inline*",
       group: "block",
-      attrs: { level: {}, textAlign: { default: "left" } },
+      attrs: blockAttrs({ level: {}, textAlign: { default: "left" } }),
     },
-    bulletList: { content: "listItem+", group: "block" },
+    bulletList: { content: "listItem+", group: "block", attrs: blockAttrs() },
     orderedList: {
       content: "listItem+",
       group: "block",
-      attrs: { start: { default: 1 } },
+      attrs: blockAttrs({ start: { default: 1 } }),
     },
-    listItem: { content: "paragraph block*" },
-    taskList: { content: "taskItem+", group: "block" },
+    listItem: { content: "paragraph block*", attrs: blockAttrs() },
+    taskList: { content: "taskItem+", group: "block", attrs: blockAttrs() },
     taskItem: {
       content: "paragraph block*",
-      attrs: { checked: { default: false } },
+      attrs: blockAttrs({ checked: { default: false } }),
     },
-    blockquote: { content: "block+", group: "block" },
+    blockquote: { content: "block+", group: "block", attrs: blockAttrs() },
     codeBlock: {
       content: "text*",
       marks: "",
       group: "block",
       code: true,
-      attrs: { language: { default: null } },
+      attrs: blockAttrs({ language: { default: null } }),
     },
-    horizontalRule: { group: "block" },
+    horizontalRule: { group: "block", attrs: blockAttrs() },
     hardBreak: { inline: true, group: "inline", selectable: false },
     text: { group: "inline" },
     image: {
       group: "block",
       atom: true,
-      attrs: {
+      attrs: blockAttrs({
         attachmentId: {},
         alt: { default: null },
         title: { default: null },
-      },
+      }),
     },
     attachment: {
       group: "block",
       atom: true,
-      attrs: { attachmentId: {}, title: { default: null } },
+      attrs: blockAttrs({ attachmentId: {}, title: { default: null } }),
     },
-    table: { content: "tableRow+", group: "block" },
-    tableRow: { content: "(tableHeader | tableCell)+" },
+    table: { content: "tableRow+", group: "block", attrs: blockAttrs() },
+    tableRow: { content: "(tableHeader | tableCell)+", attrs: blockAttrs() },
     tableHeader: {
       content: "block+",
-      attrs: {
+      attrs: blockAttrs({
         colspan: { default: 1 },
         rowspan: { default: 1 },
         colwidth: { default: null },
-      },
+      }),
     },
     tableCell: {
       content: "block+",
-      attrs: {
+      attrs: blockAttrs({
         colspan: { default: 1 },
         rowspan: { default: 1 },
         colwidth: { default: null },
-      },
+      }),
+    },
+    callout: {
+      content: "block+",
+      group: "block",
+      attrs: blockAttrs({ variant: { default: "info" } }),
+    },
+    columns: {
+      content: "column{2,4}",
+      group: "block",
+      attrs: blockAttrs(),
+    },
+    column: { content: "block+", attrs: blockAttrs() },
+    formula: {
+      content: "text*",
+      group: "block",
+      code: true,
+      attrs: blockAttrs(),
     },
   },
   marks: {
@@ -90,7 +133,7 @@ export const richTextSchema = new Schema({
   },
 });
 
-export const projectionTruth = {
+const projectionTruthWithoutBlockIds = {
   type: "doc",
   content: [
     {
@@ -204,6 +247,46 @@ export const projectionTruth = {
       attrs: { language: "rust" },
       content: [{ type: "text", text: "fn main() {}" }],
     },
+    {
+      type: "callout",
+      attrs: { variant: "warning" },
+      content: [
+        {
+          type: "paragraph",
+          attrs: { textAlign: "left" },
+          content: [{ type: "text", text: "Notice" }],
+        },
+      ],
+    },
+    {
+      type: "columns",
+      content: [
+        {
+          type: "column",
+          content: [
+            {
+              type: "paragraph",
+              attrs: { textAlign: "left" },
+              content: [{ type: "text", text: "Left column" }],
+            },
+          ],
+        },
+        {
+          type: "column",
+          content: [
+            {
+              type: "paragraph",
+              attrs: { textAlign: "left" },
+              content: [{ type: "text", text: "Right column" }],
+            },
+          ],
+        },
+      ],
+    },
+    {
+      type: "formula",
+      content: [{ type: "text", text: "x^2 + y^2" }],
+    },
     { type: "horizontalRule" },
     {
       type: "image",
@@ -268,6 +351,29 @@ export const projectionTruth = {
   ],
 };
 
+function addStableBlockIds(value) {
+  let next = 1;
+  const visit = (node) => {
+    const result = {
+      ...node,
+      ...(node.content ? { content: node.content.map(visit) } : {}),
+    };
+    if (!STABLE_BLOCK_TYPES.has(node.type)) return result;
+    return {
+      ...result,
+      attrs: {
+        ...node.attrs,
+        blockId: `fixture-block-${next++}`,
+      },
+    };
+  };
+  return visit(value);
+}
+
+export const projectionTruth = addStableBlockIds(
+  projectionTruthWithoutBlockIds,
+);
+
 export const plainTextTruth = [
   "Bold Italic Strike Underline Link\nCode",
   "Heading",
@@ -277,6 +383,10 @@ export const plainTextTruth = [
   "Done task",
   "Quote",
   "fn main() {}",
+  "Notice",
+  "Left column",
+  "Right column",
+  "x^2 + y^2",
   "Header",
   "Left",
   "Right",

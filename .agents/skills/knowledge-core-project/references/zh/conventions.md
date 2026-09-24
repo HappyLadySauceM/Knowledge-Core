@@ -22,7 +22,11 @@ Go 构造函数校验必需依赖并返回 `(T, error)`。错误补充操作上�
 
 受信任的后端 Attachment publication-reference 与 Platform consumer RPC 使用 service-mesh mTLS 边界。不要再添加应用 service token；需要用户上下文的方法仍保留 access-token metadata 和管理员 JWT 校验。
 
-<!-- fact:conventions.code-style status:verified sources:AGENTS.md, docs/trace-architecture.md#4-噪音过滤, user-confirmed, user-confirmed-internal-rpc-auth-boundary, user-confirmed-schema-v2-rerecord -->
+## Collaboration 富文本与遥测
+
+Collaboration 在提交或广播 Yjs 更新前校验白名单块节点上的 Web StableBlockId `blockId` 元数据；值必须是字符串，去除首尾空白后长度为 1..=128 字节。非法更新继续保留有界的 `richtext-invalid` 与 `invalid-update` 指标。awareness 拒绝日志保持低基数，不记录文档 ID、连接 ID 或客户端 ID 列表。
+
+<!-- fact:conventions.code-style status:verified sources:AGENTS.md, docs/trace-architecture.md#4-噪音过滤, services/collaboration/src/richtext.rs and services/collaboration/src/actor.rs, user-confirmed, user-confirmed-internal-rpc-auth-boundary, user-confirmed-schema-v2-rerecord -->
 
 ## 4. 仓库模块
 

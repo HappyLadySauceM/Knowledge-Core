@@ -42,6 +42,32 @@ const ALLOWED_NODES: &[&str] = &[
 
 const ALLOWED_MARKS: &[&str] = &["bold", "italic", "strike", "underline", "code", "link"];
 
+// Keep this list aligned with the Web editor's StableBlockId extension. These
+// IDs are editor metadata used by history diffing, not user-authored marks or
+// text attributes.
+const BLOCK_ID_NODES: &[&str] = &[
+    "paragraph",
+    "heading",
+    "bulletList",
+    "orderedList",
+    "listItem",
+    "taskList",
+    "taskItem",
+    "blockquote",
+    "codeBlock",
+    "horizontalRule",
+    "image",
+    "attachment",
+    "table",
+    "tableRow",
+    "tableHeader",
+    "tableCell",
+    "callout",
+    "columns",
+    "column",
+    "formula",
+];
+
 const BLOCK_NODES: &[&str] = &[
     "paragraph",
     "heading",
@@ -733,19 +759,41 @@ fn validate_attributes(node_type: &str, value: &Value) -> Result<()> {
         .as_object()
         .ok_or_else(|| ServiceError::invalid_input("content contains unsupported attributes"))?;
     let allowed = allowed_attributes(node_type);
-    if attributes
-        .keys()
-        .any(|key| !allowed.contains(&key.as_str()))
-    {
+    if attributes.keys().any(|key| {
+        !(allowed.contains(&key.as_str())
+            || key == "blockId" && BLOCK_ID_NODES.contains(&node_type))
+    }) {
         return Err(ServiceError::invalid_input(
             "content contains unsupported attributes",
         ));
     }
+    validate_block_id(node_type, attributes)?;
     validate_required_attributes(node_type, Some(attributes))?;
     validate_list_and_heading_attributes(attributes)?;
     validate_text_attributes(attributes)?;
     validate_reference_attributes(attributes)?;
     validate_table_attributes(attributes)
+}
+
+fn validate_block_id(node_type: &str, attributes: &Map<String, Value>) -> Result<()> {
+    let Some(value) = attributes.get("blockId") else {
+        return Ok(());
+    };
+    if !BLOCK_ID_NODES.contains(&node_type) {
+        return Err(ServiceError::invalid_input(
+            "blockId is only valid on block nodes",
+        ));
+    }
+    let value = value
+        .as_str()
+        .ok_or_else(|| ServiceError::invalid_input("blockId must be a string"))?;
+    let trimmed = value.trim();
+    if trimmed.is_empty() || trimmed.len() > 128 {
+        return Err(ServiceError::invalid_input(
+            "blockId must be between 1 and 128 bytes after trimming",
+        ));
+    }
+    Ok(())
 }
 
 fn validate_list_and_heading_attributes(attributes: &Map<String, Value>) -> Result<()> {
@@ -958,8 +1006,8 @@ mod tests {
     use yrs::{Doc, Transact, XmlElementPrelim, XmlFragment};
 
     use super::{
-        MAX_DEPTH, canonical_json_number, initial_state, projection_from_document,
-        projection_from_state, validate_rich_text,
+        BLOCK_ID_NODES, MAX_DEPTH, canonical_json_number, initial_state, projection_from_document,
+        projection_from_state, validate_attributes, validate_rich_text,
     };
 
     #[test]
@@ -1063,6 +1111,79 @@ mod tests {
         });
 
         validate_rich_text(&document).expect("complete supported schema must be valid");
+    }
+
+    #[test]
+    fn block_ids_are_bounded_and_scoped_to_stable_block_nodes() {
+        for &node_type in BLOCK_ID_NODES {
+            let mut attributes = serde_json::Map::from_iter([(
+                "blockId".to_owned(),
+                serde_json::json!("stable-id"),
+            )]);
+            match node_type {
+                "heading" => {
+                    attributes.insert("level".to_owned(), serde_json::json!(1));
+                }
+                "taskItem" => {
+                    attributes.insert("checked".to_owned(), serde_json::json!(false));
+                }
+                "image" | "attachment" => {
+                    attributes.insert(
+                        "attachmentId".to_owned(),
+                        serde_json::json!("01890f47-76a8-7b1c-b4db-1d9d3906f73b"),
+                    );
+                }
+                _ => {}
+            }
+            validate_attributes(node_type, &serde_json::Value::Object(attributes))
+                .unwrap_or_else(|error| panic!("{node_type} should accept blockId: {error}"));
+        }
+
+        let valid = serde_json::json!({
+            "type": "doc",
+            "content": [{
+                "type": "paragraph",
+                "attrs": {"blockId": "  block-1  "}
+            }]
+        });
+        validate_rich_text(&valid).expect("trimmed block ID should be accepted");
+
+        let too_long = "x".repeat(129);
+        let invalid_documents = [
+            serde_json::json!({"type":"doc","content":[
+                {"type":"paragraph","attrs":{"blockId":""}}
+            ]}),
+            serde_json::json!({"type":"doc","content":[
+                {"type":"paragraph","attrs":{"blockId":"   "}}
+            ]}),
+            serde_json::json!({"type":"doc","content":[
+                {"type":"paragraph","attrs":{"blockId":too_long}}
+            ]}),
+            serde_json::json!({"type":"doc","content":[
+                {"type":"paragraph","attrs":{"blockId":true}}
+            ]}),
+            serde_json::json!({"type":"doc","content":[
+                {"type":"paragraph","content":[
+                    {"type":"text","text":"x","marks":[
+                        {"type":"bold","attrs":{"blockId":"mark-id"}}
+                    ]}
+                ]}
+            ]}),
+            serde_json::json!({"type":"doc","content":[
+                {"type":"text","text":"x","attrs":{"blockId":"text-id"}}
+            ]}),
+            serde_json::json!({"type":"doc","content":[
+                {"type":"hardBreak","attrs":{"blockId":"inline-id"}}
+            ]}),
+            serde_json::json!({"type":"doc","content":[
+                {"type":"unsupported","attrs":{"blockId":"unsupported-id"}}
+            ]}),
+        ];
+
+        for document in invalid_documents {
+            let error = validate_rich_text(&document).expect_err("invalid block ID");
+            assert_eq!(error.key(), "collaboration.invalid_input");
+        }
     }
 
     #[test]

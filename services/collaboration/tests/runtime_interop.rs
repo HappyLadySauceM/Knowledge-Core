@@ -27,6 +27,25 @@ fn official_yprosemirror_update_v1_projects_complete_schema_through_yrs() {
 }
 
 #[test]
+fn official_yjs_update_with_block_ids_passes_candidate_validation() {
+    let fixture = parse_fixture(YJS_FIXTURE);
+    let update = decode_state(&fixture);
+    let candidate =
+        richtext::candidate_from_update(&richtext::initial_state(), &update, 1 << 20, 16 << 20)
+            .expect("Yjs update with block IDs should be accepted");
+    let Some((_, projection)) = candidate else {
+        panic!("fixture update should advance the initial document");
+    };
+    assert!(
+        projection.content["content"]
+            .as_array()
+            .is_some_and(|nodes| nodes
+                .iter()
+                .any(|node| { node["attrs"]["blockId"].as_str().is_some() }))
+    );
+}
+
+#[test]
 fn yrs_reencoding_preserves_yprosemirror_projection_truth() {
     let fixture = parse_fixture(YJS_FIXTURE);
     let state = decode_state(&fixture);

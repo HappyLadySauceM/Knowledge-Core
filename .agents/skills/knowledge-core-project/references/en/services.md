@@ -54,7 +54,7 @@ Clients enter through Gateway HTTP or Collaboration WebSocket. Gateway calls Ide
 - **doesNotOwn**: Document permission rules or user credentials
 - **language**: Rust
 - **ports**: {"admin":8084,"rpc":8883,"websocket":8091}
-- **role**: Realtime Yjs draft persistence, publication snapshot capture, document purge, and multi-instance sync
+- **role**: Realtime Yjs draft persistence, publication snapshot capture, document purge, and multi-instance sync; allowlisted Web StableBlockId blockId metadata is validated before commit and broadcast
 
 ### Platform
 
@@ -67,7 +67,7 @@ Clients enter through Gateway HTTP or Collaboration WebSocket. Gateway calls Ide
 - **role**: Admin-writable site, email, and AI configuration
 
 
-<!-- fact:services.catalog status:verified sources:filesystem:service-definitions, idl/rpc/v1, identity-maddy-smtp-probe, idl/rpc/v1 and architecture-design.md, user-confirmed -->
+<!-- fact:services.catalog status:verified sources:filesystem:service-definitions, idl/rpc/v1, identity-maddy-smtp-probe, services/collaboration/src/richtext.rs and services/collaboration/tests/runtime_interop.rs, idl/rpc/v1 and architecture-design.md, user-confirmed -->
 
 ## Appendix
 

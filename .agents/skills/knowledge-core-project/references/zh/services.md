@@ -54,7 +54,7 @@
 - **doesNotOwn**：文档权限规则或用户凭据
 - **language**：Rust
 - **ports**：{"admin":8084,"rpc":8883,"websocket":8091}
-- **role**：实时 Yjs 草稿持久化、发布快照捕获、文档清理与多实例同步
+- **role**：实时 Yjs 草稿持久化、发布快照捕获、文档清理与多实例同步；在提交和广播前校验白名单中的 Web StableBlockId `blockId` 元数据
 
 ### Platform
 
@@ -66,7 +66,7 @@
 - **ports**：{"admin":8086,"rpc":8885}
 - **role**：管理员可写的站点、邮件与 AI 配置
 
-<!-- fact:services.catalog status:verified sources:filesystem:service-definitions, idl/rpc/v1, identity-maddy-smtp-probe, idl/rpc/v1 and architecture-design.md, user-confirmed -->
+<!-- fact:services.catalog status:verified sources:filesystem:service-definitions, idl/rpc/v1, identity-maddy-smtp-probe, services/collaboration/src/richtext.rs and services/collaboration/tests/runtime_interop.rs, idl/rpc/v1 and architecture-design.md, user-confirmed -->
 
 ## 附录
 

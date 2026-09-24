@@ -449,7 +449,7 @@
     },
     {
       "id": "conventions.code-style",
-      "revision": 175,
+      "revision": 196,
       "section": "conventions",
       "sources": [
         {
@@ -459,6 +459,10 @@
         {
           "kind": "documented",
           "reference": "docs/trace-architecture.md#4-\u566a\u97f3\u8fc7\u6ee4"
+        },
+        {
+          "kind": "observed",
+          "reference": "services/collaboration/src/richtext.rs and services/collaboration/src/actor.rs"
         },
         {
           "kind": "user",
@@ -474,8 +478,8 @@
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-09-10T06:56:39Z",
-      "value": "## Errors\n\nGo constructors validate required dependencies and return `(T, error)`. Errors add operation context, keep the cause with `%w`, and use `errors.Is` / `errors.As`. Cross-boundary errors use `pkg/error` code/key/kind. Do not use `Must*`, panic for business failure, or `os.Exit` outside the process entrypoint. Gateway reconstructs public RFC 9457 problems from upstream Kitex BizStatus code, key, kind, and catalog message; it must not rewrite `KindInternal` as unavailable. Transport failures without BizStatus remain `gateway.dependency_unavailable` (503) or `gateway.upstream_timeout` (504). Invalid extras map to `gateway.invalid_upstream_response` (502).\n\n## Logging and telemetry\n\nPropagate `context.Context`, deadlines, request IDs, and W3C trace end to end. Metric labels and span attributes stay on route templates, RPC methods, status codes, stable business codes, and dependency names. Knowledge and Attachment worker empty-claim probes use `trace.Suppress` so idle SQL does not export orphan roots; claimed work uses a short unsuppressed span. GetConsumerState treats a missing namespace as DesiredRevision=0 idle state, not NotFound.\n\n## Tests\n\nTests stay close to implementation and cover success, edges, dependency failure, error mapping, cleanup/rollback, and deterministic concurrent behavior. Rust requires rustfmt, clippy `-D warnings`, and cargo deny.\n\n## Secrets and layout\n\nRepository text uses LF except `.bat` / `.cmd`. Module and directory ownership lives in `conventions.code-layout`, not architecture.\n\n## Internal RPC authentication\n\nUse the service-mesh mTLS boundary for trusted backend-only Attachment publication-reference and Platform consumer RPCs. Do not add a second application service token; preserve access-token metadata and administrator JWT checks for methods that require user context.\n"
+      "updatedAt": "2026-09-24T09:01:56Z",
+      "value": "## Errors\n\nGo constructors validate required dependencies and return `(T, error)`. Errors add operation context, keep the cause with `%w`, and use `errors.Is` / `errors.As`. Cross-boundary errors use `pkg/error` code/key/kind. Do not use `Must*`, panic for business failure, or `os.Exit` outside the process entrypoint. Gateway reconstructs public RFC 9457 problems from upstream Kitex BizStatus code, key, kind, and catalog message; it must not rewrite `KindInternal` as unavailable. Transport failures without BizStatus remain `gateway.dependency_unavailable` (503) or `gateway.upstream_timeout` (504). Invalid extras map to `gateway.invalid_upstream_response` (502).\n\n## Logging and telemetry\n\nPropagate `context.Context`, deadlines, request IDs, and W3C trace end to end. Metric labels and span attributes stay on route templates, RPC methods, status codes, stable business codes, and dependency names. Knowledge and Attachment worker empty-claim probes use `trace.Suppress` so idle SQL does not export orphan roots; claimed work uses a short unsuppressed span. GetConsumerState treats a missing namespace as DesiredRevision=0 idle state, not NotFound.\n\n## Tests\n\nTests stay close to implementation and cover success, edges, dependency failure, error mapping, cleanup/rollback, and deterministic concurrent behavior. Rust requires rustfmt, clippy `-D warnings`, and cargo deny.\n\n## Secrets and layout\n\nRepository text uses LF except `.bat` / `.cmd`. Module and directory ownership lives in `conventions.code-layout`, not architecture.\n\n## Internal RPC authentication\n\nUse the service-mesh mTLS boundary for trusted backend-only Attachment publication-reference and Platform consumer RPCs. Do not add a second application service token; preserve access-token metadata and administrator JWT checks for methods that require user context.\n\n## Collaboration rich-text and telemetry\n\nCollaboration validates Web StableBlockId `blockId` metadata on the allowlisted block nodes before committing or broadcasting a Yjs update; values are strings whose trimmed length is 1..=128 bytes. Invalid updates preserve bounded `richtext-invalid` and `invalid-update` metrics. Awareness rejection logs remain low-cardinality and omit document IDs, connection IDs, and client ID lists."
     },
     {
       "id": "documents.managed",
@@ -783,7 +787,7 @@
     },
     {
       "id": "services.catalog",
-      "revision": 192,
+      "revision": 196,
       "section": "services",
       "sources": [
         {
@@ -800,6 +804,10 @@
           "reference": "identity-maddy-smtp-probe"
         },
         {
+          "kind": "observed",
+          "reference": "services/collaboration/src/richtext.rs and services/collaboration/tests/runtime_interop.rs"
+        },
+        {
           "kind": "user",
           "reference": "idl/rpc/v1 and architecture-design.md"
         },
@@ -809,7 +817,7 @@
         }
       ],
       "status": "verified",
-      "updatedAt": "2026-09-23T08:28:15Z",
+      "updatedAt": "2026-09-24T09:01:56Z",
       "value": [
         {
           "apis": [
@@ -919,7 +927,7 @@
             "rpc": 8883,
             "websocket": 8091
           },
-          "role": "Realtime Yjs draft persistence, publication snapshot capture, document purge, and multi-instance sync"
+          "role": "Realtime Yjs draft persistence, publication snapshot capture, document purge, and multi-instance sync; allowlisted Web StableBlockId blockId metadata is validated before commit and broadcast"
         },
         {
           "apis": [
@@ -1130,11 +1138,11 @@
     "profile": "generic",
     "slug": "knowledge-core"
   },
-  "revision": 194,
+  "revision": 196,
   "scan": {
-    "fingerprint": "a0edd993f3b99dd10b182a4c47ca8d54158c93b0dd41c9d395a290f261d0f809",
+    "fingerprint": "1b75df07ba6cba07a543d2438d15dd01f2680e193309c9fb5e6feeef261d0e27",
     "inventoryCount": 480
   },
   "schemaVersion": 3,
-  "updatedAt": "2026-09-23T09:31:07Z"
+  "updatedAt": "2026-09-24T09:01:56Z"
 }
